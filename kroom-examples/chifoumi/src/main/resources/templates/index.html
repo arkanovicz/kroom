@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="$lang">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chifoumi Arena</title>
+    <link rel="stylesheet" href="/lib/pico/pico.min.css">
+    <link rel="stylesheet" href="/css/chifoumi.css">
+</head>
+<body>
+    <header class="container">
+        <nav>
+            <ul>
+                <li><strong>Chifoumi Arena</strong></li>
+            </ul>
+            <ul>
+                <li>
+                    <select id="lang-select" onchange="switchLang(this.value)">
+                        #foreach($entry in $languages.entrySet())
+                        <option value="$entry.key" #if($entry.key == $lang)selected#end>$entry.value</option>
+                        #end
+                    </select>
+                </li>
+                <li id="online-count">
+                    <span class="online-dot"></span>
+                    <span id="online-num">0</span> online
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Login section -->
+        <section id="login-section">
+            <article>
+                <header>
+                    <h2>Welcome to Chifoumi Arena!</h2>
+                </header>
+                <p>Rock, Paper, Scissors, Well - the French variant with an extra move.</p>
+                <p>Enter your name to start playing:</p>
+                <form id="login-form">
+                    <fieldset role="group">
+                        <input type="text" id="player-name" placeholder="Your name" maxlength="20" required>
+                        <button type="submit">Play</button>
+                    </fieldset>
+                </form>
+
+                <details>
+                    <summary>How to play</summary>
+                    <div class="rules">
+                        <p>Classic Rock-Paper-Scissors, plus the Well:</p>
+                        <ul>
+                            <li><span class="move">🪨 Rock</span> beats <span class="move">✂️ Scissors</span></li>
+                            <li><span class="move">✂️ Scissors</span> beats <span class="move">📄 Paper</span></li>
+                            <li><span class="move">📄 Paper</span> beats <span class="move">🪨 Rock</span> and <span class="move">🕳️ Well</span></li>
+                            <li><span class="move">🕳️ Well</span> beats <span class="move">🪨 Rock</span> and <span class="move">✂️ Scissors</span></li>
+                        </ul>
+                        <p>Paper is the only counter to the powerful Well!</p>
+                    </div>
+                </details>
+            </article>
+        </section>
+
+        <!-- Lobby section (after login) -->
+        <section id="lobby-section" style="display: none;">
+            <div class="grid">
+                <article>
+                    <header>
+                        <h3>Ready to play, <span id="player-display"></span>?</h3>
+                    </header>
+                    <div id="queue-status">
+                        <button id="find-match-btn" class="primary">Find Match</button>
+                    </div>
+                    <div id="searching" style="display: none;">
+                        <p aria-busy="true">Searching for opponent...</p>
+                        <button id="cancel-search-btn" class="secondary">Cancel</button>
+                    </div>
+                </article>
+
+                <article>
+                    <header>
+                        <h3>Live Activity</h3>
+                    </header>
+                    <ul id="activity-feed" class="activity-list">
+                        <li class="empty">Waiting for activity...</li>
+                    </ul>
+                </article>
+            </div>
+
+            <article>
+                <header>
+                    <h3>Stats</h3>
+                </header>
+                <div class="grid stats-grid">
+                    <div>
+                        <strong id="stat-matches">0</strong>
+                        <small>Matches played</small>
+                    </div>
+                    <div>
+                        <strong id="stat-rock">0</strong>
+                        <small>🪨 Rock</small>
+                    </div>
+                    <div>
+                        <strong id="stat-paper">0</strong>
+                        <small>📄 Paper</small>
+                    </div>
+                    <div>
+                        <strong id="stat-scissors">0</strong>
+                        <small>✂️ Scissors</small>
+                    </div>
+                    <div>
+                        <strong id="stat-well">0</strong>
+                        <small>🕳️ Well</small>
+                    </div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <footer class="container">
+        <small>Built with <a href="https://github.com/republicate/kroom">Kroom</a> - Ktor + SSE</small>
+    </footer>
+
+    <script src="/js/domhelper.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/sse.js"></script>
+    <script src="/js/chifoumi.js"></script>
+</body>
+</html>

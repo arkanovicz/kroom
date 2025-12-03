@@ -1,0 +1,137 @@
+# French translations for Chifoumi Arena
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Chifoumi Arena"
+msgstr "Arène Chifoumi"
+
+msgid "Welcome to Chifoumi Arena!"
+msgstr "Bienvenue dans l'Arène Chifoumi !"
+
+msgid "Rock, Paper, Scissors, Well - the French variant with an extra move."
+msgstr "Pierre, Feuille, Ciseaux, Puits - la variante avec un coup supplémentaire."
+
+msgid "Enter your name to start playing:"
+msgstr "Entrez votre nom pour commencer à jouer :"
+
+msgid "Your name"
+msgstr "Votre nom"
+
+msgid "Play"
+msgstr "Jouer"
+
+msgid "How to play"
+msgstr "Comment jouer"
+
+msgid "Classic Rock-Paper-Scissors, plus the Well:"
+msgstr "Pierre-Feuille-Ciseaux classique, plus le Puits :"
+
+msgid "Rock"
+msgstr "Pierre"
+
+msgid "Paper"
+msgstr "Feuille"
+
+msgid "Scissors"
+msgstr "Ciseaux"
+
+msgid "Well"
+msgstr "Puits"
+
+msgid "beats"
+msgstr "bat"
+
+msgid "and"
+msgstr "et"
+
+msgid "Paper is the only counter to the powerful Well!"
+msgstr "La Feuille est le seul contre au puissant Puits !"
+
+msgid "Ready to play,"
+msgstr "Prêt à jouer,"
+
+msgid "Find Match"
+msgstr "Trouver un match"
+
+msgid "Searching for opponent..."
+msgstr "Recherche d'un adversaire..."
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Live Activity"
+msgstr "Activité en direct"
+
+msgid "Waiting for activity..."
+msgstr "En attente d'activité..."
+
+msgid "Stats"
+msgstr "Statistiques"
+
+msgid "Matches played"
+msgstr "Matchs joués"
+
+msgid "online"
+msgstr "en ligne"
+
+msgid "Round"
+msgstr "Manche"
+
+msgid "VS"
+msgstr "VS"
+
+msgid "Choose your move!"
+msgstr "Choisissez votre coup !"
+
+msgid "Waiting for opponent..."
+msgstr "En attente de l'adversaire..."
+
+msgid "You"
+msgstr "Vous"
+
+msgid "Opponent"
+msgstr "Adversaire"
+
+msgid "Draw!"
+msgstr "Égalité !"
+
+msgid "You win this round!"
+msgstr "Vous gagnez cette manche !"
+
+msgid "You lose this round!"
+msgstr "Vous perdez cette manche !"
+
+msgid "Match Over!"
+msgstr "Fin du match !"
+
+msgid "Victory!"
+msgstr "Victoire !"
+
+msgid "Defeat"
+msgstr "Défaite"
+
+msgid "Better luck next time!"
+msgstr "Plus de chance la prochaine fois !"
+
+msgid "Play Again"
+msgstr "Rejouer"
+
+msgid "Back to Lobby"
+msgstr "Retour au salon"
+
+msgid "joined"
+msgstr "a rejoint"
+
+msgid "left"
+msgstr "est parti"
+
+msgid "started"
+msgstr "a commencé"
+
+msgid "beat"
+msgstr "a battu"
+
+msgid "Built with"
+msgstr "Construit avec"

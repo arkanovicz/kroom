@@ -1,0 +1,275 @@
+/* Chifoumi Arena styles */
+
+:root {
+    --move-size: 80px;
+    --move-size-lg: 120px;
+}
+
+/* Online indicator */
+.online-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #2ecc71;
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Rules section */
+.rules .move {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* Activity feed */
+.activity-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.activity-list li {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--pico-muted-border-color);
+    font-size: 0.9rem;
+}
+
+.activity-list li.empty {
+    color: var(--pico-muted-color);
+    font-style: italic;
+}
+
+.activity-list .time {
+    color: var(--pico-muted-color);
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+/* Stats grid */
+.stats-grid {
+    text-align: center;
+}
+
+.stats-grid > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.stats-grid strong {
+    font-size: 1.5rem;
+}
+
+.stats-grid small {
+    color: var(--pico-muted-color);
+}
+
+/* Game area */
+#game-area {
+    text-align: center;
+}
+
+/* Score board */
+.score-board {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.player-name {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.player-score {
+    font-size: 3rem;
+    font-weight: bold;
+}
+
+.player-1 .player-score {
+    color: var(--pico-primary);
+}
+
+.player-2 .player-score {
+    color: var(--pico-secondary);
+}
+
+.vs {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--pico-muted-color);
+}
+
+/* Game messages */
+.game-message {
+    font-size: 1.25rem;
+    margin-bottom: 2rem;
+    min-height: 2rem;
+}
+
+/* Move buttons */
+.move-buttons {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.move-btn {
+    width: var(--move-size);
+    height: var(--move-size);
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.move-btn .emoji {
+    font-size: 2rem;
+}
+
+.move-btn .label {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.move-btn:hover:not(:disabled) {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.move-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.move-btn.selected {
+    background: var(--pico-primary);
+    color: white;
+}
+
+/* Round result */
+.round-result {
+    margin: 2rem 0;
+}
+
+.moves-reveal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.revealed-move {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.revealed-move .emoji {
+    font-size: 4rem;
+    animation: revealMove 0.5s ease-out;
+}
+
+.revealed-move .label {
+    margin-top: 0.5rem;
+    font-weight: bold;
+}
+
+@keyframes revealMove {
+    from {
+        transform: scale(0) rotate(-180deg);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) rotate(0);
+        opacity: 1;
+    }
+}
+
+.result-indicator {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.result-indicator.win {
+    color: #2ecc71;
+}
+
+.result-indicator.lose {
+    color: #e74c3c;
+}
+
+.result-indicator.draw {
+    color: #f39c12;
+}
+
+/* Match result */
+.match-result {
+    padding: 2rem;
+}
+
+.match-result h2 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.match-result.winner h2 {
+    color: #2ecc71;
+}
+
+.match-result.loser h2 {
+    color: #e74c3c;
+}
+
+/* Responsive */
+@media (min-width: 768px) {
+    .move-btn {
+        width: var(--move-size-lg);
+        height: var(--move-size-lg);
+    }
+
+    .move-btn .emoji {
+        font-size: 3rem;
+    }
+
+    .move-btn .label {
+        font-size: 0.9rem;
+    }
+}
+
+/* Waiting animation */
+.waiting {
+    position: relative;
+}
+
+.waiting::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
