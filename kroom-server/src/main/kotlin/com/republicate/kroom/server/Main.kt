@@ -9,7 +9,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
-import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("kroom.main")
@@ -46,11 +45,11 @@ fun Application.configureRouting() {
             }
 
             val room = RoomManager.getOrCreateRoom(roomName)
-            val user = User(login)
+            val actor = Actor(login, login)
 
             logger.info("User '$login' connecting to room '$roomName'")
 
-            val channel = room.joinRoom(user)
+            val channel = room.join(actor)
 
             try {
                 // Read events from the channel and send them to the client
@@ -60,7 +59,7 @@ fun Application.configureRouting() {
             } catch (e: Exception) {
                 logger.debug("SSE connection ended for user '$login' in room '$roomName'", e)
             } finally {
-                room.leaveRoom(user, channel)
+                room.leave(actor)
             }
         }
 
@@ -130,7 +129,7 @@ fun Application.configureRouting() {
                     return@post
                 }
 
-                room.chat(from, text)
+                room.sendChat(from, text)
                 call.respondText("""{"success":true}""", ContentType.Application.Json)
             }
         }
@@ -377,9 +376,21 @@ private val playgroundHtml = """
 
             eventSource = new EventSource(`/events/${"$"}{room}?login=${"$"}{encodeURIComponent(username)}`);
 
-            eventSource.addEventListener('connected', (e) => {
+            eventSource.addEventListener('state', (e) => {
                 const data = JSON.parse(e.data);
-                updateUsersList(data.users);
+                if (data.actors) {
+                    updateUsersList(data.actors.map(a => a.name));
+                }
+                if (data.history) {
+                    data.history.forEach(msg => {
+                        addMessage(msg.from || 'System', msg.text);
+                    });
+                }
+            });
+
+            eventSource.addEventListener('actors', (e) => {
+                const data = JSON.parse(e.data);
+                updateUsersList(data.actors.map(a => a.name));
             });
 
             eventSource.addEventListener('chat', (e) => {
@@ -388,8 +399,12 @@ private val playgroundHtml = """
             });
 
             eventSource.addEventListener('error', (e) => {
-                const data = JSON.parse(e.data);
-                addMessage(null, 'Error: ' + data.error, true);
+                try {
+                    const data = JSON.parse(e.data);
+                    addMessage(null, 'Error: ' + data.error, true);
+                } catch (_) {
+                    // Not JSON error event
+                }
             });
 
             eventSource.onopen = () => {

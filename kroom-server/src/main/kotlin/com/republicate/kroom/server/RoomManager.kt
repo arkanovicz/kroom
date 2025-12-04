@@ -4,33 +4,27 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Manages room lifecycle and provides access to rooms
+ * Manages chat room lifecycle - for backward compatibility
+ * For generic rooms, use Lobby directly
  */
 object RoomManager {
     private val logger = LoggerFactory.getLogger("kroom.manager")
-    private val rooms = ConcurrentHashMap<String, Room>()
+    private val rooms = ConcurrentHashMap<String, ChatRoom>()
 
     /**
-     * Global lobby room - always exists
+     * Get or create a chat room
      */
-    val lobby: Room by lazy {
-        getOrCreateRoom("global")
-    }
-
-    /**
-     * Get or create a room
-     */
-    fun getOrCreateRoom(name: String): Room {
+    fun getOrCreateRoom(name: String): ChatRoom {
         return rooms.computeIfAbsent(name) {
             logger.info("Creating room '$name'")
-            Room(name)
+            ChatRoom(name)
         }
     }
 
     /**
      * Get a room if it exists
      */
-    fun getRoom(name: String): Room? = rooms[name]
+    fun getRoom(name: String): ChatRoom? = rooms[name]
 
     /**
      * Remove a room
@@ -52,7 +46,7 @@ object RoomManager {
      */
     fun getRoomInfo(name: String): RoomInfo? {
         return rooms[name]?.let { room ->
-            RoomInfo(name, room.userCount.value, room.getUsers())
+            RoomInfo(name, room.actorCount.value, room.getActors().map { it.name })
         }
     }
 
@@ -61,7 +55,7 @@ object RoomManager {
      */
     fun getAllRoomInfo(): List<RoomInfo> {
         return rooms.map { (name, room) ->
-            RoomInfo(name, room.userCount.value, room.getUsers())
+            RoomInfo(name, room.actorCount.value, room.getActors().map { it.name })
         }
     }
 
@@ -79,4 +73,12 @@ object RoomManager {
         val userCount: Int,
         val users: List<String>
     )
+}
+
+/**
+ * @deprecated Use Actor instead
+ */
+@Deprecated("Use Actor instead", ReplaceWith("Actor(login, login)"))
+data class User(val login: String) {
+    fun toActor(): Actor = Actor(login, login)
 }

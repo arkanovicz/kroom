@@ -1,331 +1,339 @@
 package com.republicate.kroom.server
 
+import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import org.slf4j.LoggerFactory
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Base Room class for SSE-based real-time communication
- * Inspired by decoinche's Room architecture but adapted for Ktor and Kotlin coroutines
+ * Base Room class for SSE-based real-time communication with generic state
+ *
+ * @param S The type of room state
+ * @param id Unique room identifier
  */
-open class Room(val name: String) {
-    private val logger = LoggerFactory.getLogger("kroom.room")
+abstract class Room<S : Any>(val id: String) {
+    protected val logger = LoggerFactory.getLogger("kroom.room")
 
-    // Users currently in this room
-    private val users = ConcurrentHashMap<String, User>()
+    /**
+     * Room state - must be initialized by subclass
+     */
+    abstract var state: S
 
-    // User event channels - each user session gets its own channel to receive events
-    private data class UserSession(val id: String, val channel: Channel<ServerSentEvent>)
-    private val userSessions = ConcurrentHashMap<String, MutableSet<UserSession>>()
+    // Actors (active participants)
+    protected val actors = ConcurrentHashMap<String, Actor>()
 
-    // Message queue for async event processing
+    // Spectators (observers)
+    protected val spectators = ConcurrentHashMap<String, Spectator>()
+
+    // Event queue for async processing
     private val eventQueue = Channel<Event>(Channel.UNLIMITED)
 
-    // Message ID counter for event sequencing
+    // Message ID counter
     private val messageId = AtomicLong(1)
 
-    // Last event time for keep-alive
+    // Keep-alive tracking
     private var lastEventTime = System.currentTimeMillis()
-
-    // Event processing job
     private var processingJob: Job? = null
 
-    // Room scope for coroutines
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    // Coroutine scope
+    protected val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // Chat history (circular buffer concept)
-    private val chatHistory = mutableListOf<ChatMessage>()
-    private val maxChatHistory = 50
+    // Participant counts
+    private val _actorCount = MutableStateFlow(0)
+    val actorCount: StateFlow<Int> = _actorCount.asStateFlow()
 
-    // Connected users count
-    private val _userCount = MutableStateFlow(0)
-    val userCount: StateFlow<Int> = _userCount.asStateFlow()
+    private val _spectatorCount = MutableStateFlow(0)
+    val spectatorCount: StateFlow<Int> = _spectatorCount.asStateFlow()
 
     companion object {
-        private const val KEEPALIVE_DELAY = 2000L // 2 seconds
+        const val KEEPALIVE_DELAY = 15_000L  // 15 seconds
     }
 
     init {
         start()
     }
 
-    /**
-     * Start the event processing loop
-     */
     private fun start() {
         processingJob = scope.launch {
-            logger.info("Room '$name' event loop started")
+            logger.info("Room '$id' started")
             while (isActive) {
                 try {
-                    // Try to receive an event with timeout
                     val event = withTimeoutOrNull(KEEPALIVE_DELAY) {
                         eventQueue.receive()
                     }
-
                     if (event != null) {
                         processEvent(event)
                         lastEventTime = System.currentTimeMillis()
                     } else {
-                        // Timeout - send keep-alive
-                        val now = System.currentTimeMillis()
-                        if (now - lastEventTime >= KEEPALIVE_DELAY) {
-                            keepAlive()
-                        }
+                        keepAlive()
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    logger.error("Error processing event in room '$name'", e)
+                    logger.error("Error in room '$id'", e)
                 }
             }
-            logger.info("Room '$name' event loop stopped")
+            logger.info("Room '$id' stopped")
         }
     }
 
     /**
-     * Stop the room and cleanup resources
+     * Stop room and cleanup
      */
     fun stop() {
         processingJob?.cancel()
         scope.cancel()
-        userSessions.clear()
-        users.clear()
-        logger.info("Room '$name' stopped")
+        actors.values.forEach { it.disconnect() }
+        spectators.values.forEach { it.disconnect() }
+        actors.clear()
+        spectators.clear()
+        logger.info("Room '$id' stopped")
     }
 
     /**
-     * User joins the room - returns a channel that will receive events for this session
+     * Actor joins the room
      */
-    suspend fun joinRoom(user: User): Channel<ServerSentEvent> {
-        val login = user.login
-        users.putIfAbsent(login, user)
-
-        val sessionId = "${System.currentTimeMillis()}-${(0..999).random()}"
+    suspend fun join(actor: Actor): Channel<ServerSentEvent> {
         val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
-        val session = UserSession(sessionId, channel)
+        actor.channel = channel
 
-        userSessions.compute(login) { _, sessions ->
-            val set = sessions ?: ConcurrentHashMap.newKeySet()
-            set.add(session)
-            set
-        }
+        actors[actor.id] = actor
+        _actorCount.value = actors.size
 
-        _userCount.value = users.size
+        logger.debug("Actor '${actor.name}' joined room '$id' (${actors.size} actors)")
 
-        logger.debug("User '$login' joined room '$name' (session count: ${userSessions[login]?.size})")
-
-        // Send context to this user
-        sendContextToChannel(user, channel)
-
-        // Notify room if this is the first session for this user
-        if (userSessions[login]?.size == 1) {
-            onUserJoined(login)
-        }
+        // Send initial state
+        sendStateTo(actor)
+        onActorJoined(actor)
 
         return channel
     }
 
     /**
-     * User leaves the room
+     * Spectator joins the room
      */
-    suspend fun leaveRoom(user: User, sessionChannel: Channel<ServerSentEvent>) {
-        val login = user.login
+    suspend fun joinAsSpectator(spectator: Spectator): Channel<ServerSentEvent> {
+        val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
+        spectator.channel = channel
 
-        userSessions.compute(login) { _, sessions ->
-            sessions?.removeIf { it.channel == sessionChannel }
-            sessionChannel.close()
-            if (sessions.isNullOrEmpty()) null else sessions
-        }
+        spectators[spectator.id] = spectator
+        _spectatorCount.value = spectators.size
 
-        // If no more sessions for this user, remove them from the room
-        if (!userSessions.containsKey(login)) {
-            users.remove(login)
-            _userCount.value = users.size
-            logger.debug("User '$login' left room '$name' completely")
-            onUserLeft(login)
+        logger.debug("Spectator '${spectator.name}' joined room '$id' (${spectators.size} spectators)")
 
-            // Check if room should be closed
-            if (shouldCloseEmptyRoom() && users.isEmpty()) {
-                stop()
-            }
+        // Send initial state
+        sendStateTo(spectator)
+        onSpectatorJoined(spectator)
+
+        return channel
+    }
+
+    /**
+     * Actor or spectator leaves
+     */
+    suspend fun leave(actor: Actor) {
+        actor.disconnect()
+
+        if (actor is Spectator) {
+            spectators.remove(actor.id)
+            _spectatorCount.value = spectators.size
+            logger.debug("Spectator '${actor.name}' left room '$id'")
+            onSpectatorLeft(actor)
         } else {
-            logger.debug("User '$login' session closed in room '$name' (${userSessions[login]?.size} remaining)")
+            actors.remove(actor.id)
+            _actorCount.value = actors.size
+            logger.debug("Actor '${actor.name}' left room '$id'")
+            onActorLeft(actor)
+        }
+
+        // Check if room should close
+        if (shouldCloseWhenEmpty() && actors.isEmpty()) {
+            stop()
+            Lobby.remove(id)
         }
     }
 
     /**
-     * Send initial context to a newly joined user
+     * Handle an action from an actor
+     * Returns the result to broadcast or send
      */
-    private suspend fun sendContextToChannel(user: User, channel: Channel<ServerSentEvent>) {
-        // Send connected users
-        val connectedUsers = users.keys.toList()
-        channel.send(ServerSentEvent(data = """{"users":${connectedUsers.joinToString(",", "[", "]") { "\"$it\"" }}}""", event = "connected"))
+    abstract fun handleAction(actor: Actor, action: Json.Object): ActionResult
 
-        // Send chat history
-        val historyCopy = synchronized(chatHistory) {
-            chatHistory.toList()
-        }
-        historyCopy.forEach { msg ->
-            channel.send(ServerSentEvent(data = msg.toJson(), event = "chat", id = msg.seq.toString()))
-        }
+    /**
+     * Convert state to JSON for client
+     */
+    abstract fun stateToJson(): Json.Object
 
-        // Allow subclasses to send additional context
-        sendPrivateContextToChannel(user, channel)
+    /**
+     * Called when actor joins - override to customize
+     */
+    protected open suspend fun onActorJoined(actor: Actor) {}
+
+    /**
+     * Called when actor leaves - override to customize
+     */
+    protected open suspend fun onActorLeft(actor: Actor) {}
+
+    /**
+     * Called when spectator joins - override to customize
+     */
+    protected open suspend fun onSpectatorJoined(spectator: Spectator) {}
+
+    /**
+     * Called when spectator leaves - override to customize
+     */
+    protected open suspend fun onSpectatorLeft(spectator: Spectator) {}
+
+    /**
+     * Whether room should close when all actors leave
+     */
+    protected open fun shouldCloseWhenEmpty(): Boolean = true
+
+    /**
+     * Send current state to an actor
+     */
+    protected suspend fun sendStateTo(actor: Actor) {
+        actor.channel?.send(ServerSentEvent(
+            data = stateToJson().toString(),
+            event = "state"
+        ))
     }
 
     /**
-     * Override in subclasses to send user-specific context
+     * Broadcast event to all (actors + spectators)
      */
-    protected open suspend fun sendPrivateContextToChannel(user: User, channel: Channel<ServerSentEvent>) {
-        // Base implementation does nothing
+    fun broadcast(event: String, data: Json.Object) {
+        eventQueue.trySend(Event.Broadcast(event, data.toString()))
     }
 
     /**
-     * Override in subclasses to handle user joined event
+     * Broadcast event to actors only
      */
-    protected open suspend fun onUserJoined(login: String) {
-        // Broadcast user joined
-        post("connected", """{"users":${users.keys.joinToString(",", "[", "]") { "\"$it\"" }}}""")
+    fun broadcastToActors(event: String, data: Json.Object) {
+        eventQueue.trySend(Event.BroadcastToActors(event, data.toString()))
     }
 
     /**
-     * Override in subclasses to handle user left event
+     * Broadcast event to spectators only
      */
-    protected open suspend fun onUserLeft(login: String) {
-        // Broadcast user left
-        post("connected", """{"users":${users.keys.joinToString(",", "[", "]") { "\"$it\"" }}}""")
+    fun broadcastToSpectators(event: String, data: Json.Object) {
+        eventQueue.trySend(Event.BroadcastToSpectators(event, data.toString()))
     }
 
     /**
-     * Whether to close the room when empty
+     * Send event to specific actor
      */
-    protected open fun shouldCloseEmptyRoom(): Boolean = false
-
-    /**
-     * Post an event to all users in the room
-     */
-    fun post(event: String, data: String) {
-        eventQueue.trySend(Event.Broadcast(event, data))
+    fun sendTo(actor: Actor, event: String, data: Json.Object) {
+        eventQueue.trySend(Event.Targeted(actor.id, event, data.toString()))
     }
 
     /**
-     * Post an event to a specific user
-     */
-    fun post(login: String, event: String, data: String) {
-        eventQueue.trySend(Event.Targeted(login, event, data))
-    }
-
-    /**
-     * Send chat message
-     */
-    fun chat(from: String?, text: String) {
-        val msg = ChatMessage(
-            seq = messageId.incrementAndGet(),
-            from = from,
-            text = text,
-            timestamp = Instant.now().toString()
-        )
-
-        synchronized(chatHistory) {
-            chatHistory.add(msg)
-            if (chatHistory.size > maxChatHistory) {
-                chatHistory.removeAt(0)
-            }
-        }
-
-        post("chat", msg.toJson())
-    }
-
-    /**
-     * Process an event from the queue
+     * Process queued event
      */
     private suspend fun processEvent(event: Event) {
-        val id = messageId.get().toString()
+        val msgId = messageId.incrementAndGet().toString()
         when (event) {
             is Event.Broadcast -> {
-                val sse = ServerSentEvent(data = event.data, event = event.event, id = id)
-                logger.trace("Broadcasting to room '$name': ${event.event}")
-                broadcast(sse)
+                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                sendToAll(sse)
+            }
+            is Event.BroadcastToActors -> {
+                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                sendToActors(sse)
+            }
+            is Event.BroadcastToSpectators -> {
+                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                sendToSpectators(sse)
             }
             is Event.Targeted -> {
-                val sse = ServerSentEvent(data = event.data, event = event.event, id = id)
-                logger.trace("Sending to user '${event.login}' in room '$name': ${event.event}")
-                sendToUser(event.login, sse)
+                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                sendToActor(event.actorId, sse)
             }
         }
     }
 
-    /**
-     * Broadcast an SSE to all users
-     */
-    private suspend fun broadcast(sse: ServerSentEvent) {
-        userSessions.values.forEach { sessions ->
-            sessions.forEach { session ->
-                try {
-                    session.channel.send(sse)
-                } catch (e: Exception) {
-                    logger.warn("Failed to send to session", e)
-                }
-            }
+    private suspend fun sendToAll(sse: ServerSentEvent) {
+        actors.values.forEach { sendSafe(it, sse) }
+        spectators.values.forEach { sendSafe(it, sse) }
+    }
+
+    private suspend fun sendToActors(sse: ServerSentEvent) {
+        actors.values.forEach { sendSafe(it, sse) }
+    }
+
+    private suspend fun sendToSpectators(sse: ServerSentEvent) {
+        spectators.values.forEach { sendSafe(it, sse) }
+    }
+
+    private suspend fun sendToActor(actorId: String, sse: ServerSentEvent) {
+        actors[actorId]?.let { sendSafe(it, sse) }
+            ?: spectators[actorId]?.let { sendSafe(it, sse) }
+    }
+
+    private suspend fun sendSafe(actor: Actor, sse: ServerSentEvent) {
+        try {
+            actor.channel?.send(sse)
+        } catch (e: Exception) {
+            logger.warn("Failed to send to ${actor.name}", e)
         }
     }
 
-    /**
-     * Send an SSE to a specific user
-     */
-    private suspend fun sendToUser(login: String, sse: ServerSentEvent) {
-        userSessions[login]?.forEach { session ->
-            try {
-                session.channel.send(sse)
-            } catch (e: Exception) {
-                logger.warn("Failed to send to user '$login'", e)
-            }
-        }
-    }
-
-    /**
-     * Send keep-alive to all users
-     */
     private suspend fun keepAlive() {
-        userSessions.values.forEach { sessions ->
-            sessions.forEach { session ->
-                try {
-                    // Send a comment as keep-alive
-                    session.channel.send(ServerSentEvent(comments = "keepalive"))
-                } catch (e: Exception) {
-                    logger.warn("Failed to send keep-alive", e)
-                }
-            }
-        }
+        val sse = ServerSentEvent(comments = "keepalive")
+        actors.values.forEach { sendSafe(it, sse) }
+        spectators.values.forEach { sendSafe(it, sse) }
     }
 
-    fun getUsers(): List<String> = users.keys.toList()
+    /**
+     * Get list of actor infos
+     */
+    fun getActors(): List<Actor> = actors.values.toList()
 
+    /**
+     * Get list of spectator infos
+     */
+    fun getSpectators(): List<Spectator> = spectators.values.toList()
+
+    /**
+     * Get an actor by ID
+     */
+    fun getActor(id: String): Actor? = actors[id]
+
+    /**
+     * Room info for lobby
+     */
+    open fun toJson(): Json.Object = Json.Object(
+        "id" to id,
+        "actorCount" to actors.size,
+        "spectatorCount" to spectators.size,
+        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.id, "name" to it.name) })
+    )
+
+    // Event types for queue
     sealed class Event {
         data class Broadcast(val event: String, val data: String) : Event()
-        data class Targeted(val login: String, val event: String, val data: String) : Event()
-    }
-
-    data class ChatMessage(
-        val seq: Long,
-        val from: String?,
-        val text: String,
-        val timestamp: String
-    ) {
-        fun toJson(): String {
-            val fromField = from?.let { """"from":"$it",""" } ?: ""
-            return """{"seq":$seq,$fromField"text":"$text","timestamp":"$timestamp"}"""
-        }
+        data class BroadcastToActors(val event: String, val data: String) : Event()
+        data class BroadcastToSpectators(val event: String, val data: String) : Event()
+        data class Targeted(val actorId: String, val event: String, val data: String) : Event()
     }
 }
 
 /**
- * Simple user representation
+ * Result of handling an action
  */
-data class User(val login: String)
+sealed class ActionResult {
+    /** Action succeeded, optionally broadcast an event */
+    data class Success(
+        val event: String? = null,
+        val data: Json.Object? = null
+    ) : ActionResult()
+
+    /** Action failed with error message */
+    data class Error(val message: String) : ActionResult()
+}
