@@ -4,7 +4,7 @@ import com.republicate.kroom.examples.chifoumi.game.MatchStats
 import com.republicate.kroom.examples.chifoumi.game.Move
 import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
 import com.republicate.kroom.examples.chifoumi.sse.PlayResult
-import com.republicate.kroom.server.User
+import com.republicate.kroom.server.Actor
 import com.republicate.kroom.webapp.core.respondError
 import com.republicate.kroom.webapp.core.respondJson
 import com.republicate.kroom.webapp.core.respondSuccess
@@ -35,15 +35,15 @@ fun Route.chifoumiRoutes() {
             return@sse
         }
 
-        val user = User(session.playerName)
-        val channel = ChifoumiLobby.joinRoom(user)
+        val actor = Actor(session.identifier, session.playerName)
+        val channel = ChifoumiLobby.join(actor)
 
         try {
             channel.consumeAsFlow().collect { event ->
                 send(event)
             }
         } finally {
-            ChifoumiLobby.leaveRoom(user, channel)
+            ChifoumiLobby.leave(actor)
         }
     }
 
@@ -176,7 +176,7 @@ fun Route.chifoumiRoutes() {
         // Get lobby info
         get("/lobby") {
             respondJson {
-                set("online", ChifoumiLobby.getUsers().size)
+                set("online", ChifoumiLobby.getActors().size)
                 set("queue", ChifoumiLobby.getQueueSize())
                 set("matches", ChifoumiLobby.getActiveMatchCount())
             }

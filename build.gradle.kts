@@ -2,7 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
-description = "Kroom - kotlin rooms toolbox"
+description = "Kroom - Kotlin multiplatform library for real-time collaborative applications using Server-Sent Events (SSE)"
 
 plugins {
     alias(libs.plugins.multiplatform) apply false
@@ -17,7 +17,7 @@ plugins {
 allprojects {
 
     group = "com.republicate.kroom"
-    version = "0.1-SNAPSHOT"
+    version = "0.1"
 
     repositories {
         mavenCentral()
@@ -36,7 +36,7 @@ subprojects {
                 pom {
                     name.set(project.name)
                     description.set(project.description)
-                    url.set("https://gitlab.republicate.com/claude/kroom")
+                    url.set("https://github.com/arkanovicz/kroom")
                     licenses {
                         license {
                             name.set("The Apache Software License, Version 2.0")
@@ -53,8 +53,8 @@ subprojects {
                         }
                     }
                     scm {
-                        connection.set("scm:scm:git@gitlab.republicate.com:claude/kroom.git")
-                        url.set("https://gitlab.republicate.com/claude/kroom#")
+                        connection.set("scm:scm:git@github.com/arkanovicz/kroom.git")
+                        url.set("https://github.com/arkanovicz/kroom")
                     }
                 }
                 // Task ':publish<platform>PublicationToMavenLocal' uses this output of task ':sign<platform>Publication' without declaring an explicit or implicit dependency.

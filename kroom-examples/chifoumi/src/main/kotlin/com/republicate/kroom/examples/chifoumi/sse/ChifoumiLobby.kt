@@ -4,14 +4,21 @@ import com.republicate.kroom.examples.chifoumi.game.Match
 import com.republicate.kroom.examples.chifoumi.game.MatchStats
 import com.republicate.kroom.examples.chifoumi.game.Move
 import com.republicate.kroom.examples.chifoumi.game.Round
+import com.republicate.kroom.server.ActionResult
+import com.republicate.kroom.server.Actor
 import com.republicate.kroom.server.Room
-import com.republicate.kroom.server.User
 import com.republicate.kson.Json
-import io.ktor.sse.*
-import kotlinx.coroutines.channels.Channel
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+
+/**
+ * Lobby state
+ */
+data class LobbyState(
+    val queueSize: Int = 0,
+    val activeMatchCount: Int = 0
+)
 
 /**
  * Main lobby room for Chifoumi Arena.
@@ -22,8 +29,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * - Activity feed (recent match results)
  * - Active matches
  */
-object ChifoumiLobby : Room("chifoumi-lobby") {
-    private val logger = LoggerFactory.getLogger("chifoumi.lobby")
+object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
+    private val log = LoggerFactory.getLogger("chifoumi.lobby")
+
+    override var state = LobbyState()
 
     // Players waiting for a match
     private val matchQueue = ConcurrentLinkedQueue<String>()
@@ -38,41 +47,136 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
     private val activityFeed = ConcurrentLinkedQueue<ActivityEvent>()
     private const val MAX_ACTIVITY = 10
 
-    override suspend fun sendPrivateContextToChannel(user: User, channel: Channel<ServerSentEvent>) {
+    // Actor ID -> login name mapping (for targeted sends)
+    private val actorLogins = ConcurrentHashMap<String, Actor>()
+
+    override fun stateToJson(): Json.Object = Json.Object(
+        "queue" to matchQueue.size,
+        "matches" to activeMatches.size,
+        "stats" to MatchStats.toJson(),
+        "activity" to Json.Array(activityFeed.map { it.toJson() })
+    )
+
+    override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
+        val type = action.getString("type") ?: return ActionResult.Error("Missing action type")
+        return when (type) {
+            "join_queue" -> handleJoinQueue(actor)
+            "leave_queue" -> handleLeaveQueue(actor)
+            "play" -> {
+                val moveStr = action.getString("move") ?: return ActionResult.Error("Missing move")
+                val move = Move.fromString(moveStr) ?: return ActionResult.Error("Invalid move: $moveStr")
+                handlePlayMove(actor, move)
+            }
+            else -> ActionResult.Error("Unknown action: $type")
+        }
+    }
+
+    private fun handleJoinQueue(actor: Actor): ActionResult {
+        val login = actor.name
+        // Already in queue?
+        if (matchQueue.contains(login)) return ActionResult.Success()
+
+        // Already in match?
+        if (playerMatches.containsKey(login)) return ActionResult.Success()
+
+        // Try to find opponent
+        val opponent = matchQueue.poll()
+        return if (opponent != null && opponent != login) {
+            // Create match
+            val match = Match(player1 = opponent, player2 = login)
+            activeMatches[match.id] = match
+            playerMatches[opponent] = match.id
+            playerMatches[login] = match.id
+            updateState()
+
+            // Notify both players
+            actorLogins[opponent]?.let { sendTo(it, "match", match.toJson()) }
+            sendTo(actor, "match", match.toJson())
+
+            addActivity(ActivityEvent.MatchStarted(opponent, login, match.id))
+            log.info("Match ${match.id} started: $opponent vs $login")
+            ActionResult.Success("matched", Json.Object("match" to match.toJson()))
+        } else {
+            // Add to queue
+            matchQueue.add(login)
+            updateState()
+            sendTo(actor, "queue", Json.Object("position" to matchQueue.size))
+            log.info("$login joined queue (position: ${matchQueue.size})")
+            ActionResult.Success()
+        }
+    }
+
+    private fun handleLeaveQueue(actor: Actor): ActionResult {
+        matchQueue.remove(actor.name)
+        updateState()
+        return ActionResult.Success()
+    }
+
+    private fun handlePlayMove(actor: Actor, move: Move): ActionResult {
+        val login = actor.name
+        val matchId = playerMatches[login] ?: return ActionResult.Error("Not in a match")
+        val match = activeMatches[matchId] ?: return ActionResult.Error("Match not found")
+
+        if (match.isFinished) return ActionResult.Error("Match already finished")
+
+        return try {
+            val round = match.play(login, move)
+            MatchStats.recordMove(move)
+
+            if (round != null) {
+                // Round complete, notify both players
+                val opponent = if (match.player1 == login) match.player2 else match.player1
+                val roundData = Json.Object("round" to round.toJson())
+                sendTo(actor, "round", roundData)
+                actorLogins[opponent]?.let { sendTo(it, "round", roundData) }
+
+                // Check if match is finished
+                if (match.isFinished) {
+                    MatchStats.recordMatch()
+                    val winner = match.winner!!
+                    val loser = if (winner == match.player1) match.player2 else match.player1
+                    addActivity(ActivityEvent.MatchEnded(winner, loser, match.id, match.score1, match.score2))
+
+                    // Send final result
+                    val resultData = Json.Object("match" to match.toJson())
+                    sendTo(actor, "result", resultData)
+                    actorLogins[opponent]?.let { sendTo(it, "result", resultData) }
+
+                    endMatch(matchId)
+                }
+                ActionResult.Success()
+            } else {
+                // Waiting for opponent
+                val opponent = if (match.player1 == login) match.player2 else match.player1
+                actorLogins[opponent]?.let { sendTo(it, "waiting", Json.Object("player" to login)) }
+                ActionResult.Success()
+            }
+        } catch (e: IllegalArgumentException) {
+            ActionResult.Error(e.message ?: "Invalid move")
+        }
+    }
+
+    override suspend fun onActorJoined(actor: Actor) {
+        actorLogins[actor.name] = actor
+
         // Send current match if player is in one
-        playerMatches[user.login]?.let { matchId ->
+        playerMatches[actor.name]?.let { matchId ->
             activeMatches[matchId]?.let { match ->
-                channel.send(ServerSentEvent(
-                    data = match.toJson().toString(),
-                    event = "match"
-                ))
+                sendTo(actor, "match", match.toJson())
             }
         }
 
-        // Send activity feed
-        activityFeed.forEach { event ->
-            channel.send(ServerSentEvent(
-                data = event.toJson().toString(),
-                event = "activity"
-            ))
-        }
-
-        // Send stats
-        channel.send(ServerSentEvent(
-            data = MatchStats.toJson().toString(),
-            event = "stats"
-        ))
+        addActivity(ActivityEvent.PlayerJoined(actor.name))
     }
 
-    override suspend fun onUserJoined(login: String) {
-        super.onUserJoined(login)
-        addActivity(ActivityEvent.PlayerJoined(login))
-    }
+    override suspend fun onActorLeft(actor: Actor) {
+        val login = actor.name
+        actorLogins.remove(login)
 
-    override suspend fun onUserLeft(login: String) {
-        super.onUserLeft(login)
         // Remove from queue if waiting
         matchQueue.remove(login)
+        updateState()
+
         // Handle if in active match
         playerMatches[login]?.let { matchId ->
             activeMatches[matchId]?.let { match ->
@@ -84,8 +188,10 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
         addActivity(ActivityEvent.PlayerDisconnected(login))
     }
 
+    override fun shouldCloseWhenEmpty(): Boolean = false
+
     /**
-     * Player joins the matchmaking queue.
+     * Player joins the matchmaking queue (called from HTTP API).
      * @return Match if paired, null if waiting
      */
     @Synchronized
@@ -104,19 +210,21 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
             activeMatches[match.id] = match
             playerMatches[opponent] = match.id
             playerMatches[login] = match.id
+            updateState()
 
-            // Notify both players
-            post(opponent, "match", match.toJson().toString())
-            post(login, "match", match.toJson().toString())
+            // Notify both players via SSE
+            actorLogins[opponent]?.let { sendTo(it, "match", match.toJson()) }
+            actorLogins[login]?.let { sendTo(it, "match", match.toJson()) }
 
             addActivity(ActivityEvent.MatchStarted(opponent, login, match.id))
-            logger.info("Match ${match.id} started: $opponent vs $login")
+            log.info("Match ${match.id} started: $opponent vs $login")
             match
         } else {
             // Add to queue
             matchQueue.add(login)
-            post(login, "queue", """{"position":${matchQueue.size}}""")
-            logger.info("$login joined queue (position: ${matchQueue.size})")
+            updateState()
+            actorLogins[login]?.let { sendTo(it, "queue", Json.Object("position" to matchQueue.size)) }
+            log.info("$login joined queue (position: ${matchQueue.size})")
             null
         }
     }
@@ -126,6 +234,7 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
      */
     fun leaveQueue(login: String) {
         matchQueue.remove(login)
+        updateState()
     }
 
     /**
@@ -141,7 +250,7 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
     fun getMatchById(matchId: String): Match? = activeMatches[matchId]
 
     /**
-     * Player submits a move.
+     * Player submits a move (called from HTTP API).
      * @return the completed Round if both played, null otherwise
      */
     fun playMove(login: String, move: Move): PlayResult {
@@ -157,9 +266,9 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
             if (round != null) {
                 // Round complete, notify both players
                 val opponent = if (match.player1 == login) match.player2 else match.player1
-                val roundJson = round.toJson().toString()
-                post(login, "round", roundJson)
-                post(opponent, "round", roundJson)
+                val roundData = Json.Object("round" to round.toJson())
+                actorLogins[login]?.let { sendTo(it, "round", roundData) }
+                actorLogins[opponent]?.let { sendTo(it, "round", roundData) }
 
                 // Check if match is finished
                 if (match.isFinished) {
@@ -169,9 +278,9 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
                     addActivity(ActivityEvent.MatchEnded(winner, loser, match.id, match.score1, match.score2))
 
                     // Send final result
-                    val resultJson = match.toJson().toString()
-                    post(login, "result", resultJson)
-                    post(opponent, "result", resultJson)
+                    val resultData = Json.Object("match" to match.toJson())
+                    actorLogins[login]?.let { sendTo(it, "result", resultData) }
+                    actorLogins[opponent]?.let { sendTo(it, "result", resultData) }
 
                     endMatch(matchId)
                     PlayResult.MatchComplete(round, match)
@@ -181,7 +290,7 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
             } else {
                 // Waiting for opponent
                 val opponent = if (match.player1 == login) match.player2 else match.player1
-                post(opponent, "waiting", """{"player":"$login"}""")
+                actorLogins[opponent]?.let { sendTo(it, "waiting", Json.Object("player" to login)) }
                 PlayResult.WaitingForOpponent
             }
         } catch (e: IllegalArgumentException) {
@@ -195,6 +304,7 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
             playerMatches.remove(it.player1)
             playerMatches.remove(it.player2)
         }
+        updateState()
     }
 
     private fun addActivity(event: ActivityEvent) {
@@ -202,7 +312,14 @@ object ChifoumiLobby : Room("chifoumi-lobby") {
         while (activityFeed.size > MAX_ACTIVITY) {
             activityFeed.poll()
         }
-        post("activity", event.toJson().toString())
+        broadcast("activity", event.toJson())
+    }
+
+    private fun updateState() {
+        state = LobbyState(
+            queueSize = matchQueue.size,
+            activeMatchCount = activeMatches.size
+        )
     }
 
     fun getQueueSize() = matchQueue.size
