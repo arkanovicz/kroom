@@ -1,0 +1,8 @@
+.gradle
+build
+/private
+.idea
+.kotlin
+kotlin-js-store
+.claude
+CLAUDE.md
