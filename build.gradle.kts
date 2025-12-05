@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 description = "Kroom - Kotlin multiplatform library for real-time collaborative applications using Server-Sent Events (SSE)"
 
 plugins {
+    alias(libs.plugins.android.library) apply false
     alias(libs.plugins.multiplatform) apply false
     alias(libs.plugins.jvm) apply false
     alias(libs.plugins.dokka)
@@ -20,6 +21,7 @@ allprojects {
     version = "0.1"
 
     repositories {
+        google()
         mavenCentral()
     }
 }

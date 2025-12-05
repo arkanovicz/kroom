@@ -18,6 +18,7 @@ project(":kroom-examples:chifoumi").projectDir = file("kroom-examples/chifoumi")
 
 pluginManagement {
     repositories {
+        google()
         gradlePluginPortal()
         mavenCentral()
     }

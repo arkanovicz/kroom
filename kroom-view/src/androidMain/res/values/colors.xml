@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="kroom_primary">#FF6200EE</color>
+    <color name="kroom_primary_variant">#FF3700B3</color>
+    <color name="kroom_secondary">#FF03DAC5</color>
+    <color name="kroom_background">#FFFFFFFF</color>
+    <color name="kroom_on_primary">#FFFFFFFF</color>
+    <color name="kroom_on_secondary">#FF000000</color>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Kroom" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/kroom_primary</item>
+        <item name="colorPrimaryVariant">@color/kroom_primary_variant</item>
+        <item name="colorOnPrimary">@color/kroom_on_primary</item>
+        <item name="colorSecondary">@color/kroom_secondary</item>
+        <item name="colorOnSecondary">@color/kroom_on_secondary</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+    </style>
+
+    <style name="Theme.Kroom.Fullscreen" parent="Theme.Kroom">
+        <item name="android:windowActionBarOverlay">true</item>
+        <item name="android:windowBackground">@null</item>
+    </style>
+
+    <style name="ThemeOverlay.Kroom.Container" parent="">
+        <item name="kroomBackgroundColor">@color/kroom_background</item>
+    </style>
+</resources>

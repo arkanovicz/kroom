@@ -1,4 +1,5 @@
 [versions]
+agp = "8.5.2"
 kotlin = "2.2.0"
 dokka = "1.9.20"
 nexus-publish = "2.0.0"
@@ -77,7 +78,15 @@ pac4j-core = { module = "org.pac4j:pac4j-core", version.ref = "pac4j" }
 pac4j-oidc = { module = "org.pac4j:pac4j-oidc", version.ref = "pac4j" }
 pac4j-oauth = { module = "org.pac4j:pac4j-oauth", version.ref = "pac4j" }
 
+# Android
+androidx-core = { module = "androidx.core:core-ktx", version = "1.15.0" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.0" }
+androidx-webkit = { module = "androidx.webkit:webkit", version = "1.12.1" }
+android-material = { module = "com.google.android.material:material", version = "1.12.0" }
+slf4j-handroid = { module = "sk.baka.slf4j:slf4j-handroid", version = "2.0.13" }
+
 [plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
 antlr = { id = "com.strumenta.antlr-kotlin", version.ref = "antlr-kotlin" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "kotlinx-atomicfu" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

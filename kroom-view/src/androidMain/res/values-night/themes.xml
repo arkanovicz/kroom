@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ThemeOverlay.Kroom.Container" parent="">
+        <item name="kroomBackgroundColor">#FF121212</item>
+    </style>
+</resources>
