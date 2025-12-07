@@ -198,7 +198,7 @@ abstract class Room<S : Any>(val id: String) {
     /**
      * Send current state to an actor
      */
-    protected suspend fun sendStateTo(actor: Actor) {
+    protected open suspend fun sendStateTo(actor: Actor) {
         actor.channel?.send(ServerSentEvent(
             data = stateToJson().toString(),
             event = "state"
