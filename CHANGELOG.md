@@ -2,7 +2,36 @@
 
 All notable changes to kroom will be documented in this file.
 
-## [0.1] - 2024-12
+## [Unreleased] - 0.2
+
+### Added
+
+#### kroom-server
+- `Table<S>` class for seat-based games
+  - Seat assignment with reconnect by name
+  - `mySeat` included in state payload
+  - `assignSeat(actorId, playerName, requestedSeat?)` for explicit seat selection
+- `Room.sendStateTo()` now open for override
+
+#### kroom-webapp-assets (new module)
+- `domhelper.js` - lightweight jQuery-like DOM manipulation
+- `api.js` - fetch wrapper for REST APIs with error handling
+- `store.js` - minimal Redux-like state management
+  - `createStore(reducer, initialState, enhancer?)`
+  - `applyMiddleware(...middlewares)`
+  - `combineReducers(reducers)`
+  - Built-in `logMiddleware` and `thunkMiddleware`
+- `kroomAssets()` Ktor route for serving assets
+- `KroomAssets.coreScripts()` helper for script tags with versioning
+
+### Changed
+- Documentation expanded with module overview and API references
+
+---
+
+## [0.1] - 2024-12-05
+
+Initial release.
 
 ### Added
 
@@ -13,26 +42,11 @@ All notable changes to kroom will be documented in this file.
 - `Spectator` for non-participating viewers
 - `ActionResult` sealed class (Success/Error) for action responses
 - Keep-alive mechanism (configurable interval)
-- `Table<S>` class for seat-based games
-  - Seat assignment with reconnect by name
-  - `mySeat` included in state payload
-  - `assignSeat(actorId, playerName, requestedSeat?)` for explicit seat selection
 
 #### kroom-webapp-core
 - Ktor webapp foundation
 - `staticRoutes()` for serving static assets from classpath
 - `respondJson {}` DSL for JSON responses
-
-#### kroom-webapp-assets
-- `domhelper.js` - lightweight jQuery-like DOM manipulation
-- `api.js` - fetch wrapper for REST APIs with error handling
-- `store.js` - minimal Redux-like state management
-  - `createStore(reducer, initialState, enhancer?)`
-  - `applyMiddleware(...middlewares)`
-  - `combineReducers(reducers)`
-  - Built-in `logMiddleware` and `thunkMiddleware`
-- `kroomAssets()` Ktor route for serving assets
-- `KroomAssets.coreScripts()` helper for script tags with versioning
 
 #### kroom-webapp-velocity
 - Velocity template engine integration for Ktor
