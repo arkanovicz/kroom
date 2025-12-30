@@ -22,7 +22,8 @@ class VelocityPlugin(private val config: VelocityConfig) {
         setProperty("classpath.resource.loader.class", ClasspathResourceLoader::class.java.name)
         setProperty(RuntimeConstants.INPUT_ENCODING, "UTF-8")
         config.templatePath?.let {
-            setProperty("classpath.resource.loader.prefix", it)
+            val prefix = if (it.endsWith("/")) it else "$it/"
+            setProperty("classpath.resource.loader.prefix", prefix)
         }
         init()
     }
