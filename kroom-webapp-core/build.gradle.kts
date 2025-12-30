@@ -15,7 +15,6 @@ dependencies {
     api(project(":kroom-server"))
     api(libs.ktor.server.core)
     api(libs.ktor.server.netty)
-    api(libs.ktor.server.http2)
     api(libs.ktor.server.content.negotiation)
     api(libs.ktor.server.sse)
     api(libs.ktor.server.status.pages)
@@ -32,4 +31,12 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
 }

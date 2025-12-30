@@ -1,6 +1,7 @@
 package com.republicate.kroom.view
 
 import kotlinx.cinterop.*
+import kotlin.experimental.ExperimentalObjCRefinement
 import platform.Foundation.*
 import platform.WebKit.*
 import platform.darwin.NSObject
@@ -11,11 +12,12 @@ import platform.darwin.NSObject
  * Intercepts requests with the "kroom" scheme and serves content from ViewHandler.
  * API and SSE requests (starting with /api or /events) are passed through to the server.
  */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalObjCRefinement::class)
 class KroomURLSchemeHandler(
     private val passthroughPrefixes: List<String> = listOf("/api", "/events")
 ) : NSObject(), WKURLSchemeHandlerProtocol {
 
+    @ObjCSignatureOverride
     override fun webView(webView: WKWebView, startURLSchemeTask: WKURLSchemeTaskProtocol) {
         val request = startURLSchemeTask.request
         val url = request.URL ?: run {
@@ -72,6 +74,7 @@ class KroomURLSchemeHandler(
         }
     }
 
+    @ObjCSignatureOverride
     override fun webView(webView: WKWebView, stopURLSchemeTask: WKURLSchemeTaskProtocol) {
         // Called when the task is cancelled - nothing to clean up
     }
@@ -145,6 +148,7 @@ class KroomWebViewConfig {
  * webView.load(URLRequest(url: URL(string: "kroom://index")!))
  * ```
  */
+@OptIn(ExperimentalForeignApi::class)
 fun createKroomWebView(config: KroomWebViewConfig = KroomWebViewConfig()): WKWebView {
     ViewHandler.init()
 

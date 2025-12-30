@@ -2,6 +2,7 @@ package com.republicate.kroom.view
 
 import kotlinx.cinterop.*
 import platform.Foundation.*
+import platform.posix.memcpy
 
 /**
  * iOS ViewHandler implementation.

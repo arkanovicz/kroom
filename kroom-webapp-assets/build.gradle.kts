@@ -38,6 +38,16 @@ tasks.named("compileKotlin") {
     dependsOn(generateVersion)
 }
 
+tasks.named("sourcesJar") {
+    dependsOn(generateVersion)
+}
+
+tasks.configureEach {
+    if (name.contains("dokka", ignoreCase = true)) {
+        dependsOn(generateVersion)
+    }
+}
+
 dependencies {
     api(libs.ktor.server.core)
 

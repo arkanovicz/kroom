@@ -1,11 +1,10 @@
 package com.republicate.kroom.view
 
 /**
- * Native (Linux/Windows/etc.) ViewHandler implementation.
+ * Windows (MinGW) ViewHandler implementation (headless).
  *
- * For non-Apple native targets, there's no standard WebView component.
- * This is a headless-only stub. Use JVM target for desktop with WebView needs,
- * or run the webapp in the system browser.
+ * Windows native targets don't have a standard WebView component.
+ * Use JVM target for desktop with WebView needs, or run the webapp in the system browser.
  */
 actual object ViewHandler {
 
