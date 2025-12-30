@@ -129,6 +129,14 @@ kotlin {
 
         val jsMain by getting
         val wasmJsMain by getting
+
+        // iOS targets with WKWebView support
+        val iosMain by getting {
+            // iosMain is created by default hierarchy template
+            // It provides WKWebView-based implementation
+        }
+
+        // Other native targets remain headless (use nativeMain stub)
         val nativeMain by getting
 
         all {

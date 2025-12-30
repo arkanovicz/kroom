@@ -16,7 +16,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.9.0"
 kotlinx-html = "0.12.0"
-ktor = "3.2.1"
+ktor = "3.3.0"
 pac4j = "6.0.6"
 slf4j = "2.0.16"
 velocity = "2.4.1"
@@ -64,6 +64,7 @@ ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", versio
 ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
 ktor-server-tests = { module = "io.ktor:ktor-server-tests", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-server-http2 = { module = "io.ktor:ktor-server-http2", version.ref = "ktor" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 velocity-engine-core = { module = "org.apache.velocity:velocity-engine-core", version.ref = "velocity" }
