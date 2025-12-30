@@ -26,7 +26,7 @@ private const val TAG = "kroom"
 abstract class KroomActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityKroomBinding
-    private lateinit var webView: WebView
+    protected lateinit var webView: WebView
 
     /**
      * Return the base URL of your kroom webapp server.
@@ -39,6 +39,13 @@ abstract class KroomActivity : AppCompatActivity() {
      * Default: /api and /events (SSE)
      */
     protected open fun getPassthroughPrefixes(): List<String> = listOf("/api", "/events")
+
+    /**
+     * Override to configure the WebView before the URL is loaded.
+     * Called after WebView settings are configured but before loadUrl.
+     * Use this to add JavaScript interfaces or custom configuration.
+     */
+    protected open fun onWebViewReady() {}
 
     @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +67,8 @@ abstract class KroomActivity : AppCompatActivity() {
             useWideViewPort = true
             loadWithOverviewMode = true
         }
+
+        onWebViewReady()
 
         Log.d(TAG, "Loading ${getSiteUrl()}")
         webView.loadUrl(getSiteUrl())

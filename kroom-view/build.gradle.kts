@@ -12,6 +12,7 @@ plugins {
     `maven-publish`
 }
 
+
 android {
     namespace = "com.republicate.kroom.view"
     compileSdk = 34
@@ -60,7 +61,9 @@ kotlin {
     }
 
     // Android JVM target
-    androidTarget()
+    androidTarget {
+        publishLibraryVariants("release")
+    }
 
     // JS targets
     js {
