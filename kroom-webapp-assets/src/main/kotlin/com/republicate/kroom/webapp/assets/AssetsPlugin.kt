@@ -80,7 +80,8 @@ private suspend fun serveAsset(path: String, call: ApplicationCall) {
  * Version info for cache busting
  */
 object KroomAssets {
-    const val VERSION = "0.3-SNAPSHOT"
+    /** Version is generated from project.version at build time */
+    const val VERSION = KROOM_VERSION
 
     /** Script tag for domhelper.js */
     fun domhelperScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/domhelper.js?v=$VERSION"></script>"""
