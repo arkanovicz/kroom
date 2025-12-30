@@ -5,13 +5,14 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 /**
- * Mount static routes for serving CSS, JS, and other static assets.
+ * Mount static routes for serving CSS, JS, images and other static assets.
  *
  * Assets are loaded from classpath resources under /static/
  *
  * Serves:
  * - /css/{path} from static/css/
  * - /js/{path} from static/js/
+ * - /img/{path} from static/img/
  * - /lib/{path} from static/lib/
  */
 fun Route.staticRoutes() {
@@ -23,6 +24,11 @@ fun Route.staticRoutes() {
     route("/js") {
         get("/{path...}") {
             serveStatic("js", call.parameters.getAll("path")?.joinToString("/"))
+        }
+    }
+    route("/img") {
+        get("/{path...}") {
+            serveStatic("img", call.parameters.getAll("path")?.joinToString("/"))
         }
     }
     route("/lib") {
