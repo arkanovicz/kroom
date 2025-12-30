@@ -80,7 +80,7 @@ private suspend fun serveAsset(path: String, call: ApplicationCall) {
  * Version info for cache busting
  */
 object KroomAssets {
-    const val VERSION = "0.2"
+    const val VERSION = "0.3-SNAPSHOT"
 
     /** Script tag for domhelper.js */
     fun domhelperScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/domhelper.js?v=$VERSION"></script>"""
@@ -91,10 +91,14 @@ object KroomAssets {
     /** Script tag for store.js */
     fun storeScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/store.js?v=$VERSION"></script>"""
 
-    /** All core scripts in order */
+    /** Script tag for sse.js */
+    fun sseScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/sse.js?v=$VERSION"></script>"""
+
+    /** All core scripts in order (domhelper, api, store, sse) */
     fun coreScripts(prefix: String = "") = listOf(
         domhelperScript(prefix),
         apiScript(prefix),
-        storeScript(prefix)
+        storeScript(prefix),
+        sseScript(prefix)
     ).joinToString("\n")
 }

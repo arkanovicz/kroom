@@ -2,6 +2,38 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.3] - Unreleased
+
+### Added
+
+#### kroom-webapp-assets
+- `sse.js` - SSE client with platform abstraction
+  - Browser uses native `EventSource`
+  - Native WebView can inject `window.kroomSSE` to delegate to app
+  - Auto-reconnect with configurable delay
+  - `onJson(eventName, handler)` for automatic JSON parsing
+- `store.js` enhancements:
+  - `createSelector(...inputSelectors, resultFn)` - memoized selectors
+  - `subscribeToSlice(store, selector, callback)` - selective subscriptions
+  - `createAction(type, payloadCreator)` - action creator factory
+
+#### kroom-webapp-core
+- `kroomServer()` helper with HTTP/2 cleartext (h2c) support
+  - `KroomServerConfig` with `h2c = true` by default
+  - Solves browser's 6-connection limit for SSE via multiplexing
+
+#### kroom-view
+- iOS WKWebView support
+  - `ViewHandler` for serving bundle resources
+  - `KroomURLSchemeHandler` for intercepting kroom:// scheme
+  - `createKroomWebView(config)` factory function
+
+### Changed
+- Ktor upgraded to 3.3.0 (h2c support)
+- JS assets consolidated in kroom-webapp-assets (removed from kroom-webapp-core)
+
+---
+
 ## [0.2] - 2025-12-08
 
 ### Added
