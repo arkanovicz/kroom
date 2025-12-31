@@ -103,7 +103,7 @@ abstract class Room<S : Any>(val id: String) {
         val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
         actor.channel = channel
 
-        actors[actor.id] = actor
+        actors[actor.connectionId] = actor
         _actorCount.value = actors.size
 
         logger.debug("Actor '${actor.name}' joined room '$id' (${actors.size} actors)")
@@ -122,7 +122,7 @@ abstract class Room<S : Any>(val id: String) {
         val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
         spectator.channel = channel
 
-        spectators[spectator.id] = spectator
+        spectators[spectator.connectionId] = spectator
         _spectatorCount.value = spectators.size
 
         logger.debug("Spectator '${spectator.name}' joined room '$id' (${spectators.size} spectators)")
@@ -141,12 +141,12 @@ abstract class Room<S : Any>(val id: String) {
         actor.disconnect()
 
         if (actor is Spectator) {
-            spectators.remove(actor.id)
+            spectators.remove(actor.connectionId)
             _spectatorCount.value = spectators.size
             logger.debug("Spectator '${actor.name}' left room '$id'")
             onSpectatorLeft(actor)
         } else {
-            actors.remove(actor.id)
+            actors.remove(actor.connectionId)
             _actorCount.value = actors.size
             logger.debug("Actor '${actor.name}' left room '$id'")
             onActorLeft(actor)
@@ -230,7 +230,7 @@ abstract class Room<S : Any>(val id: String) {
      * Send event to specific actor
      */
     fun sendTo(actor: Actor, event: String, data: Json.Object) {
-        eventQueue.trySend(Event.Targeted(actor.id, event, data.toString()))
+        eventQueue.trySend(Event.Targeted(actor.connectionId, event, data.toString()))
     }
 
     /**
@@ -312,7 +312,7 @@ abstract class Room<S : Any>(val id: String) {
         "id" to id,
         "actorCount" to actors.size,
         "spectatorCount" to spectators.size,
-        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.id, "name" to it.name) })
+        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "userId" to it.userId, "name" to it.name) })
     )
 
     // Event types for queue

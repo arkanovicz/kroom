@@ -28,9 +28,19 @@ All notable changes to kroom will be documented in this file.
   - `KroomURLSchemeHandler` for intercepting kroom:// scheme
   - `createKroomWebView(config)` factory function
 
+#### kroom-server
+- `Actor` identity model: `connectionId` (ephemeral) + `userId` (persistent) + `name`
+  - `connectionId` = unique per SSE connection (changes on reconnect)
+  - `userId` = persistent identity for seat matching (e.g. `dudeId#token`)
+  - `isAuthenticated` property (true when `userId` is set)
+- `Table.Seat` tracks `userId`, `playerName`, `connectionId` separately
+  - Reconnection matches by `userId` instead of name
+  - `assignSeat(connectionId, userId, playerName, requestedSeat?)` new signature
+
 ### Changed
 - Ktor upgraded to 3.3.0 (h2c support)
 - JS assets consolidated in kroom-webapp-assets (removed from kroom-webapp-core)
+- `Actor.id` deprecated, use `connectionId` instead
 
 ---
 

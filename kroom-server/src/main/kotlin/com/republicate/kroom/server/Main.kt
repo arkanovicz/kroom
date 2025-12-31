@@ -45,7 +45,8 @@ fun Application.configureRouting() {
             }
 
             val room = RoomManager.getOrCreateRoom(roomName)
-            val actor = Actor(login, login)
+            val connectionId = "conn-${System.currentTimeMillis()}"
+            val actor = Actor(connectionId = connectionId, userId = login, name = login)
 
             logger.info("User '$login' connecting to room '$roomName'")
 

@@ -50,7 +50,7 @@ class ChatRoom(id: String) : Room<ChatState>(id) {
     override fun stateToJson(): Json.Object = Json.Object(
         "id" to id,
         "history" to Json.Array(state.history.map { it.toJson() }),
-        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.id, "name" to it.name) })
+        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
     )
 
     /**
@@ -77,14 +77,14 @@ class ChatRoom(id: String) : Room<ChatState>(id) {
     override suspend fun onActorJoined(actor: Actor) {
         // Broadcast updated actor list
         broadcast("actors", Json.Object(
-            "actors" to Json.Array(actors.values.map { Json.Object("id" to it.id, "name" to it.name) })
+            "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
         ))
     }
 
     override suspend fun onActorLeft(actor: Actor) {
         // Broadcast updated actor list
         broadcast("actors", Json.Object(
-            "actors" to Json.Array(actors.values.map { Json.Object("id" to it.id, "name" to it.name) })
+            "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
         ))
     }
 }
