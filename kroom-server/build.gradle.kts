@@ -23,8 +23,6 @@ dependencies {
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.server.sse)
     implementation(libs.ktor.server.status.pages)
-    implementation(libs.slf4j.simple)
-
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)

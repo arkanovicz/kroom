@@ -21,8 +21,6 @@ dependencies {
     api(libs.ktor.server.call.logging)
     api(libs.ktor.server.default.headers)
     api(libs.essential.kson)
-    implementation(libs.slf4j.simple)
-
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)

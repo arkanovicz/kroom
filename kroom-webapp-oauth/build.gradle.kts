@@ -18,8 +18,6 @@ dependencies {
     api(libs.pac4j.core)
     api(libs.pac4j.oidc)
     api(libs.pac4j.oauth)
-    implementation(libs.slf4j.simple)
-
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)

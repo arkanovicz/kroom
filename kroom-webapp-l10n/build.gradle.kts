@@ -13,8 +13,6 @@ java {
 
 dependencies {
     api(project(":kroom-webapp-velocity"))
-    implementation(libs.slf4j.simple)
-
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)
