@@ -22,10 +22,11 @@ const api = (function() {
         if (err instanceof Response) {
             const contentType = err.headers.get('content-type') || '';
             let message = '';
+            let data = null;
             try {
                 if (contentType.includes('application/json')) {
-                    const json = await err.json();
-                    message = json?.message ?? JSON.stringify(json) ?? "";
+                    data = await err.json();
+                    message = data?.message ?? data?.error ?? JSON.stringify(data) ?? "";
                 } else if (contentType.includes('text/plain')) {
                     message = await err.text();
                 }
@@ -34,7 +35,10 @@ const api = (function() {
             }
             message = message || err.statusText || 'Request failed';
             console.error(`${err.status} ${message}`);
-            throw new Error(message);
+            const apiError = new Error(message);
+            apiError.status = err.status;
+            apiError.data = data;
+            throw apiError;
         } else {
             console.error(String(err));
             throw err;
