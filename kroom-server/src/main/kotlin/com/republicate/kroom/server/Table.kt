@@ -142,7 +142,9 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      * Override stateToJsonForSeat() instead of stateToJson() for seat-aware serialization.
      */
     override suspend fun sendStateTo(actor: Actor) {
-        val seatNumber = getSeatForConnection(actor.connectionId)?.number
+        // Look up seat by userId first (reconnect/multi-tab case), then by connectionId
+        val seatNumber = actor.userId?.let { getSeatForUser(it)?.number }
+            ?: getSeatForConnection(actor.connectionId)?.number
         actor.channel?.send(ServerSentEvent(
             data = stateToJsonForSeat(seatNumber).toString(),
             event = "state"
