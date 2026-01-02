@@ -46,12 +46,16 @@ Element.prototype.removeClass = function(className) {
     className.split(/\s+/).forEach(c => { if (c) this.classList.remove(c); });
     return this;
 };
-NodeList.prototype.toggleClass = function(className) {
-    this.forEach(elem => elem.classList.toggle(className));
+NodeList.prototype.toggleClass = function(className, force) {
+    this.forEach(elem => elem.toggleClass(className, force));
     return this;
 };
-Element.prototype.toggleClass = function(className) {
-    this.classList.toggle(className);
+Element.prototype.toggleClass = function(className, force) {
+    if (typeof force === 'undefined') {
+        this.classList.toggle(className);
+    } else {
+        this.classList.toggle(className, force);
+    }
     return this;
 };
 NodeList.prototype.hasClass = function(className) {

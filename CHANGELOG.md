@@ -7,6 +7,8 @@ All notable changes to kroom will be documented in this file.
 ### Added
 
 #### kroom-webapp-assets
+- `domhelper.js`: `toggleClass(className, force)` now supports force parameter
+- `api.js`: Error objects now include `status` and `data` properties
 - `sse.js` - SSE client with platform abstraction
   - Browser uses native `EventSource`
   - Native WebView can inject `window.kroomSSE` to delegate to app
