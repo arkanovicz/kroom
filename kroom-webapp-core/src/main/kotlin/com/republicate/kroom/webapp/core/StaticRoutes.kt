@@ -5,7 +5,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 /**
- * Mount static routes for serving CSS, JS, images and other static assets.
+ * Mount static routes for serving CSS, JS, images, sounds and other static assets.
  *
  * Assets are loaded from classpath resources under /static/
  *
@@ -14,26 +14,14 @@ import io.ktor.server.routing.*
  * - /js/{path} from static/js/
  * - /img/{path} from static/img/
  * - /lib/{path} from static/lib/
+ * - /snd/{path} from static/snd/
  */
 fun Route.staticRoutes() {
-    route("/css") {
-        get("/{path...}") {
-            serveStatic("css", call.parameters.getAll("path")?.joinToString("/"))
-        }
-    }
-    route("/js") {
-        get("/{path...}") {
-            serveStatic("js", call.parameters.getAll("path")?.joinToString("/"))
-        }
-    }
-    route("/img") {
-        get("/{path...}") {
-            serveStatic("img", call.parameters.getAll("path")?.joinToString("/"))
-        }
-    }
-    route("/lib") {
-        get("/{path...}") {
-            serveStatic("lib", call.parameters.getAll("path")?.joinToString("/"))
+    listOf("css", "js", "img", "lib", "snd").forEach { prefix ->
+        route("/$prefix") {
+            get("/{path...}") {
+                serveStatic(prefix, call.parameters.getAll("path")?.joinToString("/"))
+            }
         }
     }
 }
@@ -59,6 +47,7 @@ private suspend fun RoutingContext.serveStatic(prefix: String, path: String?) {
         path.endsWith(".svg") -> ContentType.Image.SVG
         path.endsWith(".png") -> ContentType.Image.PNG
         path.endsWith(".jpg") || path.endsWith(".jpeg") -> ContentType.Image.JPEG
+        path.endsWith(".mp3") -> ContentType.Audio.MPEG
         path.endsWith(".woff") -> ContentType("font", "woff")
         path.endsWith(".woff2") -> ContentType("font", "woff2")
         path.endsWith(".ttf") -> ContentType("font", "ttf")
