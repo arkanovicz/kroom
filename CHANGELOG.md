@@ -39,7 +39,7 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed
 - Ktor upgraded to 3.3.0 (h2c support)
-- JS assets consolidated in kroom-webapp-assets (removed from kroom-webapp-core)
+- **kroom-webapp-assets**: JS assets moved from `webapp/js/` to `static/js/` (now served by `staticRoutes()`)
 - `Actor.id` deprecated, use `connectionId` instead
 
 ### Fixed
