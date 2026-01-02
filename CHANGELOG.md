@@ -42,6 +42,11 @@ All notable changes to kroom will be documented in this file.
 - JS assets consolidated in kroom-webapp-assets (removed from kroom-webapp-core)
 - `Actor.id` deprecated, use `connectionId` instead
 
+### Fixed
+
+#### kroom-server
+- `Table.sendStateTo()` now looks up seat by `userId` first, fixing `mySeat` for multi-tab and reconnect scenarios
+
 ---
 
 ## [0.2] - 2025-12-08
