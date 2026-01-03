@@ -38,6 +38,7 @@ All notable changes to kroom will be documented in this file.
 - `Table.Seat` tracks `userId`, `playerName`, `connectionId` separately
   - Reconnection matches by `userId` instead of name
   - `assignSeat(connectionId, userId, playerName, requestedSeat?)` new signature
+- `Table.stateToJsonForSeat()` now includes `spectators` list by default
 
 ### Changed
 - Ktor upgraded to 3.3.0 (h2c support)

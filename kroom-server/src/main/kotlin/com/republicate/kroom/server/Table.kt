@@ -152,7 +152,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
     }
 
     /**
-     * Convert state to JSON, including the viewer's seat number.
+     * Convert state to JSON, including the viewer's seat number and spectators.
      * Override this for seat-aware state serialization.
      */
     protected open fun stateToJsonForSeat(seatNumber: Int?): Json.Object {
@@ -162,6 +162,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
             json[key] = base[key]
         }
         json["mySeat"] = seatNumber
+        json["spectators"] = Json.Array(getSpectators().map { it.name })
         return json
     }
 
