@@ -49,6 +49,7 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-server
 - `Table.sendStateTo()` now looks up seat by `userId` first, fixing `mySeat` for multi-tab and reconnect scenarios
+- `Room.join()` now calls `onActorJoined()` before `sendStateTo()`, ensuring seats are assigned before initial state is sent
 
 ---
 

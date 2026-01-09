@@ -108,9 +108,9 @@ abstract class Room<S : Any>(val id: String) {
 
         logger.debug("Actor '${actor.name}' joined room '$id' (${actors.size} actors)")
 
-        // Send initial state
-        sendStateTo(actor)
+        // First complete the join (seat assignment in Table), then send state
         onActorJoined(actor)
+        sendStateTo(actor)
 
         return channel
     }
@@ -127,9 +127,9 @@ abstract class Room<S : Any>(val id: String) {
 
         logger.debug("Spectator '${spectator.name}' joined room '$id' (${spectators.size} spectators)")
 
-        // Send initial state
-        sendStateTo(spectator)
+        // First complete the join, then send state
         onSpectatorJoined(spectator)
+        sendStateTo(spectator)
 
         return channel
     }
