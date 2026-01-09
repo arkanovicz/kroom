@@ -16,7 +16,7 @@ import java.io.StringWriter
  * Provides:
  * - Language detection from URL prefix (/en/..., /fr/...)
  * - Accept-Language header parsing
- * - PO file translation loading
+ * - Pluggable translation sources (PO files, database)
  * - Velocity template translation
  */
 
@@ -27,8 +27,25 @@ class L10nConfig {
     var i18nPath: String = "/i18n"
     var logMissing: Boolean = false
 
+    // Translation source (default: PO files)
+    internal var translationSource: TranslationSource = PoTranslationSource(i18nPath, logMissing)
+
     fun language(iso: String, name: String) {
         languages = languages + (iso to name)
+    }
+
+    /**
+     * Use PO files as translation source (default).
+     */
+    fun usePo(block: PoTranslationSource.() -> Unit = {}) {
+        translationSource = PoTranslationSource(i18nPath, logMissing).apply(block)
+    }
+
+    /**
+     * Use a custom translation source.
+     */
+    fun useSource(source: TranslationSource) {
+        translationSource = source
     }
 }
 
@@ -48,10 +65,13 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
     val config = L10nConfig().apply(block)
     attributes.put(L10nConfigKey, config)
 
-    // Load translation bundles
-    config.languages.keys.forEach { lang ->
-        if (lang != config.sourceLanguage) {
-            Translator.loadBundle(lang, "${config.i18nPath}/$lang.po")
+    // Load translation bundles for PO source
+    val source = config.translationSource
+    if (source is PoTranslationSource) {
+        config.languages.keys.forEach { lang ->
+            if (lang != config.sourceLanguage) {
+                source.loadBundle(lang, "${config.i18nPath}/$lang.po")
+            }
         }
     }
 
@@ -62,7 +82,7 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
         // Skip API and static resources
         if (path.startsWith("/api/") || path.startsWith("/css/") ||
             path.startsWith("/js/") || path.startsWith("/img/") ||
-            path.startsWith("/lib/") ||
+            path.startsWith("/lib/") || path.startsWith("/admin/") ||
             path == "/health" || path == "/favicon.ico") {
             return@intercept
         }
@@ -106,6 +126,17 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
             }
             call.respondText(result.toString(), ContentType.Application.Json)
         }
+
+        // API endpoint to get JS translations for current language
+        get("/api/i18n/js") {
+            val lang = call.language
+            val translations = config.translationSource.getAllTranslations(lang)
+            val result = com.republicate.kson.Json.MutableObject()
+            translations.forEach { (en, translated) ->
+                result.set(en, translated)
+            }
+            call.respondText(result.toString(), ContentType.Application.Json)
+        }
     }
 }
 
@@ -144,6 +175,11 @@ suspend fun ApplicationCall.respondVelocityTranslated(
     // Add language info to context
     context.put("lang", language)
     context.put("languages", application.l10nConfig.languages)
+    // Add JS translations JSON for injection
+    val jsTranslations = application.l10nConfig.translationSource.getAllTranslations(language)
+    context.put("jsTranslations", com.republicate.kson.Json.MutableObject().apply {
+        jsTranslations.forEach { (en, translated) -> set(en, translated) }
+    }.toString())
     // Add custom model
     model.forEach { (key, value) -> context.put(key, value) }
 

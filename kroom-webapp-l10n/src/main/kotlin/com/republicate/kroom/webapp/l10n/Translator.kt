@@ -10,20 +10,22 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Translator for gettext-based localization.
+ * Translator for Velocity template localization.
  *
  * Translates text content in Velocity templates and plain strings.
+ * Uses a pluggable TranslationSource for lookups (PO files, database, etc.).
  */
-class Translator(private val iso: String, private val config: L10nConfig) {
+class Translator(
+    private val iso: String,
+    private val config: L10nConfig,
+    private val currentSource: String = "velocity"  // Source identifier for missing tracking
+) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(Translator::class.java)
 
         // ASTText.ctext is protected, need reflection
         private val textAccessor = ASTText::class.java.getDeclaredField("ctext").also { it.isAccessible = true }
-
-        // Translation bundles (loaded from .po files)
-        private val bundles = ConcurrentHashMap<String, Map<String, String>>()
 
         // Translation cache per (uri, lang)
         private val translationsCache = ConcurrentHashMap<Pair<String, String>, Template>()
@@ -38,23 +40,13 @@ class Translator(private val iso: String, private val config: L10nConfig) {
         )
         private val ignoreExp = Regex("(<script)|(</script>)|(<style)|(</style)")
 
-        fun loadBundle(lang: String, resourcePath: String) {
-            val resource = Translator::class.java.getResourceAsStream(resourcePath)
-            if (resource != null) {
-                bundles[lang] = PoParser.parse(resource)
-                logger.info("Loaded ${bundles[lang]?.size ?: 0} translations for $lang from $resourcePath")
-            } else {
-                logger.warn("No translation file found at $resourcePath for $lang")
-                bundles[lang] = emptyMap()
-            }
-        }
-
-        fun isLoaded(lang: String) = bundles.containsKey(lang)
-
         fun resetCache() {
             translationsCache.clear()
         }
     }
+
+    private val source: TranslationSource
+        get() = config.translationSource
 
     init {
         current.set(this)
@@ -69,12 +61,11 @@ class Translator(private val iso: String, private val config: L10nConfig) {
      */
     fun translate(enText: String): String {
         if (iso == config.sourceLanguage) return enText
-        val bundle = bundles[iso] ?: return enText
-        return bundle[enText] ?: enText.also {
-            if (config.logMissing) {
-                logger.debug("No translation found for '{}' in {}", enText, iso)
-            }
-        }
+        val translated = source.getTranslation(enText, iso)
+        if (translated != null) return translated
+        // Report missing
+        source.onMissing(enText, iso, currentSource)
+        return enText
     }
 
     /**
