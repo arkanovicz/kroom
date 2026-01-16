@@ -27,11 +27,25 @@ class L10nConfig {
     var i18nPath: String = "/i18n"
     var logMissing: Boolean = false
 
+    // Paths to skip from language redirect (configurable, defaults cover common static prefixes)
+    var skipPrefixes: List<String> = listOf("/api/", "/css/", "/js/", "/img/", "/lib/", "/snd/", "/admin/")
+    var skipPaths: List<String> = listOf("/health")
+
     // Translation source (default: PO files)
     internal var translationSource: TranslationSource = PoTranslationSource(i18nPath, logMissing)
 
     fun language(iso: String, name: String) {
         languages = languages + (iso to name)
+    }
+
+    /** Add path prefixes to skip from language routing */
+    fun skipPrefix(vararg prefixes: String) {
+        skipPrefixes = skipPrefixes + prefixes.toList()
+    }
+
+    /** Add exact paths to skip from language routing */
+    fun skipPath(vararg paths: String) {
+        skipPaths = skipPaths + paths.toList()
     }
 
     /**
@@ -79,11 +93,15 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
 
-        // Skip API and static resources
-        if (path.startsWith("/api/") || path.startsWith("/css/") ||
-            path.startsWith("/js/") || path.startsWith("/img/") ||
-            path.startsWith("/lib/") || path.startsWith("/admin/") ||
-            path == "/health" || path == "/favicon.ico") {
+        // Skip configured prefixes and paths
+        if (config.skipPrefixes.any { path.startsWith(it) } ||
+            config.skipPaths.any { path == it }) {
+            return@intercept
+        }
+
+        // Skip root-level static files (e.g., /favicon.ico, /robots.txt, /manifest.webmanifest)
+        // These are paths like /filename.ext with no subdirectory
+        if (path.matches(Regex("^/[^/]+\\.[a-zA-Z0-9]+$"))) {
             return@intercept
         }
 
