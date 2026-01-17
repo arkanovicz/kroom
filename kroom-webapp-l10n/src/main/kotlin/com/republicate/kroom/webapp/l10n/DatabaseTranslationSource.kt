@@ -25,8 +25,8 @@ class DatabaseTranslationSource(
         private val logger = LoggerFactory.getLogger(DatabaseTranslationSource::class.java)
     }
 
-    // Cache: (iso, en) -> translated (null means "looked up, not found")
-    private val cache = ConcurrentHashMap<Pair<String, String>, String?>()
+    // Cache: (iso, en) -> translated (only non-null values stored; cacheChecked tracks all lookups)
+    private val cache = ConcurrentHashMap<Pair<String, String>, String>()
     private val cacheChecked = ConcurrentHashMap.newKeySet<Pair<String, String>>()
 
     // Track which languages have been fully loaded
@@ -42,7 +42,8 @@ class DatabaseTranslationSource(
         // Query database
         return try {
             val translated = fetchOne(en, iso)
-            cache[key] = translated
+            // ConcurrentHashMap doesn't allow null values, only store if found
+            if (translated != null) cache[key] = translated
             cacheChecked.add(key)
             translated
         } catch (e: Exception) {
@@ -55,7 +56,7 @@ class DatabaseTranslationSource(
         // Return from cache if already loaded
         if (loadedLanguages.contains(iso)) {
             return cache.filterKeys { it.first == iso }
-                .mapNotNull { (key, value) -> value?.let { key.second to it } }
+                .map { (key, value) -> key.second to value }
                 .toMap()
         }
 
@@ -95,7 +96,8 @@ class DatabaseTranslationSource(
         try {
             logger.info("Auto-inserting missing translation: '{}' for {} (source={})", en, iso, source)
             insertMissing.invoke(en, iso, source)
-            cache[key] = null
+            // Don't store null in cache (ConcurrentHashMap doesn't allow nulls)
+            // cacheChecked tracks that we've already processed this key
             cacheChecked.add(key)
         } catch (e: Exception) {
             // Ignore duplicate key errors (race condition)
