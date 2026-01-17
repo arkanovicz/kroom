@@ -1,5 +1,6 @@
 package com.republicate.kroom.webapp.velocity
 
+import com.republicate.kroom.webapp.core.WebResourceVersionCache
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -25,12 +26,19 @@ class VelocityPlugin(private val config: VelocityConfig) {
             val prefix = if (it.endsWith("/")) it else "$it/"
             setProperty("classpath.resource.loader.prefix", prefix)
         }
+        // Load kroom macros library
+        setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
+        setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
         init()
     }
+
+    val versionCache: WebResourceVersionCache? = config.versionCache
 
     fun render(templatePath: String, model: Map<String, Any?> = emptyMap()): String {
         val template = engine.getTemplate(templatePath)
         val context = VelocityContext()
+        // Add version cache as $versions
+        versionCache?.let { context.put("versions", it) }
         model.forEach { (key, value) -> context.put(key, value) }
         val writer = StringWriter()
         template.merge(context, writer)
@@ -49,6 +57,7 @@ class VelocityPlugin(private val config: VelocityConfig) {
 class VelocityConfig {
     var templatePath: String? = "templates"
     var devMode: Boolean = false
+    var versionCache: WebResourceVersionCache? = null
 }
 
 /**

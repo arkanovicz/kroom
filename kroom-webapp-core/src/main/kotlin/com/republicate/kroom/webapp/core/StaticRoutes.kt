@@ -54,5 +54,9 @@ private suspend fun RoutingContext.serveStatic(prefix: String, path: String?) {
         else -> ContentType.Application.OctetStream
     }
 
+    // Long cache (1 year) when versioned (?v=...), short cache otherwise
+    val hasVersion = call.request.queryParameters.contains("v")
+    val maxAge = if (hasVersion) 31536000 else 3600  // 1 year vs 1 hour
+    call.response.header(HttpHeaders.CacheControl, "public, max-age=$maxAge")
     call.respondBytes(resource.readBytes(), contentType)
 }
