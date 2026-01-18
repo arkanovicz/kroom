@@ -49,6 +49,10 @@ window.$ = (selector, context = document) => {
     const nodes = context.querySelectorAll(selector);
     if (nodes.length === 0) return emptyProxy;
     if (nodes.length === 1) return singletonProxy(nodes[0]);
+    // Warn if ID selector returns multiple elements (IDs should be unique)
+    if (/^#[\w-]+$/.test(selector)) {
+        console.warn(`Duplicate ID: ${selector} matched ${nodes.length} elements`);
+    }
     return nodes;
 };
 
