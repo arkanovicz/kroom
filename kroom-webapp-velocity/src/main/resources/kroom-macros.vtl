@@ -3,5 +3,5 @@
 ## Versioned static resource URL - adds ?v=timestamp for cache busting
 ## Usage: #versioned("/js/app.js") → /js/app.js?v=1234567890
 #macro(versioned $url)##
-$url?v=$versions.get($url)##
+$url?v=$!{versions.get($url)}##
 #end
