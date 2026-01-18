@@ -7,7 +7,8 @@ const CHAINABLE = new Set([
     'attr', 'removeAttr', 'prop', 'data',
     'show', 'hide', 'disable', 'text', 'html',
     'clear', 'append', 'val', 'focus', 'click',
-    'empty', 'busy', 'close', 'forEach', 'load'
+    'empty', 'busy', 'close', 'forEach', 'load',
+    'setAttribute', 'removeAttribute', 'toggleAttribute'
 ]);
 
 // Empty proxy for when no elements match - enables safe chaining
