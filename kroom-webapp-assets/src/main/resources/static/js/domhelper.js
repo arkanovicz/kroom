@@ -1,9 +1,54 @@
 // domhelper.js - lightweight jQuery-like DOM helper
 // Part of kroom-webapp-assets
 
+// Chainable methods that should return the proxy for chaining
+const CHAINABLE = new Set([
+    'on', 'addClass', 'removeClass', 'toggleClass',
+    'attr', 'removeAttr', 'prop', 'data',
+    'show', 'hide', 'disable', 'text', 'html',
+    'clear', 'append', 'val', 'focus', 'click',
+    'empty', 'busy', 'close', 'forEach', 'load'
+]);
+
+// Empty proxy for when no elements match - enables safe chaining
+const emptyProxy = new Proxy([], {
+    get(target, prop) {
+        if (prop === 'length') return 0;
+        if (prop === 'item') return () => null;
+        if (prop === Symbol.iterator) return function*() {};
+        if (prop === 'nodeType') return undefined;
+        // Chainable methods return the proxy
+        if (CHAINABLE.has(prop)) return () => emptyProxy;
+        // Getters return undefined
+        return undefined;
+    }
+});
+
+// Singleton proxy wraps Element but also responds to NodeList properties
+const singletonProxy = (el) => new Proxy(el, {
+    get(target, prop) {
+        // NodeList-like behavior
+        if (prop === 'length') return 1;
+        if (prop === 'item') return (i) => i === 0 ? target : null;
+        if (prop === Symbol.iterator) return function*() { yield target; };
+        // Array-like index access: [0] returns element, others undefined
+        if (prop === '0' || prop === 0) return target;
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) return undefined;
+        // Forward everything else to Element
+        const val = target[prop];
+        return typeof val === 'function' ? val.bind(target) : val;
+    },
+    set(target, prop, value) {
+        target[prop] = value;
+        return true;
+    }
+});
+
 window.$ = (selector, context = document) => {
     const nodes = context.querySelectorAll(selector);
-    return nodes.length === 1 ? nodes[0] : nodes;
+    if (nodes.length === 0) return emptyProxy;
+    if (nodes.length === 1) return singletonProxy(nodes[0]);
+    return nodes;
 };
 
 window.$$ = (selector, context = document) => {
