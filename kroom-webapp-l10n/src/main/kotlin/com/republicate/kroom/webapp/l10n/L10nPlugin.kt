@@ -190,6 +190,8 @@ suspend fun ApplicationCall.respondVelocityTranslated(
     val translatedTemplate = translator.translate(templatePath, template)
 
     val context = VelocityContext()
+    // Add version cache if available
+    application.velocity.versionCache?.let { context.put("versions", it) }
     // Add language info to context
     context.put("lang", language)
     context.put("languages", application.l10nConfig.languages)
