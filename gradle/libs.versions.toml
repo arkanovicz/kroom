@@ -27,6 +27,7 @@ junit-platform = "1.13.3"
 mockito-junit-jupiter = "5.18.0"
 # TODO migrate to ksoup
 jsoup = "1.20.1"
+web-push = "5.1.1"
 versionsPlugin = "0.52.0"
 
 [libraries]
@@ -75,6 +76,7 @@ junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", vers
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito-junit-jupiter" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+web-push = { module = "nl.martijndwars:web-push", version.ref = "web-push" }
 pac4j-core = { module = "org.pac4j:pac4j-core", version.ref = "pac4j" }
 pac4j-oidc = { module = "org.pac4j:pac4j-oidc", version.ref = "pac4j" }
 pac4j-oauth = { module = "org.pac4j:pac4j-oauth", version.ref = "pac4j" }

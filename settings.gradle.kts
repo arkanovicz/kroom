@@ -12,6 +12,7 @@ include("kroom-webapp-assets")
 include("kroom-webapp-velocity")
 include("kroom-webapp-l10n")
 include("kroom-webapp-oauth")
+include("kroom-webapp-push")
 
 // Examples
 include("kroom-examples:chifoumi")
