@@ -108,6 +108,9 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
         // Check for language prefix: /en/... or /fr/...
         val langMatch = Regex("^/([a-z]{2})(/.*)?$").find(path)
 
+        // Preserve query string for redirects
+        val queryString = call.request.queryString().takeIf { it.isNotEmpty() }?.let { "?$it" } ?: ""
+
         if (langMatch != null) {
             val lang = langMatch.groupValues[1]
             if (lang in config.languages) {
@@ -115,14 +118,14 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
             } else {
                 // Unknown language, redirect to preferred
                 val preferredLang = getPreferredLanguage(call.request.header(HttpHeaders.AcceptLanguage), config)
-                val newPath = "/$preferredLang${langMatch.groupValues[2] ?: ""}"
+                val newPath = "/$preferredLang${langMatch.groupValues[2] ?: ""}$queryString"
                 call.respondRedirect(newPath, permanent = false)
                 finish()
             }
         } else {
             // No language prefix, redirect to preferred language
             val preferredLang = getPreferredLanguage(call.request.header(HttpHeaders.AcceptLanguage), config)
-            val newPath = "/$preferredLang$path"
+            val newPath = "/$preferredLang$path$queryString"
             call.respondRedirect(newPath, permanent = false)
             finish()
         }
