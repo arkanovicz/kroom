@@ -35,10 +35,16 @@ abstract class KroomActivity : AppCompatActivity() {
     protected abstract fun getSiteUrl(): String
 
     /**
-     * Override to specify paths that should NOT be intercepted (pass through to server).
-     * Default: /api and /events (SSE)
+     * Override to specify path prefixes served locally from bundled assets.
+     * Everything else passes through to the server.
+     * Default: common static asset prefixes
      */
-    protected open fun getPassthroughPrefixes(): List<String> = listOf("/api", "/events")
+    protected open fun getStaticPrefixes(): List<String> = listOf("/js/", "/css/", "/img/", "/lib/", "/fonts/", "/snd/")
+
+    /**
+     * Override to specify exact paths served locally.
+     */
+    protected open fun getStaticPaths(): List<String> = emptyList()
 
     /**
      * Override to configure the WebView before the URL is loaded.
@@ -91,20 +97,22 @@ abstract class KroomActivity : AppCompatActivity() {
         ): WebResourceResponse? {
             val path = request.url.path ?: return null
 
-            // Pass through to server for API and SSE
-            for (prefix in getPassthroughPrefixes()) {
-                if (path.startsWith(prefix)) {
-                    return null
-                }
-            }
-
             // Only intercept GET requests
             if (request.method != "GET") {
                 return null
             }
 
+            // Check if path should be served locally
+            val isStatic = getStaticPrefixes().any { path.startsWith(it) } ||
+                    getStaticPaths().any { path == it } ||
+                    path.matches(Regex("^/[^/]+\\.[a-zA-Z0-9]+$"))  // root-level static files
+
+            if (!isStatic) {
+                return null  // pass through to server
+            }
+
             return try {
-                val resourcePath = if (path == "/" || path.isEmpty()) "index" else path.removePrefix("/")
+                val resourcePath = path.removePrefix("/")
                 val content = ViewHandler.serve(resourcePath)
                 WebResourceResponse(
                     getMimeType(resourcePath),
@@ -113,14 +121,8 @@ abstract class KroomActivity : AppCompatActivity() {
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to serve: $path", e)
-                WebResourceResponse(
-                    "text/plain",
-                    "utf-8",
-                    404,
-                    "Not Found",
-                    emptyMap(),
-                    ByteArrayInputStream("Resource not found: $path".toByteArray())
-                )
+                // Fall back to server if local serving fails
+                null
             }
         }
 
