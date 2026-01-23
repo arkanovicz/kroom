@@ -2,12 +2,6 @@
 
 ## Versioned static resource URL - adds ?v=timestamp for cache busting
 ## Usage: #versioned("/js/app.js") → /js/app.js?v=1234567890
-## Skips versioning for files with version in name (e.g., chart-4.4.1.min.js)
 #macro(versioned $url)##
-#if($url.matches(".*-[0-9]+\.[0-9]+.*\.js$") || $url.matches(".*-[0-9]+\.[0-9]+.*\.css$"))##
-$url##
-#else##
-#set($v = $!versions.get($url))##
-#if($v && $v != "" && $v != "0")$url?v=$v#else$url#end##
-#end##
+$url?v=$!{versions.get($url)}##
 #end
