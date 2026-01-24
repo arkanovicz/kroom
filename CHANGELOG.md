@@ -2,6 +2,23 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.5-dev] - 2026-01-24
+
+### Added
+
+#### kroom-webapp-core
+- **Configurable static routes** via `installCore { static { ... } }`
+  - `prefixes`: list of path prefixes to serve (default: `css`, `js`, `img`, `fonts`, `lib`, `snd`)
+  - `devMode`: when true, serves from filesystem first with classpath fallback
+  - `devDir`: filesystem directory for dev mode hot-reload
+- Added `fonts` to default static prefixes (was missing, causing 404 for font files)
+
+### Changed
+- `staticRoutes()` now accepts `StaticConfig` parameter (backward compatible, defaults work)
+- Dev/prod static serving unified: single configuration point instead of duplicate route definitions
+
+---
+
 ## [0.4] - 2026-01-24
 
 ### Changed

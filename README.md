@@ -28,8 +28,8 @@ kroom-webapp-oauth    OAuth2 authentication
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.4")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.4")
+    implementation("com.republicate.kroom:kroom-server:0.5-dev")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.5-dev")
 }
 ```
 
@@ -50,6 +50,40 @@ routing {
     post("/api/{room}/action") { /* dispatch to room */ }
 }
 ```
+
+## kroom-webapp-core
+
+Ktor webapp foundation with `installCore()` plugin:
+
+```kotlin
+installCore {
+    logLevel = Level.INFO  // CallLogging level
+
+    static {
+        // Default prefixes: css, js, img, fonts, lib, snd
+        prefixes = listOf("css", "js", "img", "fonts", "lib", "snd")
+
+        // Dev mode: serve from filesystem first, fallback to classpath
+        devMode = true
+        devDir = File("src/main/resources/static")
+    }
+}
+```
+
+### Static Routes
+
+Default prefixes (configurable via `prefixes`):
+
+| Route | Source |
+|-------|--------|
+| `/css/*` | `static/css/` |
+| `/js/*` | `static/js/` |
+| `/img/*` | `static/img/` |
+| `/fonts/*` | `static/fonts/` |
+| `/lib/*` | `static/lib/` |
+| `/snd/*` | `static/snd/` |
+
+Assets served from classpath (production) or filesystem with classpath fallback (dev mode).
 
 ## kroom-webapp-assets
 
