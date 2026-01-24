@@ -53,6 +53,55 @@ abstract class KroomActivity : AppCompatActivity() {
      */
     protected open fun onWebViewReady() {}
 
+    /**
+     * Called when a network error occurs on the main document.
+     * Override to customize error handling.
+     * Default: shows a user-friendly error page.
+     */
+    protected open fun onNetworkError(errorCode: Int, description: String, url: String) {
+        val html = """
+            <!DOCTYPE html>
+            <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width">
+            <style>
+                body { font-family: system-ui, sans-serif; padding: 40px 20px; text-align: center; background: #f8f9fa; }
+                h1 { color: #dc3545; font-size: 24px; }
+                p { color: #6c757d; }
+                button { margin-top: 20px; padding: 12px 24px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 8px; }
+            </style></head>
+            <body>
+                <h1>Connection Error</h1>
+                <p>Could not connect to server.<br>Please check that the server is running.</p>
+                <button onclick="location.reload()">Retry</button>
+            </body></html>
+        """.trimIndent()
+        webView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+    }
+
+    /**
+     * Called when an HTTP error (4xx, 5xx) occurs on the main document.
+     * Override to customize error handling.
+     * Default: shows a user-friendly error page.
+     */
+    protected open fun onHttpError(statusCode: Int, reasonPhrase: String?, url: String) {
+        val html = """
+            <!DOCTYPE html>
+            <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width">
+            <style>
+                body { font-family: system-ui, sans-serif; padding: 40px 20px; text-align: center; background: #f8f9fa; }
+                h1 { color: #dc3545; font-size: 24px; }
+                p { color: #6c757d; }
+                code { background: #e9ecef; padding: 2px 6px; border-radius: 4px; }
+                button { margin-top: 20px; padding: 12px 24px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 8px; }
+            </style></head>
+            <body>
+                <h1>Error $statusCode</h1>
+                <p>${reasonPhrase ?: "Something went wrong"}</p>
+                <button onclick="location.reload()">Retry</button>
+            </body></html>
+        """.trimIndent()
+        webView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+    }
+
     @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,10 +182,18 @@ abstract class KroomActivity : AppCompatActivity() {
 
         override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
             Log.e(TAG, "${error.errorCode} ${error.description} for url ${request.url}")
+            // Only show error page for main document, not subresources
+            if (request.isForMainFrame) {
+                onNetworkError(error.errorCode, error.description.toString(), request.url.toString())
+            }
         }
 
         override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
-            Log.e(TAG, "${errorResponse?.reasonPhrase} for url ${request?.url}")
+            Log.e(TAG, "${errorResponse?.statusCode} ${errorResponse?.reasonPhrase} for url ${request?.url}")
+            // Only show error page for main document, not subresources
+            if (request?.isForMainFrame == true && errorResponse != null) {
+                onHttpError(errorResponse.statusCode, errorResponse.reasonPhrase, request.url.toString())
+            }
         }
     }
 }

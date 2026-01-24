@@ -2,9 +2,12 @@
 
 All notable changes to kroom will be documented in this file.
 
-## [0.3] - Unreleased
+## [0.3] - 2026-01-24
 
 ### Added
+
+#### kroom-webapp-push (new module)
+- Web Push notifications support via `nl.martijndwars:web-push`
 
 #### kroom-webapp-assets
 - `domhelper.js`: `toggleClass(className, force)` now supports force parameter
@@ -29,6 +32,9 @@ All notable changes to kroom will be documented in this file.
   - `ViewHandler` for serving bundle resources
   - `KroomURLSchemeHandler` for intercepting kroom:// scheme
   - `createKroomWebView(config)` factory function
+- Android `KroomActivity` enhancements
+  - `onNetworkError()` / `onHttpError()` callbacks for custom error pages
+  - Configurable static prefixes instead of passthrough logic
 
 #### kroom-server
 - `Actor` identity model: `connectionId` (ephemeral) + `userId` (persistent) + `name`
@@ -41,7 +47,11 @@ All notable changes to kroom will be documented in this file.
 - `Table.stateToJsonForSeat()` now includes `spectators` list by default
 
 ### Changed
+- Kotlin upgraded to 2.3.0
 - Ktor upgraded to 3.3.0 (h2c support)
+- essential-kson upgraded to 2.12
+- kddl upgraded to 0.18
+- Removed `slf4j-simple` from library modules (applications should provide their own SLF4J implementation)
 - **kroom-webapp-assets**: JS assets moved from `webapp/js/` to `static/js/` (now served by `staticRoutes()`)
 - `Actor.id` deprecated, use `connectionId` instead
 
@@ -50,6 +60,9 @@ All notable changes to kroom will be documented in this file.
 #### kroom-server
 - `Table.sendStateTo()` now looks up seat by `userId` first, fixing `mySeat` for multi-tab and reconnect scenarios
 - `Room.join()` now calls `onActorJoined()` before `sendStateTo()`, ensuring seats are assigned before initial state is sent
+
+#### kroom-webapp-l10n
+- Preserve query string during language redirect
 
 ---
 
