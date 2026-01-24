@@ -2,6 +2,13 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.4] - 2026-01-24
+
+### Changed
+- Ktor upgraded to 3.4.0
+
+---
+
 ## [0.3] - 2026-01-24
 
 ### Added
