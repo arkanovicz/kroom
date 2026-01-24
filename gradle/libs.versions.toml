@@ -14,7 +14,6 @@ kotlin-logging = "7.0.7"
 kotlinx-atomicfu = "0.29.0"
 kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
-kotlinx-serialization = "1.9.0"
 kotlinx-html = "0.12.0"
 ktor = "3.4.0"
 pac4j = "6.0.6"
@@ -47,7 +46,6 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-html = { module =" org.jetbrains.kotlinx:kotlinx-html", version.ref = "kotlinx-html" }
-kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
