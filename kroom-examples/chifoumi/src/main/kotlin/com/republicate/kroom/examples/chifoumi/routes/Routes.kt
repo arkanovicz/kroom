@@ -35,7 +35,7 @@ fun Route.chifoumiRoutes() {
             return@sse
         }
 
-        val actor = Actor(session.identifier, session.playerName)
+        val actor = Actor(connectionId = session.identifier, name = session.playerName)
         val channel = ChifoumiLobby.join(actor)
 
         try {
