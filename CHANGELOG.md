@@ -2,7 +2,7 @@
 
 All notable changes to kroom will be documented in this file.
 
-## [0.5-dev] - 2026-01-24
+## [0.5] - Unreleased
 
 ### Added
 
