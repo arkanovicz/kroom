@@ -8,6 +8,7 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.slf4j.event.Level
+import java.io.File
 
 /**
  * Install core Ktor plugins for webapp foundation.
@@ -16,7 +17,7 @@ import org.slf4j.event.Level
  * - CallLogging (request logging)
  * - DefaultHeaders
  * - StatusPages (error handling)
- * - Static routes (css, js from classpath)
+ * - Static routes (configurable prefixes, dev/prod mode)
  */
 fun Application.installCore(block: CoreConfig.() -> Unit = {}) {
     val config = CoreConfig().apply(block)
@@ -43,10 +44,21 @@ fun Application.installCore(block: CoreConfig.() -> Unit = {}) {
     }
 
     routing {
-        staticRoutes()
+        staticRoutes(config.staticConfig)
     }
 }
 
 class CoreConfig {
     var logLevel: Level = Level.INFO
+    val staticConfig = StaticConfig()
+
+    fun static(block: StaticConfig.() -> Unit) {
+        staticConfig.apply(block)
+    }
+}
+
+class StaticConfig {
+    var prefixes: List<String> = listOf("css", "js", "img", "fonts", "lib", "snd")
+    var devMode: Boolean = false
+    var devDir: File? = null
 }
