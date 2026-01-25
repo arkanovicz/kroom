@@ -62,9 +62,10 @@ class Translator(
     fun translate(enText: String): String {
         if (iso == config.sourceLanguage) return enText
         val translated = source.getTranslation(enText, iso)
-        if (translated != null) return translated
-        // Report missing
-        source.onMissing(enText, iso, currentSource)
+        // Use translation only if non-empty; empty/blank means "not yet translated"
+        if (!translated.isNullOrEmpty()) return translated
+        // Report missing only if not in DB at all (null vs empty distinction)
+        if (translated == null) source.onMissing(enText, iso, currentSource)
         return enText
     }
 
