@@ -9,23 +9,38 @@ import org.apache.velocity.VelocityContext
 import org.apache.velocity.app.VelocityEngine
 import org.apache.velocity.runtime.RuntimeConstants
 import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader
+import org.apache.velocity.runtime.resource.loader.FileResourceLoader
+import java.io.File
 import java.io.StringWriter
 
 /**
  * Velocity templating plugin for Ktor.
  *
  * Provides template rendering with optional translation support.
+ * In dev mode with devDir set, loads templates from filesystem with hot reload.
  */
 class VelocityPlugin(private val config: VelocityConfig) {
 
     val engine: VelocityEngine = VelocityEngine().apply {
-        setProperty(RuntimeConstants.RESOURCE_LOADER, "classpath")
-        setProperty("classpath.resource.loader.class", ClasspathResourceLoader::class.java.name)
         setProperty(RuntimeConstants.INPUT_ENCODING, "UTF-8")
-        config.templatePath?.let {
-            val prefix = if (it.endsWith("/")) it else "$it/"
-            setProperty("classpath.resource.loader.prefix", prefix)
+
+        if (config.devMode && config.devDir != null) {
+            // Dev mode: load from filesystem with modification checking
+            setProperty(RuntimeConstants.RESOURCE_LOADER, "file")
+            setProperty("file.resource.loader.class", FileResourceLoader::class.java.name)
+            setProperty("file.resource.loader.path", config.devDir!!.absolutePath)
+            setProperty("file.resource.loader.cache", false)
+            setProperty("file.resource.loader.modificationCheckInterval", 0)
+        } else {
+            // Production: load from classpath
+            setProperty(RuntimeConstants.RESOURCE_LOADER, "classpath")
+            setProperty("classpath.resource.loader.class", ClasspathResourceLoader::class.java.name)
+            config.templatePath?.let {
+                val prefix = if (it.endsWith("/")) it else "$it/"
+                setProperty("classpath.resource.loader.prefix", prefix)
+            }
         }
+
         // Load kroom macros library
         setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
         setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
@@ -57,6 +72,7 @@ class VelocityPlugin(private val config: VelocityConfig) {
 class VelocityConfig {
     var templatePath: String? = "templates"
     var devMode: Boolean = false
+    var devDir: File? = null  // Source directory for dev mode hot reload
     var versionCache: WebResourceVersionCache? = null
 }
 
