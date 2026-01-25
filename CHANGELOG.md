@@ -2,7 +2,7 @@
 
 All notable changes to kroom will be documented in this file.
 
-## [0.5] - Unreleased
+## [0.5] - 2026-01-25
 
 ### Added
 
@@ -16,6 +16,12 @@ All notable changes to kroom will be documented in this file.
 ### Changed
 - `staticRoutes()` now accepts `StaticConfig` parameter (backward compatible, defaults work)
 - Dev/prod static serving unified: single configuration point instead of duplicate route definitions
+- Removed unused kotlinx-serialization dependency
+
+### Fixed
+
+#### kroom-webapp-l10n
+- Fixed missing translation auto-insert bug
 
 ---
 

@@ -28,8 +28,8 @@ kroom-webapp-oauth    OAuth2 authentication
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.5-dev")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.5-dev")
+    implementation("com.republicate.kroom:kroom-server:0.5")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.5")
 }
 ```
 
