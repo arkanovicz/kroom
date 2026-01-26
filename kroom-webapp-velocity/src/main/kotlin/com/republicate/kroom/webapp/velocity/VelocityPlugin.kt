@@ -25,12 +25,13 @@ class VelocityPlugin(private val config: VelocityConfig) {
         setProperty(RuntimeConstants.INPUT_ENCODING, "UTF-8")
 
         if (config.devMode && config.devDir != null) {
-            // Dev mode: load from filesystem with modification checking
-            setProperty(RuntimeConstants.RESOURCE_LOADER, "file")
+            // Dev mode: file first (hot reload), then classpath (for macros library)
+            setProperty(RuntimeConstants.RESOURCE_LOADER, "file,classpath")
             setProperty("file.resource.loader.class", FileResourceLoader::class.java.name)
             setProperty("file.resource.loader.path", config.devDir!!.absolutePath)
             setProperty("file.resource.loader.cache", false)
             setProperty("file.resource.loader.modificationCheckInterval", 0)
+            setProperty("classpath.resource.loader.class", ClasspathResourceLoader::class.java.name)
         } else {
             // Production: load from classpath
             setProperty(RuntimeConstants.RESOURCE_LOADER, "classpath")
