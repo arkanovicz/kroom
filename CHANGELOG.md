@@ -2,6 +2,21 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.6] - 2026-01-26
+
+### Added
+
+#### kroom-webapp-velocity
+- `devDir` configuration for template hot reload in dev mode
+- Dev mode uses both file and classpath loaders for macro library support
+
+### Fixed
+
+#### kroom-webapp-l10n
+- Fall back to English for empty translations
+
+---
+
 ## [0.5] - 2026-01-25
 
 ### Added
