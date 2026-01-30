@@ -215,6 +215,19 @@ Element.prototype.hide = function() {
     return this;
 };
 
+NodeList.prototype.isVisible = function() {
+    return this.length > 0 && this.item(0).isVisible();
+};
+Element.prototype.isVisible = function() {
+    // Check hidden attribute, display:none, or no layout (offsetParent null)
+    if (this.hidden) return false;
+    const style = window.getComputedStyle(this);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    // offsetParent is null for hidden elements (except fixed/body)
+    if (this.offsetParent === null && style.position !== 'fixed' && this.tagName !== 'BODY') return false;
+    return true;
+};
+
 // State
 
 NodeList.prototype.disable = function(value) {

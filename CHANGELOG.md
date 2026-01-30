@@ -2,6 +2,15 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.7-dev] - 2026-01-30
+
+### Added
+
+#### kroom-webapp-assets
+- `Element.isVisible()` / `NodeList.isVisible()` - checks if element is visible (not hidden, not display:none)
+
+---
+
 ## [0.6] - 2026-01-26
 
 ### Added
