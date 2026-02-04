@@ -76,9 +76,10 @@ abstract class Room<S : Any>(val id: String) {
 
     /**
      * Event names that should be buffered for Last-Event-ID replay.
-     * Override to specify which events are historicizable (e.g., "chat").
+     * Configurable at runtime - add event names to enable replay for specific events.
+     * Example: `historicizableEvents.add("chat")`
      */
-    protected open val historicizableEvents: Set<String> = emptySet()
+    protected open val historicizableEvents: MutableSet<String> = mutableSetOf()
 
     init {
         start()

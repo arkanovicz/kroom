@@ -19,6 +19,7 @@ kroom-webapp-oauth    OAuth2 authentication
 
 - Room-based real-time sessions with SSE
 - Actor presence and reconnection handling
+- Last-Event-ID replay for selective event types (e.g., chat)
 - Table abstraction for seat-based games
 - Event broadcasting and keep-alive
 - Coroutine-based async processing
@@ -28,8 +29,8 @@ kroom-webapp-oauth    OAuth2 authentication
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.6")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.6")
+    implementation("com.republicate.kroom:kroom-server:0.7")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.7")
 }
 ```
 
@@ -218,6 +219,27 @@ The `Table` class:
 - Tracks seats (player name + actor ID separately for reconnect)
 - Sends `mySeat` in state payload so clients know their position
 - Handles reconnection by name matching
+
+## Last-Event-ID Replay
+
+SSE supports automatic reconnection with `Last-Event-ID` header. kroom can replay missed events selectively:
+
+```kotlin
+class MyChatRoom(id: String) : Room<MyState>(id) {
+    init {
+        historicizableEvents.add("chat")  // Only "chat" events are replayed
+    }
+
+    override fun needsHistory() = true  // Enable event buffering
+}
+```
+
+- Only events in `historicizableEvents` are buffered and replayed
+- Game events (rolled, played, etc.) use state-on-join, not replay
+- Server restart detection: stale client IDs are ignored
+- Buffer size configurable via `historyBufferSize` (default: 50)
+
+Ideal for games with chat: game state is authoritative, chat history is replayed on reconnect.
 
 ## Run Examples
 

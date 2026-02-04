@@ -32,7 +32,7 @@ data class ChatMessage(
 /**
  * A simple chat room implementation for demonstration and testing.
  *
- * Uses Last-Event-ID replay for chat messages (via broadcastChat).
+ * Uses Last-Event-ID replay for chat messages.
  * State also includes recent history for long disconnects.
  * Clients should deduplicate by message seq to handle overlap.
  */
@@ -40,8 +40,11 @@ class ChatRoom(id: String) : Room<ChatState>(id) {
     override var state = ChatState()
     private val messageSeq = AtomicLong(1)
 
+    init {
+        historicizableEvents.add("chat")
+    }
+
     override fun needsHistory() = true
-    override val historicizableEvents = setOf("chat")
 
     override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
         return when (action.getString("type")) {

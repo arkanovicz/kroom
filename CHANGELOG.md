@@ -2,9 +2,19 @@
 
 All notable changes to kroom will be documented in this file.
 
-## [0.7-dev] - 2026-01-30
+## [0.7] - 2026-02-04
 
 ### Added
+
+#### kroom-server
+- **Last-Event-ID replay support** for SSE reconnection
+  - `Room.needsHistory()` - override to enable event buffering (default: false)
+  - `Room.historyBufferSize` - configurable buffer size (default: 50)
+  - `Room.historicizableEvents` - mutable set of event names to buffer (configurable at runtime)
+  - `Room.join(actor, lastEventId)` - accepts optional Last-Event-ID header
+  - Server restart detection: stale client IDs are ignored
+  - Selective replay: only events in `historicizableEvents` are buffered (e.g., "chat" but not "rolled")
+- `ChatRoom` now enables history replay for chat messages
 
 #### kroom-webapp-assets
 - `Element.isVisible()` / `NodeList.isVisible()` - checks if element is visible (not hidden, not display:none)
