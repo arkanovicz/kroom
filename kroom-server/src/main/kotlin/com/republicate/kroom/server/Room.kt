@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.slf4j.LoggerFactory
+import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -53,7 +54,25 @@ abstract class Room<S : Any>(val id: String) {
 
     companion object {
         const val KEEPALIVE_DELAY = 15_000L  // 15 seconds
+        const val DEFAULT_HISTORY_BUFFER_SIZE = 50
     }
+
+    // History buffer for Last-Event-ID replay (only allocated if needsHistory() returns true)
+    private val historyBuffer: ArrayDeque<ServerSentEvent>? by lazy {
+        if (needsHistory()) ArrayDeque(historyBufferSize) else null
+    }
+
+    /**
+     * Override to enable Last-Event-ID replay on reconnect.
+     * Default is false - games typically don't need history since state is sent on join.
+     * Enable for chat-like rooms where history complements the current state.
+     */
+    protected open fun needsHistory(): Boolean = false
+
+    /**
+     * Buffer size for event history. Only used when needsHistory() returns true.
+     */
+    protected open val historyBufferSize: Int = DEFAULT_HISTORY_BUFFER_SIZE
 
     init {
         start()
@@ -98,8 +117,10 @@ abstract class Room<S : Any>(val id: String) {
 
     /**
      * Actor joins the room
+     * @param actor The actor joining
+     * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
-    suspend fun join(actor: Actor): Channel<ServerSentEvent> {
+    suspend fun join(actor: Actor, lastEventId: String? = null): Channel<ServerSentEvent> {
         val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
         actor.channel = channel
 
@@ -112,13 +133,18 @@ abstract class Room<S : Any>(val id: String) {
         onActorJoined(actor)
         sendStateTo(actor)
 
+        // Replay missed events if history is enabled and lastEventId is valid
+        replayIfNeeded(actor, lastEventId)
+
         return channel
     }
 
     /**
      * Spectator joins the room
+     * @param spectator The spectator joining
+     * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
-    suspend fun joinAsSpectator(spectator: Spectator): Channel<ServerSentEvent> {
+    suspend fun joinAsSpectator(spectator: Spectator, lastEventId: String? = null): Channel<ServerSentEvent> {
         val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
         spectator.channel = channel
 
@@ -130,6 +156,9 @@ abstract class Room<S : Any>(val id: String) {
         // First complete the join, then send state
         onSpectatorJoined(spectator)
         sendStateTo(spectator)
+
+        // Replay missed events if history is enabled and lastEventId is valid
+        replayIfNeeded(spectator, lastEventId)
 
         return channel
     }
@@ -206,6 +235,42 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
+     * Replay missed events to an actor if history is enabled and lastEventId is valid.
+     * Called after sendStateTo() - history complements the current state.
+     */
+    private suspend fun replayIfNeeded(actor: Actor, lastEventId: String?) {
+        if (!needsHistory() || lastEventId == null) return
+
+        val clientId = lastEventId.toLongOrNull()
+        if (clientId == null) {
+            logger.warn("Invalid Last-Event-ID format: $lastEventId")
+            return
+        }
+
+        val serverId = messageId.get()
+        if (clientId > serverId) {
+            // Server restart detected: client's ID is ahead of ours
+            logger.info("Server restart detected for actor '${actor.name}': client lastEventId=$clientId > server messageId=$serverId")
+            return
+        }
+
+        val buffer = historyBuffer ?: return
+        val eventsToReplay = synchronized(buffer) {
+            buffer.filter { sse ->
+                val eventId = sse.id?.toLongOrNull() ?: return@filter false
+                eventId > clientId
+            }
+        }
+
+        if (eventsToReplay.isNotEmpty()) {
+            logger.debug("Replaying ${eventsToReplay.size} events to '${actor.name}' since ID $clientId")
+            eventsToReplay.forEach { sse ->
+                sendSafe(actor, sse)
+            }
+        }
+    }
+
+    /**
      * Broadcast event to all (actors + spectators)
      */
     fun broadcast(event: String, data: Json.Object) {
@@ -241,19 +306,37 @@ abstract class Room<S : Any>(val id: String) {
         when (event) {
             is Event.Broadcast -> {
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                bufferEvent(sse)
                 sendToAll(sse)
             }
             is Event.BroadcastToActors -> {
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                bufferEvent(sse)
                 sendToActors(sse)
             }
             is Event.BroadcastToSpectators -> {
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                bufferEvent(sse)
                 sendToSpectators(sse)
             }
             is Event.Targeted -> {
+                // Targeted events are not buffered - private context handled by sendStateTo()
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
                 sendToActor(event.actorId, sse)
+            }
+        }
+    }
+
+    /**
+     * Buffer event for Last-Event-ID replay (only if history is enabled)
+     */
+    private fun bufferEvent(sse: ServerSentEvent) {
+        historyBuffer?.let { buffer ->
+            synchronized(buffer) {
+                buffer.addLast(sse)
+                while (buffer.size > historyBufferSize) {
+                    buffer.removeFirst()
+                }
             }
         }
     }

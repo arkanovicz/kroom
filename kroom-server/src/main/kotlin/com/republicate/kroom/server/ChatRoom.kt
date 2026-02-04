@@ -30,7 +30,13 @@ data class ChatMessage(
 }
 
 /**
- * A simple chat room implementation for demonstration and testing
+ * A simple chat room implementation for demonstration and testing.
+ *
+ * Note: This room does NOT enable needsHistory() because chat history is already
+ * included in the state (stateToJson). Enabling Last-Event-ID replay would cause
+ * duplicate messages on reconnect. For rooms that want replay, either:
+ * 1. Remove history from state and rely solely on replay, or
+ * 2. Have clients deduplicate by message seq
  */
 class ChatRoom(id: String) : Room<ChatState>(id) {
     override var state = ChatState()
