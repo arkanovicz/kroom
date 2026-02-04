@@ -74,6 +74,12 @@ abstract class Room<S : Any>(val id: String) {
      */
     protected open val historyBufferSize: Int = DEFAULT_HISTORY_BUFFER_SIZE
 
+    /**
+     * Event names that should be buffered for Last-Event-ID replay.
+     * Override to specify which events are historicizable (e.g., "chat").
+     */
+    protected open val historicizableEvents: Set<String> = emptySet()
+
     init {
         start()
     }
@@ -306,21 +312,20 @@ abstract class Room<S : Any>(val id: String) {
         when (event) {
             is Event.Broadcast -> {
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
-                bufferEvent(sse)
+                bufferIfHistoricizable(event.event, sse)
                 sendToAll(sse)
             }
             is Event.BroadcastToActors -> {
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
-                bufferEvent(sse)
+                bufferIfHistoricizable(event.event, sse)
                 sendToActors(sse)
             }
             is Event.BroadcastToSpectators -> {
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
-                bufferEvent(sse)
+                bufferIfHistoricizable(event.event, sse)
                 sendToSpectators(sse)
             }
             is Event.Targeted -> {
-                // Targeted events are not buffered - private context handled by sendStateTo()
                 val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
                 sendToActor(event.actorId, sse)
             }
@@ -328,9 +333,10 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Buffer event for Last-Event-ID replay (only if history is enabled)
+     * Buffer event for Last-Event-ID replay if event name is in historicizableEvents
      */
-    private fun bufferEvent(sse: ServerSentEvent) {
+    private fun bufferIfHistoricizable(eventName: String, sse: ServerSentEvent) {
+        if (eventName !in historicizableEvents) return
         historyBuffer?.let { buffer ->
             synchronized(buffer) {
                 buffer.addLast(sse)
