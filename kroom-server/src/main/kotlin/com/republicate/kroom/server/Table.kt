@@ -41,9 +41,13 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         val number: Int,              // 1-indexed seat number
         var user: User? = null,       // User occupying this seat (null if empty)
         var playerName: String? = null,  // Display name (may differ from user.displayName)
-        var status: PlayerStatus = PlayerStatus.OFFLINE  // Player connection status
+        var status: PlayerStatus = PlayerStatus.OFFLINE,  // Player connection status
+        var statusChangedAt: Long = System.currentTimeMillis()  // When status last changed
     ) {
         val isEmpty: Boolean get() = user == null
+
+        /** How long (ms) the player has been in current status */
+        fun statusDuration(): Long = System.currentTimeMillis() - statusChangedAt
 
         /**
          * Check if this seat's user is connected to the room.
@@ -232,6 +236,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         }
         val oldStatus = seat.status
         seat.status = newStatus
+        seat.statusChangedAt = System.currentTimeMillis()
         logger.info("Seat $seatNumber status: $oldStatus -> $newStatus, broadcasting=$broadcastChange")
         if (broadcastChange) {
             broadcast("player_status", Json.Object(
