@@ -106,7 +106,8 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         val existingSeat = getSeatForUser(user)
         if (existingSeat != null) {
             existingSeat.playerName = playerName  // Update name in case it changed
-            existingSeat.status = PlayerStatus.ONLINE
+            // Broadcast status change on reconnect (e.g., OFFLINE -> ONLINE)
+            updatePlayerStatus(existingSeat.number, PlayerStatus.ONLINE)
             return existingSeat.number
         }
 
@@ -144,7 +145,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      */
     protected fun disconnectSeat(user: User) {
         getSeatForUser(user)?.let {
-            it.status = PlayerStatus.OFFLINE
+            updatePlayerStatus(it.number, PlayerStatus.OFFLINE)
         }
     }
 
@@ -225,8 +226,13 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      */
     fun updatePlayerStatus(seatNumber: Int, newStatus: PlayerStatus, broadcastChange: Boolean = true) {
         val seat = getSeat(seatNumber) ?: return
-        if (seat.status == newStatus) return  // No change
+        if (seat.status == newStatus) {
+            logger.debug("Status unchanged for seat $seatNumber: $newStatus")
+            return
+        }
+        val oldStatus = seat.status
         seat.status = newStatus
+        logger.info("Seat $seatNumber status: $oldStatus -> $newStatus, broadcasting=$broadcastChange")
         if (broadcastChange) {
             broadcast("player_status", Json.Object(
                 "seat" to seatNumber,
