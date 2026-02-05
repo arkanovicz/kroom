@@ -4,6 +4,16 @@ import com.republicate.kson.Json
 import io.ktor.sse.*
 
 /**
+ * Player connection status for seats
+ */
+enum class PlayerStatus {
+    ONLINE,   // Connected and active
+    IDLE,     // Connected but inactive (no input for a while)
+    AWAY,     // Tab/app not visible
+    OFFLINE   // Disconnected
+}
+
+/**
  * A Table is a Room with fixed seats for players.
  *
  * Use this for turn-based games where players occupy specific positions (seats).
@@ -29,7 +39,8 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         val number: Int,              // 1-indexed seat number
         var userId: String? = null,   // Persistent identity of player (null if empty)
         var playerName: String? = null,  // Display name (may differ from userId)
-        var connectionId: String? = null // Current connection ID (null if disconnected)
+        var connectionId: String? = null, // Current connection ID (null if disconnected)
+        var status: PlayerStatus = PlayerStatus.OFFLINE  // Player connection status
     ) {
         val isEmpty: Boolean get() = userId == null
         val isConnected: Boolean get() = connectionId != null
@@ -87,6 +98,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         if (existingSeat != null) {
             existingSeat.connectionId = connectionId
             existingSeat.playerName = playerName  // Update name in case it changed
+            existingSeat.status = PlayerStatus.ONLINE
             return existingSeat.number
         }
 
@@ -97,6 +109,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
             seat.userId = userId
             seat.playerName = playerName
             seat.connectionId = connectionId
+            seat.status = PlayerStatus.ONLINE
             return seat.number
         }
 
@@ -105,6 +118,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         seat.userId = userId
         seat.playerName = playerName
         seat.connectionId = connectionId
+        seat.status = PlayerStatus.ONLINE
         return seat.number
     }
 
@@ -112,7 +126,10 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      * Clear connection from seat (disconnect, but keep userId for reconnect)
      */
     protected fun disconnectSeat(connectionId: String) {
-        getSeatForConnection(connectionId)?.let { it.connectionId = null }
+        getSeatForConnection(connectionId)?.let {
+            it.connectionId = null
+            it.status = PlayerStatus.OFFLINE
+        }
     }
 
     /**
@@ -163,6 +180,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         }
         json["mySeat"] = seatNumber
         json["spectators"] = Json.Array(getSpectators().map { it.name })
+        json["playerStatuses"] = getSeatStatuses()
         return json
     }
 
@@ -190,6 +208,44 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         }
     }
 
+    /**
+     * Update player status for a seat.
+     * @param seatNumber The seat to update
+     * @param newStatus The new status
+     * @param broadcastChange Whether to broadcast the status change to all participants
+     */
+    fun updatePlayerStatus(seatNumber: Int, newStatus: PlayerStatus, broadcastChange: Boolean = true) {
+        val seat = getSeat(seatNumber) ?: return
+        if (seat.status == newStatus) return  // No change
+        seat.status = newStatus
+        if (broadcastChange) {
+            broadcast("player_status", Json.Object(
+                "seat" to seatNumber,
+                "player" to seat.playerName,
+                "status" to newStatus.name.lowercase()
+            ))
+        }
+    }
+
+    /**
+     * Update player status by connection ID (for client-initiated updates)
+     */
+    fun updatePlayerStatusByConnection(connectionId: String, newStatus: PlayerStatus) {
+        val seat = getSeatForConnection(connectionId) ?: return
+        updatePlayerStatus(seat.number, newStatus)
+    }
+
+    /**
+     * Get all seat statuses (for state sync)
+     */
+    fun getSeatStatuses(): Json.Array = Json.Array(seats.drop(1).filter { !it.isEmpty }.map { seat ->
+        Json.Object(
+            "seat" to seat.number,
+            "player" to seat.playerName,
+            "status" to seat.status.name.lowercase()
+        )
+    })
+
     override suspend fun onActorJoined(actor: Actor) {
         val seatNumber = assignActorToSeat(actor)
         if (seatNumber != null) {
@@ -205,6 +261,27 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
             disconnectSeat(actor.connectionId)
             onPlayerDisconnected(actor, seat.number)
         }
+    }
+
+    /**
+     * Handle a status action from a client.
+     * Call this from handleAction when action type is "status".
+     * @return ActionResult.Success if handled, null if not a status action
+     */
+    protected fun handleStatusAction(actor: Actor, action: Json.Object): ActionResult? {
+        if (action.getString("type") != "status") return null
+        val statusStr = action.getString("status") ?: return ActionResult.Error("Missing status field")
+        val newStatus = try {
+            PlayerStatus.valueOf(statusStr.uppercase())
+        } catch (e: IllegalArgumentException) {
+            return ActionResult.Error("Invalid status: $statusStr")
+        }
+        // Don't allow clients to set OFFLINE (that's server-controlled)
+        if (newStatus == PlayerStatus.OFFLINE) {
+            return ActionResult.Error("Cannot set OFFLINE status")
+        }
+        updatePlayerStatusByConnection(actor.connectionId, newStatus)
+        return ActionResult.Success()  // Status change already broadcast by updatePlayerStatus
     }
 
     /**
@@ -224,7 +301,8 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
             Json.Object(
                 "number" to seat.number,
                 "player" to seat.playerName,
-                "connected" to seat.isConnected
+                "connected" to seat.isConnected,
+                "status" to seat.status.name.lowercase()
             )
         }),
         "actorCount" to actorCount.value,
