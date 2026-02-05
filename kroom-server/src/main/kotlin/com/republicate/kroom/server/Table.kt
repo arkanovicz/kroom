@@ -280,8 +280,11 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         if (newStatus == PlayerStatus.OFFLINE) {
             return ActionResult.Error("Cannot set OFFLINE status")
         }
-        updatePlayerStatusByConnection(actor.connectionId, newStatus)
-        return ActionResult.Success()  // Status change already broadcast by updatePlayerStatus
+        // Use userId to find seat (connectionId from action route is ephemeral)
+        val seat = actor.userId?.let { getSeatForUser(it) }
+            ?: return ActionResult.Error("Player not found")
+        updatePlayerStatus(seat.number, newStatus)
+        return ActionResult.Success()
     }
 
     /**
