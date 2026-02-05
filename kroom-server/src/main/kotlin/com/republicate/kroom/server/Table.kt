@@ -4,7 +4,7 @@ import com.republicate.kson.Json
 import io.ktor.sse.*
 
 /**
- * Player connection status for seats
+ * Player connection status for seats.
  */
 enum class PlayerStatus {
     ONLINE,   // Connected and active
@@ -21,9 +21,9 @@ enum class PlayerStatus {
  * - Claim an empty seat (become a player)
  * - Join as a spectator if all seats are taken or if they choose to spectate
  *
- * The Table tracks the mapping between actors and seats, enabling:
- * - Player identification on reconnect (by name matching)
- * - Targeted messages to specific seats
+ * The Table tracks the mapping between users and seats, enabling:
+ * - Player identification on reconnect (by user identity)
+ * - Targeted messages to specific seats (reaches all user's connections)
  * - Seat-aware state serialization
  *
  * @param S The type of game state
@@ -33,70 +33,78 @@ enum class PlayerStatus {
 abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
 
     /**
-     * Seat information
+     * Seat information.
+     * A seat is occupied by a User (not a single connection).
+     * The user may have multiple connections (tabs) to the same seat.
      */
     data class Seat(
         val number: Int,              // 1-indexed seat number
-        var userId: String? = null,   // Persistent identity of player (null if empty)
-        var playerName: String? = null,  // Display name (may differ from userId)
-        var connectionId: String? = null, // Current connection ID (null if disconnected)
+        var user: User? = null,       // User occupying this seat (null if empty)
+        var playerName: String? = null,  // Display name (may differ from user.displayName)
         var status: PlayerStatus = PlayerStatus.OFFLINE  // Player connection status
     ) {
-        val isEmpty: Boolean get() = userId == null
-        val isConnected: Boolean get() = connectionId != null
+        val isEmpty: Boolean get() = user == null
+
+        /**
+         * Check if this seat's user is connected to the room.
+         * @param roomId The room ID to check connections for
+         */
+        fun isConnected(roomId: String): Boolean = user?.isConnectedTo(roomId) == true
+
+        // Legacy compatibility
+        @Deprecated("Use user?.userId instead")
+        val userId: String? get() = user?.userId
     }
 
     // Seats array (1-indexed, index 0 unused for cleaner API)
     private val seats: Array<Seat> = Array(seatCount + 1) { Seat(it) }
 
     /**
-     * Get seat by number (1-indexed)
+     * Get seat by number (1-indexed).
      */
     fun getSeat(number: Int): Seat? = seats.getOrNull(number)
 
     /**
-     * Get all occupied seats
+     * Get all occupied seats.
      */
     fun getOccupiedSeats(): List<Seat> = seats.drop(1).filter { !it.isEmpty }
 
     /**
-     * Get the seat for an actor (by connection ID)
+     * Get the seat for a user.
      */
-    fun getSeatForConnection(connectionId: String): Seat? = seats.drop(1).find { it.connectionId == connectionId }
+    fun getSeatForUser(user: User): Seat? = seats.drop(1).find { it.user == user }
 
     /**
-     * Get the seat for a user (by userId - persistent identity)
+     * Get the seat for a user by userId.
      */
-    fun getSeatForUser(userId: String): Seat? = seats.drop(1).find { it.userId == userId }
+    fun getSeatForUser(userId: String): Seat? = seats.drop(1).find { it.user?.userId == userId }
 
     /**
-     * Get the seat for a player (by name) - for display/legacy purposes
+     * Get the seat for a player (by name) - for display/legacy purposes.
      */
     fun getSeatForPlayer(name: String): Seat? = seats.drop(1).find { it.playerName == name }
 
     /**
-     * Find an empty seat
+     * Find an empty seat.
      */
     fun findEmptySeat(): Seat? = seats.drop(1).find { it.isEmpty }
 
     /**
-     * Check if table is full (all seats occupied)
+     * Check if table is full (all seats occupied).
      */
     fun isFull(): Boolean = seats.drop(1).all { !it.isEmpty }
 
     /**
-     * Assign a player to a seat.
-     * @param connectionId The actor's connection ID
-     * @param userId The actor's persistent identity (required for seat assignment)
+     * Assign a user to a seat.
+     * @param user The user to assign
      * @param playerName The player's display name
      * @param requestedSeat Optional specific seat number to claim (1-indexed)
      * @return The seat number, or null if no seat available or requested seat is taken
      */
-    protected fun assignSeat(connectionId: String, userId: String, playerName: String, requestedSeat: Int? = null): Int? {
+    protected fun assignSeat(user: User, playerName: String, requestedSeat: Int? = null): Int? {
         // Check if user already has a seat (reconnect case)
-        val existingSeat = getSeatForUser(userId)
+        val existingSeat = getSeatForUser(user)
         if (existingSeat != null) {
-            existingSeat.connectionId = connectionId
             existingSeat.playerName = playerName  // Update name in case it changed
             existingSeat.status = PlayerStatus.ONLINE
             return existingSeat.number
@@ -106,40 +114,48 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         if (requestedSeat != null) {
             val seat = getSeat(requestedSeat)
             if (seat == null || !seat.isEmpty) return null
-            seat.userId = userId
+            seat.user = user
             seat.playerName = playerName
-            seat.connectionId = connectionId
             seat.status = PlayerStatus.ONLINE
             return seat.number
         }
 
         // Find first empty seat
         val seat = findEmptySeat() ?: return null
-        seat.userId = userId
+        seat.user = user
         seat.playerName = playerName
-        seat.connectionId = connectionId
         seat.status = PlayerStatus.ONLINE
         return seat.number
     }
 
     /**
-     * Clear connection from seat (disconnect, but keep userId for reconnect)
+     * Legacy: Assign a seat using connectionId and userId strings.
+     * @deprecated Use assignSeat(user, playerName, requestedSeat) instead
      */
-    protected fun disconnectSeat(connectionId: String) {
-        getSeatForConnection(connectionId)?.let {
-            it.connectionId = null
+    @Deprecated("Use assignSeat(user, playerName, requestedSeat) instead")
+    protected fun assignSeat(connectionId: String, userId: String, playerName: String, requestedSeat: Int? = null): Int? {
+        val user = Users.getOrCreate(userId, playerName)
+        return assignSeat(user, playerName, requestedSeat)
+    }
+
+    /**
+     * Mark seat as disconnected (user has no more connections to this room).
+     * Called when user's last connection leaves.
+     */
+    protected fun disconnectSeat(user: User) {
+        getSeatForUser(user)?.let {
             it.status = PlayerStatus.OFFLINE
         }
     }
 
     /**
-     * Remove player from seat entirely (leave game)
+     * Remove player from seat entirely (leave game).
      */
     protected fun vacateSeat(seatNumber: Int) {
         seats.getOrNull(seatNumber)?.let {
-            it.userId = null
+            it.user = null
             it.playerName = null
-            it.connectionId = null
+            it.status = PlayerStatus.OFFLINE
         }
     }
 
@@ -147,11 +163,10 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      * Called when actor joins - override to customize seat assignment.
      * Default behavior: assign to first empty seat or reconnect to existing seat.
      * Returns the assigned seat number, or null if joining as spectator.
-     * Note: Requires actor to have a userId for seat assignment.
      */
     protected open suspend fun assignActorToSeat(actor: Actor): Int? {
-        val userId = actor.userId ?: return null  // No identity = spectator
-        return assignSeat(actor.connectionId, userId, actor.name)
+        val user = actor.user ?: return null  // No identity = spectator
+        return assignSeat(user, actor.name)
     }
 
     /**
@@ -159,9 +174,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      * Override stateToJsonForSeat() instead of stateToJson() for seat-aware serialization.
      */
     override suspend fun sendStateTo(actor: Actor) {
-        // Look up seat by userId first (reconnect/multi-tab case), then by connectionId
-        val seatNumber = actor.userId?.let { getSeatForUser(it)?.number }
-            ?: getSeatForConnection(actor.connectionId)?.number
+        val seatNumber = actor.user?.let { getSeatForUser(it)?.number }
         actor.channel?.send(ServerSentEvent(
             data = stateToJsonForSeat(seatNumber).toString(),
             event = "state"
@@ -185,25 +198,21 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
     }
 
     /**
-     * Send event to a specific seat
+     * Send event to a specific seat (all connections of the user in that seat).
      */
     fun sendToSeat(seatNumber: Int, event: String, data: Json.Object) {
-        seats.getOrNull(seatNumber)?.connectionId?.let { connectionId ->
-            getActor(connectionId)?.let { actor ->
-                sendTo(actor, event, data)
-            }
+        seats.getOrNull(seatNumber)?.user?.let { user ->
+            sendToUser(user, event, data)
         }
     }
 
     /**
-     * Broadcast to all seated players (not spectators)
+     * Broadcast to all seated players (not spectators).
      */
     fun broadcastToSeated(event: String, data: Json.Object) {
         seats.drop(1).forEach { seat ->
-            seat.connectionId?.let { connectionId ->
-                getActor(connectionId)?.let { actor ->
-                    sendTo(actor, event, data)
-                }
+            seat.user?.let { user ->
+                sendToUser(user, event, data)
             }
         }
     }
@@ -228,15 +237,15 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
     }
 
     /**
-     * Update player status by connection ID (for client-initiated updates)
+     * Update player status by user.
      */
-    fun updatePlayerStatusByConnection(connectionId: String, newStatus: PlayerStatus) {
-        val seat = getSeatForConnection(connectionId) ?: return
+    fun updatePlayerStatus(user: User, newStatus: PlayerStatus) {
+        val seat = getSeatForUser(user) ?: return
         updatePlayerStatus(seat.number, newStatus)
     }
 
     /**
-     * Get all seat statuses (for state sync)
+     * Get all seat statuses (for state sync).
      */
     fun getSeatStatuses(): Json.Array = Json.Array(seats.drop(1).filter { !it.isEmpty }.map { seat ->
         Json.Object(
@@ -251,16 +260,27 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         if (seatNumber != null) {
             onPlayerSeated(actor, seatNumber)
         } else {
-            onSpectatorJoined(actor as? Spectator ?: Spectator(actor.connectionId, actor.userId, actor.name))
+            onSpectatorJoined(actor as? Spectator ?: Spectator(actor.connectionId, actor.user, actor.name))
         }
     }
 
-    override suspend fun onActorLeft(actor: Actor) {
-        val seat = getSeatForConnection(actor.connectionId)
-        if (seat != null) {
-            disconnectSeat(actor.connectionId)
-            onPlayerDisconnected(actor, seat.number)
+    override suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
+        val user = actor.user
+        if (user != null) {
+            val seat = getSeatForUser(user)
+            if (seat != null) {
+                if (userFullyLeft) {
+                    // User has no more connections - mark as offline
+                    disconnectSeat(user)
+                    onPlayerDisconnected(actor, seat.number)
+                } else {
+                    // User still has other connections - just a tab closing
+                    onPlayerConnectionClosed(actor, seat.number)
+                }
+                return
+            }
         }
+        // Not a seated player - must be spectator behavior from parent
     }
 
     /**
@@ -280,22 +300,29 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         if (newStatus == PlayerStatus.OFFLINE) {
             return ActionResult.Error("Cannot set OFFLINE status")
         }
-        // Use userId to find seat (connectionId from action route is ephemeral)
-        val seat = actor.userId?.let { getSeatForUser(it) }
-            ?: return ActionResult.Error("Player not found")
+        // Use user to find seat
+        val user = actor.user ?: return ActionResult.Error("Not authenticated")
+        val seat = getSeatForUser(user) ?: return ActionResult.Error("Player not found")
         updatePlayerStatus(seat.number, newStatus)
         return ActionResult.Success()
     }
 
     /**
-     * Called when a player takes a seat
+     * Called when a player takes a seat.
      */
     protected open suspend fun onPlayerSeated(actor: Actor, seatNumber: Int) {}
 
     /**
-     * Called when a seated player disconnects (seat retained for reconnect)
+     * Called when a seated player fully disconnects (no more connections).
+     * Seat is retained for reconnect.
      */
     protected open suspend fun onPlayerDisconnected(actor: Actor, seatNumber: Int) {}
+
+    /**
+     * Called when one of a player's connections closes, but they still have other connections.
+     * Default: no-op. Override if you need to track individual connection closures.
+     */
+    protected open suspend fun onPlayerConnectionClosed(actor: Actor, seatNumber: Int) {}
 
     override fun toJson(): Json.Object = Json.Object(
         "id" to id,
@@ -304,11 +331,24 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
             Json.Object(
                 "number" to seat.number,
                 "player" to seat.playerName,
-                "connected" to seat.isConnected,
+                "userId" to seat.user?.userId,
+                "connected" to seat.isConnected(id),
                 "status" to seat.status.name.lowercase()
             )
         }),
-        "actorCount" to actorCount.value,
+        "userCount" to users.size,
         "spectatorCount" to spectatorCount.value
     )
+
+    // ========== Legacy compatibility ==========
+
+    /**
+     * @deprecated Use getSeatForUser(user) instead
+     */
+    @Deprecated("Use getSeatForUser(user) instead")
+    fun getSeatForConnection(connectionId: String): Seat? {
+        // Find the actor, then find their seat via user
+        val actor = getActor(connectionId) ?: return null
+        return actor.user?.let { getSeatForUser(it) }
+    }
 }

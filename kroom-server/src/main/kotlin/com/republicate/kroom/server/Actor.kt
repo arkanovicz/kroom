@@ -4,39 +4,43 @@ import io.ktor.sse.*
 import kotlinx.coroutines.channels.Channel
 
 /**
- * Base class for room participants
- * An Actor represents any entity that can interact with a room
+ * Base class for room participants.
+ * An Actor represents a single connection to a room.
+ *
+ * A User can have multiple Actors (connections) to the same or different rooms.
+ * For example, if a user opens two browser tabs to the same game, each tab
+ * creates its own Actor, but both share the same User.
  *
  * @param connectionId Unique ID for this connection (changes on reconnect)
- * @param userId Persistent identity (null for anonymous actors)
- * @param name Display name
+ * @param user The User this actor belongs to (null for anonymous connections)
+ * @param name Display name for this actor (defaults to user's displayName if available)
  */
 open class Actor(
     val connectionId: String,
-    val userId: String? = null,
-    val name: String
+    val user: User? = null,
+    val name: String = user?.displayName ?: "Anonymous"
 ) {
     /**
-     * SSE channel for this actor's connection
-     * Null when disconnected
+     * SSE channel for this actor's connection.
+     * Null when disconnected.
      */
     var channel: Channel<ServerSentEvent>? = null
         internal set
 
     /**
-     * Whether the actor is currently connected
+     * Whether the actor is currently connected.
      */
     val isConnected: Boolean
         get() = channel != null
 
     /**
-     * Whether this actor has a persistent identity
+     * Whether this actor has a persistent identity (belongs to a User).
      */
     val isAuthenticated: Boolean
-        get() = userId != null
+        get() = user != null
 
     /**
-     * Disconnect this actor
+     * Disconnect this actor.
      */
     fun disconnect() {
         channel?.close()
@@ -51,21 +55,61 @@ open class Actor(
 
     override fun hashCode(): Int = connectionId.hashCode()
 
-    override fun toString(): String = "Actor($connectionId, userId=$userId, $name)"
+    override fun toString(): String = "Actor($connectionId, user=${user?.userId}, $name)"
 
-    // Legacy compatibility: 'id' as alias for connectionId
+    // ========== Backward compatibility ==========
+
+    /**
+     * Legacy compatibility: userId as property.
+     * @deprecated Use user?.userId instead
+     */
+    @Deprecated("Use user?.userId instead", ReplaceWith("user?.userId"))
+    val userId: String?
+        get() = user?.userId
+
+    /**
+     * Legacy compatibility: 'id' as alias for connectionId.
+     * @deprecated Use connectionId instead
+     */
     @Deprecated("Use connectionId instead", ReplaceWith("connectionId"))
     val id: String get() = connectionId
+
+    companion object {
+        /**
+         * Create an Actor with a userId string (backward compatible factory).
+         * If userId is non-null, looks up or creates a User.
+         * @deprecated Use Actor(connectionId, user, name) constructor instead
+         */
+        @Deprecated("Use Actor(connectionId, user, name) constructor instead")
+        @JvmStatic
+        fun create(connectionId: String, userId: String?, name: String): Actor {
+            val user = userId?.let { Users.getOrCreate(it, name) }
+            return Actor(connectionId, user, name)
+        }
+    }
 }
 
 /**
- * A Spectator is an Actor that can observe but not interact
- * Spectators receive broadcasts but cannot perform actions
+ * A Spectator is an Actor that can observe but not interact.
+ * Spectators receive broadcasts but cannot perform actions.
  */
 class Spectator(
     connectionId: String,
-    userId: String? = null,
-    name: String
-) : Actor(connectionId, userId, name) {
-    override fun toString(): String = "Spectator($connectionId, userId=$userId, $name)"
+    user: User? = null,
+    name: String = user?.displayName ?: "Anonymous"
+) : Actor(connectionId, user, name) {
+    override fun toString(): String = "Spectator($connectionId, user=${user?.userId}, $name)"
+
+    companion object {
+        /**
+         * Create a Spectator with a userId string (backward compatible factory).
+         * @deprecated Use Spectator(connectionId, user, name) constructor instead
+         */
+        @Deprecated("Use Spectator(connectionId, user, name) constructor instead")
+        @JvmStatic
+        fun create(connectionId: String, userId: String?, name: String): Spectator {
+            val user = userId?.let { Users.getOrCreate(it, name) }
+            return Spectator(connectionId, user, name)
+        }
+    }
 }

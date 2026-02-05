@@ -76,9 +76,12 @@ object RoomManager {
 }
 
 /**
- * @deprecated Use Actor instead
+ * @deprecated Use Actor with User instead
  */
-@Deprecated("Use Actor instead", ReplaceWith("Actor(connectionId, userId, name)"))
-data class User(val login: String) {
-    fun toActor(): Actor = Actor(connectionId = login, userId = login, name = login)
+@Deprecated("Use Actor with User instead", ReplaceWith("Actor(connectionId, Users.getOrCreate(login, login), login)"))
+data class LegacyUser(val login: String) {
+    fun toActor(): Actor {
+        val user = Users.getOrCreate(login, login)
+        return Actor(connectionId = login, user = user, name = login)
+    }
 }

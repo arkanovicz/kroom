@@ -13,7 +13,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Base Room class for SSE-based real-time communication with generic state
+ * Base Room class for SSE-based real-time communication with generic state.
+ *
+ * A Room tracks both Users (persistent identities) and Actors (individual connections).
+ * A User can have multiple simultaneous connections (Actors) to the same room,
+ * for example when opening multiple browser tabs.
  *
  * @param S The type of room state
  * @param id Unique room identifier
@@ -26,10 +30,13 @@ abstract class Room<S : Any>(val id: String) {
      */
     abstract var state: S
 
-    // Actors (active participants)
+    // Users present in this room (userId -> User)
+    protected val users = ConcurrentHashMap<String, User>()
+
+    // Actors (individual connections) - keyed by connectionId for event processing
     protected val actors = ConcurrentHashMap<String, Actor>()
 
-    // Spectators (observers)
+    // Spectators (observers) - keyed by connectionId
     protected val spectators = ConcurrentHashMap<String, Spectator>()
 
     // Event queue for async processing
@@ -45,12 +52,22 @@ abstract class Room<S : Any>(val id: String) {
     // Coroutine scope
     protected val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // Participant counts
-    private val _actorCount = MutableStateFlow(0)
-    val actorCount: StateFlow<Int> = _actorCount.asStateFlow()
+    // Participant counts (user-centric, not connection-centric)
+    private val _userCount = MutableStateFlow(0)
+    val userCount: StateFlow<Int> = _userCount.asStateFlow()
 
     private val _spectatorCount = MutableStateFlow(0)
     val spectatorCount: StateFlow<Int> = _spectatorCount.asStateFlow()
+
+    // Legacy: actorCount now reflects unique users, not connections
+    @Deprecated("Use userCount instead for unique users, or connectionCount for raw connections")
+    val actorCount: StateFlow<Int> = _userCount
+
+    /**
+     * Total number of active connections (actors + spectators).
+     */
+    val connectionCount: Int
+        get() = actors.size + spectators.size
 
     companion object {
         const val KEEPALIVE_DELAY = 15_000L  // 15 seconds
@@ -117,13 +134,18 @@ abstract class Room<S : Any>(val id: String) {
         scope.cancel()
         actors.values.forEach { it.disconnect() }
         spectators.values.forEach { it.disconnect() }
+        // Clean up user connections to this room
+        users.values.forEach { user ->
+            user.connectionsByRoom.remove(id)
+        }
         actors.clear()
         spectators.clear()
+        users.clear()
         logger.info("Room '$id' stopped")
     }
 
     /**
-     * Actor joins the room
+     * Actor joins the room.
      * @param actor The actor joining
      * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
@@ -131,10 +153,20 @@ abstract class Room<S : Any>(val id: String) {
         val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
         actor.channel = channel
 
+        // Register actor by connectionId
         actors[actor.connectionId] = actor
-        _actorCount.value = actors.size
 
-        logger.debug("Actor '${actor.name}' joined room '$id' (${actors.size} actors)")
+        // Register user and track this connection
+        actor.user?.let { user ->
+            val isNewUser = !users.containsKey(user.userId)
+            users[user.userId] = user
+            user.addConnection(id, actor)
+            if (isNewUser) {
+                _userCount.value = users.size
+            }
+        }
+
+        logger.debug("Actor '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections)")
 
         // First complete the join (seat assignment in Table), then send state
         onActorJoined(actor)
@@ -147,7 +179,7 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Spectator joins the room
+     * Spectator joins the room.
      * @param spectator The spectator joining
      * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
@@ -157,6 +189,12 @@ abstract class Room<S : Any>(val id: String) {
 
         spectators[spectator.connectionId] = spectator
         _spectatorCount.value = spectators.size
+
+        // Track spectator's user if authenticated
+        spectator.user?.let { user ->
+            users[user.userId] = user
+            user.addConnection(id, spectator)
+        }
 
         logger.debug("Spectator '${spectator.name}' joined room '$id' (${spectators.size} spectators)")
 
@@ -171,10 +209,20 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Actor or spectator leaves
+     * Actor or spectator leaves.
      */
     suspend fun leave(actor: Actor) {
         actor.disconnect()
+
+        // Clean up user connection tracking
+        val userFullyLeft = actor.user?.let { user ->
+            val noMoreConnections = user.removeConnection(id, actor)
+            if (noMoreConnections) {
+                users.remove(user.userId)
+                _userCount.value = users.size
+            }
+            noMoreConnections
+        } ?: true  // Anonymous actors always "fully leave"
 
         if (actor is Spectator) {
             spectators.remove(actor.connectionId)
@@ -183,56 +231,67 @@ abstract class Room<S : Any>(val id: String) {
             onSpectatorLeft(actor)
         } else {
             actors.remove(actor.connectionId)
-            _actorCount.value = actors.size
-            logger.debug("Actor '${actor.name}' left room '$id'")
-            onActorLeft(actor)
+            logger.debug("Actor '${actor.name}' left room '$id' (userFullyLeft=$userFullyLeft)")
+            onActorLeft(actor, userFullyLeft)
         }
 
         // Check if room should close
-        if (shouldCloseWhenEmpty() && actors.isEmpty()) {
+        if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty()) {
             stop()
             Lobby.remove(id)
         }
     }
 
     /**
-     * Handle an action from an actor
-     * Returns the result to broadcast or send
+     * Handle an action from an actor.
+     * Returns the result to broadcast or send.
      */
     abstract fun handleAction(actor: Actor, action: Json.Object): ActionResult
 
     /**
-     * Convert state to JSON for client
+     * Convert state to JSON for client.
      */
     abstract fun stateToJson(): Json.Object
 
     /**
-     * Called when actor joins - override to customize
+     * Called when actor joins - override to customize.
      */
     protected open suspend fun onActorJoined(actor: Actor) {}
 
     /**
-     * Called when actor leaves - override to customize
+     * Called when actor leaves - override to customize.
+     * @param actor The actor that left
+     * @param userFullyLeft True if the user has no more connections to this room
      */
+    protected open suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
+        // Default implementation for backward compatibility - subclasses can override
+        @Suppress("DEPRECATION")
+        onActorLeft(actor)
+    }
+
+    /**
+     * @deprecated Override onActorLeft(actor, userFullyLeft) instead
+     */
+    @Deprecated("Override onActorLeft(actor, userFullyLeft) instead")
     protected open suspend fun onActorLeft(actor: Actor) {}
 
     /**
-     * Called when spectator joins - override to customize
+     * Called when spectator joins - override to customize.
      */
     protected open suspend fun onSpectatorJoined(spectator: Spectator) {}
 
     /**
-     * Called when spectator leaves - override to customize
+     * Called when spectator leaves - override to customize.
      */
     protected open suspend fun onSpectatorLeft(spectator: Spectator) {}
 
     /**
-     * Whether room should close when all actors leave
+     * Whether room should close when all users leave.
      */
     protected open fun shouldCloseWhenEmpty(): Boolean = true
 
     /**
-     * Send current state to an actor
+     * Send current state to an actor.
      */
     protected open suspend fun sendStateTo(actor: Actor) {
         actor.channel?.send(ServerSentEvent(
@@ -286,35 +345,51 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Broadcast event to all (actors + spectators)
+     * Broadcast event to all (actors + spectators).
      */
     fun broadcast(event: String, data: Json.Object) {
         eventQueue.trySend(Event.Broadcast(event, data.toString()))
     }
 
     /**
-     * Broadcast event to actors only
+     * Broadcast event to actors only.
      */
     fun broadcastToActors(event: String, data: Json.Object) {
         eventQueue.trySend(Event.BroadcastToActors(event, data.toString()))
     }
 
     /**
-     * Broadcast event to spectators only
+     * Broadcast event to spectators only.
      */
     fun broadcastToSpectators(event: String, data: Json.Object) {
         eventQueue.trySend(Event.BroadcastToSpectators(event, data.toString()))
     }
 
     /**
-     * Send event to specific actor
+     * Send event to specific actor by connectionId.
      */
     fun sendTo(actor: Actor, event: String, data: Json.Object) {
         eventQueue.trySend(Event.Targeted(actor.connectionId, event, data.toString()))
     }
 
     /**
-     * Process queued event
+     * Send event to all connections of a specific user.
+     */
+    fun sendToUser(user: User, event: String, data: Json.Object) {
+        user.getConnectionsInRoom(id).forEach { actor ->
+            eventQueue.trySend(Event.Targeted(actor.connectionId, event, data.toString()))
+        }
+    }
+
+    /**
+     * Send event to a user by userId.
+     */
+    fun sendToUser(userId: String, event: String, data: Json.Object) {
+        users[userId]?.let { sendToUser(it, event, data) }
+    }
+
+    /**
+     * Process queued event.
      */
     private suspend fun processEvent(event: Event) {
         val msgId = messageId.incrementAndGet().toString()
@@ -342,7 +417,7 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Buffer event for Last-Event-ID replay if event name is in historicizableEvents
+     * Buffer event for Last-Event-ID replay if event name is in historicizableEvents.
      */
     private fun bufferIfHistoricizable(eventName: String, sse: ServerSentEvent) {
         if (eventName !in historicizableEvents) return
@@ -389,28 +464,42 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Get list of actor infos
+     * Get list of all actors (connections).
      */
     fun getActors(): List<Actor> = actors.values.toList()
 
     /**
-     * Get list of spectator infos
+     * Get list of all users (unique identities).
+     */
+    fun getUsers(): List<User> = users.values.toList()
+
+    /**
+     * Get list of spectators.
      */
     fun getSpectators(): List<Spectator> = spectators.values.toList()
 
     /**
-     * Get an actor by ID
+     * Get an actor by connectionId.
      */
-    fun getActor(id: String): Actor? = actors[id]
+    fun getActor(connectionId: String): Actor? = actors[connectionId] ?: spectators[connectionId]
 
     /**
-     * Room info for lobby
+     * Get a user by userId.
+     */
+    fun getUser(userId: String): User? = users[userId]
+
+    /**
+     * Room info for lobby.
      */
     open fun toJson(): Json.Object = Json.Object(
         "id" to id,
-        "actorCount" to actors.size,
+        "userCount" to users.size,
+        "connectionCount" to actors.size,
         "spectatorCount" to spectators.size,
-        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "userId" to it.userId, "name" to it.name) })
+        "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
+        // Legacy field for backward compatibility
+        "actorCount" to users.size,
+        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "userId" to it.user?.userId, "name" to it.name) })
     )
 
     // Event types for queue
@@ -423,7 +512,7 @@ abstract class Room<S : Any>(val id: String) {
 }
 
 /**
- * Result of handling an action
+ * Result of handling an action.
  */
 sealed class ActionResult {
     /** Action succeeded, optionally broadcast an event */

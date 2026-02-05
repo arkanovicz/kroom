@@ -60,6 +60,8 @@ class ChatRoom(id: String) : Room<ChatState>(id) {
     override fun stateToJson(): Json.Object = Json.Object(
         "id" to id,
         "history" to Json.Array(state.history.map { it.toJson() }),
+        "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
+        // Legacy field for backward compatibility
         "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
     )
 
@@ -85,16 +87,22 @@ class ChatRoom(id: String) : Room<ChatState>(id) {
     }
 
     override suspend fun onActorJoined(actor: Actor) {
-        // Broadcast updated actor list
-        broadcast("actors", Json.Object(
+        // Broadcast updated user list
+        broadcast("users", Json.Object(
+            "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
+            // Legacy field
             "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
         ))
     }
 
-    override suspend fun onActorLeft(actor: Actor) {
-        // Broadcast updated actor list
-        broadcast("actors", Json.Object(
-            "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
-        ))
+    override suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
+        // Only broadcast if user fully left (not just closing one of multiple tabs)
+        if (userFullyLeft) {
+            broadcast("users", Json.Object(
+                "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
+                // Legacy field
+                "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
+            ))
+        }
     }
 }

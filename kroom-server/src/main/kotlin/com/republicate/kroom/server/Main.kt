@@ -46,7 +46,8 @@ fun Application.configureRouting() {
 
             val room = RoomManager.getOrCreateRoom(roomName)
             val connectionId = "conn-${System.currentTimeMillis()}"
-            val actor = Actor(connectionId = connectionId, userId = login, name = login)
+            val user = Users.getOrCreate(login, login)
+            val actor = Actor(connectionId = connectionId, user = user, name = login)
 
             // Read Last-Event-ID header for reconnection handling
             // EventSource sends this automatically on reconnect
