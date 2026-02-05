@@ -242,35 +242,43 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Replay missed events to an actor if history is enabled and lastEventId is valid.
+     * Replay missed events to an actor if history is enabled.
      * Called after sendStateTo() - history complements the current state.
+     * If lastEventId is null (fresh connect), replays entire buffer.
+     * If lastEventId is present, replays events after that ID.
      */
     private suspend fun replayIfNeeded(actor: Actor, lastEventId: String?) {
-        if (!needsHistory() || lastEventId == null) return
-
-        val clientId = lastEventId.toLongOrNull()
-        if (clientId == null) {
-            logger.warn("Invalid Last-Event-ID format: $lastEventId")
-            return
-        }
-
-        val serverId = messageId.get()
-        if (clientId > serverId) {
-            // Server restart detected: client's ID is ahead of ours
-            logger.info("Server restart detected for actor '${actor.name}': client lastEventId=$clientId > server messageId=$serverId")
-            return
-        }
+        if (!needsHistory()) return
 
         val buffer = historyBuffer ?: return
-        val eventsToReplay = synchronized(buffer) {
-            buffer.filter { sse ->
-                val eventId = sse.id?.toLongOrNull() ?: return@filter false
-                eventId > clientId
+
+        val eventsToReplay = if (lastEventId == null) {
+            // Fresh connect: replay entire buffer
+            synchronized(buffer) { buffer.toList() }
+        } else {
+            val clientId = lastEventId.toLongOrNull()
+            if (clientId == null) {
+                logger.warn("Invalid Last-Event-ID format: $lastEventId")
+                return
+            }
+
+            val serverId = messageId.get()
+            if (clientId > serverId) {
+                // Server restart detected: client's ID is ahead of ours
+                logger.info("Server restart detected for actor '${actor.name}': client lastEventId=$clientId > server messageId=$serverId")
+                return
+            }
+
+            synchronized(buffer) {
+                buffer.filter { sse ->
+                    val eventId = sse.id?.toLongOrNull() ?: return@filter false
+                    eventId > clientId
+                }
             }
         }
 
         if (eventsToReplay.isNotEmpty()) {
-            logger.debug("Replaying ${eventsToReplay.size} events to '${actor.name}' since ID $clientId")
+            logger.debug("Replaying ${eventsToReplay.size} events to '${actor.name}' (lastEventId=${lastEventId ?: "none"})")
             eventsToReplay.forEach { sse ->
                 sendSafe(actor, sse)
             }
