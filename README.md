@@ -13,6 +13,7 @@ kroom-webapp-assets   shared client-side JS/CSS
 kroom-webapp-velocity Velocity template integration
 kroom-webapp-l10n     i18n with gettext
 kroom-webapp-oauth    OAuth2 authentication
+kroom-webapp-push     Web Push notifications
 ```
 
 ## Features
@@ -20,7 +21,8 @@ kroom-webapp-oauth    OAuth2 authentication
 - Room-based real-time sessions with SSE
 - Actor presence and reconnection handling
 - Last-Event-ID replay for selective event types (e.g., chat)
-- Table abstraction for seat-based games
+- Table abstraction for seat-based games with player status tracking
+- Multi-tab support via User-centric identity model
 - Event broadcasting and keep-alive
 - Coroutine-based async processing
 
@@ -29,8 +31,8 @@ kroom-webapp-oauth    OAuth2 authentication
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.7")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.7")
+    implementation("com.republicate.kroom:kroom-server:0.8")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.8")
 }
 ```
 
@@ -207,7 +209,7 @@ class GameRoom(id: String) : Table<GameState>(id, seatCount = 2) {
     override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
         when (action.getString("type")) {
             "join" -> {
-                val seat = assignSeat(actor.id, actor.name, requestedSeat = null)
+                val seat = assignSeat(actor.user!!, actor.name, requestedSeat = null)
                 // seat is 1-indexed, null if table full
             }
         }
@@ -216,9 +218,10 @@ class GameRoom(id: String) : Table<GameState>(id, seatCount = 2) {
 ```
 
 The `Table` class:
-- Tracks seats (player name + actor ID separately for reconnect)
+- Tracks seats via `User` identity (not connection ID) for multi-tab support
 - Sends `mySeat` in state payload so clients know their position
-- Handles reconnection by name matching
+- Handles reconnection by user identity matching
+- Player status tracking (online/idle/away/offline) with `Seat.status`
 
 ## Last-Event-ID Replay
 

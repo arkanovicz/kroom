@@ -2,6 +2,51 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.8] - 2026-02-06
+
+### Added
+
+#### kroom-server
+- **User-centric architecture** for multi-tab support
+  - `User` class: persistent identity with connections-per-room tracking
+  - `Users` global registry: single `User` instance per userId across the application
+  - `Actor` now references `User` instead of bare `userId`
+  - `sendToSeat()` reaches all user connections, not just one
+  - `onActorLeft(actor, userFullyLeft)` — `userFullyLeft=true` when user's last connection closes
+- **Player status tracking** (online/idle/away/offline)
+  - `PlayerStatus` enum with ONLINE, IDLE, AWAY, OFFLINE states
+  - `Seat.status` and `Seat.statusChangedAt` fields
+  - `updatePlayerStatus()` / `updatePlayerStatusByConnection()` methods
+  - `handleStatusAction()` for client-initiated status changes
+  - `player_status` SSE event broadcast
+  - Automatic ONLINE/OFFLINE broadcast on reconnect/disconnect
+- **Full history replay on fresh connect** — new connections without Last-Event-ID now receive the entire history buffer
+
+#### kroom-webapp-assets
+- `status.js` — client-side idle/away detection via Page Visibility API
+  - `StatusTracker` class with configurable idle timeout
+  - `PlayerStatus` constants (ONLINE, IDLE, AWAY, OFFLINE)
+- `api.js`: configurable API base URL via `window.kroomApiBase` (for native apps with bundled assets)
+
+#### kroom-view
+- `KroomWebView` (iOS): injects `window.kroomApiBase` via `WKUserScript` for native apps
+
+### Changed
+
+#### kroom-server (BREAKING)
+- `Actor` constructor takes `User` instead of `userId` string
+- `Table.Seat` references `User` instead of `connectionId`
+- `Seat.isConnected` now takes `roomId` parameter
+- `onActorLeft(actor, userFullyLeft)` replaces `onActorLeft(actor)`
+- Deprecated shims provided for old API signatures
+
+### Fixed
+
+#### kroom-server
+- `handleStatusAction`: use `userId` to find seat, not ephemeral `connectionId`
+
+---
+
 ## [0.7] - 2026-02-04
 
 ### Added
