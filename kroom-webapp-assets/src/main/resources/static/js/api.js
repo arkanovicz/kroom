@@ -2,7 +2,9 @@
 // Part of kroom-webapp-assets
 
 const api = (function() {
-    const base = '/api/';
+    // API base: use window.kroomApiBase if set (for native apps with bundled assets)
+    // Otherwise use relative '/api/' (works when served from same origin)
+    const base = (window.kroomApiBase || '') + '/api/';
 
     function headers(accept, withJson) {
         let ret = {

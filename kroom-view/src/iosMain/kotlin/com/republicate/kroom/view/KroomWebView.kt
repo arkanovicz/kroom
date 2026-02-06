@@ -161,6 +161,16 @@ fun createKroomWebView(config: KroomWebViewConfig = KroomWebViewConfig()): WKWeb
 
         // Enable DOM storage
         websiteDataStore = WKWebsiteDataStore.defaultDataStore()
+
+        // Inject apiBaseUrl as window.kroomApiBase for API/SSE calls
+        if (config.apiBaseUrl.isNotEmpty()) {
+            val script = WKUserScript(
+                source = "window.kroomApiBase = '${config.apiBaseUrl}';",
+                injectionTime = WKUserScriptInjectionTime.WKUserScriptInjectionTimeAtDocumentStart,
+                forMainFrameOnly = true
+            )
+            userContentController.addUserScript(script)
+        }
     }
 
     return WKWebView(frame = cValue { }, configuration = webViewConfig)
