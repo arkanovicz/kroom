@@ -31,8 +31,8 @@ kroom-webapp-push     Web Push notifications
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.8")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.8")
+    implementation("com.republicate.kroom:kroom-server:0.9")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.9")
 }
 ```
 

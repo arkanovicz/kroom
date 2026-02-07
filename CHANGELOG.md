@@ -2,6 +2,20 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.9] - 2026-02-07
+
+### Added
+
+#### kroom-webapp-l10n
+- `#translate` Velocity directive — like `#parse`, but applies translation to included templates
+  - Extends `Parse`, overrides `getTemplate()` to run through active `Translator`
+  - Requires `Translator.current` ThreadLocal to be set
+
+#### kroom-webapp-velocity
+- Auto-registers `TranslateDirective` when l10n module is on the classpath
+
+---
+
 ## [0.8] - 2026-02-06
 
 ### Added
