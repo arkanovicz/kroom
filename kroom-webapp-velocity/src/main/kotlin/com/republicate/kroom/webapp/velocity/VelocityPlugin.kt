@@ -19,7 +19,7 @@ import java.io.StringWriter
  * Provides template rendering with optional translation support.
  * In dev mode with devDir set, loads templates from filesystem with hot reload.
  */
-class VelocityPlugin(private val config: VelocityConfig) {
+class VelocityPlugin(config: VelocityConfig) {
 
     val engine: VelocityEngine = VelocityEngine().apply {
         setProperty(RuntimeConstants.INPUT_ENCODING, "UTF-8")
@@ -45,6 +45,16 @@ class VelocityPlugin(private val config: VelocityConfig) {
         // Load kroom macros library
         setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
         setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
+
+        // Auto-register TranslateDirective if l10n module is on classpath
+        val translateDirective = "com.republicate.kroom.webapp.l10n.TranslateDirective"
+        try {
+            Class.forName(translateDirective)
+            setProperty("runtime.custom_directives", translateDirective)
+        } catch (_: ClassNotFoundException) {
+            // l10n module not present, skip
+        }
+
         init()
     }
 
