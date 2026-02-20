@@ -2,6 +2,17 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.10] - 2026-02-20
+
+### Changed
+
+#### kroom-server
+- **Per-connection heartbeat** — replaced room-level keepalive with Ktor's per-session `heartbeat { period = 15.seconds }`, which writes directly to the socket and detects dead connections regardless of room activity
+- Removed `keepAlive()`, `KEEPALIVE_DELAY`, `lastEventTime` from `Room`
+- Simplified event loop to plain `eventQueue.receive()`
+
+---
+
 ## [0.9] - 2026-02-07
 
 ### Added

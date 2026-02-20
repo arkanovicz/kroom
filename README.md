@@ -23,7 +23,7 @@ kroom-webapp-push     Web Push notifications
 - Last-Event-ID replay for selective event types (e.g., chat)
 - Table abstraction for seat-based games with player status tracking
 - Multi-tab support via User-centric identity model
-- Event broadcasting and keep-alive
+- Per-connection heartbeat via Ktor SSE (dead connection detection)
 - Coroutine-based async processing
 
 ## Quick Start
@@ -31,8 +31,8 @@ kroom-webapp-push     Web Push notifications
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.9")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.9")
+    implementation("com.republicate.kroom:kroom-server:0.10")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.10")
 }
 ```
 
