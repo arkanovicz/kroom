@@ -45,8 +45,6 @@ abstract class Room<S : Any>(val id: String) {
     // Message ID counter
     private val messageId = AtomicLong(1)
 
-    // Keep-alive tracking
-    private var lastEventTime = System.currentTimeMillis()
     private var processingJob: Job? = null
 
     // Coroutine scope
@@ -70,7 +68,6 @@ abstract class Room<S : Any>(val id: String) {
         get() = actors.size + spectators.size
 
     companion object {
-        const val KEEPALIVE_DELAY = 15_000L  // 15 seconds
         const val DEFAULT_HISTORY_BUFFER_SIZE = 50
     }
 
@@ -107,15 +104,8 @@ abstract class Room<S : Any>(val id: String) {
             logger.info("Room '$id' started")
             while (isActive) {
                 try {
-                    val event = withTimeoutOrNull(KEEPALIVE_DELAY) {
-                        eventQueue.receive()
-                    }
-                    if (event != null) {
-                        processEvent(event)
-                        lastEventTime = System.currentTimeMillis()
-                    } else {
-                        keepAlive()
-                    }
+                    val event = eventQueue.receive()
+                    processEvent(event)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -455,12 +445,6 @@ abstract class Room<S : Any>(val id: String) {
         } catch (e: Exception) {
             logger.warn("Failed to send to ${actor.name}", e)
         }
-    }
-
-    private suspend fun keepAlive() {
-        val sse = ServerSentEvent(comments = "keepalive")
-        actors.values.forEach { sendSafe(it, sse) }
-        spectators.values.forEach { sendSafe(it, sse) }
     }
 
     /**

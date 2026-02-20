@@ -17,6 +17,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import io.ktor.server.sse.*
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Simple session for anonymous players.
@@ -29,6 +30,7 @@ data class PlayerSession(val identifier: String, val playerName: String)
 fun Route.chifoumiRoutes() {
     // SSE endpoint for real-time updates
     sse("/events") {
+        heartbeat { period = 15.seconds }
         val session = call.sessions.get<PlayerSession>()
         if (session == null) {
             call.respond(HttpStatusCode.Unauthorized, "Not logged in")

@@ -10,6 +10,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = LoggerFactory.getLogger("kroom.main")
 
@@ -33,6 +34,7 @@ fun Application.configureRouting() {
 
         // SSE endpoint for room connections
         sse("/events/{roomName}") {
+            heartbeat { period = 15.seconds }
             val roomName = call.parameters["roomName"] ?: run {
                 send(ServerSentEvent(data = """{"error":"Room name is required"}""", event = "error"))
                 return@sse
