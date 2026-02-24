@@ -49,8 +49,8 @@ actual object ViewHandler {
         val file = segments.last()
 
         return if (file.contains('.')) {
-            // Try assets/ first (Android assets folder), then static/ (jar dependencies)
-            (loadResource("assets/$path") ?: loadResource("static/$path"))?.readBytes()
+            // Try Android assets folder first, then static/ (jar dependencies)
+            (loadResource(path) ?: loadResource("static/$path"))?.readBytes()
                 ?: throw IllegalArgumentException("Resource not found: $path")
         } else {
             val buffer = ByteArrayOutputStream()
