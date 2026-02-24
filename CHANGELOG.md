@@ -2,6 +2,15 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.11] - 2026-02-24
+
+### Fixed
+
+#### kroom-view
+- `ViewHandler.serve()` (Android): removed spurious `assets/` prefix that caused double-nesting (`assets/assets/...`). Now tries the path directly against Android assets, then falls back to `static/` for JAR resources.
+
+---
+
 ## [0.10] - 2026-02-20
 
 ### Changed
