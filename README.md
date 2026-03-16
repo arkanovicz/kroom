@@ -31,8 +31,8 @@ kroom-webapp-push     Web Push notifications
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.republicate.kroom:kroom-server:0.11")
-    implementation("com.republicate.kroom:kroom-webapp-assets:0.11")
+    implementation("com.republicate.kroom:kroom-server:0.12-SNAPSHOT")
+    implementation("com.republicate.kroom:kroom-webapp-assets:0.12-SNAPSHOT")
 }
 ```
 
@@ -53,6 +53,41 @@ routing {
     post("/api/{room}/action") { /* dispatch to room */ }
 }
 ```
+
+## Heartbeat and Dead Connection Detection
+
+SSE connections can die silently — browser killed, network dropped without TCP FIN. Without heartbeat, the server blocks forever on `channel.receive()`, never discovering the failure.
+
+Ktor's SSE heartbeat solves this: it periodically writes a comment line to the socket. When the write fails on a dead connection, the exception propagates and terminates the SSE handler, triggering cleanup.
+
+**This must be configured on each SSE route**, not on the Room:
+
+```kotlin
+sse("/events/{room}") {
+    heartbeat { period = 15.seconds }
+
+    val actor = Actor(connectionId = "...", name = login)
+    val channel = room.join(actor)
+
+    try {
+        for (event in channel) {
+            send(event)
+        }
+    } finally {
+        room.leave(actor)
+    }
+}
+```
+
+The `heartbeat` block is Ktor's built-in per-connection heartbeat (since Ktor 3.1). It sends SSE comment lines at the configured interval regardless of room activity. A shorter period detects dead connections faster but generates more traffic.
+
+| Period | Detection | Notes |
+|--------|-----------|-------|
+| 2-5s | Fast | Good for interactive apps (games, chat) |
+| 15s | Moderate | Default in kroom examples |
+| 30s | Ktor default | Sufficient for low-frequency updates |
+
+**Without heartbeat, dead connections are never detected** unless the room happens to send an event that fails. Always configure it.
 
 ## kroom-webapp-core
 
