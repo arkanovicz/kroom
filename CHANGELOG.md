@@ -2,6 +2,25 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+#### kroom-webapp-oauth
+- Working OIDC authorization-code flow (Google, generic OIDC, custom providers) — replaces the skeleton routes
+- Encrypted + signed session cookies, keys derived from `sessionSecret` (previously plaintext, client-forgeable)
+- `externalUrl`, `cookieDomain`, `cookieSecure` config for multi-subdomain deployments behind a reverse proxy
+- `onAuthenticated` hook to enrich the session (e.g. `appId` for the app's own user id) or reject the login
+- `returnTo` post-login redirect with open-redirect validation
+- Cookies sent with `SameSite=Lax`
+
+### Changed
+
+#### kroom-webapp-oauth
+- Dropped pac4j (no Ktor binding) in favor of direct `com.nimbusds:oauth2-oidc-sdk`
+
+---
+
 ## [0.11] - 2026-02-24
 
 ### Fixed

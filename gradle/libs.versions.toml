@@ -16,7 +16,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 kotlinx-html = "0.12.0"
 ktor = "3.4.0"
-pac4j = "6.0.6"
+nimbus-oidc-sdk = "11.14"
 slf4j = "2.0.16"
 velocity = "2.4.1"
 velocity-tools = "3.1"
@@ -75,9 +75,7 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito-junit-jupiter" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 web-push = { module = "nl.martijndwars:web-push", version.ref = "web-push" }
-pac4j-core = { module = "org.pac4j:pac4j-core", version.ref = "pac4j" }
-pac4j-oidc = { module = "org.pac4j:pac4j-oidc", version.ref = "pac4j" }
-pac4j-oauth = { module = "org.pac4j:pac4j-oauth", version.ref = "pac4j" }
+nimbus-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-oidc-sdk" }
 
 # Android
 androidx-core = { module = "androidx.core:core-ktx", version = "1.15.0" }
@@ -92,6 +90,7 @@ antlr = { id = "com.strumenta.antlr-kotlin", version.ref = "antlr-kotlin" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "kotlinx-atomicfu" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 nexusPublish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "nexus-publish" }
 versions = { id = "com.github.ben-manes.versions", version.ref = "versionsPlugin" }

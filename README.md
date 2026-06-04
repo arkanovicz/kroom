@@ -12,7 +12,7 @@ kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
 kroom-webapp-assets   shared client-side JS/CSS
 kroom-webapp-velocity Velocity template integration
 kroom-webapp-l10n     i18n with gettext
-kroom-webapp-oauth    OAuth2 authentication
+kroom-webapp-oauth    OIDC authentication
 kroom-webapp-push     Web Push notifications
 ```
 
