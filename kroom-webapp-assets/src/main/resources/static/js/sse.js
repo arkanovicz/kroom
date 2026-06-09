@@ -77,9 +77,19 @@ class SSEConnection {
             this.eventSource.onmessage = (event) => {
                 this.emit('message', event.data);
             };
+
+            // bind handlers registered before connect() (the .onJson(...).connect() pattern)
+            Object.keys(this.handlers).forEach((name) => this._bind(name));
         }
 
         return this;
+    }
+
+    // one EventSource listener per custom event, fanning out to all its handlers
+    _bind(eventName) {
+        if (this.eventSource && !['open', 'error', 'message'].includes(eventName)) {
+            this.eventSource.addEventListener(eventName, (event) => this.emit(eventName, event.data));
+        }
     }
 
     disconnect() {
@@ -95,25 +105,12 @@ class SSEConnection {
     }
 
     on(eventName, handler) {
-        if (!this.handlers[eventName]) {
-            this.handlers[eventName] = [];
-
-            // Register with EventSource for custom events (browser only)
-            if (this.eventSource && !['open', 'error', 'message'].includes(eventName)) {
-                this.eventSource.addEventListener(eventName, (event) => {
-                    this.emit(eventName, event.data);
-                });
-            }
-        }
+        const isNew = !this.handlers[eventName];
+        if (isNew) this.handlers[eventName] = [];
         this.handlers[eventName].push(handler);
-
-        // If already connected and registering a new event type, add listener (browser only)
-        if (this.eventSource && !['open', 'error', 'message'].includes(eventName)) {
-            this.eventSource.addEventListener(eventName, (event) => {
-                handler(event.data);
-            });
-        }
-
+        // bind the EventSource listener once per event (when already connected);
+        // pre-connect registrations are bound by connect()
+        if (isNew) this._bind(eventName);
         return this;
     }
 
