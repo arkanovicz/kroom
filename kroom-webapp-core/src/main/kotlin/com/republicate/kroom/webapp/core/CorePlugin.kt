@@ -22,6 +22,9 @@ import java.io.File
 fun Application.installCore(block: CoreConfig.() -> Unit = {}) {
     val config = CoreConfig().apply(block)
 
+    // l10n redirects "/" to "/en/"; normalize trailing slashes once, for every kroom app
+    install(IgnoreTrailingSlash)
+
     install(CallLogging) {
         level = config.logLevel
     }

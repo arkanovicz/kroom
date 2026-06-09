@@ -51,7 +51,7 @@ fun Route.kroomAssets(prefix: String = "") {
 }
 
 private suspend fun serveAsset(path: String, call: ApplicationCall) {
-    val resourcePath = "webapp/$path"
+    val resourcePath = "static/$path"  // assets are packaged under static/ (matches installCore)
     val resource = Thread.currentThread().contextClassLoader.getResourceAsStream(resourcePath)
 
     if (resource == null) {

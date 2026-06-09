@@ -27,8 +27,9 @@ class L10nConfig {
     var i18nPath: String = "/i18n"
     var logMissing: Boolean = false
 
-    // Paths to skip from language redirect (configurable, defaults cover common static prefixes)
-    var skipPrefixes: List<String> = listOf("/api/", "/css/", "/js/", "/img/", "/lib/", "/snd/", "/admin/")
+    // Paths to skip from language redirect (configurable, defaults cover common static prefixes,
+    // OAuth callbacks, and SSE channels — all language-neutral)
+    var skipPrefixes: List<String> = listOf("/api/", "/css/", "/js/", "/img/", "/lib/", "/snd/", "/admin/", "/oauth/", "/events/")
     var skipPaths: List<String> = listOf("/health")
 
     // Translation source (default: PO files)

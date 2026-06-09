@@ -2,6 +2,17 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.13] - 2026-06-09
+
+### Changed
+
+- IgnoreTrailingSlash installed by default
+
+### Fixed
+
+- webapp/$path should be static/$path
+- l0n should ignore /oauth/, /events/
+
 ## [0.12] - 2026-06-05
 
 ### Added
