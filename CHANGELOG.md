@@ -2,6 +2,13 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.14] - 2026-06-09
+
+### Fixed
+
+#### kroom-webapp-assets
+- sse.js: pre-connect event handlers now bind on connect; one EventSource listener per event (was dropping `.onJson(...).connect()` handlers and double-binding later ones)
+
 ## [0.13] - 2026-06-09
 
 ### Changed
