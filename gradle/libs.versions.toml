@@ -4,6 +4,7 @@ kotlin = "2.3.0"
 dokka = "1.9.20"
 nexus-publish = "2.0.0"
 antlr-kotlin = "1.0.5"
+bouncycastle = "1.81"
 commons-collections4 = "4.5.0"
 commons-lang3 = "3.18.0"
 essential-kson = "2.12"
@@ -31,6 +32,7 @@ versionsPlugin = "0.52.0"
 
 [libraries]
 antlr-kotlin = { module = "com.strumenta:antlr-kotlin-runtime", version.ref = "antlr-kotlin" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 commons-collections4 = { module = "org.apache.commons:commons-collections4", version.ref = "commons-collections4" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 essential-kson = { module = "com.republicate.kson:essential-kson", version.ref = "essential-kson" }
