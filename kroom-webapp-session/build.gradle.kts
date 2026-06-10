@@ -1,7 +1,8 @@
-description = "Kroom webapp oauth - OIDC authentication plugin"
+description = "Kroom webapp session - encrypted session identity for Ktor webapps"
 
 plugins {
     alias(libs.plugins.jvm)
+    alias(libs.plugins.kotlin.serialization)
     `maven-publish`
 }
 
@@ -13,11 +14,9 @@ java {
 }
 
 dependencies {
-    api(project(":kroom-webapp-session"))
-    api(libs.nimbus.oidc.sdk)
+    api(project(":kroom-webapp-core"))
+    api(libs.ktor.server.sessions)
     testImplementation(libs.kotlin.test)
-    testImplementation(libs.ktor.server.test.host)
-    testImplementation(libs.ktor.server.netty)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 }

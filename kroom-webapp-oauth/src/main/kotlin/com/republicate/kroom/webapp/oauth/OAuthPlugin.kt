@@ -19,6 +19,11 @@ import com.nimbusds.openid.connect.sdk.OIDCTokenResponseParser
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator
+import com.republicate.kroom.webapp.session.AuthFlow
+import com.republicate.kroom.webapp.session.UserSession
+import com.republicate.kroom.webapp.session.sessionConfig
+import com.republicate.kroom.webapp.session.sessionConfigOrNull
+import com.republicate.kroom.webapp.session.validateReturnTo
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -28,54 +33,21 @@ import io.ktor.server.sessions.*
 import io.ktor.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.net.URI
-import java.security.MessageDigest
 
 /**
  * OAuth plugin for Ktor webapps — OIDC authorization-code flow.
  *
- * Provides:
- * - Encrypted cookie sessions
- * - OIDC authentication (Google + generic + custom providers)
- * - `onAuthenticated` hook for app-level enrichment or rejection
+ * Requires [com.republicate.kroom.webapp.session.installSessions] to have run.
+ * Provides OIDC authentication (Google + generic + custom providers) and an
+ * `onAuthenticated` hook for app-level enrichment or rejection.
  */
 
 private val logger = LoggerFactory.getLogger("kroom.oauth")
 
-private const val DEFAULT_SECRET = "change-me-in-production"
-
-@Serializable
-data class UserSession(
-    val id: String,
-    val name: String,
-    val email: String?,
-    val provider: String,
-    val appId: String? = null
-)
-
-/** Short-lived state carried across the login hop. */
-@Serializable
-data class OAuthFlow(
-    val provider: String,
-    val state: String,
-    val nonce: String,
-    val returnTo: String
-)
-
 class OAuthConfig {
-    var sessionSecret: String = DEFAULT_SECRET
     var callbackUrl: String = "/oauth/callback"
-
-    /** Public base URL (e.g. `https://republicate.com`); null derives from the request (dev only). */
-    var externalUrl: String? = null
-
-    /** Cookie domain (e.g. `.republicate.com`) so one login covers all subdomains; null = host-only. */
-    var cookieDomain: String? = null
-
-    /** Defaults to true when [externalUrl] is https. */
-    var cookieSecure: Boolean? = null
 
     // Google OIDC
     var googleClientId: String? = null
@@ -168,44 +140,15 @@ private val OidcProvidersKey = AttributeKey<Map<String, OidcProvider>>("OidcProv
 val Application.oauthConfig: OAuthConfig
     get() = attributes[OAuthConfigKey]
 
-// encryption key: AES-128, sign key: HmacSHA256
-internal fun sessionTransformer(secret: String) = SessionTransportTransformerEncrypt(
-    deriveKey(secret, "encrypt").copyOf(16),
-    deriveKey(secret, "sign")
-)
-
-private fun deriveKey(secret: String, salt: String): ByteArray =
-    MessageDigest.getInstance("SHA-256").digest("$salt:$secret".toByteArray())
-
 /**
- * Validate a post-login redirect target: relative paths, the request host,
- * and hosts under [cookieDomain] are allowed; anything else falls back to `/`.
- */
-internal fun validateReturnTo(returnTo: String?, requestHost: String, cookieDomain: String?): String {
-    if (returnTo.isNullOrBlank()) return "/"
-    if (returnTo.startsWith("/") && !returnTo.startsWith("//")) return returnTo
-    val uri = try { URI(returnTo) } catch (e: Exception) { return "/" }
-    if (uri.scheme != "http" && uri.scheme != "https") return "/"
-    val host = uri.host ?: return "/"
-    if (host == requestHost) return returnTo
-    cookieDomain?.removePrefix(".")?.let { domain ->
-        if (host == domain || host.endsWith(".$domain")) return returnTo
-    }
-    return "/"
-}
-
-/**
- * Install OAuth plugin.
+ * Install OAuth plugin. Configures OIDC providers and routes.
  *
- * Configures encrypted cookie sessions, OIDC providers and routes.
+ * `installSessions { }` must be called first (owns the session/flow cookies).
  */
 fun Application.installOAuth(block: OAuthConfig.() -> Unit = {}) {
+    requireNotNull(sessionConfigOrNull) { "installSessions { } must be called before installOAuth" }
     val config = OAuthConfig().apply(block)
     attributes.put(OAuthConfigKey, config)
-
-    if (config.sessionSecret == DEFAULT_SECRET) {
-        logger.warn("Using default session secret — set sessionSecret in production")
-    }
 
     val providers = mutableMapOf<String, OidcProvider>()
     if (config.googleClientId != null && config.googleClientSecret != null) {
@@ -222,29 +165,6 @@ fun Application.installOAuth(block: OAuthConfig.() -> Unit = {}) {
     config.providers.forEach { providers[it.name] = it }
     attributes.put(OidcProvidersKey, providers)
 
-    val secure = config.cookieSecure ?: (config.externalUrl?.startsWith("https://") == true)
-    val transformer = sessionTransformer(config.sessionSecret)
-    fun CookieConfiguration.commonSettings() {
-        path = "/"
-        httpOnly = true
-        this.secure = secure
-        extensions["SameSite"] = "Lax"
-        config.cookieDomain?.let { domain = it }
-    }
-
-    install(Sessions) {
-        cookie<UserSession>("user_session") {
-            cookie.commonSettings()
-            cookie.maxAgeInSeconds = 3600 * 24 * 7 // 1 week
-            transform(transformer)
-        }
-        cookie<OAuthFlow>("oauth_flow") {
-            cookie.commonSettings()
-            cookie.maxAgeInSeconds = 600 // login hop only
-            transform(transformer)
-        }
-    }
-
     routing {
         oauthRoutes()
     }
@@ -252,7 +172,7 @@ fun Application.installOAuth(block: OAuthConfig.() -> Unit = {}) {
 
 /** Absolute redirect_uri: externalUrl when set, else derived from the request (dev). */
 private fun ApplicationCall.callbackUri(config: OAuthConfig): String =
-    config.externalUrl?.let { it.trimEnd('/') + config.callbackUrl }
+    application.sessionConfig.externalUrl?.let { it.trimEnd('/') + config.callbackUrl }
         ?: with(request.origin) {
             val port = if (serverPort == 80 || serverPort == 443) "" else ":$serverPort"
             "$scheme://$serverHost$port${config.callbackUrl}"
@@ -272,17 +192,17 @@ fun Route.oauthRoutes() {
             val returnTo = validateReturnTo(
                 call.request.queryParameters["returnTo"] ?: call.request.headers[HttpHeaders.Referrer],
                 call.request.origin.serverHost,
-                config.cookieDomain
+                application.sessionConfig.cookieDomain
             )
             val state = State()
             val nonce = Nonce()
-            call.sessions.set(OAuthFlow(provider.name, state.value, nonce.value, returnTo))
+            call.sessions.set(AuthFlow(provider.name, state.value, nonce.value, returnTo))
             call.respondRedirect(provider.authRequestUri(call.callbackUri(config), state, nonce).toString())
         }
 
         get("/callback") {
-            val flow = call.sessions.get<OAuthFlow>()
-            call.sessions.clear<OAuthFlow>()
+            val flow = call.sessions.get<AuthFlow>()
+            call.sessions.clear<AuthFlow>()
             try {
                 if (flow == null) throw OAuthFlowException("no pending oauth flow")
                 val params = call.request.queryParameters
@@ -340,15 +260,3 @@ fun Route.oauthRoutes() {
         }
     }
 }
-
-/**
- * Get current user session (null if not authenticated).
- */
-val ApplicationCall.userSession: UserSession?
-    get() = sessions.get<UserSession>()
-
-/**
- * Check if user is authenticated.
- */
-val ApplicationCall.isAuthenticated: Boolean
-    get() = userSession != null

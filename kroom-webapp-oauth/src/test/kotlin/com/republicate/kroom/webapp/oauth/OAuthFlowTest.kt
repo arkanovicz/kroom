@@ -11,6 +11,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.openid.connect.sdk.SubjectType
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
+import com.republicate.kroom.webapp.session.installSessions
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
@@ -99,8 +100,8 @@ class OAuthFlowTest {
         assertions: suspend (callback: HttpResponse, client: HttpClient) -> Unit
     ) = testApplication {
         application {
+            installSessions { sessionSecret = "test-secret" }
             installOAuth {
-                sessionSecret = "test-secret"
                 providers.add(testProvider())
                 configure()
             }
@@ -180,8 +181,8 @@ class OAuthFlowTest {
     @Test
     fun `unknown provider returns 404`() = testApplication {
         application {
+            installSessions { sessionSecret = "test-secret" }
             installOAuth {
-                sessionSecret = "test-secret"
                 providers.add(testProvider())
             }
         }

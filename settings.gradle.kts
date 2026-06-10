@@ -11,6 +11,7 @@ include("kroom-webapp-core")
 include("kroom-webapp-assets")
 include("kroom-webapp-velocity")
 include("kroom-webapp-l10n")
+include("kroom-webapp-session")
 include("kroom-webapp-oauth")
 include("kroom-webapp-push")
 

@@ -1,4 +1,4 @@
-package com.republicate.kroom.webapp.oauth
+package com.republicate.kroom.webapp.session
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
