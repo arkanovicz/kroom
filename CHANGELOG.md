@@ -2,6 +2,41 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+#### kroom-webapp-session (new module)
+- Encrypted session identity shared by the authentication modules, extracted from
+  kroom-webapp-oauth: `UserSession`, the `AuthFlow` redirect-login cookie, the
+  single `installSessions { }` Sessions install, `validateReturnTo`, and
+  `call.userSession` / `call.isAuthenticated`.
+
+#### kroom-webapp-auth (new module)
+- Email+password identity with OIDC account linking
+- `AuthStore<ID>` — the app owns its dude/credentials schema and maps rows into
+  `Principal<ID>` / `Credential` value projections; `AuthStoreException` rejects a
+  write under app policy (e.g. an email-variant quota)
+- argon2id hashing via BouncyCastle (pure-JVM), self-describing PHC strings,
+  per-hash salt, optional pepper, cost read back on verify
+- `normalizeEmail` (lowercase+trim; `+tag` variants kept distinct) and `emailBase`
+  (`+tag` stripped, for app-side quota grouping)
+- `installAuth<reified ID>` with a `String→ID` parser for Int/Long/String/Uuid (and
+  an `idFromString` override), email-only `register`/`login`/`logout` routes, and
+  `ApplicationCall.authId()`
+- `linkOidc()` — wire into `installOAuth { onAuthenticated }` to find-or-create a
+  principal by normalized email and attach the provider credential
+
+### Changed
+
+#### kroom-webapp-oauth (BREAKING)
+- Session ownership moved to the new kroom-webapp-session module. Call
+  `installSessions { sessionSecret; externalUrl; cookieDomain; cookieSecure }`
+  **before** `installOAuth { }`; those four settings moved off `OAuthConfig`.
+- `UserSession`, `validateReturnTo`, `ApplicationCall.userSession` /
+  `isAuthenticated` moved from `com.republicate.kroom.webapp.oauth` to
+  `com.republicate.kroom.webapp.session` — update imports.
+
 ## [0.14] - 2026-06-09
 
 ### Fixed

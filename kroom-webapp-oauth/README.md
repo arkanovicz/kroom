@@ -1,20 +1,23 @@
 # kroom-webapp-oauth
 
-OIDC authentication for Ktor webapps — authorization-code flow with
-encrypted cookie sessions.
+OIDC authentication for Ktor webapps — authorization-code flow over the
+encrypted sessions from `kroom-webapp-session`.
 
 ## Usage
 
 ```kotlin
 fun Application.module() {
-    installOAuth {
+    installSessions {
         sessionSecret = System.getenv("SESSION_SECRET")
-        googleClientId = System.getenv("GOOGLE_CLIENT_ID")
-        googleClientSecret = System.getenv("GOOGLE_CLIENT_SECRET")
 
         // single app serving many subdomains behind a reverse proxy
         externalUrl = "https://example.com"
         cookieDomain = ".example.com"
+    }
+
+    installOAuth {
+        googleClientId = System.getenv("GOOGLE_CLIENT_ID")
+        googleClientSecret = System.getenv("GOOGLE_CLIENT_SECRET")
 
         // enrich or reject logins; returning null rejects
         onAuthenticated = { session, call ->
@@ -23,6 +26,8 @@ fun Application.module() {
     }
 }
 ```
+
+`installSessions { }` must be called before `installOAuth { }`.
 
 ## Routes
 
@@ -33,7 +38,8 @@ fun Application.module() {
 - `GET /oauth/logout`
 - `GET /api/auth/user` — session as JSON, or `{"authenticated":false}`
 
-In handlers: `call.userSession`, `call.isAuthenticated`.
+In handlers: `call.userSession`, `call.isAuthenticated` (from
+`com.republicate.kroom.webapp.session`).
 
 ## Providers
 
@@ -43,8 +49,10 @@ instances to `providers`.
 
 ## Notes
 
-- Session and flow cookies are encrypted and signed with keys derived
-  from `sessionSecret`.
+- Session/flow cookies, `sessionSecret`, `externalUrl` and `cookieDomain`
+  now live in `kroom-webapp-session` (`installSessions { }`).
 - `redirect_uri` = `externalUrl + callbackUrl`; without `externalUrl`
   it is derived from the request (dev only — behind a proxy this
   requires `XForwardedHeaders`).
+- To link OIDC logins into email+password accounts, pair with
+  `kroom-webapp-auth`: `onAuthenticated = { s, _ -> authStore.linkOidc(s) }`.
