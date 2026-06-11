@@ -15,6 +15,7 @@ import com.republicate.kroom.webapp.session.installSessions
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.engine.*
@@ -46,6 +47,9 @@ class OAuthFlowTest {
     @Volatile
     private var idTokenNonce: String? = null
 
+    @Volatile
+    private var idTokenName: String? = "Test User"
+
     @BeforeTest
     fun startIdp() {
         idp = embeddedServer(Netty, port = 0) {
@@ -76,7 +80,7 @@ class OAuthFlowTest {
             .expirationTime(Date(System.currentTimeMillis() + 60_000))
             .issueTime(Date())
             .claim("nonce", idTokenNonce)
-            .claim("name", "Test User")
+            .claim("name", idTokenName)
             .claim("email", "test@example.com")
             .build()
         return SignedJWT(JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test").build(), claims).apply {
@@ -84,25 +88,36 @@ class OAuthFlowTest {
         }.serialize()
     }
 
-    private fun testProvider(): OidcProvider {
+    private fun testMetadata(): OIDCProviderMetadata {
         val metadata = OIDCProviderMetadata(Issuer(issuer()), listOf(SubjectType.PUBLIC), URI("${issuer()}/jwks"))
         metadata.authorizationEndpointURI = URI("${issuer()}/authorize")
         metadata.tokenEndpointURI = URI("${issuer()}/token")
-        return OidcProvider(
-            "test", "test-client", "test-secret",
-            metadata = metadata, jwkSet = JWKSet(rsaKey.toPublicJWK())
-        )
+        return metadata
     }
+
+    private fun testJwkSet() = JWKSet(rsaKey.toPublicJWK())
+
+    private fun testProvider(requireNonce: Boolean = true): OidcProvider =
+        OidcProvider(
+            "test", "test-client", "test-secret",
+            metadata = testMetadata(), jwkSet = testJwkSet(), requireNonce = requireNonce
+        )
 
     private fun runFlow(
         configure: OAuthConfig.() -> Unit = {},
-        callbackParams: (state: String) -> String = { state -> "code=test-code&state=$state" },
+        provider: OidcProvider? = null,
+        captureNonce: Boolean = true,
+        checkAuthorize: (params: Map<String, String>) -> Unit = {},
+        callback: suspend (client: HttpClient, state: String) -> HttpResponse = { client, state ->
+            client.get("/oauth/callback?code=test-code&state=$state")
+        },
         assertions: suspend (callback: HttpResponse, client: HttpClient) -> Unit
     ) = testApplication {
+        val testProvider = provider ?: testProvider()
         application {
             installSessions { sessionSecret = "test-secret" }
             installOAuth {
-                providers.add(testProvider())
+                providers.add(testProvider)
                 configure()
             }
         }
@@ -118,10 +133,11 @@ class OAuthFlowTest {
         val params = URI(location).rawQuery.split("&").associate {
             it.substringBefore("=") to URLDecoder.decode(it.substringAfter("="), "UTF-8")
         }
-        idTokenNonce = params["nonce"]
+        if (captureNonce) idTokenNonce = params["nonce"]
+        checkAuthorize(params)
 
-        val callback = client.get("/oauth/callback?${callbackParams(params["state"]!!)}")
-        assertions(callback, client)
+        val response = callback(client, params["state"]!!)
+        assertions(response, client)
     }
 
     @Test
@@ -137,7 +153,7 @@ class OAuthFlowTest {
 
     @Test
     fun `state mismatch rejects login`() = runFlow(
-        callbackParams = { _ -> "code=test-code&state=forged" },
+        callback = { client, _ -> client.get("/oauth/callback?code=test-code&state=forged") },
         assertions = { callback, client ->
             assertEquals(HttpStatusCode.Found, callback.status)
             assertEquals("/", callback.headers[HttpHeaders.Location])
@@ -147,11 +163,62 @@ class OAuthFlowTest {
 
     @Test
     fun `provider error rejects login`() = runFlow(
-        callbackParams = { state -> "error=access_denied&state=$state" },
+        callback = { client, state -> client.get("/oauth/callback?error=access_denied&state=$state") },
         assertions = { callback, _ ->
             assertEquals("/", callback.headers[HttpHeaders.Location])
         }
     )
+
+    @Test
+    fun `missing nonce in id_token rejected by strict provider`() = runFlow(
+        captureNonce = false,
+        assertions = { callback, client ->
+            assertEquals("/", callback.headers[HttpHeaders.Location])
+            assertTrue(client.get("/api/auth/user").bodyAsText().contains("\"authenticated\":false"))
+        }
+    )
+
+    @Test
+    fun `nonce-less provider authenticates (LinkedIn style)`() = runFlow(
+        provider = testProvider(requireNonce = false),
+        captureNonce = false,
+        assertions = { callback, client ->
+            assertEquals("/after", callback.headers[HttpHeaders.Location])
+            assertTrue(client.get("/api/auth/user").bodyAsText().contains("user-123"))
+        }
+    )
+
+    @Test
+    fun `apple-shaped form_post flow with first-auth name`() {
+        idTokenName = null
+        runFlow(
+            provider = OidcProvider(
+                "test", "test-client", null,
+                metadata = testMetadata(), jwkSet = testJwkSet(),
+                scope = listOf("openid", "email", "name"),
+                extraAuthParams = mapOf("response_mode" to "form_post"),
+                clientSecretSupplier = { "generated-jwt-secret" },
+                clientSecretPost = true
+            ),
+            checkAuthorize = { params ->
+                assertEquals("form_post", params["response_mode"])
+                assertEquals("openid email name", params["scope"])
+            },
+            callback = { client, state ->
+                client.submitForm("/oauth/callback", parameters {
+                    append("code", "test-code")
+                    append("state", state)
+                    append("user", """{"name":{"firstName":"Jane","lastName":"Doe"},"email":"test@example.com"}""")
+                })
+            },
+            assertions = { callback, client ->
+                assertEquals("/after", callback.headers[HttpHeaders.Location])
+                val user = client.get("/api/auth/user").bodyAsText()
+                assertTrue(user.contains("Jane Doe"), user)
+                assertTrue(user.contains("user-123"), user)
+            }
+        )
+    }
 
     @Test
     fun `hook enriches session with appId`() = runFlow(

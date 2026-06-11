@@ -2,6 +2,41 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+#### kroom-webapp-oauth
+- Apple, GitHub and LinkedIn providers, as `apple { teamId; keyId;
+  servicesClientId; privateKey }`, `github { clientId; clientSecret }` and
+  `linkedin { clientId; clientSecret }` config shortcuts
+- `OAuth2Provider` — raw-OAuth2 path (no OIDC/id_token): explicit
+  authorize/token/userinfo endpoints + `extractProfile(userInfo, fetch)`
+  mapper; `githubProvider(...)` factory with the private-email fallback to
+  `/user/emails` and overridable bases (GitHub Enterprise)
+- `AppleClientSecret` — Sign in with Apple `client_secret` as an ES256 JWT
+  signed with the `.p8` key (nimbus-jose), cached ~4 months
+- `OidcProvider` knobs for non-vanilla providers: `scope`, `extraAuthParams`
+  (Apple's `response_mode=form_post`), `clientSecretSupplier` (dynamic
+  secrets), `clientSecretPost`, `requireNonce = false` (LinkedIn never echoes
+  the nonce)
+- `POST /oauth/callback` for `form_post` response mode; Apple's first-auth
+  `user` field is parsed for the display name
+
+### Changed
+
+#### kroom-webapp-oauth
+- `OAuthConfig.providers` is now a list of the new `OAuthProvider` interface
+  (`OidcProvider` and `OAuth2Provider` implement it) — source-compatible for
+  existing google/oidc consumers; `onAuthenticated` is unchanged and the
+  session `id` remains the stable per-provider user id (OIDC `sub`, GitHub
+  numeric id)
+
+#### kroom-webapp-session
+- The transient `auth_flow` cookie is `SameSite=None` when secure, so the
+  login handshake survives cross-site `form_post` callbacks (Apple); stays
+  `Lax` over plain http
+
 ## [0.15] - 2026-06-10
 
 ### Added

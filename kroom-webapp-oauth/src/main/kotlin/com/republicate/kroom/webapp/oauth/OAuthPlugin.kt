@@ -1,47 +1,29 @@
 package com.republicate.kroom.webapp.oauth
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.oauth2.sdk.AuthorizationCode
-import com.nimbusds.oauth2.sdk.AuthorizationCodeGrant
-import com.nimbusds.oauth2.sdk.ResponseType
-import com.nimbusds.oauth2.sdk.Scope
-import com.nimbusds.oauth2.sdk.TokenErrorResponse
-import com.nimbusds.oauth2.sdk.TokenRequest
-import com.nimbusds.oauth2.sdk.auth.ClientSecretBasic
-import com.nimbusds.oauth2.sdk.auth.Secret
-import com.nimbusds.oauth2.sdk.id.ClientID
 import com.nimbusds.oauth2.sdk.id.State
-import com.nimbusds.openid.connect.sdk.AuthenticationRequest
 import com.nimbusds.openid.connect.sdk.Nonce
-import com.nimbusds.openid.connect.sdk.OIDCTokenResponse
-import com.nimbusds.openid.connect.sdk.OIDCTokenResponseParser
-import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
-import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator
 import com.republicate.kroom.webapp.session.AuthFlow
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.sessionConfig
 import com.republicate.kroom.webapp.session.sessionConfigOrNull
 import com.republicate.kroom.webapp.session.validateReturnTo
+import com.republicate.kson.Json
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import io.ktor.util.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.net.URI
 
 /**
- * OAuth plugin for Ktor webapps — OIDC authorization-code flow.
+ * OAuth plugin for Ktor webapps — OIDC and raw-OAuth2 authorization-code flows.
  *
  * Requires [com.republicate.kroom.webapp.session.installSessions] to have run.
- * Provides OIDC authentication (Google + generic + custom providers) and an
- * `onAuthenticated` hook for app-level enrichment or rejection.
+ * Provides authentication (google/apple/github/linkedin/oidc shortcuts + custom
+ * providers) and an `onAuthenticated` hook for app-level enrichment or rejection.
  */
 
 private val logger = LoggerFactory.getLogger("kroom.oauth")
@@ -58,90 +40,84 @@ class OAuthConfig {
     var oidcClientId: String? = null
     var oidcClientSecret: String? = null
 
-    /** Additional providers beyond the google/oidc shortcuts. */
-    val providers = mutableListOf<OidcProvider>()
+    /** Additional providers beyond the shortcuts. */
+    val providers = mutableListOf<OAuthProvider>()
 
     /**
      * Called after profile extraction, before the session is set.
+     * The session carries `provider`, `email`, and the stable per-provider
+     * user id in `id` — enough to link accounts app-side.
      * Return a (possibly enriched) session to accept, null to reject the login.
      */
     var onAuthenticated: (suspend (session: UserSession, call: ApplicationCall) -> UserSession?)? = null
 }
 
-/**
- * An OIDC provider. Metadata is fetched from [discoveryUri] on first use,
- * or injected directly (tests, non-discoverable providers).
- */
-class OidcProvider(
-    val name: String,
-    val clientId: String,
-    val clientSecret: String?,
-    private val discoveryUri: String? = null,
-    metadata: OIDCProviderMetadata? = null,
-    jwkSet: JWKSet? = null
-) {
-    init {
-        require(discoveryUri != null || metadata != null) { "provider '$name' needs a discoveryUri or metadata" }
-    }
-
-    // benign race: concurrent first uses may fetch twice
-    private var resolvedMetadata: OIDCProviderMetadata? = metadata
-    private var resolvedValidator: IDTokenValidator? = null
-    private val jwkSetOverride = jwkSet
-
-    private suspend fun metadata(): OIDCProviderMetadata =
-        resolvedMetadata ?: withContext(Dispatchers.IO) {
-            OIDCProviderMetadata.parse(URI(discoveryUri!!).toURL().readText())
-        }.also { resolvedMetadata = it }
-
-    private suspend fun validator(): IDTokenValidator =
-        resolvedValidator ?: metadata().let { md ->
-            if (jwkSetOverride != null)
-                IDTokenValidator(md.issuer, ClientID(clientId), JWSAlgorithm.RS256, jwkSetOverride)
-            else
-                IDTokenValidator(md.issuer, ClientID(clientId), JWSAlgorithm.RS256, md.jwkSetURI.toURL())
-        }.also { resolvedValidator = it }
-
-    internal suspend fun authRequestUri(redirectUri: String, state: State, nonce: Nonce): URI =
-        AuthenticationRequest.Builder(
-            ResponseType.CODE,
-            Scope("openid", "profile", "email"),
-            ClientID(clientId),
-            URI(redirectUri)
-        ).endpointURI(metadata().authorizationEndpointURI)
-            .state(state)
-            .nonce(nonce)
-            .build()
-            .toURI()
-
-    internal suspend fun exchangeCode(code: String, redirectUri: String, nonce: String): IDTokenClaimsSet {
-        val grant = AuthorizationCodeGrant(AuthorizationCode(code), URI(redirectUri))
-        val request = if (clientSecret != null)
-            TokenRequest(metadata().tokenEndpointURI, ClientSecretBasic(ClientID(clientId), Secret(clientSecret)), grant)
-        else
-            TokenRequest(metadata().tokenEndpointURI, ClientID(clientId), grant)
-        val tokenEndpointUri = metadata().tokenEndpointURI
-        return withContext(Dispatchers.IO) {
-            val response = OIDCTokenResponseParser.parse(request.toHTTPRequest().send())
-            if (!response.indicatesSuccess())
-                throw OAuthFlowException("token exchange at $tokenEndpointUri failed: ${(response as TokenErrorResponse).errorObject}")
-            val idToken = (response as OIDCTokenResponse).oidcTokens.idToken
-                ?: throw OAuthFlowException("no id_token in token response")
-            validator().validate(idToken, Nonce(nonce))
-        }
-    }
+class AppleConfig {
+    lateinit var teamId: String
+    lateinit var keyId: String
+    lateinit var servicesClientId: String
+    /** `.p8` PEM content (or its bare base64 body). */
+    lateinit var privateKey: String
 }
 
-private class OAuthFlowException(message: String) : Exception(message)
+/** Sign in with Apple: OIDC with a generated ES256 JWT secret and `form_post` callback. */
+fun OAuthConfig.apple(block: AppleConfig.() -> Unit) {
+    val apple = AppleConfig().apply(block)
+    providers.add(
+        OidcProvider(
+            name = "apple",
+            clientId = apple.servicesClientId,
+            clientSecret = null,
+            discoveryUri = "https://appleid.apple.com/.well-known/openid-configuration",
+            scope = listOf("openid", "email", "name"),
+            // Apple requires form_post when name/email scopes are requested
+            extraAuthParams = mapOf("response_mode" to "form_post"),
+            clientSecretSupplier = AppleClientSecret(apple.teamId, apple.keyId, apple.servicesClientId, apple.privateKey)::get,
+            clientSecretPost = true
+        )
+    )
+}
+
+class GithubConfig {
+    lateinit var clientId: String
+    lateinit var clientSecret: String
+}
+
+/** GitHub: raw OAuth2 with the private-email fallback. */
+fun OAuthConfig.github(block: GithubConfig.() -> Unit) {
+    val github = GithubConfig().apply(block)
+    providers.add(githubProvider(github.clientId, github.clientSecret))
+}
+
+class LinkedinConfig {
+    lateinit var clientId: String
+    lateinit var clientSecret: String
+}
+
+/** LinkedIn: standard OIDC, except the nonce is never echoed in the id_token. */
+fun OAuthConfig.linkedin(block: LinkedinConfig.() -> Unit) {
+    val linkedin = LinkedinConfig().apply(block)
+    providers.add(
+        OidcProvider(
+            name = "linkedin",
+            clientId = linkedin.clientId,
+            clientSecret = linkedin.clientSecret,
+            discoveryUri = "https://www.linkedin.com/oauth/.well-known/openid-configuration",
+            requireNonce = false
+        )
+    )
+}
+
+internal class OAuthFlowException(message: String) : Exception(message)
 
 private val OAuthConfigKey = AttributeKey<OAuthConfig>("OAuthConfig")
-private val OidcProvidersKey = AttributeKey<Map<String, OidcProvider>>("OidcProviders")
+private val OAuthProvidersKey = AttributeKey<Map<String, OAuthProvider>>("OAuthProviders")
 
 val Application.oauthConfig: OAuthConfig
     get() = attributes[OAuthConfigKey]
 
 /**
- * Install OAuth plugin. Configures OIDC providers and routes.
+ * Install OAuth plugin. Configures providers and routes.
  *
  * `installSessions { }` must be called first (owns the session/flow cookies).
  */
@@ -150,7 +126,7 @@ fun Application.installOAuth(block: OAuthConfig.() -> Unit = {}) {
     val config = OAuthConfig().apply(block)
     attributes.put(OAuthConfigKey, config)
 
-    val providers = mutableMapOf<String, OidcProvider>()
+    val providers = mutableMapOf<String, OAuthProvider>()
     if (config.googleClientId != null && config.googleClientSecret != null) {
         providers["google"] = OidcProvider(
             "google", config.googleClientId!!, config.googleClientSecret!!,
@@ -163,7 +139,7 @@ fun Application.installOAuth(block: OAuthConfig.() -> Unit = {}) {
         )
     }
     config.providers.forEach { providers[it.name] = it }
-    attributes.put(OidcProvidersKey, providers)
+    attributes.put(OAuthProvidersKey, providers)
 
     routing {
         oauthRoutes()
@@ -183,7 +159,7 @@ private fun ApplicationCall.callbackUri(config: OAuthConfig): String =
  */
 fun Route.oauthRoutes() {
     val config = application.oauthConfig
-    val providers = application.attributes[OidcProvidersKey]
+    val providers = application.attributes[OAuthProvidersKey]
 
     route("/oauth") {
         get("/login/{provider}") {
@@ -201,36 +177,12 @@ fun Route.oauthRoutes() {
         }
 
         get("/callback") {
-            val flow = call.sessions.get<AuthFlow>()
-            call.sessions.clear<AuthFlow>()
-            try {
-                if (flow == null) throw OAuthFlowException("no pending oauth flow")
-                val params = call.request.queryParameters
-                params["error"]?.let { throw OAuthFlowException("provider error: $it") }
-                if (params["state"] != flow.state) throw OAuthFlowException("state mismatch")
-                val code = params["code"] ?: throw OAuthFlowException("missing code")
-                val provider = providers[flow.provider]
-                    ?: throw OAuthFlowException("unknown provider '${flow.provider}'")
-                val claims = provider.exchangeCode(code, call.callbackUri(config), flow.nonce)
-                var session = UserSession(
-                    id = claims.subject.value,
-                    name = claims.getStringClaim("name")
-                        ?: claims.getStringClaim("preferred_username")
-                        ?: claims.subject.value,
-                    email = claims.getStringClaim("email"),
-                    provider = provider.name
-                )
-                config.onAuthenticated?.let { hook ->
-                    session = hook(session, call)
-                        ?: throw OAuthFlowException("login rejected by onAuthenticated hook")
-                }
-                call.sessions.set(session)
-                call.respondRedirect(flow.returnTo)
-            } catch (e: Exception) {
-                logger.warn("OAuth callback failed: {}", e.message)
-                call.sessions.clear<UserSession>()
-                call.respondRedirect("/")
-            }
+            handleCallback(call, config, providers, call.request.queryParameters)
+        }
+
+        // form_post response mode (Apple)
+        post("/callback") {
+            handleCallback(call, config, providers, call.receiveParameters())
         }
 
         get("/logout") {
@@ -243,7 +195,7 @@ fun Route.oauthRoutes() {
         val session = call.sessions.get<UserSession>()
         if (session != null) {
             call.respondText(
-                com.republicate.kson.Json.MutableObject().apply {
+                Json.MutableObject().apply {
                     set("id", session.id)
                     set("name", session.name)
                     set("email", session.email)
@@ -259,4 +211,49 @@ fun Route.oauthRoutes() {
             )
         }
     }
+}
+
+private suspend fun handleCallback(
+    call: ApplicationCall,
+    config: OAuthConfig,
+    providers: Map<String, OAuthProvider>,
+    params: Parameters
+) {
+    val flow = call.sessions.get<AuthFlow>()
+    call.sessions.clear<AuthFlow>()
+    try {
+        if (flow == null) throw OAuthFlowException("no pending oauth flow")
+        params["error"]?.let { throw OAuthFlowException("provider error: $it") }
+        if (params["state"] != flow.state) throw OAuthFlowException("state mismatch")
+        val code = params["code"] ?: throw OAuthFlowException("missing code")
+        val provider = providers[flow.provider]
+            ?: throw OAuthFlowException("unknown provider '${flow.provider}'")
+        val profile = provider.authenticate(code, call.callbackUri(config), flow.nonce)
+        var session = UserSession(
+            id = profile.id,
+            name = profile.name ?: params["user"]?.let(::appleFirstAuthName) ?: profile.id,
+            email = profile.email,
+            provider = provider.name
+        )
+        config.onAuthenticated?.let { hook ->
+            session = hook(session, call)
+                ?: throw OAuthFlowException("login rejected by onAuthenticated hook")
+        }
+        call.sessions.set(session)
+        call.respondRedirect(flow.returnTo)
+    } catch (e: Exception) {
+        logger.warn("OAuth callback failed: {}", e.message)
+        call.sessions.clear<UserSession>()
+        call.respondRedirect("/")
+    }
+}
+
+/** Apple posts a `user` JSON field (with the name) on the first authorization only. */
+private fun appleFirstAuthName(userParam: String): String? = try {
+    (Json.parse(userParam) as? Json.Object)?.getObject("name")?.let { name ->
+        listOfNotNull(name.getString("firstName"), name.getString("lastName"))
+            .joinToString(" ").ifBlank { null }
+    }
+} catch (e: Exception) {
+    null
 }
