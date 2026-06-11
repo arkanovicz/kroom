@@ -119,6 +119,9 @@ fun Application.installSessions(block: SessionConfig.() -> Unit = {}) {
         }
         cookie<AuthFlow>("auth_flow") {
             cookie.commonSettings()
+            // cross-site form_post callbacks (Apple) need this cookie on a cross-origin POST;
+            // None requires Secure, so plain-http dev keeps Lax
+            if (secure) cookie.extensions["SameSite"] = "None"
             cookie.maxAgeInSeconds = config.flowMaxAgeSeconds
             transform(transformer)
         }

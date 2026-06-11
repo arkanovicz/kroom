@@ -35,3 +35,6 @@ fun Application.module() {
 - Cookies are encrypted (AES-128) and signed (HMAC-SHA256) with keys derived
   from `sessionSecret`; `SameSite=Lax`; `secure` defaults to true when
   `externalUrl` is https.
+- Exception: when `secure`, the transient `auth_flow` cookie is `SameSite=None`
+  so it survives cross-site `form_post` callbacks (Sign in with Apple). Over
+  plain http (dev) it stays `Lax` — Apple login requires https anyway.
