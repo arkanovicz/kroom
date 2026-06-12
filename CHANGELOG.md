@@ -2,6 +2,38 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+#### kroom-webapp-auth
+- Email verification: with a configured `mailer`, `register` holds the
+  registration pending behind an emailed 6-digit code (`{pending:true}`, no
+  principal until confirmed) — `POST /api/auth/{verify,resend}`
+- Password reset: `POST /api/auth/forgot` (always `{ok:true}`, no existence
+  leak) and `POST /api/auth/reset` (sets the password and logs in; creates the
+  credential if absent so OIDC-only accounts can gain one)
+- Guest upgrade: `POST /api/auth/upgrade` attaches email+password to the
+  authenticated no-email principal through the same code flow, preserving id
+  and display name
+- `Mailer` hook (app owns SMTP; awaited, failures answer 502 and keep the code
+  for resend) with overridable `verifyEmail`/`resetEmail` bodies
+- `AuthCodeStore` — pluggable pending-code storage, in-memory default with TTL;
+  constant-time, attempt-limited code checks
+- Abuse limits: per-IP rate limit on the auth routes (`rateLimitPerMinute`,
+  429), per-address resend cooldown and daily mail cap
+- Knobs: `requireVerification` (default true, effective with a mailer),
+  `codeTtlSeconds`, `codeLength`, `maxVerifyAttempts`, `resendCooldownSeconds`,
+  `maxMailsPerDay`, `rateLimitPerMinute`
+
+### Changed
+
+#### kroom-webapp-auth
+- **`AuthStore` gained `setPassword(id, hash)` (upsert) and `setEmail(id,
+  email)`** — consumers must implement both
+- `Route.authRoutes` signature is now `(AuthConfig, Argon2Hasher, parser)` —
+  use `installAuth { }`, which is unchanged
+
 ## [0.16] - 2026-06-11
 
 ### Added

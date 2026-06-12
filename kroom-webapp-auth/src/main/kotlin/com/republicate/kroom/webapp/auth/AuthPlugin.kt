@@ -27,6 +27,45 @@ class AuthConfig<ID> {
 
     /** Override the `String → ID` parser (defaults cover Int/Long/String/Uuid). */
     var idFromString: ((String) -> ID)? = null
+
+    /** App-supplied mail transport; required for verification, reset and coded upgrade. */
+    var mailer: Mailer? = null
+
+    /** Hold registrations behind an emailed code (effective only with a [mailer]). */
+    var requireVerification: Boolean = true
+
+    var codeTtlSeconds: Int = 600
+    var codeLength: Int = 6
+    var maxVerifyAttempts: Int = 5
+
+    /** Minimum delay between code mails to the same address. */
+    var resendCooldownSeconds: Int = 60
+
+    /** Daily cap of code mails per address; 0 disables. */
+    var maxMailsPerDay: Int = 5
+
+    /** Per-IP request cap per minute on the auth routes; 0 disables. */
+    var rateLimitPerMinute: Int = 10
+
+    /** Pluggable code storage; defaults are in-memory. */
+    var verificationStore: AuthCodeStore = InMemoryAuthCodeStore()
+    var resetStore: AuthCodeStore = InMemoryAuthCodeStore()
+
+    /** Override the verification mail (subject/body read config at call time). */
+    var verifyEmail: (code: String) -> MailMessage = { code ->
+        MailMessage(
+            "Your verification code",
+            "Your verification code is: $code\n\nIt expires in ${codeTtlSeconds / 60} minutes."
+        )
+    }
+
+    /** Override the password-reset mail. */
+    var resetEmail: (code: String) -> MailMessage = { code ->
+        MailMessage(
+            "Your password reset code",
+            "Your password reset code is: $code\n\nIt expires in ${codeTtlSeconds / 60} minutes."
+        )
+    }
 }
 
 @PublishedApi
@@ -47,7 +86,9 @@ internal fun <ID> Application.installAuthResolved(config: AuthConfig<ID>, parser
     val hasher = config.hasher ?: Argon2Hasher(pepper = config.pepper?.toByteArray(Charsets.UTF_8))
     @Suppress("UNCHECKED_CAST")
     attributes.put(IdParserKey, parser as (String) -> Any?)
-    routing { authRoutes(config.authStore, hasher) }
+    if (config.requireVerification && config.mailer == null)
+        authLogger.warn("requireVerification is set but no mailer is configured — registration proceeds unverified")
+    routing { authRoutes(config, hasher, parser) }
 }
 
 /** Default `String → ID` parser for the built-in id types. */

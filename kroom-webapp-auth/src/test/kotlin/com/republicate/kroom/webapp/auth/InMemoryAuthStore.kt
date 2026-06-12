@@ -27,6 +27,16 @@ class InMemoryAuthStore : AuthStore<Int> {
         credentials[id to service] = Credential(service, passwordHash, oauthId)
     }
 
+    override suspend fun setPassword(id: Int, passwordHash: String) {
+        credentials[id to "password"] = Credential("password", passwordHash, null)
+    }
+
+    override suspend fun setEmail(id: Int, email: String) {
+        val principal = principals.getValue(id).copy(email = email)
+        principals[id] = principal
+        byEmail[email] = id
+    }
+
     override suspend fun touch(id: Int) {
         touched++
     }

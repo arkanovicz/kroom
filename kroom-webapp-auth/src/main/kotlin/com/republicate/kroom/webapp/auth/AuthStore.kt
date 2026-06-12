@@ -16,6 +16,16 @@ interface AuthStore<ID> {
     suspend fun findCredential(id: ID, service: String): Credential?
     suspend fun createPrincipal(email: String?, displayName: String): Principal<ID>
     suspend fun createCredential(id: ID, service: String, passwordHash: String?, oauthId: String?)
+
+    /**
+     * Create or update the `password` credential. Creating when absent lets an
+     * OIDC-only or guest account gain a password (reset, upgrade).
+     */
+    suspend fun setPassword(id: ID, passwordHash: String)
+
+    /** Attach a (normalized) email to an existing principal (guest upgrade). */
+    suspend fun setEmail(id: ID, email: String)
+
     suspend fun touch(id: ID)
 }
 
