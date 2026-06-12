@@ -17,7 +17,8 @@ All notable changes to kroom will be documented in this file.
   authenticated no-email principal through the same code flow, preserving id
   and display name
 - `Mailer` hook (app owns SMTP; awaited, failures answer 502 and keep the code
-  for resend) with overridable `verifyEmail`/`resetEmail` bodies
+  for resend — cooldown and daily cap only advance on successful sends) with
+  overridable `verifyEmail`/`resetEmail` bodies
 - `AuthCodeStore` — pluggable pending-code storage, in-memory default with TTL;
   constant-time, attempt-limited code checks
 - Abuse limits: per-IP rate limit on the auth routes (`rateLimitPerMinute`,

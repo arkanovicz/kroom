@@ -81,4 +81,24 @@ internal class RateLimiter(private val max: Int, private val windowMs: Long) {
         }
         return allowed
     }
+
+    /** Peek without counting — pair with [record] when the action may still fail. */
+    fun wouldAllow(key: String): Boolean {
+        if (max <= 0) return true
+        val now = System.currentTimeMillis()
+        var allowed = true
+        hits.compute(key) { _, present ->
+            present?.also {
+                it.removeIf { hit -> hit < now - windowMs }
+                allowed = it.size < max
+            }?.takeIf { it.isNotEmpty() }
+        }
+        return allowed
+    }
+
+    fun record(key: String) {
+        if (max <= 0) return
+        val now = System.currentTimeMillis()
+        hits.compute(key) { _, present -> (present ?: mutableListOf()).also { it.add(now) } }
+    }
 }

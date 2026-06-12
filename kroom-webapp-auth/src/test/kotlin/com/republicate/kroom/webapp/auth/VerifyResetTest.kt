@@ -156,15 +156,18 @@ class VerifyResetTest {
     }
 
     @Test
-    fun `mail failure responds 502 and resend recovers`() = testApplication {
+    fun `mail failure responds 502 and resend recovers despite cooldown and daily cap`() = testApplication {
         val mailer = RecordingMailer().apply { fail = true }
-        setup(mailer) { resendCooldownSeconds = 0 }
+        // default 60s cooldown kept on purpose; a single daily slot
+        setup(mailer) { maxMailsPerDay = 1 }
         val client = cookieClient()
         assertEquals(HttpStatusCode.BadGateway, client.register().status)
 
+        // the failed send must have armed neither the cooldown nor the only daily slot
         mailer.fail = false
         val resend = client.postJson("/api/auth/resend", """{"email":"alice@example.com"}""")
         assertEquals(HttpStatusCode.OK, resend.status)
+        assertEquals(1, mailer.sent.size)
         val verify = client.postJson("/api/auth/verify", """{"email":"alice@example.com","code":"${mailer.lastCode()}"}""")
         assertEquals(HttpStatusCode.OK, verify.status)
     }

@@ -40,11 +40,20 @@ fun <ID> Route.authRoutes(config: AuthConfig<ID>, hasher: Argon2Hasher, parser: 
     fun underCooldown(existing: PendingCode?): Boolean =
         existing != null && System.currentTimeMillis() - existing.lastSent < config.resendCooldownSeconds * 1000L
 
-    // responds 502 and returns false on send failure (pending entry is kept for resend)
-    suspend fun RoutingContext.sendCodeMail(email: String, code: String, template: (String) -> MailMessage): Boolean {
-        val message = template(code)
+    // Store the entry and mail the code. The cooldown stamp and the daily cap only
+    // advance on a successful send — a failure (502, entry kept) must not throttle the retry.
+    suspend fun RoutingContext.issueCode(
+        codeStore: AuthCodeStore,
+        email: String,
+        entry: PendingCode,
+        template: (String) -> MailMessage
+    ): Boolean {
+        codeStore.put(email, entry.copy(lastSent = 0))
+        val message = template(entry.code)
         return try {
             mailer!!.send(email, message.subject, message.body)
+            codeStore.put(email, entry.copy(lastSent = System.currentTimeMillis()))
+            mailLimiter.record(email)
             authLogger.info("code mail sent to {}", email)
             true
         } catch (e: Exception) {
@@ -98,21 +107,16 @@ fun <ID> Route.authRoutes(config: AuthConfig<ID>, hasher: Argon2Hasher, parser: 
                 return@post respondError("email already registered", HttpStatusCode.Conflict)
 
             if (verification) {
-                if (underCooldown(config.verificationStore.get(email)) || !mailLimiter.allow(email))
+                if (underCooldown(config.verificationStore.get(email)) || !mailLimiter.wouldAllow(email))
                     return@post respondError("too many codes requested", HttpStatusCode.TooManyRequests)
-                val code = generateCode(config.codeLength)
-                val now = System.currentTimeMillis()
-                config.verificationStore.put(
-                    email,
-                    PendingCode(
-                        code = code,
-                        expires = now + config.codeTtlSeconds * 1000L,
-                        lastSent = now,
-                        displayName = displayName,
-                        passwordHash = hasher.hash(password)
-                    )
+                val entry = PendingCode(
+                    code = generateCode(config.codeLength),
+                    expires = System.currentTimeMillis() + config.codeTtlSeconds * 1000L,
+                    lastSent = 0,
+                    displayName = displayName,
+                    passwordHash = hasher.hash(password)
                 )
-                if (!sendCodeMail(email, code, config.verifyEmail)) return@post
+                if (!issueCode(config.verificationStore, email, entry, config.verifyEmail)) return@post
                 return@post respondJson { set("pending", true) }
             }
 
@@ -169,22 +173,17 @@ fun <ID> Route.authRoutes(config: AuthConfig<ID>, hasher: Argon2Hasher, parser: 
                 return@post respondError("email already registered", HttpStatusCode.Conflict)
 
             if (verification) {
-                if (underCooldown(config.verificationStore.get(email)) || !mailLimiter.allow(email))
+                if (underCooldown(config.verificationStore.get(email)) || !mailLimiter.wouldAllow(email))
                     return@post respondError("too many codes requested", HttpStatusCode.TooManyRequests)
-                val code = generateCode(config.codeLength)
-                val now = System.currentTimeMillis()
-                config.verificationStore.put(
-                    email,
-                    PendingCode(
-                        code = code,
-                        expires = now + config.codeTtlSeconds * 1000L,
-                        lastSent = now,
-                        displayName = session.name,
-                        passwordHash = hasher.hash(password),
-                        upgradeId = session.id
-                    )
+                val entry = PendingCode(
+                    code = generateCode(config.codeLength),
+                    expires = System.currentTimeMillis() + config.codeTtlSeconds * 1000L,
+                    lastSent = 0,
+                    displayName = session.name,
+                    passwordHash = hasher.hash(password),
+                    upgradeId = session.id
                 )
-                if (!sendCodeMail(email, code, config.verifyEmail)) return@post
+                if (!issueCode(config.verificationStore, email, entry, config.verifyEmail)) return@post
                 return@post respondJson { set("pending", true) }
             }
 
@@ -248,17 +247,16 @@ fun <ID> Route.authRoutes(config: AuthConfig<ID>, hasher: Argon2Hasher, parser: 
                 val email = normalizeEmail(emailRaw)
                 val entry = config.verificationStore.get(email)
                 // always ok — don't leak whether a registration is pending
-                if (entry == null || underCooldown(entry) || !mailLimiter.allow(email)) {
+                if (entry == null || underCooldown(entry) || !mailLimiter.wouldAllow(email)) {
                     authLogger.info("resend for {} skipped (none pending, cooldown or daily cap)", email)
                     return@post respondJson { set("ok", true) }
                 }
-                val code = generateCode(config.codeLength)
-                val now = System.currentTimeMillis()
-                config.verificationStore.put(
-                    email,
-                    entry.copy(code = code, expires = now + config.codeTtlSeconds * 1000L, lastSent = now, attempts = 0)
+                val fresh = entry.copy(
+                    code = generateCode(config.codeLength),
+                    expires = System.currentTimeMillis() + config.codeTtlSeconds * 1000L,
+                    attempts = 0
                 )
-                if (!sendCodeMail(email, code, config.verifyEmail)) return@post
+                if (!issueCode(config.verificationStore, email, fresh, config.verifyEmail)) return@post
                 respondJson { set("ok", true) }
             }
 
@@ -271,18 +269,17 @@ fun <ID> Route.authRoutes(config: AuthConfig<ID>, hasher: Argon2Hasher, parser: 
                 // always ok — don't leak which emails exist
                 if (store.findByNormalizedEmail(email) == null
                     || underCooldown(config.resetStore.get(email))
-                    || !mailLimiter.allow(email)
+                    || !mailLimiter.wouldAllow(email)
                 ) {
                     authLogger.info("forgot for {} skipped (unknown, cooldown or daily cap)", email)
                     return@post respondJson { set("ok", true) }
                 }
-                val code = generateCode(config.codeLength)
-                val now = System.currentTimeMillis()
-                config.resetStore.put(
-                    email,
-                    PendingCode(code = code, expires = now + config.codeTtlSeconds * 1000L, lastSent = now)
+                val entry = PendingCode(
+                    code = generateCode(config.codeLength),
+                    expires = System.currentTimeMillis() + config.codeTtlSeconds * 1000L,
+                    lastSent = 0
                 )
-                if (!sendCodeMail(email, code, config.resetEmail)) return@post
+                if (!issueCode(config.resetStore, email, entry, config.resetEmail)) return@post
                 respondJson { set("ok", true) }
             }
 
