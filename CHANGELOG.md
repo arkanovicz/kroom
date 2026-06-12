@@ -35,6 +35,10 @@ All notable changes to kroom will be documented in this file.
 - `Route.authRoutes` signature is now `(AuthConfig, Argon2Hasher, parser)` —
   use `installAuth { }`, which is unchanged
 
+#### dependencies
+- essential-kson 2.12 → 2.14 (2.13+ broke binary compatibility — align
+  consumers), kddl 0.18 → 0.24
+
 ## [0.16] - 2026-06-11
 
 ### Added
