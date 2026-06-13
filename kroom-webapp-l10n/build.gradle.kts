@@ -14,6 +14,8 @@ java {
 
 dependencies {
     api(project(":kroom-webapp-velocity"))
+    // Inert unless localeStrategy = SESSION; keeps session an implementation detail
+    implementation(project(":kroom-webapp-session"))
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)

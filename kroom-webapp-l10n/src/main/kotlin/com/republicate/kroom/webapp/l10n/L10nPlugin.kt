@@ -1,5 +1,7 @@
 package com.republicate.kroom.webapp.l10n
 
+import com.republicate.kroom.webapp.session.sessionConfigOrNull
+import com.republicate.kroom.webapp.session.sessionLocale
 import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -20,12 +22,23 @@ import java.io.StringWriter
  * - Velocity template translation
  */
 
+/** Where the request language comes from. */
+enum class LocaleStrategy {
+    /** Language lives in a `/{lang}/` URL prefix; missing prefixes are redirected in (default). */
+    URL_PREFIX,
+    /** Language lives in the session; a `/{lang}/` prefix pins it once, then vanishes. */
+    SESSION
+}
+
 class L10nConfig {
     var sourceLanguage: String = "en"
     var defaultLanguage: String = "en"
     var languages: Map<String, String> = mapOf("en" to "English")
     var i18nPath: String = "/i18n"
     var logMissing: Boolean = false
+
+    /** Locale source; SESSION requires `installSessions` before `installL10n`. */
+    var localeStrategy: LocaleStrategy = LocaleStrategy.URL_PREFIX
 
     // Paths to skip from language redirect (configurable, defaults cover common static prefixes,
     // OAuth callbacks, and SSE channels — all language-neutral)
@@ -71,7 +84,17 @@ val Application.l10nConfig: L10nConfig
     get() = attributes[L10nConfigKey]
 
 val ApplicationCall.language: String
-    get() = attributes.getOrNull(LanguageKey) ?: application.l10nConfig.defaultLanguage
+    get() {
+        attributes.getOrNull(LanguageKey)?.let { return it }
+        val config = application.l10nConfig
+        return when (config.localeStrategy) {
+            LocaleStrategy.URL_PREFIX -> config.defaultLanguage
+            // session pin → Accept-Language → default, all filtered to configured languages
+            LocaleStrategy.SESSION ->
+                sessionLocale?.takeIf { it in config.languages }
+                    ?: getPreferredLanguage(request.header(HttpHeaders.AcceptLanguage), config)
+        }
+    }
 
 /**
  * Install localization plugin.
@@ -79,6 +102,10 @@ val ApplicationCall.language: String
 fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
     val config = L10nConfig().apply(block)
     attributes.put(L10nConfigKey, config)
+
+    if (config.localeStrategy == LocaleStrategy.SESSION && sessionConfigOrNull == null) {
+        error("installL10n { localeStrategy = SESSION } requires installSessions to be called first")
+    }
 
     // Load translation bundles for PO source
     val source = config.translationSource
@@ -112,23 +139,38 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
         // Preserve query string for redirects
         val queryString = call.request.queryString().takeIf { it.isNotEmpty() }?.let { "?$it" } ?: ""
 
-        if (langMatch != null) {
-            val lang = langMatch.groupValues[1]
-            if (lang in config.languages) {
-                call.attributes.put(LanguageKey, lang)
-            } else {
-                // Unknown language, redirect to preferred
-                val preferredLang = getPreferredLanguage(call.request.header(HttpHeaders.AcceptLanguage), config)
-                val newPath = "/$preferredLang${langMatch.groupValues[2] ?: ""}$queryString"
-                call.respondRedirect(newPath, permanent = false)
-                finish()
+        when (config.localeStrategy) {
+            LocaleStrategy.URL_PREFIX -> {
+                if (langMatch != null) {
+                    val lang = langMatch.groupValues[1]
+                    if (lang in config.languages) {
+                        call.attributes.put(LanguageKey, lang)
+                    } else {
+                        // Unknown language, redirect to preferred
+                        val preferredLang = getPreferredLanguage(call.request.header(HttpHeaders.AcceptLanguage), config)
+                        val newPath = "/$preferredLang${langMatch.groupValues[2]}$queryString"
+                        call.respondRedirect(newPath, permanent = false)
+                        finish()
+                    }
+                } else {
+                    // No language prefix, redirect to preferred language
+                    val preferredLang = getPreferredLanguage(call.request.header(HttpHeaders.AcceptLanguage), config)
+                    val newPath = "/$preferredLang$path$queryString"
+                    call.respondRedirect(newPath, permanent = false)
+                    finish()
+                }
             }
-        } else {
-            // No language prefix, redirect to preferred language
-            val preferredLang = getPreferredLanguage(call.request.header(HttpHeaders.AcceptLanguage), config)
-            val newPath = "/$preferredLang$path$queryString"
-            call.respondRedirect(newPath, permanent = false)
-            finish()
+            LocaleStrategy.SESSION -> {
+                // Only a known /{lang}/ prefix acts: pin it in the session, then drop it from the URL.
+                val lang = langMatch?.groupValues?.get(1)
+                if (lang != null && lang in config.languages) {
+                    call.sessionLocale = lang
+                    val rest = langMatch.groupValues[2].ifEmpty { "/" }  // /fr -> /, /fr/x -> /x
+                    call.respondRedirect("$rest$queryString", permanent = false)
+                    finish()
+                }
+                // Any other path: serve as-is; language resolved lazily by call.language.
+            }
         }
     }
 

@@ -38,6 +38,10 @@ data class AuthFlow(
     val returnTo: String
 )
 
+/** Visitor language preference, set before any [UserSession] exists. Plain cookie — not secret. */
+@Serializable
+data class LocaleSession(val lang: String)
+
 class SessionConfig {
     var sessionSecret: String = DEFAULT_SESSION_SECRET
 
@@ -125,6 +129,11 @@ fun Application.installSessions(block: SessionConfig.() -> Unit = {}) {
             cookie.maxAgeInSeconds = config.flowMaxAgeSeconds
             transform(transformer)
         }
+        // Anonymous-capable language pin (l10n SESSION strategy); plain, readable, no transform
+        cookie<LocaleSession>("locale") {
+            cookie.commonSettings()
+            cookie.maxAgeInSeconds = config.userSessionMaxAgeSeconds
+        }
     }
 }
 
@@ -135,3 +144,11 @@ val ApplicationCall.userSession: UserSession?
 /** Whether a user session is present. */
 val ApplicationCall.isAuthenticated: Boolean
     get() = userSession != null
+
+/** Visitor's pinned language (null if none); works for anonymous visitors. */
+var ApplicationCall.sessionLocale: String?
+    get() = sessions.get<LocaleSession>()?.lang
+    set(value) {
+        if (value == null) sessions.clear<LocaleSession>()
+        else sessions.set(LocaleSession(value))
+    }

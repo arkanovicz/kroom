@@ -2,6 +2,26 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.18] - 2026-06-13
+
+### Added
+
+#### kroom-webapp-l10n
+- `localeStrategy` (`URL_PREFIX` default, or `SESSION`): in `SESSION` mode the
+  language lives in the session, not the URL — no `/{lang}/` is forced onto
+  links (one canonical URL per page). A `/{lang}/` request pins the language in
+  the session then 302s to the de-prefixed path (`/fr/x → /x`, `/fr → /`);
+  every other path is served as-is, language resolved session → `Accept-Language`
+  → `defaultLanguage`. `URL_PREFIX` behavior is unchanged.
+- `SESSION` requires `installSessions` before `installL10n` (fails fast at
+  startup otherwise); l10n gains an inert `implementation` dependency on
+  kroom-webapp-session, unused under `URL_PREFIX`.
+
+#### kroom-webapp-session
+- `LocaleSession` plain `locale` cookie and `ApplicationCall.sessionLocale`
+  getter/setter — anonymous-capable language pin, set before any `UserSession`
+  exists.
+
 ## [0.17] - 2026-06-12
 
 ### Added
