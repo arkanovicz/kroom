@@ -18,7 +18,7 @@ plugins {
 allprojects {
 
     group = "com.republicate.kroom"
-    version = "0.18"
+    version = "0.19"
 
     repositories {
         google()

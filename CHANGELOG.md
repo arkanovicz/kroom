@@ -2,6 +2,12 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.19] - 2026-06-18
+
+### Changed
+
+- bump ktor version to 3.5.0
+
 ## [0.18] - 2026-06-13
 
 ### Added
