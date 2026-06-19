@@ -254,32 +254,44 @@ suspend fun RoutingContext.respondVelocity(
 private val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
 
 /**
+ * Resolve [path] (one or more `/`-separated clean segments, e.g. `source` or `legal/terms`) to a
+ * template `"$prefix/$path.$extension"` and, if it exists, render it via [VelocityPlugin.pageRenderer]
+ * — so the per-request base context (`$user` …) applies and, when l10n is installed, the page is
+ * translated. Returns `true` if a page was served, `false` if the path is unsafe or no template
+ * backs it, leaving the response untouched so the caller can fall through (404, next route, …).
+ *
+ * This is the reusable primitive behind [pages]: a param-route handler (e.g. `/{community}`, which
+ * ktor scores above a tailcard) can delegate its no-match branch here instead of reimplementing the
+ * lookup. Unsafe paths (traversal, dotfiles, partials like `header.inc`) never resolve. Existence is
+ * checked separately from rendering, so a `ResourceNotFoundException` from a nested `#parse` in a
+ * real page still surfaces as 500 — a template bug isn't masked as a missing page.
+ */
+suspend fun ApplicationCall.servePage(
+    path: String,
+    prefix: String = "pages",
+    extension: String = "html"
+): Boolean {
+    val segments = path.split('/').filter { it.isNotEmpty() }
+    if (segments.isEmpty() || segments.any { !SAFE_SEGMENT.matches(it) }) return false
+    val template = "${prefix.trimEnd('/')}/${segments.joinToString("/")}.${extension.trimStart('.')}"
+    if (!velocity.engine.resourceExists(template)) return false
+    velocity.pageRenderer(this, template)
+    return true
+}
+
+/**
  * Mount a convention that renders a clean URI as a template: `/source` → `pages/source.html`,
  * `/legal/terms` → `pages/legal/terms.html`. A content page becomes *just a template* — no route,
- * no model. Renders through [VelocityPlugin.pageRenderer], so the per-request base context (`$user`
- * …) applies and — when l10n is installed — the page is translated.
+ * no model.
  *
  * Mount it **last**, after all specific and param routes: it claims any otherwise-unmatched GET,
- * 404ing paths with no backing template. Unsafe paths (traversal, dotfiles, partials like
- * `header.inc`) never resolve.
+ * 404ing paths with no backing template. Note ktor scores a param route (`/{x}`) **above** this
+ * tailcard, so an app with a root param route should instead delegate from that handler via
+ * [servePage]. See [servePage] for the lookup/security details.
  */
 fun Route.pages(prefix: String = "pages", extension: String = "html") {
-    val base = prefix.trimEnd('/')
-    val ext = extension.trimStart('.')
     get("/{path...}") {
-        val segments = call.parameters.getAll("path").orEmpty()
-        if (segments.isEmpty() || segments.any { !SAFE_SEGMENT.matches(it) }) {
-            call.respond(HttpStatusCode.NotFound)
-            return@get
-        }
-        val template = "$base/${segments.joinToString("/")}.$ext"
-        val plugin = call.velocity
-        if (!plugin.engine.resourceExists(template)) {
-            call.respond(HttpStatusCode.NotFound)
-            return@get
-        }
-        // Existence checked separately so a ResourceNotFoundException from a nested #parse in a real
-        // page still surfaces as 500 — we don't mask template bugs as 404.
-        plugin.pageRenderer(call, template)
+        val path = call.parameters.getAll("path").orEmpty().joinToString("/")
+        if (!call.servePage(path, prefix, extension)) call.respond(HttpStatusCode.NotFound)
     }
 }

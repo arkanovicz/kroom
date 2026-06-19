@@ -4,6 +4,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
@@ -42,5 +43,25 @@ class PagesTest {
         for (path in listOf("/header.inc", "/foo.txt", "/.env", "/legal/..%2f..%2fsecret", "/kroom-macros.vtl")) {
             assertEquals(HttpStatusCode.NotFound, client.get(path).status, "expected 404 for $path")
         }
+    }
+
+    // The motivating case: a root param route ranks above the tailcard, so pages() never runs.
+    // The handler delegates its no-match branch to servePage instead.
+    @Test
+    fun `a param route can delegate its no-match branch to servePage`() = testApplication {
+        application {
+            installVelocity { templatePath = null; session("user") { "alice" } }
+            routing {
+                get("/{community}") {
+                    val community = call.parameters["community"]!!
+                    if (community == "acme") call.respondText("community:acme")
+                    else if (!call.servePage(community)) call.respond(HttpStatusCode.NotFound)
+                }
+            }
+        }
+        assertEquals("community:acme", client.get("/acme").bodyAsText())   // real community wins
+        assertEquals("src:alice", client.get("/source").bodyAsText())      // falls through to a page
+        assertEquals(HttpStatusCode.NotFound, client.get("/nope").status)  // neither → 404
+        assertEquals(HttpStatusCode.NotFound, client.get("/header.inc").status) // partial stays unreachable
     }
 }
