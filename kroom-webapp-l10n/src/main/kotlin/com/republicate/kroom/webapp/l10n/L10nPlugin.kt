@@ -3,13 +3,13 @@ package com.republicate.kroom.webapp.l10n
 import com.republicate.kroom.webapp.session.sessionConfigOrNull
 import com.republicate.kroom.webapp.session.sessionLocale
 import com.republicate.kroom.webapp.velocity.velocity
+import com.republicate.kroom.webapp.velocity.velocityOrNull
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
-import org.apache.velocity.VelocityContext
 import java.io.StringWriter
 
 /**
@@ -105,6 +105,19 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
 
     if (config.localeStrategy == LocaleStrategy.SESSION && sessionConfigOrNull == null) {
         error("installL10n { localeStrategy = SESSION } requires installSessions to be called first")
+    }
+
+    // Register l10n's request-scope values so every render sees $lang/$languages/$jsTranslations
+    // (velocity must be installed first; l10n's API endpoints work without it).
+    velocityOrNull?.let { v ->
+        v.registerRequest("lang") { it.language }
+        v.registerRequest("languages") { it.application.l10nConfig.languages }
+        v.registerRequest("jsTranslations") { call ->
+            val translations = call.application.l10nConfig.translationSource.getAllTranslations(call.language)
+            com.republicate.kson.Json.MutableObject().apply {
+                translations.forEach { (en, translated) -> set(en, translated) }
+            }.toString()
+        }
     }
 
     // Load translation bundles for PO source
@@ -231,24 +244,15 @@ suspend fun ApplicationCall.respondVelocityTranslated(
     model: Map<String, Any?> = emptyMap(),
     contentType: ContentType = ContentType.Text.Html
 ) {
-    val template = application.velocity.engine.getTemplate(templatePath)
+    val plugin = application.velocity
+    val template = plugin.engine.getTemplate(templatePath)
+    // Constructing the Translator sets Translator.current for the #translate runtime directive.
     val translator = Translator(language, application.l10nConfig)
     val translatedTemplate = translator.translate(templatePath, template)
 
-    val context = VelocityContext()
-    // Add version cache if available
-    application.velocity.versionCache?.let { context.put("versions", it) }
-    // Add language info to context
-    context.put("lang", language)
-    context.put("languages", application.l10nConfig.languages)
-    // Add JS translations JSON for injection
-    val jsTranslations = application.l10nConfig.translationSource.getAllTranslations(language)
-    context.put("jsTranslations", com.republicate.kson.Json.MutableObject().apply {
-        jsTranslations.forEach { (en, translated) -> set(en, translated) }
-    }.toString())
-    // Add custom model
-    model.forEach { (key, value) -> context.put(key, value) }
-
+    // Same scope chain as respondVelocity: $versions, $user, the registered $lang/$jsTranslations,
+    // and the route model on top. l10n only adds template translation.
+    val context = plugin.scopedContext(this, model)
     val writer = StringWriter()
     translatedTemplate.merge(context, writer)
 

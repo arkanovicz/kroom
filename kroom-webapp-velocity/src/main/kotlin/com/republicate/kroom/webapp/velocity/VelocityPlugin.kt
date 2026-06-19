@@ -187,6 +187,13 @@ val Application.velocity: VelocityPlugin
     get() = attributes[VelocityPluginKey]
 
 /**
+ * Velocity plugin if installed, else null — for optional cross-module wiring (e.g. l10n
+ * registering its scope keys only when velocity is present).
+ */
+val Application.velocityOrNull: VelocityPlugin?
+    get() = attributes.getOrNull(VelocityPluginKey)
+
+/**
  * Get Velocity plugin from call.
  */
 val ApplicationCall.velocity: VelocityPlugin
