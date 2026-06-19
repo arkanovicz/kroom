@@ -2,6 +2,17 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.21] - 2026-06-19
+
+### Added
+
+#### kroom-webapp-velocity
+- `ApplicationCall.servePage(path, prefix, extension): Boolean` — the lookup behind
+  `pages()`, exposed as a callable. Since ktor scores a root param route (`/{x}`)
+  above the `pages()` tailcard, an app with such a route delegates its no-match
+  branch to `servePage` (renders if a template backs the path, else returns false to
+  fall through) instead of reimplementing the resolve/sanitise/exists logic.
+
 ## [0.20] - 2026-06-19
 
 ### Added
@@ -25,11 +36,6 @@ All notable changes to kroom will be documented in this file.
   resolve. Renders through the scope chain (`$user` etc. apply), via a new
   `VelocityPlugin.pageRenderer` hook (default `respondVelocity`), overridable so
   other modules can change the strategy.
-- `ApplicationCall.servePage(path, prefix, extension): Boolean` — the lookup behind
-  `pages()`, exposed as a callable. Since ktor scores a root param route (`/{x}`)
-  above the `pages()` tailcard, an app with such a route delegates its no-match
-  branch to `servePage` (renders if a template backs the path, else returns false to
-  fall through) instead of reimplementing the resolve/sanitise/exists logic.
 
 #### kroom-webapp-l10n
 - `$lang`, `$languages`, `$jsTranslations` are registered as request-scope values,
