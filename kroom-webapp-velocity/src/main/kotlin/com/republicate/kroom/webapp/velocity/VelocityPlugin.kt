@@ -81,11 +81,12 @@ class VelocityPlugin(config: VelocityConfig) {
     fun registerRequest(key: String, provider: (ApplicationCall) -> Any?) { requestProviders[key] = provider }
 
     /**
-     * How [pages] renders a resolved template. Defaults to [respondVelocity]; l10n overrides it to
+     * How [pages] renders a resolved template. Defaults to [respondVelocity]; settable declaratively
+     * via `installVelocity { pageRenderer = … }`, and l10n overrides it to
      * [com.republicate.kroom.webapp.l10n.respondVelocityTranslated] on install, so content pages
      * translate automatically. Read per request, so install order is irrelevant.
      */
-    var pageRenderer: suspend ApplicationCall.(String) -> Unit = { respondVelocity(it) }
+    var pageRenderer: suspend ApplicationCall.(String) -> Unit = config.pageRenderer ?: { respondVelocity(it) }
 
     /**
      * Low-level, call-less render: flat context with `$versions` + model. Unchanged — for callers
@@ -165,6 +166,9 @@ class VelocityConfig {
     internal val applicationProviders = LinkedHashMap<String, () -> Any?>()
     internal val sessionProviders = LinkedHashMap<String, (ApplicationCall) -> Any?>()
     internal val requestProviders = LinkedHashMap<String, (ApplicationCall) -> Any?>()
+
+    /** How `Route.pages()` renders a resolved template; null keeps the default `respondVelocity`. */
+    var pageRenderer: (suspend ApplicationCall.(String) -> Unit)? = null
 
     /** Register an application-scope value (singleton, call-independent), e.g. `application("brand") { "…" }`. */
     fun application(key: String, provider: () -> Any?) { applicationProviders[key] = provider }

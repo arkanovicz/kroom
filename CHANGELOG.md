@@ -2,6 +2,16 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.22] - 2026-06-19
+
+### Added
+
+#### kroom-webapp-velocity
+- `VelocityConfig.pageRenderer` — set the `pages()` render strategy declaratively in
+  `installVelocity { pageRenderer = … }`, for symmetry with `application()/session()/
+  request()`. Equivalent to the existing post-install `velocity.pageRenderer = …`;
+  null keeps the default `respondVelocity`. l10n still overrides it on install.
+
 ## [0.21] - 2026-06-19
 
 ### Added

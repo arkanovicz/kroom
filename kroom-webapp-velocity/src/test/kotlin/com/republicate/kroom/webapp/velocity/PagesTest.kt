@@ -45,6 +45,19 @@ class PagesTest {
         }
     }
 
+    @Test
+    fun `pageRenderer can be set declaratively in the install block`() = testApplication {
+        application {
+            installVelocity {
+                templatePath = null
+                session("user") { "alice" }
+                pageRenderer = { respondText("custom:$it") }
+            }
+            routing { pages() }
+        }
+        assertEquals("custom:pages/source.html", client.get("/source").bodyAsText())
+    }
+
     // The motivating case: a root param route ranks above the tailcard, so pages() never runs.
     // The handler delegates its no-match branch to servePage instead.
     @Test
