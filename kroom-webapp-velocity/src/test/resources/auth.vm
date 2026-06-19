@@ -1,0 +1,1 @@
+#if($user)in:$user#{else}out#end

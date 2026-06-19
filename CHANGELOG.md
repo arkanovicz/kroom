@@ -2,6 +2,28 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.20] - 2026-06-19
+
+### Added
+
+#### kroom-webapp-velocity
+- Read-only **scope chain** for every render: `application ⊂ session ⊂ request`,
+  with the route model most specific. Register per-key providers in the install
+  block — `application(key) { … }`, `session(key) { call -> … }`,
+  `request(key) { call -> … }` — and the value is available in **every** template
+  (e.g. `$user`) without each route passing it; the route model still wins on
+  collision. Providers resolve lazily (memoized per render); scopes are
+  read-through (`#set` lands in a fresh top context). Plugins self-register their
+  own keys via `registerApplication/Session/Request`. `$versions` is now an
+  application-scope provider. The low-level call-less `render(templatePath, model)`
+  is unchanged.
+
+#### kroom-webapp-l10n
+- `$lang`, `$languages`, `$jsTranslations` are registered as request-scope values,
+  so they are available on every render (not only the translated path), and
+  `respondVelocityTranslated` now renders through the same scope chain — a
+  translated page sees the full base context (`$user`, …) and still translates.
+
 ## [0.19] - 2026-06-18
 
 ### Changed
