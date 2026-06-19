@@ -47,32 +47,30 @@ const api = (function() {
         }
     }
 
+    // Body-carrying request. FormData passes through untouched (the browser sets the
+    // multipart Content-Type + boundary); anything else is sent as JSON. Either way the
+    // Accept and Authorization headers are kept — only Content-Type is dropped for uploads.
+    function send(method, path, body) {
+        const isForm = body instanceof FormData;
+        return fetch(base + path, {
+            credentials: "same-origin",
+            method,
+            body: isForm ? body : JSON.stringify(body),
+            headers: isForm ? headers(undefined, false) : headers()
+        });
+    }
+
     return {
         get: (path, accept) => fetch(base + path, {
             credentials: "same-origin",
             headers: headers(accept, false)
         }),
 
-        post: (path, body) => fetch(base + path, {
-            credentials: "same-origin",
-            method: 'POST',
-            body: JSON.stringify(body),
-            headers: headers()
-        }),
+        post: (path, body) => send('POST', path, body),
 
-        put: (path, body) => fetch(base + path, {
-            credentials: "same-origin",
-            method: 'PUT',
-            body: JSON.stringify(body),
-            headers: headers()
-        }),
+        put: (path, body) => send('PUT', path, body),
 
-        delete: (path, body) => fetch(base + path, {
-            credentials: "same-origin",
-            method: 'DELETE',
-            body: JSON.stringify(body),
-            headers: headers()
-        }),
+        delete: (path, body) => send('DELETE', path, body),
 
         // Helpers returning parsed responses
 

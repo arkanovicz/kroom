@@ -12,6 +12,12 @@ All notable changes to kroom will be documented in this file.
   request()`. Equivalent to the existing post-install `velocity.pageRenderer = …`;
   null keeps the default `respondVelocity`. l10n still overrides it on install.
 
+#### kroom-webapp-assets
+- `api.post/put/delete` accept a `FormData` body for file uploads: it's sent as-is so
+  the browser sets the `multipart/form-data` boundary, with `Content-Type` dropped but
+  `Accept`/`Authorization` kept. Non-`FormData` bodies are still JSON as before. The
+  three verbs now share one `send()` helper (was triplicated).
+
 ## [0.21] - 2026-06-19
 
 ### Added
