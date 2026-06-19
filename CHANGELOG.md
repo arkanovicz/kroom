@@ -17,12 +17,22 @@ All notable changes to kroom will be documented in this file.
   own keys via `registerApplication/Session/Request`. `$versions` is now an
   application-scope provider. The low-level call-less `render(templatePath, model)`
   is unchanged.
+- `Route.pages(prefix = "pages", extension = "html")` — a convention that renders a
+  clean URI as a template (`/source` → `pages/source.html`, `/legal/terms` →
+  `pages/legal/terms.html`): a content page is *just a template*, no route or model.
+  Mount it **last**, after specific/param routes; it 404s paths with no backing
+  template. Traversal, dotfiles and partials (`header.inc`, the macro library) never
+  resolve. Renders through the scope chain (`$user` etc. apply), via a new
+  `VelocityPlugin.pageRenderer` hook (default `respondVelocity`), overridable so
+  other modules can change the strategy.
 
 #### kroom-webapp-l10n
 - `$lang`, `$languages`, `$jsTranslations` are registered as request-scope values,
   so they are available on every render (not only the translated path), and
   `respondVelocityTranslated` now renders through the same scope chain — a
   translated page sees the full base context (`$user`, …) and still translates.
+- On install, overrides `pageRenderer` to `respondVelocityTranslated` — so `pages()`
+  content pages translate automatically when l10n is present.
 
 ## [0.19] - 2026-06-18
 

@@ -118,6 +118,8 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
                 translations.forEach { (en, translated) -> set(en, translated) }
             }.toString()
         }
+        // Route.pages() renders content pages translated when l10n is present.
+        v.pageRenderer = { respondVelocityTranslated(it) }
     }
 
     // Load translation bundles for PO source

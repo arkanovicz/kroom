@@ -81,6 +81,13 @@ class VelocityPlugin(config: VelocityConfig) {
     fun registerRequest(key: String, provider: (ApplicationCall) -> Any?) { requestProviders[key] = provider }
 
     /**
+     * How [pages] renders a resolved template. Defaults to [respondVelocity]; l10n overrides it to
+     * [com.republicate.kroom.webapp.l10n.respondVelocityTranslated] on install, so content pages
+     * translate automatically. Read per request, so install order is irrelevant.
+     */
+    var pageRenderer: suspend ApplicationCall.(String) -> Unit = { respondVelocity(it) }
+
+    /**
      * Low-level, call-less render: flat context with `$versions` + model. Unchanged — for callers
      * that have no [ApplicationCall] (no session/request scope available).
      */
@@ -240,4 +247,39 @@ suspend fun RoutingContext.respondVelocity(
     block: MutableMap<String, Any?>.() -> Unit
 ) {
     call.respondVelocity(templatePath, contentType, block)
+}
+
+// A path segment safe to splice into a resource lookup: no dots (kills `..`, dotfiles, and any
+// `foo.txt`/`header.inc` suffix), no slashes (kills `%2f`-smuggled separators), no empties.
+private val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
+
+/**
+ * Mount a convention that renders a clean URI as a template: `/source` → `pages/source.html`,
+ * `/legal/terms` → `pages/legal/terms.html`. A content page becomes *just a template* — no route,
+ * no model. Renders through [VelocityPlugin.pageRenderer], so the per-request base context (`$user`
+ * …) applies and — when l10n is installed — the page is translated.
+ *
+ * Mount it **last**, after all specific and param routes: it claims any otherwise-unmatched GET,
+ * 404ing paths with no backing template. Unsafe paths (traversal, dotfiles, partials like
+ * `header.inc`) never resolve.
+ */
+fun Route.pages(prefix: String = "pages", extension: String = "html") {
+    val base = prefix.trimEnd('/')
+    val ext = extension.trimStart('.')
+    get("/{path...}") {
+        val segments = call.parameters.getAll("path").orEmpty()
+        if (segments.isEmpty() || segments.any { !SAFE_SEGMENT.matches(it) }) {
+            call.respond(HttpStatusCode.NotFound)
+            return@get
+        }
+        val template = "$base/${segments.joinToString("/")}.$ext"
+        val plugin = call.velocity
+        if (!plugin.engine.resourceExists(template)) {
+            call.respond(HttpStatusCode.NotFound)
+            return@get
+        }
+        // Existence checked separately so a ResourceNotFoundException from a nested #parse in a real
+        // page still surfaces as 500 — we don't mask template bugs as 404.
+        plugin.pageRenderer(call, template)
+    }
 }
