@@ -7,7 +7,7 @@ const CHAINABLE = new Set([
     'attr', 'removeAttr', 'prop', 'data',
     'show', 'hide', 'disable', 'text', 'html',
     'clear', 'append', 'val', 'focus', 'click',
-    'empty', 'busy', 'close', 'forEach', 'load',
+    'empty', 'busy', 'close', 'forEach', 'load', 'first', 'last', 'has',
     'setAttribute', 'removeAttribute', 'toggleAttribute'
 ]);
 
@@ -281,6 +281,26 @@ Element.prototype.html = function(txt) {
 
 NodeList.prototype.item = function(i) {
     return this[+i || 0];
+};
+NodeList.prototype.first = function() {
+    return this.item(0);
+};
+Element.prototype.first = function() {
+    return this;
+};
+NodeList.prototype.last = function() {
+    return this.item(this.length - 1);
+};
+Element.prototype.last = function() {
+    return this;
+};
+NodeList.prototype.has = function(selector) {
+    let result = [];
+    this.forEach(elem => { if (elem.querySelector(selector)) result.push(elem); });
+    return Reflect.construct(Array, result, NodeList);
+};
+Element.prototype.has = function(selector) {
+    return this.querySelector(selector) ? this : Reflect.construct(Array, [], NodeList);
 };
 NodeList.prototype.find = function(selector) {
     let result = [];

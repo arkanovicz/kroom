@@ -2,6 +2,16 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.23]
+
+### Added
+
+#### kroom-webapp-assets
+- domhelper: `.first()`, `.last()`, `.has(selector)`. `first`/`last` reduce a set to
+  its first/last element (a singleton returns itself); `has` keeps elements with a
+  descendant matching `selector`, returning a `NodeList`. All three are no-match safe
+  (return the empty proxy).
+
 ## [0.22] - 2026-06-19
 
 ### Added
