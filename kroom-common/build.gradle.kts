@@ -8,7 +8,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
-description = "Skorm common code"
+description = "Kroom common code"
 
 plugins {
     alias(libs.plugins.multiplatform)
