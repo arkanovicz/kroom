@@ -85,9 +85,9 @@ class Translator(
                 translated = translationsCache[key]
                 if (translated == null) {
                     translated = template.clone() as Template
-                    val data = translated!!.data as SimpleNode
+                    val data = translated.data as SimpleNode
                     translateNode(data)
-                    translationsCache[key] = translated!!
+                    translationsCache[key] = translated
                 }
             }
         }

@@ -18,11 +18,12 @@ plugins {
 allprojects {
 
     group = "com.republicate.kroom"
-    version = "0.23"
+    version = "0.23-beta-velocity"
 
     repositories {
         google()
         mavenCentral()
+        mavenLocal() // last: only the locally-published velocity BETA falls through here
     }
 }
 

@@ -14,12 +14,11 @@ import org.apache.velocity.runtime.directive.Parse
  */
 class TranslateDirective : Parse() {
 
-    override fun getName(): String = "translate"
+    override val name: String get() = "translate"
 
     @Throws(ResourceNotFoundException::class)
-    override fun getTemplate(path: String, encoding: String): Template {
+    override fun getTemplate(path: String, encoding: String?): Template {
         val template = super.getTemplate(path, encoding)
-            ?: throw ResourceNotFoundException("Template not found: $path")
         val translator = Translator.current.get()
             ?: return template  // No translator, return untranslated
         return translator.translate(path, template)
