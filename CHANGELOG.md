@@ -17,6 +17,9 @@ Pre-release on branch `kmp-velocity`, published to maven-local only.
 ### Build
 - `mavenLocal()` added (last) to repositories so the velocity 3.0 BETA resolves. Until
   velocity 3.0 reaches Central, a fresh checkout needs it in maven-local.
+- Kotlin `2.3.0` → `2.4.0` (context parameters are stable, no flag — needed for the typed
+  `vtlFile` build-time template path). atomicfu `0.29.0` → `0.33.0` (0.29's legacy bytecode
+  transformer can't analyze 2.4 output; 0.33 uses the IR transform).
 
 ## [0.23]
 
