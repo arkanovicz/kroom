@@ -16,6 +16,14 @@ Pre-release on branch `kmp-velocity`, published to maven-local only.
   with the runtime `Translator` via the extracted `HtmlFragmentTranslator`, which now also translates
   `title`/`alt`/`aria-label` attribute values (previously missed).
 
+#### kroom-velocity-l10n (new — Gradle plugin)
+- `com.republicate.kroom.velocity-l10n`: emits per-language, build-time-compiled templates. For each
+  template × language it writes a translated `.vm` (via `TemplateTranslator`) and a
+  `context(request, session, app) … = vtlFile(…)` stub, plus a `renderPage(path, lang)` dispatcher;
+  points the velocity `templateRoot` at the generated trees and wires the stubs into the consumer's
+  main source set. Refs resolve to declared, typed scope members (compile-checked, multiplatform-ready);
+  no runtime translation. Configured via a `velocityL10n { }` DSL (`=` assignment, Gradle 8.4+).
+
 ### Changed
 
 #### kroom-view, kroom-webapp-velocity, kroom-webapp-l10n

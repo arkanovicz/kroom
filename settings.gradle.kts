@@ -6,6 +6,9 @@ include("kroom-common")
 include("kroom-view")
 include("kroom-server")
 
+// Build tooling
+include("kroom-velocity-l10n")
+
 // Webapp framework
 include("kroom-webapp-core")
 include("kroom-webapp-assets")
