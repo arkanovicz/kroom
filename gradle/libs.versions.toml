@@ -69,6 +69,7 @@ ktor-server-http2 = { module = "io.ktor:ktor-server-http2", version.ref = "ktor"
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 velocity-engine-core = { module = "org.apache.velocity:velocity-engine-core", version.ref = "velocity" }
+velocity-engine-common = { module = "org.apache.velocity:velocity-engine-common", version.ref = "velocity" }
 velocity-tools-generic = { module = "org.apache.velocity.tools:velocity-tools-generic", version.ref = "velocity-tools" }
 junit = { module = "junit:junit", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }

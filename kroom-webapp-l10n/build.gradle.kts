@@ -16,6 +16,8 @@ dependencies {
     api(project(":kroom-webapp-velocity"))
     // Inert unless localeStrategy = SESSION; keeps session an implementation detail
     implementation(project(":kroom-webapp-session"))
+    // 3.0 common front-end: parse() + the source-ranged AST, for build-time TemplateTranslator
+    implementation(libs.velocity.engine.common)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)

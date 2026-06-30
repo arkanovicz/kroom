@@ -6,6 +6,16 @@ All notable changes to kroom will be documented in this file.
 
 Pre-release on branch `kmp-velocity`, published to maven-local only.
 
+### Added
+
+#### kroom-webapp-l10n
+- `TemplateTranslator`: build-time, source-to-source template translation. Parses a template with
+  the velocity 3.0 common front-end and splices a translated variant of each text node back into the
+  source by its AST `range`, leaving every directive/`$ref`/byte of structure intact — the basis for
+  per-language, build-time-compiled templates (no runtime translation). Shares the HTML text logic
+  with the runtime `Translator` via the extracted `HtmlFragmentTranslator`, which now also translates
+  `title`/`alt`/`aria-label` attribute values (previously missed).
+
 ### Changed
 
 #### kroom-view, kroom-webapp-velocity, kroom-webapp-l10n
