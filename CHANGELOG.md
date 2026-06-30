@@ -9,7 +9,7 @@ Pre-release on branch `kmp-velocity`, published to maven-local only.
 ### Changed
 
 #### kroom-view, kroom-webapp-velocity, kroom-webapp-l10n
-- Consume the new KMP `velocity-engine-core` 3.0 (`3.0.0-BETA-20260629-03`) in place of
+- Consume the new KMP `velocity-engine-core` 3.0 (`3.0.0-BETA-20260630-05`) in place of
   2.4.1. `velocity-tools-generic:3.1` kept — binary-compatible; its transitive engine 2.3
   is evicted. `TranslateDirective` adapted to the engine's idiomatic Kotlin directive API
   (`override val name`, non-null `getTemplate`).
