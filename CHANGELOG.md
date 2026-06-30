@@ -14,7 +14,9 @@ Pre-release on branch `kmp-velocity`, published to maven-local only.
   source by its AST `range`, leaving every directive/`$ref`/byte of structure intact — the basis for
   per-language, build-time-compiled templates (no runtime translation). Shares the HTML text logic
   with the runtime `Translator` via the extracted `HtmlFragmentTranslator`, which now also translates
-  `title`/`alt`/`aria-label` attribute values (previously missed).
+  `title`/`alt`/`aria-label` attribute values (previously missed). Literal `#parse`/`#include` targets
+  are rewritten (e.g. language-prefixed) so relocated per-language trees still resolve; dynamic targets
+  are left untouched.
 
 #### kroom-velocity-l10n (new — Gradle plugin)
 - `com.republicate.kroom.velocity-l10n`: emits per-language, build-time-compiled templates. For each

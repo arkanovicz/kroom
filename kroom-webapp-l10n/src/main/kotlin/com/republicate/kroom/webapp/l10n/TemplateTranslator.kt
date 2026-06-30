@@ -4,8 +4,11 @@ import org.apache.velocity.engine.ASTBlock
 import org.apache.velocity.engine.ASTBlockMacroCall
 import org.apache.velocity.engine.ASTForeach
 import org.apache.velocity.engine.ASTIf
+import org.apache.velocity.engine.ASTInclude
 import org.apache.velocity.engine.ASTMacro
+import org.apache.velocity.engine.ASTParse
 import org.apache.velocity.engine.ASTText
+import org.apache.velocity.engine.Expr
 import org.apache.velocity.engine.Node
 import org.apache.velocity.engine.parse
 import org.apache.velocity.engine.parseDiagnostics
@@ -26,21 +29,29 @@ class TemplateTranslator(
     private val missingSource: String = "velocity"
 ) {
 
-    /** Translate [templateSource] into [iso]; returns the source unchanged for the source language. */
-    fun translate(templateSource: String, iso: String): String {
-        if (iso == sourceLanguage) return templateSource
+    /**
+     * Translate [templateSource] into [iso]. Text nodes are translated for non-source languages;
+     * [includePathRewrite], if given, rewrites the *literal* target of each `#parse`/`#include`
+     * (e.g. to prepend a language prefix) for *every* language — the relocated trees need it even for
+     * the source language. A dynamic (`$var`) target is left as-is; the velocity compiler rejects it
+     * anyway. Returns the source unchanged only when neither applies.
+     */
+    fun translate(
+        templateSource: String,
+        iso: String,
+        includePathRewrite: ((String) -> String)? = null
+    ): String {
+        val translateText = iso != sourceLanguage
+        if (!translateText && includePathRewrite == null) return templateSource
         val diagnostics = parseDiagnostics(templateSource)
         require(diagnostics.isEmpty()) { "Velocity parse error(s): ${diagnostics.joinToString("; ")}" }
         val ast = parse(templateSource)
 
         // One fragment translator per template: carries <script>/<style> ignore state across nodes,
         // which are visited in document order.
-        val fragments = HtmlFragmentTranslator { lookup(it, iso) }
+        val fragments = if (translateText) HtmlFragmentTranslator { lookup(it, iso) } else null
         val edits = ArrayList<Pair<IntRange, String>>()
-        collectText(ast) { node ->
-            val range = node.range ?: return@collectText
-            edits.add(range to fragments.translate(node.value))
-        }
+        collect(ast, fragments, includePathRewrite, edits)
         edits.sortBy { it.first.first }
 
         val out = StringBuilder(templateSource.length)
@@ -50,7 +61,7 @@ class TemplateTranslator(
             val end = range.last + 1
             if (start < pos) continue            // defensive: ignore any overlapping node
             out.append(templateSource, pos, start)  // verbatim span (directives, refs, comments)
-            out.append(text)                        // translated text node
+            out.append(text)                        // translated text / rewritten include target
             pos = end
         }
         if (pos < templateSource.length) out.append(templateSource, pos, templateSource.length)
@@ -64,23 +75,38 @@ class TemplateTranslator(
         return en
     }
 
-    // Visit literal text nodes in document order. Block-bearing nodes recurse; everything else
-    // (references, #set, comments, #parse/#include, macro calls) holds no translatable text.
-    private fun collectText(node: Node, out: (ASTText) -> Unit) {
+    // Visit nodes in document order. Text nodes translate; #parse/#include literal targets rewrite;
+    // block-bearing nodes recurse; everything else (references, #set, comments, macro calls) is verbatim.
+    private fun collect(
+        node: Node,
+        fragments: HtmlFragmentTranslator?,
+        includePathRewrite: ((String) -> String)?,
+        edits: MutableList<Pair<IntRange, String>>
+    ) {
         when (node) {
-            is ASTText -> out(node)
-            is ASTBlock -> node.items.forEach { collectText(it, out) }
+            is ASTText -> if (fragments != null) node.range?.let { edits += it to fragments.translate(node.value) }
+            is ASTParse -> includePathRewrite?.let { literalTargetEdit(node.target, it)?.let(edits::add) }
+            is ASTInclude -> includePathRewrite?.let { literalTargetEdit(node.target, it)?.let(edits::add) }
+            is ASTBlock -> node.items.forEach { collect(it, fragments, includePathRewrite, edits) }
             is ASTIf -> {
-                node.branches.forEach { collectText(it.body, out) }
-                node.orElse?.let { collectText(it, out) }
+                node.branches.forEach { collect(it.body, fragments, includePathRewrite, edits) }
+                node.orElse?.let { collect(it, fragments, includePathRewrite, edits) }
             }
             is ASTForeach -> {
-                collectText(node.body, out)
-                node.orElse?.let { collectText(it, out) }
+                collect(node.body, fragments, includePathRewrite, edits)
+                node.orElse?.let { collect(it, fragments, includePathRewrite, edits) }
             }
-            is ASTMacro -> collectText(node.body, out)
-            is ASTBlockMacroCall -> collectText(node.body, out)
+            is ASTMacro -> collect(node.body, fragments, includePathRewrite, edits)
+            is ASTBlockMacroCall -> collect(node.body, fragments, includePathRewrite, edits)
             else -> {}
         }
+    }
+
+    // A literal `"path"` target → an edit replacing it with `"rewrite(path)"`; null if dynamic.
+    private fun literalTargetEdit(target: Expr?, rewrite: (String) -> String): Pair<IntRange, String>? {
+        val range = target?.range ?: return null
+        val src = target.source
+        if (src.length < 2 || src.first() != '"' || src.last() != '"') return null
+        return range to "\"${rewrite(src.substring(1, src.length - 1))}\""
     }
 }

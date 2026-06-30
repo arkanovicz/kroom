@@ -66,8 +66,9 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
             val translator = TemplateTranslator(translationSource(lang, source, i18nDir), source)
             for (file in templateFiles) {
                 val rel = file.relativeTo(templatesDir).invariantSeparatorsPath
-                val text = file.readText()
-                val translated = if (lang == source) text else translator.translate(text, lang)
+                // Translate text (non-source langs) and prefix literal #parse/#include targets with the
+                // language, so they resolve within the relocated <lang>/ tree.
+                val translated = translator.translate(file.readText(), lang) { "$lang/$it" }
                 File(templatesOut, "$lang/$rel").apply { parentFile.mkdirs(); writeText(translated) }
                 stubs += Stub(
                     funName = "page_${rel.replace(Regex("[^A-Za-z0-9]"), "_")}_$lang",

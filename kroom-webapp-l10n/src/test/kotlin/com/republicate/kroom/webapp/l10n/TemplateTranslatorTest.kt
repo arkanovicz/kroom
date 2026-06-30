@@ -63,6 +63,20 @@ class TemplateTranslatorTest {
     }
 
     @Test
+    fun `rewrites literal parse and include targets, leaving dynamic ones`() {
+        val t = translator("Hello" to "Bonjour")
+        assertEquals(
+            "#parse(\"fr/quiz.html\")<p>Bonjour</p>#include(\"fr/foot.html\")",
+            t.translate("#parse(\"quiz.html\")<p>Hello</p>#include(\"foot.html\")", "fr") { "fr/$it" }
+        )
+        // Source language: no text translation, but targets still get the prefix.
+        assertEquals(
+            "#parse(\"en/quiz.html\")<p>Hello</p>",
+            t.translate("#parse(\"quiz.html\")<p>Hello</p>", "en") { "en/$it" }
+        )
+    }
+
+    @Test
     fun `source language returns source unchanged`() {
         val src = "<p>Hello</p>\$user #if(\$x)<b>Home</b>#end"
         assertEquals(src, translator("Hello" to "Bonjour").translate(src, "en"))
