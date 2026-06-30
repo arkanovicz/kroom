@@ -25,6 +25,8 @@ Pre-release on branch `kmp-velocity`, published to maven-local only.
   points the velocity `templateRoot` at the generated trees and wires the stubs into the consumer's
   main source set. Refs resolve to declared, typed scope members (compile-checked, multiplatform-ready);
   no runtime translation. Configured via a `velocityL10n { }` DSL (`=` assignment, Gradle 8.4+).
+- Base scope interfaces consumers extend so kroom's own members resolve without re-declaring them:
+  `KroomAppScope { versions }` (velocity) and `KroomL10nRequestScope { lang; languages; jsTranslations }` (l10n).
 
 ### Changed
 
