@@ -40,6 +40,8 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
 
     @get:Input @get:Optional abstract val requestScope: Property<String>
 
+    @get:Input @get:Optional abstract val macroLibraries: ListProperty<String>
+
     @get:Input abstract val generatedPackage: Property<String>
 
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
@@ -78,9 +80,22 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
             }
         }
 
+        copyMacroLibraries(templatesOut)
+
         val pkg = generatedPackage.get()
         File(kotlinOut, pkg.replace('.', '/')).apply { mkdirs() }
             .resolve("Templates.kt").writeText(renderKotlin(pkg, stubs))
+    }
+
+    /** Drop macro libraries into the template root (language-neutral): kroom's own, then the consumer's. */
+    private fun copyMacroLibraries(templatesOut: File) {
+        javaClass.getResourceAsStream("/kroom-macros.vtl")?.use { input ->
+            File(templatesOut, "kroom-macros.vtl").outputStream().use { input.copyTo(it) }
+        }
+        for (path in macroLibraries.getOrElse(emptyList())) {
+            val file = File(path)
+            if (file.isFile) file.copyTo(File(templatesOut, file.name), overwrite = true)
+        }
     }
 
     /** A [TranslationSource] backed by `<i18nDir>/<lang>.po`; empty for the source language. */

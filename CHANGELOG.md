@@ -2,9 +2,9 @@
 
 All notable changes to kroom will be documented in this file.
 
-## [0.23-beta-velocity]
+## [0.23-kmp-velocity-01]
 
-Pre-release on branch `kmp-velocity`, published to maven-local only.
+Tagged pre-release on branch `kmp-velocity`, published to maven-local only.
 
 ### Added
 
@@ -27,11 +27,14 @@ Pre-release on branch `kmp-velocity`, published to maven-local only.
   no runtime translation. Configured via a `velocityL10n { }` DSL (`=` assignment, Gradle 8.4+).
 - Base scope interfaces consumers extend so kroom's own members resolve without re-declaring them:
   `KroomAppScope { versions }` (velocity) and `KroomL10nRequestScope { lang; languages; jsTranslations }` (l10n).
+- Macro-library support: `kroom-macros.vtl` (`#versioned`, …) is dropped into the template root and
+  registered via velocity's `macroLibrary`, so library macros (and literal macro args) resolve in the
+  compiled path. Extra libraries via `velocityL10n { macroLibraries = listOf(...) }`.
 
 ### Changed
 
 #### kroom-view, kroom-webapp-velocity, kroom-webapp-l10n
-- Consume the new KMP `velocity-engine-core` 3.0 (`3.0.0-BETA-20260630-05`) in place of
+- Consume the new KMP `velocity-engine-core` 3.0 (`3.0.0-BETA-20260701-06`) in place of
   2.4.1. `velocity-tools-generic:3.1` kept — binary-compatible; its transitive engine 2.3
   is evicted. `TranslateDirective` adapted to the engine's idiomatic Kotlin directive API
   (`override val name`, non-null `getTemplate`).

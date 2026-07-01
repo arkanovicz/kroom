@@ -45,6 +45,13 @@ abstract class VelocityL10nExtension {
     /** FQN of the request-scope type (highest precedence). */
     abstract val requestScope: Property<String>
 
+    /**
+     * Extra `.vtl` macro-library files whose `#macro`s are globally available to every template
+     * (in addition to kroom's own `kroom-macros.vtl`, always included). Macros should be
+     * language-neutral — put translatable text in templates, not macros. Each is copied verbatim.
+     */
+    abstract val macroLibraries: ListProperty<String>
+
     /** Package of the generated dispatcher. Default `com.republicate.kroom.l10n.generated`. */
     abstract val generatedPackage: Property<String>
 }
