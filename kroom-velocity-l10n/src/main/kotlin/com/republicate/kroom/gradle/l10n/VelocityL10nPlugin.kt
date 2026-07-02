@@ -38,6 +38,13 @@ class VelocityL10nPlugin : Plugin<Project> {
             task.outputDir.set(generatedRoot)
         }
 
+        // The generated stubs reference vtlFile + the render helpers at compile time; inject the
+        // engine at the exact version this plugin was built against, so consumers add nothing.
+        project.dependencies.add(
+            "implementation",
+            "org.apache.velocity:velocity-engine-common:${BuildInfo.VELOCITY_VERSION}"
+        )
+
         // Resolve $ref-bearing templates + the macro libraries from the generated, translated trees.
         project.pluginManager.apply("org.apache.velocity.engine")
         val velocity = project.extensions.getByType(VelocityExtension::class.java)

@@ -28,3 +28,28 @@ gradlePlugin {
         }
     }
 }
+
+// Bake the catalog's velocity version into the plugin, so it injects velocity-engine-common at the
+// exact version the K2 plugin compiles against — consumers add nothing, no drift possible.
+val generateBuildInfo = tasks.register("generateBuildInfo") {
+    val velocityVersion = libs.versions.velocity.asProvider().get()
+    val outDir = layout.buildDirectory.dir("generated/buildinfo")
+    inputs.property("velocityVersion", velocityVersion)
+    outputs.dir(outDir)
+    doLast {
+        outDir.get().file("com/republicate/kroom/gradle/l10n/BuildInfo.kt").asFile.apply {
+            parentFile.mkdirs()
+            writeText(
+                """
+                package com.republicate.kroom.gradle.l10n
+
+                internal object BuildInfo {
+                    const val VELOCITY_VERSION = "$velocityVersion"
+                }
+                """.trimIndent()
+            )
+        }
+    }
+}
+
+kotlin.sourceSets.main { kotlin.srcDir(generateBuildInfo) }

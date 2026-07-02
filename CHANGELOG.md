@@ -31,6 +31,9 @@ Tagged pre-release on branch `kmp-velocity`, published to maven-local only.
   registered via velocity's `macroLibrary`, so library macros (and literal macro args) resolve in the
   compiled path. Extra libraries via `velocityL10n { macroLibraries = listOf(...) }`. (velocity -07
   brings `##`/whitespace-gobbling parity between the compiled and runtime paths.)
+- The plugin injects `velocity-engine-common` (at the exact version it was built against) into the
+  consumer's `implementation` — the generated stubs need it at compile time, and a hand-added copy
+  would be a version-drift trap. A consumer needs only the plugin id and the `velocityL10n { }` block.
 
 ### Changed
 
