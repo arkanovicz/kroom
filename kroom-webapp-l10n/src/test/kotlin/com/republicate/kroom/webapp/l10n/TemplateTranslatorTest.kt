@@ -97,6 +97,16 @@ class TemplateTranslatorTest {
         assertEquals(src, translator().translate(src, "fr"))
     }
 
+    // Escape must not double-escape numeric character references in a *translated* token
+    // (untranslated ones are already byte-identical by passthrough).
+    @Test
+    fun `translated token keeps numeric character references intact`() {
+        assertEquals(
+            "<button>&#x25B6; Lire</button>",
+            translator("&#x25B6; Play" to "&#x25B6; Lire").translate("<button>&#x25B6; Play</button>", "fr")
+        )
+    }
+
     @Test
     fun `untranslated text is left in place`() {
         // "World" has no entry → stays; only "Hello" flips.

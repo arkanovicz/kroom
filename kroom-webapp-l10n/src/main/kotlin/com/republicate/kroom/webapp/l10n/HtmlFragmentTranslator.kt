@@ -99,8 +99,12 @@ internal class HtmlFragmentTranslator(private val translateToken: (String) -> St
         return ret
     }
 
+    // `&` escapes unless it opens a numeric character reference (&#182; / &#x25B6;), which must
+    // survive the unescape→translate→escape round-trip untouched.
+    private val charRef = Regex("&(?!#(?:[0-9]+|[xX][0-9a-fA-F]+);)")
+
     private fun escapeHtml(s: String) = s
-        .replace("&", "&amp;")
+        .replace(charRef, "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")

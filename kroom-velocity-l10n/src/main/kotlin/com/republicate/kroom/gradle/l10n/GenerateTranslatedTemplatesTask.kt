@@ -126,7 +126,7 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
             appendLine()
             appendLine("package $pkg")
             appendLine()
-            appendLine("import org.apache.velocity.engine.jvm.vtlFile")
+            appendLine("import org.apache.velocity.engine.rt.vtlFile")
             appendLine()
             for (s in stubs) {
                 appendLine(ctx)
