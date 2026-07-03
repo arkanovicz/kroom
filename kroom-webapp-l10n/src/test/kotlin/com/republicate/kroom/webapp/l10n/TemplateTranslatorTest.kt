@@ -82,6 +82,21 @@ class TemplateTranslatorTest {
         assertEquals(src, translator("Hello" to "Bonjour").translate(src, "en"))
     }
 
+    // K1 repro (mya): fr tree with an EMPTY translation map came out mangled —
+    // #end→#en, #if($quizzEnabled) split, stray '>' injected, &#x25B6;→&amp;#x25B6;.
+    // With no translations, translate() must be the identity on every byte.
+    @Test
+    fun `empty translation map is byte-identical on directives entities and refs`() {
+        val src = """
+            |<button onclick="toggle()">&#x25B6; Play</button>
+            |#if(${'$'}quizzEnabled)
+            |<div class="quizz">${'$'}score points</div>
+            |#end
+            |<span>tail</span>
+        """.trimMargin()
+        assertEquals(src, translator().translate(src, "fr"))
+    }
+
     @Test
     fun `untranslated text is left in place`() {
         // "World" has no entry → stays; only "Hello" flips.

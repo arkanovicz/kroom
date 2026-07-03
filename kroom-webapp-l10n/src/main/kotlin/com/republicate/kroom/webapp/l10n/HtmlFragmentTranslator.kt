@@ -51,8 +51,11 @@ internal class HtmlFragmentTranslator(private val translateToken: (String) -> St
                     output.print(group.value)
                 } else {
                     token = normalize(token)
-                    token = translateToken(token)
-                    output.print(escapeHtml(token))
+                    val translated = translateToken(token)
+                    // Untranslated must be byte-identical: unescape/normalize/escape is lossy
+                    // (numeric entities like &#x25B6; re-escape to &amp;#…, whitespace collapses),
+                    // so only re-encode when a translation actually replaced the token.
+                    output.print(if (translated == token) group.value else escapeHtml(translated))
                 }
                 val groupEnd = group.range.last + 1
                 if (groupEnd < end) output.print(text.substring(groupEnd, end))
