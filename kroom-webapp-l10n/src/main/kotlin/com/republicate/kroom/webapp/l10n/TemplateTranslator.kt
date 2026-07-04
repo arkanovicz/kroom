@@ -21,7 +21,7 @@ import org.apache.velocity.engine.parseDiagnostics
  * directive, reference and byte of structure untouched. Reuses [HtmlFragmentTranslator] for the
  * HTML text logic, so `title`/`alt`/`aria-label` and `<script>`/`<style>` handling match the
  * runtime [Translator]. The product is a translated `.vm` that the runtime engine renders today and
- * that `vtlFile` compiles tomorrow — no runtime translation either way.
+ * that `template()` compiles tomorrow — no runtime translation either way.
  */
 class TemplateTranslator(
     private val source: TranslationSource,

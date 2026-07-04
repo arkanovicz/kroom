@@ -18,7 +18,7 @@ import java.io.File
  * Translates each template under [templates] into every configured language and emits, into
  * [outputDir]:
  * - `templates/<lang>/<rel>` — the translated Velocity sources (source language: verbatim);
- * - `kotlin/.../Templates.kt` — a `vtlFile` stub per (template, language) plus a `renderPage`
+ * - `kotlin/.../Templates.kt` — a `template()` stub per (template, language) plus a `renderPage`
  *   dispatcher, all carrying the consumer's typed scopes as context parameters.
  *
  * The translated trees feed the velocity `templateRoot`; the stubs compile through the velocity K2
@@ -126,11 +126,11 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
             appendLine()
             appendLine("package $pkg")
             appendLine()
-            appendLine("import org.apache.velocity.engine.rt.vtlFile")
+            appendLine("import org.apache.velocity.engine.runtime.template")
             appendLine()
             for (s in stubs) {
                 appendLine(ctx)
-                appendLine("private fun ${s.funName}(): String = vtlFile(\"${s.vtlPath}\")")
+                appendLine("private fun ${s.funName}(): String = template(\"${s.vtlPath}\")")
             }
             appendLine()
             appendLine("/** Render the compiled, translated template for [path] in [lang], or null if none. */")

@@ -38,7 +38,7 @@ class VelocityL10nPlugin : Plugin<Project> {
             task.outputDir.set(generatedRoot)
         }
 
-        // The generated stubs reference vtlFile + the render helpers at compile time; inject the
+        // The generated stubs reference template() + the render helpers at compile time; inject the
         // engine at the exact version this plugin was built against, so consumers add nothing.
         project.dependencies.add(
             "implementation",
