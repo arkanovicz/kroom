@@ -115,14 +115,12 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation(libs.velocity.engine.core)
-                implementation(libs.velocity.tools.generic)
             }
         }
 
         val androidMain by getting {
             dependencies {
                 implementation(libs.velocity.engine.core)
-                implementation(libs.velocity.tools.generic)
                 implementation(libs.androidx.core)
                 implementation(libs.androidx.appcompat)
                 implementation(libs.androidx.webkit)

@@ -20,7 +20,6 @@ ktor = "3.5.0"
 nimbus-oidc-sdk = "11.14"
 slf4j = "2.0.16"
 velocity = "3.0.0-BETA-20260703-02"
-velocity-tools = "3.1"
 junit = "4.13.2"
 junit-jupiter = "5.13.3"
 junit-platform = "1.13.3"
@@ -72,7 +71,6 @@ velocity-engine-core = { module = "org.apache.velocity:velocity-engine-core", ve
 velocity-engine-common = { module = "org.apache.velocity:velocity-engine-common", version.ref = "velocity" }
 velocity-engine-gradle-plugin = { module = "org.apache.velocity:velocity-engine-gradle-plugin", version.ref = "velocity" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
-velocity-tools-generic = { module = "org.apache.velocity.tools:velocity-tools-generic", version.ref = "velocity-tools" }
 junit = { module = "junit:junit", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter" }

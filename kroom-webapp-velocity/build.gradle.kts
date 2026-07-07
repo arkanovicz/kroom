@@ -15,7 +15,6 @@ java {
 dependencies {
     api(project(":kroom-webapp-core"))
     api(libs.velocity.engine.core)
-    api(libs.velocity.tools.generic)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.junit.jupiter.api)
