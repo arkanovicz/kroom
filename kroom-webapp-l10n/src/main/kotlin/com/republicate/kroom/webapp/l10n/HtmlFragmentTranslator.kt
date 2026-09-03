@@ -46,16 +46,19 @@ internal class HtmlFragmentTranslator(private val translateToken: (String) -> St
                 val (_, group) = match.firstValidGroup()
                 val groupStart = group.range.first
                 if (groupStart > start) output.print(text.substring(start, groupStart))
-                var token = unescapeHtml(group.value)
+                val decoration = leadingDecoration.find(group.value)?.value ?: ""
+                output.print(decoration)
+                val raw = group.value.substring(decoration.length)
+                var token = unescapeHtml(raw)
                 if (containsOnlyIgnorable(token)) {
-                    output.print(group.value)
+                    output.print(raw)
                 } else {
                     token = normalize(token)
                     val translated = translateToken(token)
                     // Untranslated must be byte-identical: unescape/normalize/escape is lossy
                     // (numeric entities like &#x25B6; re-escape to &amp;#…, whitespace collapses),
                     // so only re-encode when a translation actually replaced the token.
-                    output.print(if (translated == token) group.value else escapeHtml(translated))
+                    output.print(if (translated == token) raw else escapeHtml(translated))
                 }
                 val groupEnd = group.range.last + 1
                 if (groupEnd < end) output.print(text.substring(groupEnd, end))
@@ -76,7 +79,13 @@ internal class HtmlFragmentTranslator(private val translateToken: (String) -> St
 
     private fun normalize(str: String) = str.replace("\\s+".toRegex(), " ")
 
-    private fun containsOnlyIgnorable(s: String) = s.all { it in "\r\n\t -;:.\"/<> 0123456789€!" }
+    private fun containsOnlyIgnorable(s: String) = s.all { it in "\r\n\t -;:.\"/<> 0123456789€!&" }
+
+    // A character reference — whole, or the ';' left when the velocity parser cuts one at its '#'
+    // (`&#x25B6;` lexes as a macro call named x25B6, splitting the text node) — is decoration, not
+    // phrase: out of the lookup key, back into the output verbatim. Leading side only; most keys
+    // legitimately end on punctuation.
+    private val leadingDecoration = Regex("^(?:&#(?:[0-9]+|[xX][0-9a-fA-F]+);|[;\\s])+")
 
     private fun buildIgnoreMap(text: String): NavigableMap<Int, Boolean> {
         val ret: NavigableMap<Int, Boolean> = TreeMap()

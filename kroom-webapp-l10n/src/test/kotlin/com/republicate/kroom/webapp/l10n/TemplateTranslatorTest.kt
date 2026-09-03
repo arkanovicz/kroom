@@ -5,14 +5,17 @@ import kotlin.test.assertEquals
 
 class TemplateTranslatorTest {
 
-    private fun source(vararg pairs: Pair<String, String>) = object : TranslationSource {
-        private val fr = pairs.toMap()
-        override fun getTranslation(en: String, iso: String): String? = if (iso == "fr") fr[en] else null
-        override fun getAllTranslations(iso: String): Map<String, String> = if (iso == "fr") fr else emptyMap()
-        override fun isLoaded(iso: String): Boolean = true
-    }
+    private fun source(pairs: Array<out Pair<String, String>>, onMissing: (String) -> Unit) =
+        object : TranslationSource {
+            private val fr = pairs.toMap()
+            override fun getTranslation(en: String, iso: String): String? = if (iso == "fr") fr[en] else null
+            override fun getAllTranslations(iso: String): Map<String, String> = if (iso == "fr") fr else emptyMap()
+            override fun isLoaded(iso: String): Boolean = true
+            override fun onMissing(en: String, iso: String, source: String?) = onMissing(en)
+        }
 
-    private fun translator(vararg pairs: Pair<String, String>) = TemplateTranslator(source(*pairs))
+    private fun translator(vararg pairs: Pair<String, String>, onMissing: (String) -> Unit = {}) =
+        TemplateTranslator(source(pairs, onMissing))
 
     @Test
     fun `translates visible text`() {
@@ -97,14 +100,27 @@ class TemplateTranslatorTest {
         assertEquals(src, translator().translate(src, "fr"))
     }
 
-    // Escape must not double-escape numeric character references in a *translated* token
-    // (untranslated ones are already byte-identical by passthrough).
+    // A leading character reference is decoration, not phrase: it stays out of the key and comes
+    // back verbatim (never double-escaped to &amp;#…). Both spellings key on the same token, though
+    // only the hex one splits the text node (`#x25B6` lexes as a macro call).
     @Test
-    fun `translated token keeps numeric character references intact`() {
-        assertEquals(
-            "<button>&#x25B6; Lire</button>",
-            translator("&#x25B6; Play" to "&#x25B6; Lire").translate("<button>&#x25B6; Play</button>", "fr")
-        )
+    fun `a leading character reference stays out of the key and intact in the output`() {
+        for (ref in listOf("&#x25B6;", "&#182;")) {
+            assertEquals(
+                "<button>$ref Lire</button>",
+                translator("Play" to "Lire").translate("<button>$ref Play</button>", "fr")
+            )
+        }
+    }
+
+    // The mya shape: a character reference alone in its element is not a translatable token at all
+    // (neither half of the split is), so nothing is looked up and nothing reported missing.
+    @Test
+    fun `a lone character reference yields no token`() {
+        val missing = mutableListOf<String>()
+        val t = translator(onMissing = { missing += it })
+        assertEquals("<span>&#x25B6;</span>", t.translate("<span>&#x25B6;</span>", "fr"))
+        assertEquals(emptyList(), missing)
     }
 
     @Test

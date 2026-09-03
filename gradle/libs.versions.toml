@@ -19,7 +19,7 @@ kotlinx-html = "0.12.0"
 ktor = "3.5.0"
 nimbus-oidc-sdk = "11.14"
 slf4j = "2.0.16"
-velocity = "3.0.0-BETA-20260703-02"
+velocity = "3.0.0-BETA-20260901-01"
 junit = "4.13.2"
 junit-jupiter = "5.13.3"
 junit-platform = "1.13.3"
@@ -69,6 +69,7 @@ slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 velocity-engine-core = { module = "org.apache.velocity:velocity-engine-core", version.ref = "velocity" }
 velocity-engine-common = { module = "org.apache.velocity:velocity-engine-common", version.ref = "velocity" }
+velocity-engine-scripting = { module = "org.apache.velocity:velocity-engine-scripting", version.ref = "velocity" }
 velocity-engine-gradle-plugin = { module = "org.apache.velocity:velocity-engine-gradle-plugin", version.ref = "velocity" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }

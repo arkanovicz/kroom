@@ -28,20 +28,22 @@ class VelocityPlugin(config: VelocityConfig) {
 
         if (config.devMode && config.devDir != null) {
             // Dev mode: file first (hot reload), then classpath (for macros library)
-            setProperty(RuntimeConstants.RESOURCE_LOADER, "file,classpath")
-            setProperty("file.resource.loader.class", FileResourceLoader::class.java.name)
-            setProperty("file.resource.loader.path", config.devDir!!.absolutePath)
-            setProperty("file.resource.loader.cache", false)
-            setProperty("file.resource.loader.modificationCheckInterval", 0)
-            setProperty("classpath.resource.loader.class", ClasspathResourceLoader::class.java.name)
+            setProperty(RuntimeConstants.RESOURCE_LOADERS, "file,classpath")
+            setProperty("resource.loader.file.class", FileResourceLoader::class.java.name)
+            setProperty("resource.loader.file.path", config.devDir!!.absolutePath)
+            setProperty("resource.loader.file.cache", false)
+            setProperty("resource.loader.file.modification_check_interval", 0)
+            setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
+        } else if (config.templatePath != null) {
+            // Production: templates under templatePath by bare name, macros library at classpath root
+            setProperty(RuntimeConstants.RESOURCE_LOADERS, "templates,root")
+            setProperty("resource.loader.templates.class", ClasspathResourceLoader::class.java.name)
+            setProperty("resource.loader.templates.path", config.templatePath)
+            setProperty("resource.loader.root.class", ClasspathResourceLoader::class.java.name)
         } else {
-            // Production: load from classpath
-            setProperty(RuntimeConstants.RESOURCE_LOADER, "classpath")
-            setProperty("classpath.resource.loader.class", ClasspathResourceLoader::class.java.name)
-            config.templatePath?.let {
-                val prefix = if (it.endsWith("/")) it else "$it/"
-                setProperty("classpath.resource.loader.prefix", prefix)
-            }
+            // Production: everything at classpath root
+            setProperty(RuntimeConstants.RESOURCE_LOADERS, "classpath")
+            setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
         }
 
         // Load kroom macros library

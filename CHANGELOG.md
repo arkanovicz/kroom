@@ -2,6 +2,40 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.23-kmp-velocity-04]
+
+### Fixed
+
+#### kroom-webapp-velocity
+- Production template loading: `templatePath` was a no-op — velocity's `ClasspathResourceLoader` had
+  no path property, so bare template names never resolved under `templates/` in a packaged jar (only
+  the dev-mode file loader worked). Fixed at source in the engine (`ClasspathResourceLoader.path`) and
+  wired here as two loaders: pages by bare name under `templatePath`, macro library at classpath root.
+- Engine properties use the canonical 2.x names (`resource.loaders`,
+  `resource.loader.<name>.class/.path/.cache/.modification_check_interval`). The engine's
+  deprecated-key translator is gone, so the old positional spelling was silently inert —
+  `modification_check_interval` in particular was being dropped, defeating dev-mode hot reload.
+
+#### kroom-webapp-l10n
+- A character reference adjacent to text was not translated: `&#x25B6;` lexes as a macro call named
+  `x25B6` (undefined, so it renders back verbatim — but it splits the text node), leaving `; Play`
+  and `&` as fragments and no `&#x25B6; Play` token to look up. A *leading* character reference — or
+  the bare `;` residue of one the parser cut at its `#` — is now decoration: out of the lookup key,
+  back into the output verbatim. Both `&#x25B6; Play` and `&#182; Play` key on `Play`, and a lone
+  reference (`<span>&#x25B6;</span>`, the common case) yields no token at all instead of a spurious
+  `&` reported missing. Trailing punctuation is untouched — most keys legitimately end on it.
+- `TemplateTranslator`: `#include` takes several targets (`ASTInclude.targets`); each literal one is
+  rewritten, as `#parse`'s single target already was.
+
+### Build
+- velocity `3.0.0-BETA-20260703-02` → `3.0.0-BETA-20260901-01`. Brings the `ClasspathResourceLoader`
+  path property and the classic `Directive`/`Parse` facade on the 3.0 render pipeline, so
+  `TranslateDirective` and `Translator` survive the engine's guts cleanup unchanged and
+  `runtime.custom_directives` is honoured again.
+- `velocity-engine-scripting` added as `testRuntimeOnly` to the velocity and l10n webapp modules:
+  tests render loader-served (interpreted) templates, which now need the runtime compiler. Production
+  renders compiled classes, so scripting stays droppable there.
+
 ## [0.23-kmp-velocity-01]
 
 Tagged pre-release on branch `kmp-velocity`, published to maven-local only.

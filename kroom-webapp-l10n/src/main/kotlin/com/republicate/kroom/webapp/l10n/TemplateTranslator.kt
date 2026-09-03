@@ -86,7 +86,7 @@ class TemplateTranslator(
         when (node) {
             is ASTText -> if (fragments != null) node.range?.let { edits += it to fragments.translate(node.value) }
             is ASTParse -> includePathRewrite?.let { literalTargetEdit(node.target, it)?.let(edits::add) }
-            is ASTInclude -> includePathRewrite?.let { literalTargetEdit(node.target, it)?.let(edits::add) }
+            is ASTInclude -> includePathRewrite?.let { rw -> node.targets.forEach { literalTargetEdit(it, rw)?.let(edits::add) } }
             is ASTBlock -> node.items.forEach { collect(it, fragments, includePathRewrite, edits) }
             is ASTIf -> {
                 node.branches.forEach { collect(it.body, fragments, includePathRewrite, edits) }
