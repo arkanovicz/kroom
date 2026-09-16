@@ -2,6 +2,16 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.23-kmp-velocity-05]
+
+### Build
+- velocity `3.0.0-BETA-20260901-01` → `3.0.0-BETA-20260916-01`. Two months of engine work (classic
+  `Uberspect`/event-handler/conversion-handler facades, codegen convergence, compat flags, resource-name
+  normalization) land without a source change here: compile, tests and rendering are unaffected.
+  `RuntimeConstants.VM_LIBRARY` is `velocimacro.library.path`, so kroom's programmatic configuration
+  uses only canonical keys — verified against the engine's new init-time report of settings it ignores,
+  which names none for either the dev or the production loader shape.
+
 ## [0.23-kmp-velocity-04]
 
 ### Fixed
