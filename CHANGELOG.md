@@ -26,6 +26,8 @@ All notable changes to kroom will be documented in this file.
   consumer's call, configured on their side.
 
 ### Build
+- The build version is now `0.23-kmp-velocity-SNAPSHOT`; maven-local pre-releases are dated from here on,
+  `0.23-kmp-velocity-<yyyymmdd>-<nn>` (same scheme as the velocity betas), tagged at the built commit.
 - velocity `3.0.0-BETA-20260901-01` → `3.0.0-BETA-20260916-01`. Two months of engine work (classic
   `Uberspect`/event-handler/conversion-handler facades, codegen convergence, compat flags, resource-name
   normalization) land without a source change here: compile, tests and rendering are unaffected.

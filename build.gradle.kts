@@ -18,7 +18,7 @@ plugins {
 allprojects {
 
     group = "com.republicate.kroom"
-    version = "0.23-kmp-velocity-05"
+    version = "0.23-kmp-velocity-SNAPSHOT"
 
     repositories {
         google()
