@@ -12,6 +12,7 @@ import org.apache.velocity.context.Context
 import org.apache.velocity.runtime.RuntimeConstants
 import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader
 import org.apache.velocity.runtime.resource.loader.FileResourceLoader
+import org.apache.velocity.util.ClassUtils
 import java.io.File
 import java.io.StringWriter
 
@@ -50,10 +51,12 @@ class VelocityPlugin(config: VelocityConfig) {
         setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
         setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
 
-        // Auto-register TranslateDirective if l10n module is on classpath
+        // Auto-register TranslateDirective if l10n is on the classpath. Resolve it the way the engine
+        // will (thread-context loader, then its own): a name the engine can't find is a fatal init
+        // error, so asking a different loader than it does would turn "absent" into a crash.
         val translateDirective = "com.republicate.kroom.webapp.l10n.TranslateDirective"
         try {
-            Class.forName(translateDirective)
+            ClassUtils.getClass(translateDirective)
             setProperty("runtime.custom_directives", translateDirective)
         } catch (_: ClassNotFoundException) {
             // l10n module not present, skip

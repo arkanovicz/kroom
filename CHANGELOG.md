@@ -4,6 +4,27 @@ All notable changes to kroom will be documented in this file.
 
 ## [0.23-kmp-velocity-05]
 
+### Fixed
+
+#### kroom-webapp-velocity
+- The `TranslateDirective` auto-registration probe asked the wrong classloader. It used
+  `Class.forName`, resolving against the plugin class's own loader, while the engine resolves a
+  `runtime.custom_directives` entry through the thread-context loader and then its own — and a name
+  the engine cannot find is now a fatal `VelocityException` at `init()` rather than a silent skip.
+  The probe now goes through the engine's `ClassUtils`, so it asks exactly the question the engine
+  will answer.
+
+### Added
+
+#### kroom-webapp-velocity
+- `PortableTemplatesTest` pins that everything kroom ships — the `kroom-macros.vtl` library and the
+  page templates — renders under a pure 3.0 `Config`, with `compat.informal_navigation`,
+  `duck_typing`, `elvis_falsy`, `string_escapes` and `introspection` all off. `VelocityPlugin` runs
+  the classic facade, where those are on; the build-time pipelines start from a config where they are
+  off, and the difference is *silent* (informal `$a.b` in free text renders the root followed by a
+  literal `.b`). kroom's own templates are therefore formal-only; a consumer's templates stay the
+  consumer's call, configured on their side.
+
 ### Build
 - velocity `3.0.0-BETA-20260901-01` → `3.0.0-BETA-20260916-01`. Two months of engine work (classic
   `Uberspect`/event-handler/conversion-handler facades, codegen convergence, compat flags, resource-name
