@@ -76,15 +76,13 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
  * guarantee.
  *
  * It scopes *bindings*, not objects: `%set($club.name = "x")` goes through the uberspector to the caller's
- * own object and mutates it. Sandboxing author content against that is the sub-engine's introspection
- * policy, not this wrapper's job.
+ * own object. Refusing that is the application's policy (`markdown.introspector.restrict.writes`).
  */
 private fun scoped(context: Context): Context = VelocityContext(context)
 
 /**
- * The one place a `%` sub-engine is built. Keep it that way: the restricted policy for author-edited
- * content (`introspector.uberspect.class` = SecureUberspector + `introspector.restrict.*`, which the
- * classic facade compiles into the 3.0 sandbox ACL) plugs in here and nowhere else.
+ * The one place a `%` sub-engine is built. kroom restricts nothing: sandbox, write ACL and strict header
+ * contract are the application's, through `markdown.`-prefixed properties.
  *
  * [properties] arrive last but one, so an application overrides the defaults; the lexer arrives last,
  * because a markdown block is `%`-VTL by definition and no property may say otherwise.

@@ -1,13 +1,19 @@
 package com.republicate.kroom.markdown
 
 import org.apache.velocity.VelocityContext
+import org.apache.velocity.engine.StrictReferenceException
+import org.apache.velocity.exception.MethodInvocationException
 import org.apache.velocity.app.VelocityEngine
 import org.apache.velocity.runtime.RuntimeConstants
 import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader
 import java.io.StringWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertContains
+import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The pipeline, pinned end to end: `%`-eval then flexmark. Both halves have to be visible in the
@@ -108,11 +114,9 @@ class MarkdownRendererTest {
     }
 
     /**
-     * A header NEED (`%%@ needed: String`, no default) the caller does not satisfy. Pinned as OBSERVED,
-     * not as wished: the interpreted pipeline does not enforce a need — the reference simply resolves to
-     * nothing and renders its own source, as any undefined reference does. Validation ("every includer
-     * must satisfy a block's signature") is therefore still entirely to be built; nothing under us
-     * already raises.
+     * A header NEED (`%%@ needed: String`, no default) the caller does not satisfy, outside strict mode:
+     * the reference renders its own source, as any undefined reference does. Strict mode turns it into a
+     * positioned error — pinned below with the other application switches.
      */
     @Test
     fun `an unsatisfied header need renders the reference literally`() {
@@ -154,20 +158,63 @@ class MarkdownRendererTest {
     }
 
     /**
-     * KNOWN LIMIT, pinned as OBSERVED. The child context scopes *bindings*; a property write is not one —
-     * `%set($tone.value = ...)` resolves `$tone` through the chain, then calls a setter on the caller's own
-     * object through the uberspector, which no context wrapper sees. Containing it is an introspection
-     * policy (SecureUberspector / `introspector.restrict.*` on the `%` sub-engine), and if it needs a fix
-     * it is upstream: nothing here should work around it.
+     * By default the scope contains *bindings*, not objects: `%set($tone.value = ...)` resolves `$tone`
+     * through the chain and calls the setter on the caller's own object — no context wrapper sees it.
+     * Containing that is the application's introspection policy, pinned next.
      */
     @Test
-    fun `KNOWN LIMIT - a property write pierces the scope and mutates the caller's object`() {
+    fun `by default a property write pierces the scope and mutates the caller's object`() {
         val tone = Tone("sobre")
-        val caller = ctx("tone" to tone)
         assertEquals(
             "<p>enjoué</p>\n",
-            renderer.renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", caller)
+            renderer.renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", ctx("tone" to tone))
         )
-        assertEquals("enjoué", tone.value)   // not "sobre" — the caller's object was mutated
+        assertEquals("enjoué", tone.value)
+    }
+
+    // --- policy: the application's, reached through `markdown.`-prefixed properties -----------------
+    // kroom restricts nothing itself. These pins prove the engine's switches reach the `%` sub-engine.
+
+    private fun restricted(vararg properties: Pair<String, Any?>) = MarkdownRenderer(mapOf(*properties))
+
+    @Test
+    fun `introspector restrict writes refuses a property write on the caller's object`() {
+        val tone = Tone("sobre")
+        restricted(
+            "introspector.uberspect.class" to "org.apache.velocity.util.introspection.SecureUberspector",
+            "introspector.restrict.writes" to "*"
+        ).renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", ctx("tone" to tone))
+        assertEquals("sobre", tone.value)
+    }
+
+    /** The classic facade wraps the engine's positioned StrictReferenceException, as 2.x callers expect. */
+    private fun strictFailure(block: () -> Unit): Throwable =
+        assertFailsWith<MethodInvocationException> { block() }.also {
+            assertTrue(generateSequence<Throwable>(it) { t -> t.cause }.any { t -> t is StrictReferenceException }, it.toString())
+        }
+
+    @Test
+    fun `strict mode enforces a block's header need`() {
+        val strict = restricted("runtime.strict_mode.enable" to true)
+        val block = "%%@ needed: String\nvaleur: \$needed\n"
+        val failure = strictFailure { strict.renderSource(block, ctx(), name = "need.md") }
+        assertContains(failure.message.orEmpty(), "`needed: String` at need.md[line 1, column 5]")
+        assertEquals("<p>valeur: ok</p>\n", strict.renderSource(block, ctx("needed" to "ok")))
+    }
+
+    @Test
+    fun `strict mode enforces a block's header type`() {
+        val strict = restricted("runtime.strict_mode.enable" to true)
+        strictFailure { strict.renderSource("%%@ needed: String\n\$needed\n", ctx("needed" to 42)) }
+    }
+
+    /** The class-linkage layer: a typed Kotlin island naming a restricted class does not even link. */
+    @Test
+    fun `the secure uberspector installs the full sandbox`() {
+        val secure = restricted("introspector.uberspect.class" to "org.apache.velocity.util.introspection.SecureUberspector")
+        val failure = assertFails { secure.renderSource("\${\"\" + java.lang.Runtime.getRuntime()}\n", ctx()) }
+        assertTrue(generateSequence(failure) { it.cause }.any { it is NoClassDefFoundError }, failure.toString())
+        // the pin has teeth: the same island links and renders on a plain engine
+        assertContains(renderer.renderSource("\${\"\" + java.lang.Runtime.getRuntime()}\n", ctx()), "java.lang.Runtime@")
     }
 }
