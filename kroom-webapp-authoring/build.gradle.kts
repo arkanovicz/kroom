@@ -15,6 +15,8 @@ java {
 dependencies {
     api(project(":kroom-webapp-core"))
     api(project(":kroom-webapp-session"))
+    // authoring.js builds on the house stack (domhelper, api) and shares its version for cache busting
+    api(project(":kroom-webapp-assets"))
     // a store IS a velocity ResourceLoader: one tree, read and written — and pages get $logged/$authoring
     api(project(":kroom-webapp-velocity"))
     api(libs.velocity.engine.core)

@@ -1,0 +1,17 @@
+##
+## The default `markdown.block.wrapper`: a block, plus the handle an author needs to reach it.
+##
+## Everything the editor learns about the block, it reads off this element — the path to edit and where
+## the API lives. The editor markup itself is built by authoring.js when editing starts: a visitor who
+## will never edit downloads no textarea, and there is one place the editor's shape is written down.
+##
+#set($kroomEditable = $logged && $authoring.canEdit($logged, $path))
+<div class="kroom-block" data-content="$path"#if($kroomEditable) data-api="$authoring.apiPrefix" data-name="$name"#end>
+#if($kroomEditable)
+  <nav class="kroom-block-tools" aria-label="$name">
+    <button type="button" class="kroom-edit" title="edit" aria-label="edit">&#9998;</button>
+    <button type="button" class="kroom-history" title="history" aria-label="history">&#10226;</button>
+  </nav>
+#end
+  <div class="kroom-block-body">$html</div>
+</div>

@@ -1,0 +1,140 @@
+/* authoring.css - in-place block editing. Part of kroom-webapp-authoring, pico-compatible. */
+
+:root {
+    --kroom-diff-insert: #d5f2de;
+    --kroom-diff-delete: #ffdcdc;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --kroom-diff-insert: #14351f;
+        --kroom-diff-delete: #3d1b1b;
+    }
+}
+
+:root[data-theme="dark"] {
+    --kroom-diff-insert: #14351f;
+    --kroom-diff-delete: #3d1b1b;
+}
+
+/* --- the block and its handle ------------------------------------------------------------------ */
+
+.kroom-block {
+    position: relative;
+}
+
+.kroom-block-tools {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    gap: .25rem;
+    opacity: 0;
+    transition: opacity .15s ease-in-out;
+}
+
+.kroom-block:hover > .kroom-block-tools,
+.kroom-block-tools:focus-within {
+    opacity: 1;
+}
+
+.kroom-editing > .kroom-block-tools {
+    display: none;
+}
+
+.kroom-block-tools button {
+    width: 2rem;
+    padding: 0 .25rem;
+    margin: 0;
+    line-height: 1.6;
+    font-size: .8rem;
+}
+
+.kroom-notice {
+    padding: .25rem .5rem;
+    border-left: 3px solid currentColor;
+    font-size: .875rem;
+}
+
+/* --- the editor --------------------------------------------------------------------------------- */
+
+.kroom-editor .kroom-published > summary {
+    font-size: .8rem;
+    opacity: .7;
+}
+
+/* what the page rendered, not what the textarea holds — once typed, say so */
+.kroom-editor .kroom-published.kroom-stale > summary::after {
+    content: " (before your changes)";
+}
+
+.kroom-editor .kroom-published[open] > .kroom-block-body {
+    opacity: .7;
+}
+
+textarea.kroom-source {
+    width: 100%;
+    min-height: 6rem;
+    overflow: hidden;
+    resize: vertical;
+    font-family: var(--pico-font-family-monospace, ui-monospace, monospace);
+    font-size: .875rem;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+.kroom-editor-tools {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.kroom-editor-tools button {
+    width: 2.5rem;
+    padding: 0 .25rem;
+    margin: 0;
+}
+
+.kroom-status {
+    font-size: .8rem;
+    opacity: .7;
+}
+
+/* --- diff --------------------------------------------------------------------------------------- */
+
+.kroom-diff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.kroom-diff pre {
+    max-height: 50vh;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: .8rem;
+}
+
+.diff-insert { background: var(--kroom-diff-insert); }
+.diff-delete { background: var(--kroom-diff-delete); text-decoration: line-through; }
+
+.kroom-dialog article { max-width: 60rem; }
+
+ul.kroom-revisions {
+    list-style: none;
+    padding: 0;
+    max-height: 50vh;
+    overflow: auto;
+}
+
+ul.kroom-revisions button {
+    width: 100%;
+    text-align: left;
+    font-size: .875rem;
+    padding: .25rem .5rem;
+}
+
+@media (max-width: 40rem) {
+    .kroom-diff { grid-template-columns: 1fr; }
+}
