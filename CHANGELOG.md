@@ -27,7 +27,24 @@ All notable changes to kroom will be documented in this file.
   `markdown.runtime.strict_mode.*` / `markdown.introspector.*`. `validate(source, declared)` reports, at save time, the roots a block
   reads that its includer does not declare.
 
+#### kroom-webapp-authoring
+- New module: block-based content editing over a `ResourceStore` — a velocity `ResourceLoader` that also
+  writes, so the bytes a visitor's page renders are the ones a submit wrote, with no publication step.
+  Concurrency is one lock per block with a timeout read at access (no scheduler, no SSE, no room); a submit
+  carries the rev it started from and is answered with theirs rather than overwriting. `Versioned` stores
+  (`VersionedMemoryResourceStore`, an application's git-backed one) add history and a site-wide journal.
+  The editor ships with it: a default block wrapper, `authoring.js` (textarea in place, diff on conflict and
+  in history), and `installContentSite`, which puts both template stacks, the edit API and placeholder page
+  routing in one call. `./gradlew :kroom-webapp-authoring:demo` runs it.
+
+#### kroom-common
+- `PathTemplate`: the one place a `_joker_` path is matched (`/club/13Ma` → `code = 13Ma`) and expanded
+  back. Page routing and block inclusion share it, so a page and its blocks cannot disagree.
+
 #### kroom-webapp-velocity
+- `placeholderPages()` mounts a parameterized page template as the route it describes
+  (`pages/club/_code_.html` → `/club/{code}`), a concrete page still winning over the placeholder.
+- `VelocityConfig.properties`: an open door for engine properties (`markdown.*` among them).
 - `VelocityPlugin` registers `MarkdownDirective` when `kroom-markdown` is on the classpath, alongside
   `TranslateDirective` (same engine-side probe, appended to `runtime.custom_directives`).
 - `PortableTemplatesTest` pins that everything kroom ships — the `kroom-macros.vtl` library and the
