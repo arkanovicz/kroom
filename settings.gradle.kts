@@ -22,6 +22,9 @@ include("kroom-webapp-push")
 // Rendering
 include("kroom-markdown")
 
+// Authoring
+include("kroom-webapp-authoring")
+
 // Examples
 include("kroom-examples:chifoumi")
 project(":kroom-examples:chifoumi").projectDir = file("kroom-examples/chifoumi")
