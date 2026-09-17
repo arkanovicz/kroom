@@ -74,7 +74,9 @@
         dmp.diff_cleanupSemantic(diffs);
         leftPane.clear();
         rightPane.clear();
-        diffs.forEach(([op, text]) => {
+        // a diff is array-LIKE (diff_match_patch.Diff), not iterable: read it by index, never destructure
+        diffs.forEach(diff => {
+            const op = diff[0], text = diff[1];
             if (op >= 0) rightPane.appendChild(element('span', op > 0 ? 'diff-insert' : 'diff-equal', text));
             if (op <= 0) leftPane.appendChild(element('span', op < 0 ? 'diff-delete' : 'diff-equal', text));
         });
