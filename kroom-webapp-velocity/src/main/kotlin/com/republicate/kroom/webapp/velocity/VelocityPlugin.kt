@@ -51,13 +51,18 @@ class VelocityPlugin(config: VelocityConfig) {
         setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
         setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
 
+        config.properties.forEach { (key, value) -> setProperty(key, value) }
+
         // Auto-register the directives whose module happens to be on the classpath. Resolve each the
         // way the engine will (thread-context loader, then its own): a name the engine can't find is a
         // fatal init error, so asking a different loader than it does would turn "absent" into a crash.
         val present = OPTIONAL_DIRECTIVES.filter {
             try { ClassUtils.getClass(it); true } catch (_: ClassNotFoundException) { false }
         }
-        if (present.isNotEmpty()) setProperty("runtime.custom_directives", present.joinToString(","))
+        if (present.isNotEmpty()) {
+            val declared = config.properties["runtime.custom_directives"]?.toString()?.takeIf { it.isNotBlank() }
+            setProperty("runtime.custom_directives", (listOfNotNull(declared) + present).joinToString(","))
+        }
 
         init()
     }
@@ -171,6 +176,10 @@ class VelocityConfig {
     var devMode: Boolean = false
     var devDir: File? = null  // Source directory for dev mode hot reload
     var versionCache: WebResourceVersionCache? = null
+
+    /** Extra engine properties, applied over kroom's defaults (e.g. `markdown.*` for `#markdown` blocks).
+     *  `runtime.custom_directives` is appended to, not replaced: the auto-registered directives stay. */
+    val properties = LinkedHashMap<String, Any?>()
 
     internal val applicationProviders = LinkedHashMap<String, () -> Any?>()
     internal val sessionProviders = LinkedHashMap<String, (ApplicationCall) -> Any?>()
