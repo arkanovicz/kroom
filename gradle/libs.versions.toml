@@ -9,6 +9,8 @@ bouncycastle = "1.81"
 commons-collections4 = "4.5.0"
 commons-lang3 = "3.18.0"
 essential-kson = "2.14"
+# last 0.64.x; JVM-only by design — server-side rendering, not part of kroom's KMP surface
+flexmark = "0.64.8"
 h2 = "2.3.232"
 evo-inflector = "1.3"
 kddl = "0.24"
@@ -38,6 +40,12 @@ commons-collections4 = { module = "org.apache.commons:commons-collections4", ver
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 essential-kson = { module = "com.republicate.kson:essential-kson", version.ref = "essential-kson" }
 evo-inflector = { module = "org.atteo:evo-inflector", version.ref = "evo-inflector" }
+# core + the GFM set; no flexmark-all, and no subscript ext (it fights strikethrough over `~`)
+flexmark = { module = "com.vladsch.flexmark:flexmark", version.ref = "flexmark" }
+flexmark-ext-autolink = { module = "com.vladsch.flexmark:flexmark-ext-autolink", version.ref = "flexmark" }
+flexmark-ext-gfm-strikethrough = { module = "com.vladsch.flexmark:flexmark-ext-gfm-strikethrough", version.ref = "flexmark" }
+flexmark-ext-gfm-tasklist = { module = "com.vladsch.flexmark:flexmark-ext-gfm-tasklist", version.ref = "flexmark" }
+flexmark-ext-tables = { module = "com.vladsch.flexmark:flexmark-ext-tables", version.ref = "flexmark" }
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
 kddl = { module = "com.republicate.kddl:kddl", version.ref = "kddl" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlin-logging"}

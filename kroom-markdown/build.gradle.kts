@@ -21,8 +21,17 @@ val grammarTemplate: Configuration by configurations.creating
 
 dependencies {
     api(libs.velocity.engine.common)                    // LexerSource, Config, parse — this module's public surface
+    // classic facade: the sub-engine is one (it owns the resource-loader properties an app configures
+    // under `markdown.`), and MarkdownDirective IS a classic Directive — both are public surface
+    api(libs.velocity.engine.core)
     implementation(libs.velocity.engine.scripting)      // the runtime compiler: markdown templates are authored, hence interpreted
     implementation(libs.antlr.kotlin)
+    // md→html, JVM-only by design; nothing of it crosses this module's API
+    implementation(libs.flexmark)
+    implementation(libs.flexmark.ext.autolink)
+    implementation(libs.flexmark.ext.gfm.strikethrough)
+    implementation(libs.flexmark.ext.gfm.tasklist)
+    implementation(libs.flexmark.ext.tables)
     grammarTemplate(libs.velocity.engine.common)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)

@@ -1,0 +1,3 @@
+## Bienvenue
+
+chez $club.name

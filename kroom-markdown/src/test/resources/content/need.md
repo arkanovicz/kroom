@@ -1,0 +1,2 @@
+%%@ needed: String
+valeur: $needed
