@@ -19,6 +19,9 @@ include("kroom-webapp-oauth")
 include("kroom-webapp-auth")
 include("kroom-webapp-push")
 
+// Rendering
+include("kroom-markdown")
+
 // Examples
 include("kroom-examples:chifoumi")
 project(":kroom-examples:chifoumi").projectDir = file("kroom-examples/chifoumi")
