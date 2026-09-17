@@ -1,5 +1,6 @@
 package com.republicate.kroom.markdown
 
+import org.apache.velocity.VelocityContext
 import org.apache.velocity.context.InternalContextAdapter
 import org.apache.velocity.exception.VelocityException
 import org.apache.velocity.runtime.RuntimeServices
@@ -10,7 +11,7 @@ import org.apache.velocity.util.StringUtils
 import java.io.Writer
 
 /**
- * `#markdown(path)` — the bridge between a developer's `#` layout and an author's `%` markdown block.
+ * `#markdown(name)`, `#markdown(name, {"person": $p})` — the bridge between a developer's `#` layout and an author's `%` markdown block.
  *
  * The block is merged against a child of the **caller's** context (so `$club.name` means in the block what
  * it means in the layout, while the block's own `%set` dies at the boundary — see [MarkdownRenderer]) and
@@ -42,11 +43,18 @@ class MarkdownDirective : Directive() {
     }
 
     override fun render(context: InternalContextAdapter, writer: Writer, node: Node): Boolean {
-        val path = node.takeIf { it.jjtGetNumChildren() > 0 }?.jjtGetChild(0)?.value(context)
+        val argument = node.takeIf { it.jjtGetNumChildren() > 0 }?.jjtGetChild(0)?.value(context)
             ?: throw VelocityException(
-                "#markdown(): missing or null path argument at ${StringUtils.formatFileString(this)}"
+                "#markdown(): missing or null block argument at ${StringUtils.formatFileString(this)}"
             )
-        renderer.render(path.toString(), context, writer)
+        val extra = node.takeIf { it.jjtGetNumChildren() > 1 }?.jjtGetChild(1)?.value(context) as? Map<*, *>
+        val path = try {
+            blockPath(argument.toString(), context.getCurrentTemplateName()) { context.get(it) }
+        } catch (e: IllegalArgumentException) {
+            throw VelocityException("#markdown(): ${e.message} at ${StringUtils.formatFileString(this)}", e)
+        }
+        val scope = extra?.let { args -> VelocityContext(context).also { c -> args.forEach { (k, v) -> c.put(k.toString(), v) } } }
+        renderer.render(path, scope ?: context, writer)
         return true
     }
 

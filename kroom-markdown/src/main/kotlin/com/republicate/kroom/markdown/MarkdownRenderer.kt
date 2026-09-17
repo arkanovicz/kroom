@@ -11,12 +11,16 @@ import org.apache.velocity.VelocityContext
 import org.apache.velocity.app.VelocityEngine
 import org.apache.velocity.context.Context
 import org.apache.velocity.runtime.RuntimeConstants
+import org.apache.velocity.exception.ResourceNotFoundException
 import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader
 import java.io.StringWriter
 import java.io.Writer
 
 /** The encoding markdown blocks are authored and served in. Not configurable: content is UTF-8. */
 private const val ENCODING = "UTF-8"
+
+/** Property naming the missing-block snippet (under `markdown.` on the host engine). */
+private const val MISSING = "missing"
 
 /**
  * Renders a `%`-dialect markdown template to HTML: merge first, convert second. The order is the whole
@@ -32,6 +36,9 @@ private const val ENCODING = "UTF-8"
 class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
 
     private val engine = markdownEngine(properties)
+
+    /** What a page shows where a block has not been written yet: a `%` markdown snippet, `$name` in scope. */
+    private val missing = properties[MISSING]?.toString() ?: "*No content for **\$name**.*"
 
     // flexmark's parser and renderer are immutable and thread-safe once built — built once, here.
     private val options = MutableDataSet().set(
@@ -52,7 +59,13 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
 
     fun render(path: String, context: Context, out: Writer) {
         val markdown = StringWriter()
-        engine.mergeTemplate(path, ENCODING, scoped(context), markdown)
+        try {
+            engine.mergeTemplate(path, ENCODING, scoped(context), markdown)
+        } catch (_: ResourceNotFoundException) {
+            // an unwritten block is a normal state of a live content tree, not a failure
+            val name = path.substringAfterLast('/').substringBeforeLast('.')
+            engine.evaluate(scoped(context).also { it.put("name", name) }, markdown.also { it.buffer.setLength(0) }, MISSING, missing)
+        }
         emit(markdown.toString(), out)
     }
 
@@ -78,7 +91,7 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
  * It scopes *bindings*, not objects: `%set($club.name = "x")` goes through the uberspector to the caller's
  * own object. Refusing that is the application's policy (`markdown.introspector.restrict.writes`).
  */
-private fun scoped(context: Context): Context = VelocityContext(context)
+private fun scoped(context: Context): VelocityContext = VelocityContext(context)
 
 /**
  * The one place a `%` sub-engine is built. Blocks are user-authored, so the defaults watch them: strict

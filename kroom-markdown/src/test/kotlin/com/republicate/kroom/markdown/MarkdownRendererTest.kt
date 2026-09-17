@@ -122,6 +122,45 @@ class MarkdownRendererTest {
         assertFailsWith<MethodInvocationException> { host("layout.html", "view" to mapOf("path" to "need.md")) }
     }
 
+    // --- where a block lives: beside its page, under the page's own placeholders -------------------
+
+    /**
+     * A block is addressed by NAME, resolved beside the template including it, and the placeholders that
+     * routed the page (`pages/club/_code_/club.html`, `$code` bound by the router) are expanded with the
+     * values already in the context. The store therefore only ever sees concrete paths.
+     */
+    @Test
+    fun `a block is resolved beside its page, placeholders expanded from the context`() {
+        assertEquals(
+            "<main><h2>Les Vagabonds</h2>\n<p>club 13Ma</p>\n</main>",
+            host("pages/club/_code_/club.html", "code" to "13Ma", "club" to Club("Les Vagabonds"))
+        )
+    }
+
+    @Test
+    fun `a placeholder with no value in the context is an error naming it`() {
+        val failure = assertFails { host("pages/club/_code_/club.html", "club" to Club("Les Vagabonds")) }
+        assertContains(generateSequence<Throwable>(failure) { it.cause }.last().message.orEmpty(), "code")
+    }
+
+    /** The second argument carries what the page has but the block cannot name — a loop's current item. */
+    @Test
+    fun `a map argument adds to the block's scope`() {
+        assertEquals(
+            "<main><h2>Les Vagabonds</h2>\n<p>club 13Ma</p>\n<p>bio de Nestor</p>\n</main>",
+            host("pages/club/_code_/both.html", "code" to "13Ma", "club" to Club("Les Vagabonds"), "p" to "Nestor")
+        )
+    }
+
+    /** An unwritten block is a normal state of a live content tree: the page still renders. */
+    @Test
+    fun `a block that does not exist yet renders the placeholder`() {
+        assertEquals(
+            "<main><p><em>No content for <strong>description</strong>.</em></p>\n</main>",
+            host("pages/club/_code_/club.html", "code" to "99Zz", "club" to Club("Inconnu"))
+        )
+    }
+
     // --- scope: the block reads the caller, writes to itself --------------------------------------
 
     /**

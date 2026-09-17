@@ -20,6 +20,7 @@ java {
 val grammarTemplate: Configuration by configurations.creating
 
 dependencies {
+    api(project(":kroom-common"))              // PathTemplate: page routing and block inclusion share it
     api(libs.velocity.engine.common)                    // LexerSource, Config, parse — this module's public surface
     // classic facade: the sub-engine is one (it owns the resource-loader properties an app configures
     // under `markdown.`), and MarkdownDirective IS a classic Directive — both are public surface
