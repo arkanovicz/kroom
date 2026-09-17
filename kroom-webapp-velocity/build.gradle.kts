@@ -14,6 +14,7 @@ java {
 
 dependencies {
     api(project(":kroom-webapp-core"))
+    api(project(":kroom-common"))              // PathTemplate: placeholder pages and content blocks share it
     api(libs.velocity.engine.core)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.ktor.server.test.host)

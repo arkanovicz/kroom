@@ -69,6 +69,10 @@ class VelocityPlugin(config: VelocityConfig) {
 
     val versionCache: WebResourceVersionCache? = config.versionCache
 
+    // where templates are read from — what [placeholderPages] has to browse to find the parameterized ones
+    val templatePath: String? = config.templatePath
+    val devDir: File? = config.devDir?.takeIf { config.devMode }
+
     // Live scope registries. Populated at install (config block) and post-install by other
     // plugins (e.g. l10n registers $lang). Read-only at render time; mutated only during startup.
     private val applicationProviders = LinkedHashMap(config.applicationProviders)
