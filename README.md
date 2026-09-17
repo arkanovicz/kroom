@@ -17,6 +17,7 @@ kroom-webapp-oauth    OIDC authentication
 kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
+kroom-webapp-authoring in-place block editing (locks, content stores, edit API, editor)
 ```
 
 ## Features
@@ -253,6 +254,81 @@ relax any of it under `markdown.*`.
 
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.
+
+## kroom-webapp-authoring
+
+In-place editing of those blocks: the block a visitor reads is the block an author edits, through the same
+tree — a `ResourceStore` is a velocity `ResourceLoader` first, so a submit writes the very bytes the next
+render reads.
+
+```kotlin
+installSessions { … }
+installVelocity {
+    // authoring cannot choose this: velocity's engine is built at install, before authoring exists
+    properties["markdown.block.wrapper"] = "kroom/block-wrapper.html"
+}
+installAuthoring {
+    store = FileResourceStore(Path.of("/data/content"))  // or MemoryResourceStore(), or your own
+    lockTimeout = 2.minutes                           // untouched that long, a block is free again
+    apiPrefix = "/api/content"                        // must live under /api/ — api.js roots calls there
+    canEdit = { session, path -> session?.id in editors }
+    placeholder = "*(nothing here yet)*"
+}
+```
+
+### The edit API
+
+```
+GET    {prefix}/{path...}[?rev=]   the block, its lock, whether the caller may edit it
+POST   {prefix}/lock/{path...}     take the block — 409 names who holds it, re-entrant for its owner
+DELETE {prefix}/lock/{path...}     give it back, unwritten
+POST   {prefix}/{path...}          submit {rev, body} — 409 answers {message, theirs} on a stale rev
+GET    {prefix}/history/{path...}  revisions of one block   ] 404 unless the store is Versioned
+GET    {prefix}/journal            the site-wide log        ]
+```
+
+401 without a session, 403 when `canEdit` says no. The lock routes read `/lock/…` rather than `…/lock`
+because a ktor tailcard takes every remaining segment. A submit carries the rev it started from, so an edit
+made meanwhile — a concurrent author, a `git pull` — is answered with *theirs* instead of being overwritten:
+the lock is the polite path, the rev check is the safe one.
+
+**History and the journal exist only when the store is `Versioned`** — a plain `FileResourceStore` keeps no
+past, and both routes answer 404. There is no `revert` route either: restoring an old body writes it as a
+new revision through the ordinary submit, which keeps the journal honest.
+
+### The page side
+
+`markdown.block.wrapper` names a template the `#markdown` directive renders in place of the bare html, with
+`$path`, `$name` and `$html` added to the page context. This module ships the default one at the classpath
+root as `kroom/block-wrapper.html` — root, so it resolves under every engine shape (dev's `classpath` loader,
+production's `root` loader) — and it emits the block plus, for an author `$authoring.canEdit` accepts, two
+buttons. The editor markup itself is built by `authoring.js` when editing starts: a visitor downloads none
+of it.
+
+The layout carries three files, after the house stack (domhelper.js, api.js), which `authoring.js` builds on:
+
+```html
+<link rel="stylesheet" href="/css/authoring.css?v=…">
+<script src="/lib/diff-match-patch/diff_match_patch.js?v=…"></script>
+<script src="/js/authoring.js?v=…"></script>
+```
+
+or, from a velocity layout, `$authoring.assets.tags()`. They are served by `installCore`'s static routes,
+which read `static/` from any jar on the classpath — authoring mounts no route for them.
+
+### What the editor does
+
+✎ takes the lock and swaps in a textarea holding the body; typing refreshes the lock (debounced, 700ms);
+✓ submits `{rev, body}`, ✗ gives the block back. ⟲ lists the revisions in a `<dialog>`; picking one diffs it
+against the block as it stands, and *restore* loads that body into the editor for you to submit — an undo is
+an edit like any other. A 409 on submit shows yours beside theirs, word-diffed, and you leave it editing
+against their revision, keeping your text or taking theirs.
+
+There is no preview, because there is no route that renders a body nobody has submitted: markdown is
+rendered on the server, inside a page. So editing keeps the *published* rendering — the very nodes the page
+rendered — in a fold beside the textarea, marked "before your changes" as soon as you type. It answers what
+you are changing, never what it will become. For the same reason a successful submit reloads the page: the
+submit answers a rev, and the page is the only thing that knows how to render the block.
 
 ## Table (for seat-based games)
 
