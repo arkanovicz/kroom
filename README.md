@@ -246,10 +246,10 @@ rendered by a `#`-template layout through `#markdown($view.path)`.
 ```properties
 markdown.resource.loaders = file
 markdown.resource.loader.file.path = /data/content
-markdown.introspector.uberspect.class = org.apache.velocity.util.introspection.SecureUberspector
-markdown.introspector.restrict.writes = *
-markdown.runtime.strict_mode.enable = true
 ```
+
+Blocks are watched by default — strict mode, sandbox (`SecureUberspector`), `introspector.restrict.writes = *`;
+relax any of it under `markdown.*`.
 
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.

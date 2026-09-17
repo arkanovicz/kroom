@@ -114,16 +114,12 @@ class MarkdownRendererTest {
     }
 
     /**
-     * A header NEED (`%%@ needed: String`, no default) the caller does not satisfy, outside strict mode:
-     * the reference renders its own source, as any undefined reference does. Strict mode turns it into a
-     * positioned error — pinned below with the other application switches.
+     * A header NEED (`%%@ needed: String`, no default) the caller does not satisfy. Blocks are strict by
+     * default: a positioned error, not a page quietly rendering `$needed`.
      */
     @Test
-    fun `an unsatisfied header need renders the reference literally`() {
-        assertEquals(
-            "<main><p>valeur: \$needed</p>\n</main>",
-            host("layout.html", "view" to mapOf("path" to "need.md"))
-        )
+    fun `an unsatisfied header need is an error by default`() {
+        assertFailsWith<MethodInvocationException> { host("layout.html", "view" to mapOf("path" to "need.md")) }
     }
 
     // --- scope: the block reads the caller, writes to itself --------------------------------------
@@ -158,34 +154,23 @@ class MarkdownRendererTest {
     }
 
     /**
-     * By default the scope contains *bindings*, not objects: `%set($tone.value = ...)` resolves `$tone`
-     * through the chain and calls the setter on the caller's own object — no context wrapper sees it.
-     * Containing that is the application's introspection policy, pinned next.
+     * The scope contains *bindings*, not objects: `%set($tone.value = ...)` reaches the caller's own object
+     * through the uberspector. Refused by default; an application opting out gets the plain behaviour.
      */
     @Test
-    fun `by default a property write pierces the scope and mutates the caller's object`() {
+    fun `a property write on the caller's object is refused by default`() {
         val tone = Tone("sobre")
-        assertEquals(
-            "<p>enjoué</p>\n",
-            renderer.renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", ctx("tone" to tone))
-        )
-        assertEquals("enjoué", tone.value)
+        renderer.renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", ctx("tone" to tone))
+        assertEquals("sobre", tone.value)
+
+        restricted("introspector.restrict.writes" to "false")
+            .renderSource("%set(\$tone.value = \"enjoué\")\n", ctx("tone" to tone))
+        assertEquals("enjoué", tone.value)   // the pin has teeth
     }
 
-    // --- policy: the application's, reached through `markdown.`-prefixed properties -----------------
-    // kroom restricts nothing itself. These pins prove the engine's switches reach the `%` sub-engine.
+    // --- policy: watched by default, the application's to relax through `markdown.`-prefixed properties ---
 
     private fun restricted(vararg properties: Pair<String, Any?>) = MarkdownRenderer(mapOf(*properties))
-
-    @Test
-    fun `introspector restrict writes refuses a property write on the caller's object`() {
-        val tone = Tone("sobre")
-        restricted(
-            "introspector.uberspect.class" to "org.apache.velocity.util.introspection.SecureUberspector",
-            "introspector.restrict.writes" to "*"
-        ).renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", ctx("tone" to tone))
-        assertEquals("sobre", tone.value)
-    }
 
     /** The classic facade wraps the engine's positioned StrictReferenceException, as 2.x callers expect. */
     private fun strictFailure(block: () -> Unit): Throwable =
@@ -194,8 +179,8 @@ class MarkdownRendererTest {
         }
 
     @Test
-    fun `strict mode enforces a block's header need`() {
-        val strict = restricted("runtime.strict_mode.enable" to true)
+    fun `a block's header need is enforced by default`() {
+        val strict = renderer
         val block = "%%@ needed: String\nvaleur: \$needed\n"
         val failure = strictFailure { strict.renderSource(block, ctx(), name = "need.md") }
         assertContains(failure.message.orEmpty(), "`needed: String` at need.md[line 1, column 5]")
@@ -203,18 +188,19 @@ class MarkdownRendererTest {
     }
 
     @Test
-    fun `strict mode enforces a block's header type`() {
-        val strict = restricted("runtime.strict_mode.enable" to true)
+    fun `a block's header type is enforced by default`() {
+        val strict = renderer
         strictFailure { strict.renderSource("%%@ needed: String\n\$needed\n", ctx("needed" to 42)) }
     }
 
     /** The class-linkage layer: a typed Kotlin island naming a restricted class does not even link. */
     @Test
-    fun `the secure uberspector installs the full sandbox`() {
-        val secure = restricted("introspector.uberspect.class" to "org.apache.velocity.util.introspection.SecureUberspector")
-        val failure = assertFails { secure.renderSource("\${\"\" + java.lang.Runtime.getRuntime()}\n", ctx()) }
+    fun `blocks are sandboxed by default`() {
+        val island = "\${\"\" + java.lang.Runtime.getRuntime()}\n"
+        val failure = assertFails { renderer.renderSource(island, ctx()) }
         assertTrue(generateSequence(failure) { it.cause }.any { it is NoClassDefFoundError }, failure.toString())
-        // the pin has teeth: the same island links and renders on a plain engine
-        assertContains(renderer.renderSource("\${\"\" + java.lang.Runtime.getRuntime()}\n", ctx()), "java.lang.Runtime@")
+        // the pin has teeth: the same island links and renders once the application opts out
+        val open = restricted("introspector.uberspect.class" to "org.apache.velocity.util.introspection.UberspectImpl")
+        assertContains(open.renderSource(island, ctx()), "java.lang.Runtime@")
     }
 }

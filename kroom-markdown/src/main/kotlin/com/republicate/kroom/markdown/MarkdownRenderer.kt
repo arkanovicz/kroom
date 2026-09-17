@@ -81,8 +81,9 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
 private fun scoped(context: Context): Context = VelocityContext(context)
 
 /**
- * The one place a `%` sub-engine is built. kroom restricts nothing: sandbox, write ACL and strict header
- * contract are the application's, through `markdown.`-prefixed properties.
+ * The one place a `%` sub-engine is built. Blocks are user-authored, so the defaults watch them: strict
+ * references (and the header contract), the sandbox, no writes on objects. All overridable through
+ * `markdown.`-prefixed properties.
  *
  * [properties] arrive last but one, so an application overrides the defaults; the lexer arrives last,
  * because a markdown block is `%`-VTL by definition and no property may say otherwise.
@@ -93,6 +94,9 @@ private fun markdownEngine(properties: Map<String, Any?>): VelocityEngine = Velo
     // at wherever its content actually lives.
     setProperty(RuntimeConstants.RESOURCE_LOADERS, "classpath")
     setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
+    setProperty("runtime.strict_mode.enable", true)
+    setProperty("introspector.uberspect.class", "org.apache.velocity.util.introspection.SecureUberspector")
+    setProperty("introspector.restrict.writes", "*")
     properties.forEach { (key, value) -> setProperty(key, value) }
     setProperty(RuntimeConstants.PARSER_LEXER_CLASS, MarkdownVtl::class.java.name)
     init()

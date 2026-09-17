@@ -22,9 +22,9 @@ All notable changes to kroom will be documented in this file.
   The `%` lexer is generated at build time from the engine's grammar template. Layouts stay ordinary `#`
   templates and include a block with `#markdown($path)`: the block runs in a private, always-interpreted
   sub-engine configured from the host's `markdown.`-prefixed properties, in a scope chained to the caller's
-  context (its `%set`s do not leak). kroom restricts nothing itself: sandbox, write ACL and the strict
-  header contract are the application's, via `markdown.introspector.*` and `markdown.runtime.strict_mode.*`
-  — pinned to reach the sub-engine. `validate(source, declared)` reports, at save time, the roots a block
+  context (its `%set`s do not leak). Blocks are user-authored, so they are watched by default: strict mode
+  (including the header contract), the full sandbox, and no writes on objects — each relaxable through
+  `markdown.runtime.strict_mode.*` / `markdown.introspector.*`. `validate(source, declared)` reports, at save time, the roots a block
   reads that its includer does not declare.
 
 #### kroom-webapp-velocity
