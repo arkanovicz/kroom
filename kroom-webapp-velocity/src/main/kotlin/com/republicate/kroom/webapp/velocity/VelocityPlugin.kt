@@ -51,16 +51,13 @@ class VelocityPlugin(config: VelocityConfig) {
         setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
         setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
 
-        // Auto-register TranslateDirective if l10n is on the classpath. Resolve it the way the engine
-        // will (thread-context loader, then its own): a name the engine can't find is a fatal init
-        // error, so asking a different loader than it does would turn "absent" into a crash.
-        val translateDirective = "com.republicate.kroom.webapp.l10n.TranslateDirective"
-        try {
-            ClassUtils.getClass(translateDirective)
-            setProperty("runtime.custom_directives", translateDirective)
-        } catch (_: ClassNotFoundException) {
-            // l10n module not present, skip
+        // Auto-register the directives whose module happens to be on the classpath. Resolve each the
+        // way the engine will (thread-context loader, then its own): a name the engine can't find is a
+        // fatal init error, so asking a different loader than it does would turn "absent" into a crash.
+        val present = OPTIONAL_DIRECTIVES.filter {
+            try { ClassUtils.getClass(it); true } catch (_: ClassNotFoundException) { false }
         }
+        if (present.isNotEmpty()) setProperty("runtime.custom_directives", present.joinToString(","))
 
         init()
     }
@@ -130,6 +127,13 @@ class VelocityPlugin(config: VelocityConfig) {
         renderContext(templatePath, scopedContext(call, model))
 
     companion object {
+        /** Sibling modules' custom directives, by name: each registers iff its module is deployed.
+         *  No dependency either way — the classpath is the only thing asked. */
+        private val OPTIONAL_DIRECTIVES = listOf(
+            "com.republicate.kroom.webapp.l10n.TranslateDirective",
+            "com.republicate.kroom.markdown.MarkdownDirective"
+        )
+
         private var instance: VelocityPlugin? = null
 
         fun getInstance(): VelocityPlugin {
