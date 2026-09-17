@@ -16,6 +16,7 @@ kroom-webapp-session  encrypted session identity (shared by oauth/auth)
 kroom-webapp-oauth    OIDC authentication
 kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
+kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 ```
 
 ## Features
@@ -236,6 +237,22 @@ const reducer = combineReducers({ todos: todosReducer, ui: uiReducer });
 logMiddleware    // console.log actions and state
 thunkMiddleware  // dispatch functions for async
 ```
+
+## kroom-markdown
+
+Editable content blocks: markdown files with `%` directives (`%if`, `%foreach`, `$refs`, `%%@` headers),
+rendered by a `#`-template layout through `#markdown($view.path)`.
+
+```properties
+markdown.resource.loaders = file
+markdown.resource.loader.file.path = /data/content
+markdown.introspector.uberspect.class = org.apache.velocity.util.introspection.SecureUberspector
+markdown.introspector.restrict.writes = *
+markdown.runtime.strict_mode.enable = true
+```
+
+Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
+anyway, and kroom's multiplatform scope is model sharing, not rendering.
 
 ## Table (for seat-based games)
 

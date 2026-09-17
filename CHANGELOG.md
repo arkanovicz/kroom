@@ -16,7 +16,20 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-markdown
+- New ktor-free module: markdown content blocks written in a `%` dialect of Velocity (`#` is a markdown
+  heading), merged then converted to HTML by flexmark (GFM tables, strikethrough, autolink, task lists).
+  The `%` lexer is generated at build time from the engine's grammar template. Layouts stay ordinary `#`
+  templates and include a block with `#markdown($path)`: the block runs in a private, always-interpreted
+  sub-engine configured from the host's `markdown.`-prefixed properties, in a scope chained to the caller's
+  context (its `%set`s do not leak). kroom restricts nothing itself: sandbox, write ACL and the strict
+  header contract are the application's, via `markdown.introspector.*` and `markdown.runtime.strict_mode.*`
+  — pinned to reach the sub-engine. `validate(source, declared)` reports, at save time, the roots a block
+  reads that its includer does not declare.
+
 #### kroom-webapp-velocity
+- `VelocityPlugin` registers `MarkdownDirective` when `kroom-markdown` is on the classpath, alongside
+  `TranslateDirective` (same engine-side probe, appended to `runtime.custom_directives`).
 - `PortableTemplatesTest` pins that everything kroom ships — the `kroom-macros.vtl` library and the
   page templates — renders under a pure 3.0 `Config`, with `compat.informal_navigation`,
   `duck_typing`, `elvis_falsy`, `string_escapes` and `introspection` all off. `VelocityPlugin` runs
@@ -26,6 +39,8 @@ All notable changes to kroom will be documented in this file.
   consumer's call, configured on their side.
 
 ### Build
+- velocity `3.0.0-BETA-20260917-02` (header defaults, header mode, strict header contract, full sandbox,
+  write ACL); antlr-kotlin 1.0.10, matching the engine's runtime.
 - The build version is now `0.23-kmp-velocity-SNAPSHOT`; maven-local pre-releases are dated from here on,
   `0.23-kmp-velocity-<yyyymmdd>-<nn>` (same scheme as the velocity betas), tagged at the built commit.
 - velocity `3.0.0-BETA-20260901-01` → `3.0.0-BETA-20260916-01`. Two months of engine work (classic
