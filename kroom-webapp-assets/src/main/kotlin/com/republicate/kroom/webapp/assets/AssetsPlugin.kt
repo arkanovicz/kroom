@@ -84,18 +84,23 @@ object KroomAssets {
     const val VERSION = KROOM_VERSION
 
     /** Script tag for domhelper.js */
+    @JvmOverloads
     fun domhelperScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/domhelper.js?v=$VERSION"></script>"""
 
     /** Script tag for api.js */
+    @JvmOverloads
     fun apiScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/api.js?v=$VERSION"></script>"""
 
     /** Script tag for store.js */
+    @JvmOverloads
     fun storeScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/store.js?v=$VERSION"></script>"""
 
     /** Script tag for sse.js */
+    @JvmOverloads
     fun sseScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/sse.js?v=$VERSION"></script>"""
 
     /** All core scripts in order (domhelper, api, store, sse) */
+    @JvmOverloads
     fun coreScripts(prefix: String = "") = listOf(
         domhelperScript(prefix),
         apiScript(prefix),
