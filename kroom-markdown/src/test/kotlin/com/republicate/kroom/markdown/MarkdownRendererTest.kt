@@ -98,7 +98,7 @@ class MarkdownRendererTest {
     fun `the layout calls the block and the block sees the caller's context`() {
         assertEquals(
             "<main><h2>Bienvenue</h2>\n<p>chez Les Vagabonds</p>\n</main>",
-            host("layout.html", "view" to mapOf("path" to "intro.md"), "club" to Club("Les Vagabonds"))
+            host("layout.html", "view" to mapOf("path" to "/intro.md"), "club" to Club("Les Vagabonds"))
         )
     }
 
@@ -106,11 +106,11 @@ class MarkdownRendererTest {
     fun `a header default fills an absent root, the caller's value wins`() {
         assertEquals(
             "<main><p>ton: sobre</p>\n</main>",
-            host("layout.html", "view" to mapOf("path" to "typed.md"))
+            host("layout.html", "view" to mapOf("path" to "/typed.md"))
         )
         assertEquals(
             "<main><p>ton: enjoué</p>\n</main>",
-            host("layout.html", "view" to mapOf("path" to "typed.md"), "tone" to "enjoué")
+            host("layout.html", "view" to mapOf("path" to "/typed.md"), "tone" to "enjoué")
         )
     }
 
@@ -120,7 +120,7 @@ class MarkdownRendererTest {
      */
     @Test
     fun `an unsatisfied header need is an error by default`() {
-        assertFailsWith<MethodInvocationException> { host("layout.html", "view" to mapOf("path" to "need.md")) }
+        assertFailsWith<MethodInvocationException> { host("layout.html", "view" to mapOf("path" to "/need.md")) }
     }
 
     // --- where a block lives: beside its page, under the page's own placeholders -------------------
@@ -134,22 +134,22 @@ class MarkdownRendererTest {
     fun `a block is resolved beside its page, placeholders expanded from the context`() {
         assertEquals(
             "<main><h2>Les Vagabonds</h2>\n<p>club 13Ma</p>\n</main>",
-            host("pages/club/_code_/club.html", "code" to "13Ma", "club" to Club("Les Vagabonds"))
+            host("pages/club/_code_.html", "code" to "13Ma", "club" to Club("Les Vagabonds"))
         )
     }
 
     @Test
     fun `a placeholder with no value in the context is an error naming it`() {
-        val failure = assertFails { host("pages/club/_code_/club.html", "club" to Club("Les Vagabonds")) }
+        val failure = assertFails { host("pages/club/_code_.html", "club" to Club("Les Vagabonds")) }
         assertContains(generateSequence<Throwable>(failure) { it.cause }.last().message.orEmpty(), "code")
     }
 
-    /** The second argument carries what the page has but the block cannot name — a loop's current item. */
+    /** An `index` page stands for its directory, so both spellings give their blocks the same folder. */
     @Test
     fun `a map argument adds to the block's scope`() {
         assertEquals(
             "<main><h2>Les Vagabonds</h2>\n<p>club 13Ma</p>\n<p>bio de Nestor</p>\n</main>",
-            host("pages/club/_code_/both.html", "code" to "13Ma", "club" to Club("Les Vagabonds"), "p" to "Nestor")
+            host("pages/club/_code_/index.html", "code" to "13Ma", "club" to Club("Les Vagabonds"), "p" to "Nestor")
         )
     }
 
@@ -158,7 +158,7 @@ class MarkdownRendererTest {
     fun `a block that does not exist yet renders the placeholder`() {
         assertEquals(
             "<main><p><em>No content for <strong>description</strong>.</em></p>\n</main>",
-            host("pages/club/_code_/club.html", "code" to "99Zz", "club" to Club("Inconnu"))
+            host("pages/club/_code_.html", "code" to "99Zz", "club" to Club("Inconnu"))
         )
     }
 
@@ -170,7 +170,7 @@ class MarkdownRendererTest {
     fun `a wrapper template receives the block's html, path and name`() {
         val engine = hostEngine("markdown.block.wrapper" to "wrapper.html")
         val html = StringWriter().also {
-            engine.mergeTemplate("layout.html", "UTF-8", ctx("view" to mapOf("path" to "intro.md"), "club" to Club("Les Vagabonds")), it)
+            engine.mergeTemplate("layout.html", "UTF-8", ctx("view" to mapOf("path" to "/intro.md"), "club" to Club("Les Vagabonds")), it)
         }.toString()
         assertEquals(
             "<main><section data-content=\"intro.md\" data-name=\"intro\"><h2>Bienvenue</h2>\n<p>chez Les Vagabonds</p>\n</section></main>",
@@ -200,11 +200,11 @@ class MarkdownRendererTest {
     /** The same boundary seen from the header side: a default is a binding like any other. */
     @Test
     fun `a header default fills the block's scope only, and a caller value still wins`() {
-        val bare = ctx("view" to mapOf("path" to "typed.md"))
+        val bare = ctx("view" to mapOf("path" to "/typed.md"))
         assertEquals("<main><p>ton: sobre</p>\n</main>", host("layout.html", bare))
         assertNull(bare.get("tone"))
 
-        val supplied = ctx("view" to mapOf("path" to "typed.md"), "tone" to "enjoué")
+        val supplied = ctx("view" to mapOf("path" to "/typed.md"), "tone" to "enjoué")
         assertEquals("<main><p>ton: enjoué</p>\n</main>", host("layout.html", supplied))
         assertEquals("enjoué", supplied.get("tone"))
     }
