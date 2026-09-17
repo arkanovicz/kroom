@@ -3,7 +3,8 @@ agp = "8.5.2"
 kotlin = "2.4.0"
 dokka = "1.9.20"
 nexus-publish = "2.0.0"
-antlr-kotlin = "1.0.5"
+# velocity 3.0 pins the antlr-kotlin runtime at 1.0.10; the generated `%` lexer in kroom-markdown must match it
+antlr-kotlin = "1.0.10"
 bouncycastle = "1.81"
 commons-collections4 = "4.5.0"
 commons-lang3 = "3.18.0"
@@ -19,7 +20,7 @@ kotlinx-html = "0.12.0"
 ktor = "3.5.0"
 nimbus-oidc-sdk = "11.14"
 slf4j = "2.0.16"
-velocity = "3.0.0-BETA-20260916-01"
+velocity = "3.0.0-BETA-20260917-01"
 junit = "4.13.2"
 junit-jupiter = "5.13.3"
 junit-platform = "1.13.3"
@@ -31,6 +32,7 @@ versionsPlugin = "0.52.0"
 
 [libraries]
 antlr-kotlin = { module = "com.strumenta:antlr-kotlin-runtime", version.ref = "antlr-kotlin" }
+antlr-kotlin-target = { module = "com.strumenta:antlr-kotlin-target", version.ref = "antlr-kotlin" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 commons-collections4 = { module = "org.apache.commons:commons-collections4", version.ref = "commons-collections4" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
