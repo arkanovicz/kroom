@@ -75,7 +75,7 @@ class MarkdownRendererTest {
     // --- end to end: a `#` layout calling `#markdown` on a `%` block -----------------------------
 
     /** A host engine as an application configures one: `#` layouts, blocks under `markdown.`. */
-    private fun hostEngine() = VelocityEngine().apply {
+    private fun hostEngine(vararg extra: Pair<String, Any?>) = VelocityEngine().apply {
         setProperty(RuntimeConstants.INPUT_ENCODING, "UTF-8")
         setProperty(RuntimeConstants.RESOURCE_LOADERS, "classpath")
         setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
@@ -83,6 +83,7 @@ class MarkdownRendererTest {
         setProperty("markdown.resource.loaders", "classpath")
         setProperty("markdown.resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
         setProperty("markdown.resource.loader.classpath.path", "content")
+        extra.forEach { (key, value) -> setProperty(key, value) }
         init()
     }
 
@@ -158,6 +159,22 @@ class MarkdownRendererTest {
         assertEquals(
             "<main><p><em>No content for <strong>description</strong>.</em></p>\n</main>",
             host("pages/club/_code_/club.html", "code" to "99Zz", "club" to Club("Inconnu"))
+        )
+    }
+
+    /**
+     * The application decorates blocks through a template of its own — where the edit affordances live.
+     * It renders in the page's engine and context; this module only hands it the block.
+     */
+    @Test
+    fun `a wrapper template receives the block's html, path and name`() {
+        val engine = hostEngine("markdown.block.wrapper" to "wrapper.html")
+        val html = StringWriter().also {
+            engine.mergeTemplate("layout.html", "UTF-8", ctx("view" to mapOf("path" to "intro.md"), "club" to Club("Les Vagabonds")), it)
+        }.toString()
+        assertEquals(
+            "<main><section data-content=\"intro.md\" data-name=\"intro\"><h2>Bienvenue</h2>\n<p>chez Les Vagabonds</p>\n</section></main>",
+            html
         )
     }
 

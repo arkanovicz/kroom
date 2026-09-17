@@ -32,9 +32,13 @@ class MarkdownDirective : Directive() {
     override val type: Int get() = DirectiveConstants.LINE
 
     private lateinit var renderer: MarkdownRenderer
+    private lateinit var runtime: RuntimeServices
+    private var wrapper: String? = null
 
     override fun init(rs: RuntimeServices, context: InternalContextAdapter?, node: Node?) {
         super.init(rs, context, node)
+        runtime = rs
+        wrapper = rs.getString("$PREFIX.$WRAPPER")
         renderer = synchronized(rs) {
             rs.getApplicationAttribute(RENDERER_KEY) as? MarkdownRenderer
                 ?: MarkdownRenderer(rs.configuration.subset(PREFIX)?.toMap().orEmpty())
@@ -54,12 +58,28 @@ class MarkdownDirective : Directive() {
             throw VelocityException("#markdown(): ${e.message} at ${StringUtils.formatFileString(this)}", e)
         }
         val scope = extra?.let { args -> VelocityContext(context).also { c -> args.forEach { (k, v) -> c.put(k.toString(), v) } } }
-        renderer.render(path, scope ?: context, writer)
+        val html = renderer.render(path, scope ?: context)
+        wrapper?.let { decorate(it, path, html, context, writer) } ?: writer.write(html)
         return true
+    }
+
+    /**
+     * Hand the block's HTML to a template of the application's own — where the edit affordances live. It
+     * renders in the PAGE's engine and context (so `$logged`, `$authoring` and the rest are in reach) with
+     * the block's `$path` and `$name` added: which of them may be edited is the wrapper's question to ask,
+     * and authoring's to answer. Nothing here knows about editing.
+     */
+    private fun decorate(template: String, path: String, html: String, context: InternalContextAdapter, writer: Writer) {
+        val scope = VelocityContext(context)
+        scope.put("path", path)
+        scope.put("name", path.substringAfterLast('/').substringBeforeLast('.'))
+        scope.put("html", html)
+        runtime.getTemplate(template).merge(scope, writer)
     }
 
     private companion object {
         const val PREFIX = "markdown"
+        const val WRAPPER = "block.wrapper"
         const val RENDERER_KEY = "com.republicate.kroom.markdown.renderer"
     }
 }
