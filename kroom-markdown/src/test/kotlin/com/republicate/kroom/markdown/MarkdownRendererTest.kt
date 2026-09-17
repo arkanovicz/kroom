@@ -7,6 +7,7 @@ import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader
 import java.io.StringWriter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * The pipeline, pinned end to end: `%`-eval then flexmark. Both halves have to be visible in the
@@ -16,6 +17,8 @@ import kotlin.test.assertEquals
 class MarkdownRendererTest {
 
     data class Club(val name: String)
+
+    class Tone(var value: String)
 
     private val renderer = MarkdownRenderer()
 
@@ -78,7 +81,11 @@ class MarkdownRendererTest {
     }
 
     private fun host(template: String, vararg pairs: Pair<String, Any?>): String =
-        StringWriter().also { hostEngine().mergeTemplate(template, "UTF-8", ctx(*pairs), it) }.toString()
+        host(template, ctx(*pairs))
+
+    /** Same, on a context the test keeps a handle on — to look at what the block left behind. */
+    private fun host(template: String, context: VelocityContext): String =
+        StringWriter().also { hostEngine().mergeTemplate(template, "UTF-8", context, it) }.toString()
 
     @Test
     fun `the layout calls the block and the block sees the caller's context`() {
@@ -113,5 +120,54 @@ class MarkdownRendererTest {
             "<main><p>valeur: \$needed</p>\n</main>",
             host("layout.html", "view" to mapOf("path" to "need.md"))
         )
+    }
+
+    // --- scope: the block reads the caller, writes to itself --------------------------------------
+
+    /**
+     * An author's `%set` is a scratch variable, not an edit of the page the block sits in. The block sees
+     * its own writes — including one shadowing a caller-supplied name — and the caller comes back exactly
+     * as it went in, the shadow gone with the boundary.
+     */
+    @Test
+    fun `a block's writes stay in the block`() {
+        val caller = ctx("title" to "Les Vagabonds")
+        val html = renderer.renderSource(
+            "%set(\$leak = \"x\")\n%set(\$title = \"changed\")\n\$title / \$leak\n",
+            caller
+        )
+        assertEquals("<p>changed / x</p>\n", html)
+        assertEquals("Les Vagabonds", caller.get("title"))
+        assertNull(caller.get("leak"))
+    }
+
+    /** The same boundary seen from the header side: a default is a binding like any other. */
+    @Test
+    fun `a header default fills the block's scope only, and a caller value still wins`() {
+        val bare = ctx("view" to mapOf("path" to "typed.md"))
+        assertEquals("<main><p>ton: sobre</p>\n</main>", host("layout.html", bare))
+        assertNull(bare.get("tone"))
+
+        val supplied = ctx("view" to mapOf("path" to "typed.md"), "tone" to "enjoué")
+        assertEquals("<main><p>ton: enjoué</p>\n</main>", host("layout.html", supplied))
+        assertEquals("enjoué", supplied.get("tone"))
+    }
+
+    /**
+     * KNOWN LIMIT, pinned as OBSERVED. The child context scopes *bindings*; a property write is not one —
+     * `%set($tone.value = ...)` resolves `$tone` through the chain, then calls a setter on the caller's own
+     * object through the uberspector, which no context wrapper sees. Containing it is an introspection
+     * policy (SecureUberspector / `introspector.restrict.*` on the `%` sub-engine), and if it needs a fix
+     * it is upstream: nothing here should work around it.
+     */
+    @Test
+    fun `KNOWN LIMIT - a property write pierces the scope and mutates the caller's object`() {
+        val tone = Tone("sobre")
+        val caller = ctx("tone" to tone)
+        assertEquals(
+            "<p>enjoué</p>\n",
+            renderer.renderSource("%set(\$tone.value = \"enjoué\")\n\$tone.value\n", caller)
+        )
+        assertEquals("enjoué", tone.value)   // not "sobre" — the caller's object was mutated
     }
 }

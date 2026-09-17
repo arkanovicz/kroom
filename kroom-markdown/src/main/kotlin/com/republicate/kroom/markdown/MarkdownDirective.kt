@@ -12,8 +12,9 @@ import java.io.Writer
 /**
  * `#markdown(path)` — the bridge between a developer's `#` layout and an author's `%` markdown block.
  *
- * The block is merged against the **caller's** context (so `$club.name` means in the block what it means
- * in the layout) and its output converted to HTML. Activate with
+ * The block is merged against a child of the **caller's** context (so `$club.name` means in the block what
+ * it means in the layout, while the block's own `%set` dies at the boundary — see [MarkdownRenderer]) and
+ * its output converted to HTML. Activate with
  * `runtime.custom_directives = com.republicate.kroom.markdown.MarkdownDirective` and configure the
  * blocks' loaders under `markdown.`:
  *

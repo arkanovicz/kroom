@@ -7,6 +7,7 @@ import com.vladsch.flexmark.ext.tables.TablesExtension
 import com.vladsch.flexmark.html.HtmlRenderer
 import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.data.MutableDataSet
+import org.apache.velocity.VelocityContext
 import org.apache.velocity.app.VelocityEngine
 import org.apache.velocity.context.Context
 import org.apache.velocity.runtime.RuntimeConstants
@@ -51,7 +52,7 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
 
     fun render(path: String, context: Context, out: Writer) {
         val markdown = StringWriter()
-        engine.mergeTemplate(path, ENCODING, context, markdown)
+        engine.mergeTemplate(path, ENCODING, scoped(context), markdown)
         emit(markdown.toString(), out)
     }
 
@@ -61,12 +62,24 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
 
     fun renderSource(source: String, context: Context, out: Writer, name: String = "markdown") {
         val markdown = StringWriter()
-        engine.evaluate(context, markdown, name, source)
+        engine.evaluate(scoped(context), markdown, name, source)
         emit(markdown.toString(), out)
     }
 
     private fun emit(markdown: String, out: Writer) = html.render(parser.parse(markdown), out)
 }
+
+/**
+ * A block gets its own scope: reads fall through to the caller's context, writes (`%set($x = 1)`) stay in
+ * the child and die at the block's boundary. Chained here rather than in `#markdown` so every entry point —
+ * an editor preview through `renderSource` as much as a layout through the directive — carries the same
+ * guarantee.
+ *
+ * It scopes *bindings*, not objects: `%set($club.name = "x")` goes through the uberspector to the caller's
+ * own object and mutates it. Sandboxing author content against that is the sub-engine's introspection
+ * policy, not this wrapper's job.
+ */
+private fun scoped(context: Context): Context = VelocityContext(context)
 
 /**
  * The one place a `%` sub-engine is built. Keep it that way: the restricted policy for author-edited
