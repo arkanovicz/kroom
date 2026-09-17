@@ -20,10 +20,13 @@ dependencies {
     // a store IS a velocity ResourceLoader: one tree, read and written — and pages get $logged/$authoring
     api(project(":kroom-webapp-velocity"))
     api(libs.velocity.engine.core)
+    testImplementation(project(":kroom-markdown"))       // the demo renders real `%` blocks
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.ktor.server.test.host)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    // blocks are authored content: interpreted, hence the runtime compiler — in tests only, as elsewhere
+    testRuntimeOnly(libs.velocity.engine.scripting)
 }
 
 tasks.test {

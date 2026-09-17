@@ -5,7 +5,8 @@
 ## the API lives. The editor markup itself is built by authoring.js when editing starts: a visitor who
 ## will never edit downloads no textarea, and there is one place the editor's shape is written down.
 ##
-#set($kroomEditable = $logged && $authoring.canEdit($logged, $path))
+## `== true`: the engine types a context root as Any?, and a condition must be a Boolean
+#set($kroomEditable = $authoring.canEdit($logged, $path) == true)
 <div class="kroom-block" data-content="$path"#if($kroomEditable) data-api="$authoring.apiPrefix" data-name="$name"#end>
 #if($kroomEditable)
   <nav class="kroom-block-tools" aria-label="$name">
