@@ -1,5 +1,6 @@
 package com.republicate.kroom.webapp.authoring
 
+import com.republicate.kroom.webapp.assets.kroomAssets
 import com.republicate.kroom.webapp.core.installCore
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.installSessions
@@ -47,6 +48,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     }
 
     routing {
+        kroomAssets()                 // /js/kroom/*: the house stack authoring.js builds on
         placeholderPages(config.pagePrefix, config.pageExtension)
         pages(config.pagePrefix, config.pageExtension)
     }
