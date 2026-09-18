@@ -6,6 +6,8 @@ import com.republicate.kroom.webapp.core.respondJson
 import com.republicate.kroom.webapp.core.respondSuccess
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
+import com.republicate.kroom.webapp.velocity.resolvePage
+import com.republicate.kroom.webapp.velocity.velocity
 import com.republicate.kson.Json
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -20,6 +22,7 @@ import io.ktor.server.routing.*
  * POST   /lock/{path...}    take the block (409 when someone else holds it)
  * DELETE /lock/{path...}    give it back, unwritten
  * POST   {path...}          submit {rev, body} (409 on a stale rev, with theirs)
+ * POST   /preview/{path...} render {page, body} — the page itself, this body standing in
  * GET    /history/{path...} revisions of one block   ] 404 unless the store is Versioned
  * GET    /journal           the site-wide log        ]
  * ```
@@ -30,6 +33,9 @@ import io.ktor.server.routing.*
  * A submit carries the rev the author started from, so a block edited meanwhile is answered with *theirs*
  * instead of being overwritten — the lock is the polite path, the rev check is the safe one.
  */
+/** The context key `#markdown` reads a draft from (kroom-markdown's `MarkdownDirective.DRAFTS`). */
+private const val DRAFTS = "kroomDrafts"
+
 fun Route.authoringRoutes() {
     val plugin = application.authoring
 
@@ -46,6 +52,25 @@ fun Route.authoringRoutes() {
             editorOf(plugin, path) ?: return@get
             val versioned = versionedStore(plugin) ?: return@get
             respondJson(revisions(versioned.log(path, limit())))
+        }
+
+        // A preview is the page a visitor would get, rendered with the text being written in place of the
+        // stored block: no second renderer to keep in step, and what you see is what you are about to save.
+        post("/preview/{path...}") {
+            val path = blockPath() ?: return@post
+            val session = editorOf(plugin, path) ?: return@post
+            if (!plugin.locks.touch(path, session.id))
+                return@post respondError("the lock on $path is not yours", HttpStatusCode.Conflict)
+
+            val asked = receiveJsonObject()
+            val page = asked.getString("page") ?: return@post respondError("preview needs the page it is in")
+            val (template, bound) = application.resolvePage(page)
+                ?: return@post respondError("no page at $page", HttpStatusCode.NotFound)
+
+            val html = application.velocity.renderForCall(
+                call, template, bound + mapOf(DRAFTS to mapOf(path to (asked.getString("body") ?: "")))
+            )
+            respondJson { set("page", html) }
         }
 
         route("/lock/{path...}") {

@@ -80,6 +80,25 @@ class DemoSiteTest {
         assertEquals(listOf(path), store.log().map { it.path })
     }
 
+    /** The preview is the page itself: same layout, same context, the unsaved text standing in. */
+    @Test
+    fun `a preview renders the page with the draft in place, and writes nothing`() = testApplication {
+        site()
+        val author = visitor("admin")
+        val path = "pages/club/13Ma/description.md"
+        author.post("/api/content/lock/$path")
+
+        val preview = author.post("/api/content/preview/$path") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"page":"/club/13Ma","body":"## Titre\n\nbrouillon *en cours*"}""")
+        }
+        assertEquals(HttpStatusCode.OK, preview.status)
+        val html = preview.bodyAsText()
+        assertContains(html, "brouillon <em>en cours</em>")
+        assertContains(html, "<h1>13Ma</h1>")          // the page, not a fragment
+        assertEquals(null, store.read(path))           // and nothing was written
+    }
+
     @Test
     fun `the page is routed by its placeholder, and its blocks follow the same value`() = testApplication {
         site()
