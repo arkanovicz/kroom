@@ -78,6 +78,12 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
         $('.kroom-preview .kroom-block-body')?.textContent.trim(), 'rendu du serveur');
     check('the preview asks for the page it is in', calls[1],
         { url: `/api/content/preview/${PATH}`, method: 'POST', body: { page: '/club/13Ma', body: '## Titre\n\nnouveau' } });
+    // typing back to what was already rendered costs a heartbeat, not a render
+    textarea.value = '## Titre\n\nnouveau';
+    textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await sleep(900);
+    check('an unchanged body is not re-rendered', calls.filter(c => c.url.includes('/preview/')).length, 1);
+
     click('.kroom-submit');
     await sleep(20);
     check('submit carries the rev it started from', calls[calls.length - 1],

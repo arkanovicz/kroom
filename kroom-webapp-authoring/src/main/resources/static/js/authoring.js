@@ -162,7 +162,7 @@
         tools.appendChild(button('\u2717', 'kroom-cancel secondary', cancel));
         tools.appendChild(element('span', 'kroom-status'));
 
-        session = { block, root, path, rev: held.rev, textarea, editor, body, timer: null };
+        session = { block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: textarea.value };
         block.addClass('kroom-editing');
         textarea.on('input', typed);
         grow(textarea);
@@ -198,19 +198,24 @@
         const held = session;
         if (!held) return;
         const preview = $('.kroom-preview', held.editor);
-        // nothing typed since the last render (or the fold is closed): the lock still needs its heartbeat
-        if (!preview.open || !preview.hasClass('kroom-stale')) {
+        const body = held.textarea.value;
+        // folded, or nothing new to show: the lock still needs its heartbeat, the renderer does not
+        if (!preview.open || body === held.previewed) {
+            preview.removeClass('kroom-stale');
             api.postJson(held.root + 'lock/' + held.path).catch(err => status(`lock lost: ${err.message}`));
             return;
         }
         try {
+            // the whole page comes back — the block's own header bindings only exist in that render — but
+            // only its body reaches the DOM, and only when it actually differs
             const answer = await api.postJson(held.root + 'preview/' + held.path,
-                { page: window.location.pathname, body: held.textarea.value });
+                { page: window.location.pathname, body });
             if (session !== held) return;                     // the editor moved on while we rendered
+            held.previewed = body;
             const rendered = new DOMParser().parseFromString(answer.page, 'text/html')
                 .querySelector(`.kroom-block[data-content="${held.block.data('content')}"] .kroom-block-body`);
             const shown = $('.kroom-block-body', preview);
-            if (rendered && shown) shown.innerHTML = rendered.innerHTML;
+            if (rendered && shown && shown.innerHTML !== rendered.innerHTML) shown.innerHTML = rendered.innerHTML;
             preview.removeClass('kroom-stale');
             status('');
         } catch (err) {
