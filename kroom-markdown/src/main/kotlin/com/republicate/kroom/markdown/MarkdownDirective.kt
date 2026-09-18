@@ -58,7 +58,10 @@ class MarkdownDirective : Directive() {
             throw VelocityException("#markdown(): ${e.message} at ${StringUtils.formatFileString(this)}", e)
         }
         val scope = extra?.let { args -> VelocityContext(context).also { c -> args.forEach { (k, v) -> c.put(k.toString(), v) } } }
-        val html = renderer.render(path, scope ?: context)
+        val context1 = scope ?: context
+        // a draft in the context stands in for what the store holds: the editor's preview IS the page render
+        val draft = (context.get(DRAFTS) as? Map<*, *>)?.get(path)?.toString()
+        val html = if (draft != null) renderer.renderSource(draft, context1, path) else renderer.render(path, context1)
         wrapper?.let { decorate(it, path, html, context, writer) } ?: writer.write(html)
         return true
     }
@@ -80,6 +83,8 @@ class MarkdownDirective : Directive() {
     private companion object {
         const val PREFIX = "markdown"
         const val WRAPPER = "block.wrapper"
+        /** Context key an editor sets: block path → the body being written, rendered instead of the stored one. */
+        const val DRAFTS = "kroomDrafts"
         const val RENDERER_KEY = "com.republicate.kroom.markdown.renderer"
     }
 }

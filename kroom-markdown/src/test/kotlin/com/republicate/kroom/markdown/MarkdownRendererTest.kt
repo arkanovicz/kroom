@@ -178,6 +178,20 @@ class MarkdownRendererTest {
         )
     }
 
+    /** What an editor previews is the page itself, its own text standing in for what the store holds. */
+    @Test
+    fun `a draft in the context is rendered instead of the stored block`() {
+        assertEquals(
+            "<main><h2>Les Vagabonds</h2>\n<p>brouillon</p>\n</main>",
+            host(
+                "pages/club/_code_.html",
+                "code" to "13Ma",
+                "club" to Club("Les Vagabonds"),
+                "kroomDrafts" to mapOf("pages/club/13Ma/description.md" to "## \$club.name\n\nbrouillon")
+            )
+        )
+    }
+
     // --- scope: the block reads the caller, writes to itself --------------------------------------
 
     /**
