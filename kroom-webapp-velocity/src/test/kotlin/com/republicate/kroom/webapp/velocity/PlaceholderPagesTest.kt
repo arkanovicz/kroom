@@ -41,6 +41,19 @@ class PlaceholderPagesTest {
         assertEquals("lyon, capitale des gones", client.get("/city/lyon").bodyAsText())
     }
 
+    /** The same resolution, reusable outside a route — an editor rendering a page to preview a block in it. */
+    @Test
+    fun `resolvePage answers the template and what its path binds`() = testApplication {
+        application {
+            installVelocity { templatePath = null }
+            assertEquals("pages/city/_name_.html" to mapOf("name" to "paris"), resolvePage("/city/paris"))
+            assertEquals("pages/shop/_id_/index.html" to mapOf("id" to "7"), resolvePage("/shop/7"))
+            assertEquals("pages/city/lyon.html" to emptyMap(), resolvePage("/city/lyon"))
+            assertEquals(null, resolvePage("/city/paris/extra"))
+        }
+        client.get("/city/paris")   // the application is only built on first call
+    }
+
     @Test
     fun `an unbacked path is still a 404`() = testApplication {
         app()

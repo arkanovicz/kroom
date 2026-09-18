@@ -1,12 +1,14 @@
 package com.republicate.kroom.webapp.velocity
 
 import com.republicate.kroom.PathTemplate
+import io.ktor.server.application.Application
 import io.ktor.server.request.path
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.routing.get
 import java.io.File
 import java.net.URLDecoder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarFile
 
 /**
@@ -20,7 +22,7 @@ import java.util.jar.JarFile
  */
 fun Route.placeholderPages(prefix: String = "pages", extension: String = "html") {
     val velocity = application.velocity
-    for (template in templateCatalog(velocity.templatePath, velocity.devDir, prefix, extension)) {
+    for (template in catalog(velocity, prefix, extension)) {
         val path = PathTemplate(template)
         if (path.isConcrete) continue
         get(route(path.pattern, prefix, extension)) {
@@ -32,6 +34,35 @@ fun Route.placeholderPages(prefix: String = "pages", extension: String = "html")
         }
     }
 }
+
+/**
+ * The page a URL resolves to, and the values its path binds: `/club/13Ma` → `pages/club/_code_.html` with
+ * `code = 13Ma`. A concrete template wins, as it does when serving. For whoever needs to render a page
+ * outside its own route — an editor previewing a block in the page it belongs to.
+ */
+fun Application.resolvePage(
+    url: String,
+    prefix: String = "pages",
+    extension: String = "html"
+): Pair<String, Map<String, String>>? {
+    val path = url.trim('/').substringBefore('?')
+    val concrete = "${prefix.trimEnd('/')}/$path.${extension.trimStart('.')}"
+    if (velocity.engine.resourceExists(concrete)) return concrete to emptyMap()
+    for (template in catalog(velocity, prefix, extension)) {
+        val values = PathTemplate(template).match(concrete)
+            ?: PathTemplate(template).match("${prefix.trimEnd('/')}/$path/index.${extension.trimStart('.')}")
+        if (values != null) return template to values
+    }
+    return null
+}
+
+/** Scanned once per (plugin, prefix): a jar's entries do not change under a running server. */
+private val catalogs = ConcurrentHashMap<String, List<String>>()
+
+private fun catalog(velocity: VelocityPlugin, prefix: String, extension: String): List<String> =
+    catalogs.computeIfAbsent("${System.identityHashCode(velocity)}/$prefix.$extension") {
+        templateCatalog(velocity.templatePath, velocity.devDir, prefix, extension)
+    }
 
 /** `pages/club/_code_/index.html` → `/club/{code}`; `pages/club/_code_.html` → the same. */
 private fun route(pattern: String, prefix: String, extension: String): String =
