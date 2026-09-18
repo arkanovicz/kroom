@@ -46,6 +46,7 @@ function page(responder) {
 }
 
 const held = { payload: { body: '## Titre', rev: 'abc123', meta: { author: 'admin' }, lock: { owner: 'admin' }, editable: true } };
+const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-block" data-content="${PATH}"><div class="kroom-block-body"><p>${body}</p></div></div></body></html>` } });
 
 // --- taking a block, and giving it back -----------------------------------------------------------
 {
@@ -54,7 +55,7 @@ const held = { payload: { body: '## Titre', rev: 'abc123', meta: { author: 'admi
     await sleep(20);
     check('edit takes the lock', calls[0], { url: `/api/content/lock/${PATH}`, method: 'POST', body: undefined });
     check('the stored body is what you edit', $('.kroom-block textarea')?.value, '## Titre');
-    check('the published rendering is kept beside it', $('.kroom-published')?.textContent.includes('published text'), true);
+    check('the published rendering is kept beside it', $('.kroom-preview')?.textContent.includes('published text'), true);
 
     click('.kroom-cancel');
     await sleep(20);
@@ -65,13 +66,21 @@ const held = { payload: { body: '## Titre', rev: 'abc123', meta: { author: 'admi
 
 // --- submitting -----------------------------------------------------------------------------------
 {
-    const { calls, click, $ } = page((url) => url.includes('/lock/') ? held : { payload: { rev: 'def456' } });
+    const { calls, click, $, window } = page((url) =>
+        url.includes('/lock/') ? held : url.includes('/preview/') ? previewOf('rendu du serveur') : { payload: { rev: 'def456' } });
     click('.kroom-edit');
     await sleep(20);
-    $('.kroom-block textarea').value = '## Titre\n\nnouveau';
+    const textarea = $('.kroom-block textarea');
+    textarea.value = '## Titre\n\nnouveau';
+    textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await sleep(900);
+    check('typing re-renders the page and shows this block of it',
+        $('.kroom-preview .kroom-block-body')?.textContent.trim(), 'rendu du serveur');
+    check('the preview asks for the page it is in', calls[1],
+        { url: `/api/content/preview/${PATH}`, method: 'POST', body: { page: '/club/13Ma', body: '## Titre\n\nnouveau' } });
     click('.kroom-submit');
     await sleep(20);
-    check('submit carries the rev it started from', calls[1],
+    check('submit carries the rev it started from', calls[calls.length - 1],
         { url: `/api/content/${PATH}`, method: 'POST', body: { rev: 'abc123', body: '## Titre\n\nnouveau' } });
 }
 

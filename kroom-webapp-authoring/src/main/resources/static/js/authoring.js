@@ -4,15 +4,14 @@
 // The wrapper template ships only the block and its two buttons; every piece of editor markup below is
 // built here, so a visitor who cannot edit downloads nothing of it.
 //
-// There is no preview: markdown is rendered on the server and no route renders a body that has not been
-// submitted. So instead of a preview panel that would lie, editing keeps the *published* rendering — the
-// very nodes the page rendered — in a fold beside the textarea, marked stale as soon as you type. It
-// answers "what am I changing?", never "what will this become?".
+// The preview is the page itself: the server re-renders the page this block sits in, with what you are
+// typing standing in for the stored block, and the fold below the textarea shows that block's part of it.
+// Same layout, same context, same renderer — nothing here guesses what markdown becomes.
 
 (function () {
 
-    const TOUCH_DELAY = 700;               // idle before the lock is refreshed
-    const FOLD_KEY = 'kroom.authoring.published';
+    const PREVIEW_DELAY = 700;             // idle before the preview is re-rendered (and the lock refreshed)
+    const FOLD_KEY = 'kroom.authoring.preview';
 
     // one block at a time: { block, root, path, rev, textarea, editor, body, timer }
     let session = null;
@@ -141,14 +140,18 @@
         const body = block.querySelector('.kroom-block-body');
         const editor = element('div', 'kroom-editor');
 
-        // the published rendering, kept as the nodes the page rendered — not a preview, a before
-        const published = element('details', 'kroom-published');
-        published.open = remember.get(FOLD_KEY, true);
-        published.appendChild(element('summary', null, 'published'));
-        published.on('toggle', () => remember.set(FOLD_KEY, published.open));
+        // the preview: the published rendering to start with, re-rendered from the server as you type
+        const preview = element('details', 'kroom-preview');
+        preview.open = remember.get(FOLD_KEY, true);
+        preview.appendChild(element('summary', null, 'preview'));
+        // unfolding shows what the server last rendered; it only costs a render if you typed meanwhile
+        preview.on('toggle', () => {
+            remember.set(FOLD_KEY, preview.open);
+            if (preview.open && preview.hasClass('kroom-stale')) refresh();
+        });
         block.insertBefore(editor, body);
-        published.appendChild(body);
-        editor.appendChild(published);
+        preview.appendChild(body);
+        editor.appendChild(preview);
 
         const textarea = editor.appendChild(element('textarea', 'kroom-source'));
         textarea.value = seed !== undefined ? seed : held.body;
@@ -165,8 +168,9 @@
         grow(textarea);
         textarea.focus();
         if (seed !== undefined) {
-            published.addClass('kroom-stale');
+            preview.addClass('kroom-stale');
             status('loaded from history \u2014 submit to write it');
+            refresh();
         }
     }
 
@@ -181,16 +185,37 @@
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-    /** Typing means two things: the fold no longer shows what the textarea holds, and the lock is alive. */
+    /** Typing means two things: the preview is behind, and the lock is alive. Both settle once you pause. */
     function typed() {
         grow(session.textarea);
-        $('.kroom-published', session.editor).addClass('kroom-stale');
+        $('.kroom-preview', session.editor).addClass('kroom-stale');
         clearTimeout(session.timer);
-        session.timer = setTimeout(() => {
-            api.postJson(session.root + 'lock/' + session.path)
-                .then(() => status(''))
-                .catch(err => status(`lock lost: ${err.message}`));
-        }, TOUCH_DELAY);
+        session.timer = setTimeout(refresh, PREVIEW_DELAY);
+    }
+
+    /** Re-render the page around this block, with the textarea standing in for what the store holds. */
+    async function refresh() {
+        const held = session;
+        if (!held) return;
+        const preview = $('.kroom-preview', held.editor);
+        // nothing typed since the last render (or the fold is closed): the lock still needs its heartbeat
+        if (!preview.open || !preview.hasClass('kroom-stale')) {
+            api.postJson(held.root + 'lock/' + held.path).catch(err => status(`lock lost: ${err.message}`));
+            return;
+        }
+        try {
+            const answer = await api.postJson(held.root + 'preview/' + held.path,
+                { page: window.location.pathname, body: held.textarea.value });
+            if (session !== held) return;                     // the editor moved on while we rendered
+            const rendered = new DOMParser().parseFromString(answer.page, 'text/html')
+                .querySelector(`.kroom-block[data-content="${held.block.data('content')}"] .kroom-block-body`);
+            const shown = $('.kroom-block-body', preview);
+            if (rendered && shown) shown.innerHTML = rendered.innerHTML;
+            preview.removeClass('kroom-stale');
+            status('');
+        } catch (err) {
+            status(err.message);
+        }
     }
 
     async function submit() {

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>$club</title>
@@ -7,6 +7,14 @@
     $authoring.assets.tags()
 </head>
 <body>
+<nav class="demo-session">
+    #if($logged)
+        <span>$logged.name</span>
+        <form method="post" action="/logout"><button type="submit" class="secondary">log out</button></form>
+    #else
+        <a href="/login" role="button">log in</a>
+    #end
+</nav>
 <main>
     <h1>$club</h1>
     #markdown("description")

@@ -58,18 +58,18 @@
 
 /* --- the editor --------------------------------------------------------------------------------- */
 
-.kroom-editor .kroom-published > summary {
+.kroom-editor .kroom-preview > summary {
     font-size: .8rem;
     opacity: .7;
 }
 
-/* what the page rendered, not what the textarea holds — once typed, say so */
-.kroom-editor .kroom-published.kroom-stale > summary::after {
-    content: " (before your changes)";
+/* the preview lags one pause behind the textarea — say so while it does */
+.kroom-editor .kroom-preview.kroom-stale > summary::after {
+    content: " \2026";
 }
 
-.kroom-editor .kroom-published[open] > .kroom-block-body {
-    opacity: .7;
+.kroom-editor .kroom-preview[open] > .kroom-block-body {
+    opacity: .85;
 }
 
 textarea.kroom-source {

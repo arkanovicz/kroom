@@ -2,20 +2,24 @@ package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.session.UserSession
+import com.republicate.kroom.webapp.velocity.respondVelocity
 import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
-import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 /**
  * The demo, as a thing you can click: `./gradlew :kroom-webapp-authoring:demo` (`-Pport=9000` for another
- * port), then the URL it prints — log in as anyone, edit a block, submit, reload as a visitor.
+ * port), then the URL it prints — log in (admin / admin), edit a block, submit, log out to read it as a
+ * visitor does.
  *
  * Same call an application makes ([installContentSite]), a memory store that remembers its revisions, and
  * nothing else. [DemoSiteTest] asserts this same flow without the browser.
@@ -35,21 +39,29 @@ fun Application.demo() {
     installContentSite {
         this.store = store
         sessionSecret = "demo-only-secret"
-        placeholder = "*Rien ici pour l'instant. Connectez-vous pour écrire **\$name**.*"
+        placeholder = "*Nothing here yet.*"
     }
     velocity.registerApplication("kroomAssets") { KroomAssets }
     velocity.registerApplication("demoStore") { store }
 
     routing {
         get("/") { call.respondRedirect("/club/13Ma") }
-        get("/login/{who}") {
-            val who = call.parameters["who"]!!
-            call.sessions.set(UserSession(who, who, null, "demo"))
-            call.respondRedirect("/club/13Ma")
+
+        // a login worth exactly what a demo needs: admin / admin, and the author it stamps on what you write
+        get("/login") { call.respondVelocity("login.html") }
+        post("/login") {
+            val form = call.receiveParameters()
+            val who = form["user"].orEmpty()
+            if (who == "admin" && form["password"] == "admin") {
+                call.sessions.set(UserSession(who, who, null, "demo"))
+                call.respondRedirect(form["from"] ?: "/")
+            } else {
+                call.respondVelocity("login.html", mapOf("failed" to true))
+            }
         }
-        get("/logout") {
-            call.sessions.set(UserSession("", "", null, "none"))
-            call.respondText("logged out — /login/<name> to come back")
+        post("/logout") {
+            call.sessions.clear<UserSession>()
+            call.respondRedirect(call.request.headers["Referer"] ?: "/")
         }
     }
 }
