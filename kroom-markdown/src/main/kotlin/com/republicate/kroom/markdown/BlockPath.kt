@@ -6,7 +6,7 @@ import com.republicate.kroom.PathTemplate
  * Where `#markdown("description")` reads from. A block belongs to the PAGE including it, not to the folder
  * that page sits in: `pages/club/_code_.html` and `pages/club/_code_/index.html` both give their blocks
  * `pages/club/_code_/`, so two sibling pages never silently share one. The placeholders the page was routed
- * by are the ones the block inherits, expanded from the very values the router bound — never guessed.
+ * by locate its blocks too, expanded from the page's values — the very ones the router bound, never guessed.
  *
  * A bare name takes the `.md` extension; a `/` or an extension makes it a relative path; a leading `/`
  * addresses the content root, for a block several pages share on purpose.

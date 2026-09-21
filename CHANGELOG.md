@@ -21,8 +21,9 @@ All notable changes to kroom will be documented in this file.
   heading), merged then converted to HTML by flexmark (GFM tables, strikethrough, autolink, task lists).
   The `%` lexer is generated at build time from the engine's grammar template. Layouts stay ordinary `#`
   templates and include a block with `#markdown($path)`: the block runs in a private, always-interpreted
-  sub-engine configured from the host's `markdown.`-prefixed properties, in a scope chained to the caller's
-  context (its `%set`s do not leak). Blocks are user-authored, so they are watched by default: strict mode
+  sub-engine configured from the host's `markdown.`-prefixed properties. A block does not inherit the
+  page's context: it sees what the page passes, `#markdown("description", {"club": $club})`, plus the
+  tools the application names in `markdown.tools` — a page's own tools stay the page's by default. Blocks are user-authored, so they are watched by default: strict mode
   (including the header contract), the full sandbox, and no writes on objects — each relaxable through
   `markdown.runtime.strict_mode.*` / `markdown.introspector.*`. `validate(source, declared)` reports, at save time, the roots a block
   reads that its includer does not declare.

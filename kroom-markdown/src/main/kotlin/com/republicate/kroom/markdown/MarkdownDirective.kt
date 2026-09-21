@@ -11,11 +11,12 @@ import org.apache.velocity.util.StringUtils
 import java.io.Writer
 
 /**
- * `#markdown(name)`, `#markdown(name, {"person": $p})` — the bridge between a developer's `#` layout and an author's `%` markdown block.
+ * `#markdown(name)`, `#markdown(name, {"club": $club})` — the bridge between a developer's `#` layout and an
+ * author's `%` markdown block.
  *
- * The block is merged against a child of the **caller's** context (so `$club.name` means in the block what
- * it means in the layout, while the block's own `%set` dies at the boundary — see [MarkdownRenderer]) and
- * its output converted to HTML. Activate with
+ * The block does NOT inherit the page's context: it sees what the page passes as the second argument, plus
+ * the tools the application names in `markdown.tools` — a block is a function, called with its arguments.
+ * Its output is converted to HTML. Activate with
  * `runtime.custom_directives = com.republicate.kroom.markdown.MarkdownDirective` and configure the
  * blocks' loaders under `markdown.`:
  *
@@ -34,11 +35,13 @@ class MarkdownDirective : Directive() {
     private lateinit var renderer: MarkdownRenderer
     private lateinit var runtime: RuntimeServices
     private var wrapper: String? = null
+    private var tools: List<String> = emptyList()
 
     override fun init(rs: RuntimeServices, context: InternalContextAdapter?, node: Node?) {
         super.init(rs, context, node)
         runtime = rs
         wrapper = rs.getString("$PREFIX.$WRAPPER")
+        tools = rs.configuration.getStringArray("$PREFIX.$TOOLS")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
         renderer = synchronized(rs) {
             rs.getApplicationAttribute(RENDERER_KEY) as? MarkdownRenderer
                 ?: MarkdownRenderer(rs.configuration.subset(PREFIX)?.toMap().orEmpty())
@@ -57,13 +60,25 @@ class MarkdownDirective : Directive() {
         } catch (e: IllegalArgumentException) {
             throw VelocityException("#markdown(): ${e.message} at ${StringUtils.formatFileString(this)}", e)
         }
-        val scope = extra?.let { args -> VelocityContext(context).also { c -> args.forEach { (k, v) -> c.put(k.toString(), v) } } }
-        val context1 = scope ?: context
+        val scope = blockScope(context, extra)
         // a draft in the context stands in for what the store holds: the editor's preview IS the page render
         val draft = (context.get(DRAFTS) as? Map<*, *>)?.get(path)?.toString()
-        val html = if (draft != null) renderer.renderSource(draft, context1, path) else renderer.render(path, context1)
+        val html = if (draft != null) renderer.renderSource(draft, scope, path) else renderer.render(path, scope)
         wrapper?.let { decorate(it, path, html, context, writer) } ?: writer.write(html)
         return true
+    }
+
+    /**
+     * What a block sees: the tools the application named (`markdown.tools`, looked up in the page's context)
+     * and what the page passes — nothing else. A page's own tools (a database, a schema) stay the page's
+     * without anyone having to remember to hide them; a block is handed its arguments, as a function is.
+     * A null argument is left out, so the block's own `%%@` default can still apply.
+     */
+    private fun blockScope(page: InternalContextAdapter, arguments: Map<*, *>?): VelocityContext {
+        val scope = VelocityContext()
+        for (tool in tools) page.get(tool)?.let { scope.put(tool, it) }
+        arguments?.forEach { (key, value) -> if (value != null) scope.put(key.toString(), value) }
+        return scope
     }
 
     /**
@@ -83,6 +98,8 @@ class MarkdownDirective : Directive() {
     private companion object {
         const val PREFIX = "markdown"
         const val WRAPPER = "block.wrapper"
+        /** Names of the page-context tools a block may use, comma-separated (`markdown.tools = math`). */
+        const val TOOLS = "tools"
         /** Context key an editor sets: block path → the body being written, rendered instead of the stored one. */
         const val DRAFTS = "kroomDrafts"
         const val RENDERER_KEY = "com.republicate.kroom.markdown.renderer"

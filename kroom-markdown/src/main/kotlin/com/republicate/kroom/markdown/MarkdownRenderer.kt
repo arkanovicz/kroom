@@ -83,10 +83,9 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
 }
 
 /**
- * A block gets its own scope: reads fall through to the caller's context, writes (`%set($x = 1)`) stay in
- * the child and die at the block's boundary. Chained here rather than in `#markdown` so every entry point —
- * an editor preview through `renderSource` as much as a layout through the directive — carries the same
- * guarantee.
+ * The context a caller hands in comes back as it went: reads fall through to it, writes (`%set($x = 1)`)
+ * stay in the child and die at the block's boundary — whichever entry point, `render` or `renderSource`.
+ * (Which names that context holds is `#markdown`'s business: a block's arguments and the named tools.)
  *
  * It scopes *bindings*, not objects: `%set($club.name = "x")` goes through the uberspector to the caller's
  * own object. Refusing that is the application's policy (`markdown.introspector.restrict.writes`).

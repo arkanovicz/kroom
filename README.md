@@ -242,11 +242,18 @@ thunkMiddleware  // dispatch functions for async
 ## kroom-markdown
 
 Editable content blocks: markdown files with `%` directives (`%if`, `%foreach`, `$refs`, `%%@` headers),
-rendered by a `#`-template layout through `#markdown($view.path)`.
+rendered by a `#`-template page through `#markdown`. A block sits in its page's folder and sees only what
+the page hands it, plus the tools named in `markdown.tools`:
+
+```velocity
+## pages/club/_code_.html
+#markdown("description", {"club": $club})     ## pages/club/13Ma/description.md, $club in scope
+```
 
 ```properties
 markdown.resource.loaders = file
 markdown.resource.loader.file.path = /data/content
+markdown.tools = math
 ```
 
 Blocks are watched by default — strict mode, sandbox (`SecureUberspector`), `introspector.restrict.writes = *`;

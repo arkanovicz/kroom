@@ -192,6 +192,28 @@ class MarkdownRendererTest {
         )
     }
 
+    // --- what a block sees: its arguments and the named tools, never the page -----------------------
+
+    /**
+     * A block is a function: the page's context is not its context. A page's own tools (a database, a
+     * schema) stay the page's without anyone having to remember to hide them.
+     */
+    @Test
+    fun `a block does not inherit the page's context`() {
+        val failure = assertFailsWith<MethodInvocationException> { host("bare.html", "club" to Club("Les Vagabonds")) }
+        assertContains(generateSequence<Throwable>(failure) { it.cause }.last().message.orEmpty(), "club")
+    }
+
+    /** The one opening an application makes on purpose: tools every block may use, named once. */
+    @Test
+    fun `markdown tools names what a block may use from the page`() {
+        val engine = hostEngine("markdown.tools" to "club")
+        val html = StringWriter().also {
+            engine.mergeTemplate("bare.html", "UTF-8", ctx("club" to Club("Les Vagabonds"), "code" to "13Ma"), it)
+        }.toString()
+        assertEquals("<main><h2>Bienvenue</h2>\n<p>chez Les Vagabonds</p>\n</main>", html)
+    }
+
     // --- scope: the block reads the caller, writes to itself --------------------------------------
 
     /**
