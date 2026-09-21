@@ -37,6 +37,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         properties["markdown.resource.loader.content.instance"] = config.store
         properties["markdown.block.wrapper"] = config.wrapper
         config.placeholder?.let { properties["markdown.missing"] = it }
+        if (config.blockTools.isNotEmpty()) properties["markdown.tools"] = config.blockTools.joinToString(",")
         properties.putAll(config.velocityProperties)
     }
 
@@ -69,6 +70,12 @@ class ContentSiteConfig {
 
     /** The template decorating each block; kroom's own ships in this module. */
     var wrapper: String = "kroom/block-wrapper.html"
+
+    /**
+     * Page-context tools every block may use, by name. A block sees nothing else of the page but what the
+     * page passes it: `#markdown("description", {"club": $club})`.
+     */
+    val blockTools = mutableListOf<String>()
 
     /** What a page shows where a block has not been written yet (`%` markdown, `$name` in scope). */
     var placeholder: String? = null
