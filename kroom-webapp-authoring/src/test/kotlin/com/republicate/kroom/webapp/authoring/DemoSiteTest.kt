@@ -49,6 +49,8 @@ class DemoSiteTest {
         assertContains(page, "Pas encore de contenu pour <strong>description</strong>")
         assertContains(page, """data-content="pages/club/13Ma/description.md"""")
         assertContains(page, "kroom-edit")   // the handle, because this session may edit
+        // `$authoring.assets.tags()` relies on velocity honouring a kotlin default argument
+        assertContains(page, "/js/authoring.js?v=")
 
         val anonymous = visitor().get("/club/13Ma").bodyAsText()
         assertContains(anonymous, "Pas encore de contenu")
