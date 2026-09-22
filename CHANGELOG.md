@@ -19,14 +19,17 @@ All notable changes to kroom will be documented in this file.
 #### kroom-markdown
 - New ktor-free module: markdown content blocks written in a `%` dialect of Velocity (`#` is a markdown
   heading), merged then converted to HTML by flexmark (GFM tables, strikethrough, autolink, task lists).
-  The `%` lexer is generated at build time from the engine's grammar template. Layouts stay ordinary `#`
-  templates and include a block with `#markdown($path)`: the block runs in a private, always-interpreted
-  sub-engine configured from the host's `markdown.`-prefixed properties. A block does not inherit the
-  page's context: it sees what the page passes, `#markdown("description", {"club": $club})`, plus the
-  tools the application names in `markdown.tools` — a page's own tools stay the page's by default. Blocks are user-authored, so they are watched by default: strict mode
-  (including the header contract), the full sandbox, and no writes on objects — each relaxable through
-  `markdown.runtime.strict_mode.*` / `markdown.introspector.*`. `validate(source, declared)` reports, at save time, the roots a block
-  reads that its includer does not declare.
+  The `%` lexer is generated at build time from the engine's grammar template. Built on velocity 3.0
+  alone — no classic facade: `#markdown` is a native macro (`MarkdownMacro`), registered with
+  `addMacro("markdown", …)` on whichever page engine the application runs, a 3.0 `VelocityEngine` or the
+  classic facade; the block renders on its own always-interpreted 3.0 engine, configured by
+  `MarkdownConfig` (or `markdown.*` properties: `loader`, `acl`, `sandbox`, `tools`, `block.wrapper`,
+  `missing`, plus any velocity 3.0 key). A block does not inherit the page's context: it sees what the page
+  passes, `#markdown("description", {"club": $club})`, plus the tools named in `markdown.tools`. Blocks are
+  user-authored, so they are watched by default: strict mode (including the header contract), the full
+  two-layer sandbox with `- write *`, and of VTL's 2.x conveniences only informal navigation (prose writes
+  `$club.name` unbraced). `validate(source, declared)` reports, at save time, the roots a block reads that
+  its includer does not declare.
 
 #### kroom-webapp-authoring
 - New module: block-based content editing over a `ResourceStore` — a velocity `ResourceLoader` that also
@@ -46,8 +49,8 @@ All notable changes to kroom will be documented in this file.
 - `placeholderPages()` mounts a parameterized page template as the route it describes
   (`pages/club/_code_.html` → `/club/{code}`), a concrete page still winning over the placeholder.
 - `VelocityConfig.properties`: an open door for engine properties (`markdown.*` among them).
-- `VelocityPlugin` registers `MarkdownDirective` when `kroom-markdown` is on the classpath, alongside
-  `TranslateDirective` (same engine-side probe, appended to `runtime.custom_directives`).
+- `VelocityPlugin` registers the `#markdown` macro when `kroom-markdown` is on the classpath, configured
+  from its `markdown.*` properties (same engine-side classpath probe as `TranslateDirective`).
 - `PortableTemplatesTest` pins that everything kroom ships — the `kroom-macros.vtl` library and the
   page templates — renders under a pure 3.0 `Config`, with `compat.informal_navigation`,
   `duck_typing`, `elvis_falsy`, `string_escapes` and `introspection` all off. `VelocityPlugin` runs

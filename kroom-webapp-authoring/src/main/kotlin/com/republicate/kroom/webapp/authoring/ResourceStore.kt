@@ -1,15 +1,12 @@
 package com.republicate.kroom.webapp.authoring
 
-import org.apache.velocity.exception.ResourceNotFoundException
-import org.apache.velocity.runtime.resource.Resource
-import org.apache.velocity.runtime.resource.loader.ResourceLoader
-import java.io.Reader
-import java.io.StringReader
+import org.apache.velocity.engine.ResourceLoader
+import org.apache.velocity.engine.ResourceNotFoundException
 import java.security.MessageDigest
 
 /**
- * A content tree that is both **read by the renderer and written by the editor** — hence a velocity
- * [ResourceLoader] first: the very bytes a visitor's page renders are the ones a submit wrote, with no
+ * A content tree that is both **read by the renderer and written by the editor** — hence a velocity 3.0
+ * [ResourceLoader] first (the `%` engine's loader, handed over as `markdown.loader`): the very bytes a visitor's page renders are the ones a submit wrote, with no
  * second path and no cache to reconcile.
  *
  * A stored file is a header region followed by the body. The header carries the block's meta as
@@ -17,7 +14,7 @@ import java.security.MessageDigest
  * alone. [write] rewrites the keys it is given and leaves every other header line untouched, so meta an
  * application keeps there survives an edit.
  */
-abstract class ResourceStore(private val sigil: String = "%%@") : ResourceLoader() {
+abstract class ResourceStore(private val sigil: String = "%%@") : ResourceLoader {
 
     /** The block at [path], or null when nothing has been written there yet. */
     abstract fun read(path: String): Block?
@@ -30,16 +27,12 @@ abstract class ResourceStore(private val sigil: String = "%%@") : ResourceLoader
 
     // --- the source seen by velocity: header + body, exactly as stored ---------------------------
 
-    override fun init(configuration: org.apache.velocity.util.ExtProperties) {}
+    override fun load(name: String): String =
+        source(read(name.trimStart('/')) ?: throw ResourceNotFoundException("no such content: $name"))
 
-    override fun getResourceReader(source: String, encoding: String?): Reader =
-        StringReader(source(read(source) ?: throw ResourceNotFoundException("no such content: $source")))
+    override fun exists(name: String): Boolean = read(name.trimStart('/')) != null
 
-    override fun isSourceModified(resource: Resource): Boolean =
-        getLastModified(resource) != resource.lastModified
-
-    override fun getLastModified(resource: Resource): Long =
-        resource.name?.let { read(it)?.updated } ?: 0L
+    override fun lastModified(name: String): Long? = read(name.trimStart('/'))?.updated?.takeIf { it > 0 }
 
     // --- header <-> body, the one place the file's shape is known --------------------------------
 

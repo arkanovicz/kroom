@@ -1,6 +1,5 @@
 package com.republicate.kroom.webapp.authoring
 
-import org.apache.velocity.util.ExtProperties
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createParentDirectories
@@ -15,14 +14,10 @@ import kotlin.io.path.writeText
  * application subclasses it into something [Versioned] — the git-backed store site2026 needs lives there,
  * app-side, with JGit and the commit policy it wants.
  *
- * Configurable either way: handed as `markdown.resource.loader.<name>.instance` (the application then holds
- * the same object the editor writes through), or by `…​.path` when only reading matters.
+ * Handed to the `%` engine as `markdown.loader`: the application holds the very object the editor writes
+ * through.
  */
-open class FileResourceStore(private var root: Path = Path.of("data/content"), sigil: String = "%%@") : ResourceStore(sigil) {
-
-    override fun init(configuration: ExtProperties) {
-        configuration.getString("path")?.let { root = Path.of(it) }
-    }
+open class FileResourceStore(private val root: Path = Path.of("data/content"), sigil: String = "%%@") : ResourceStore(sigil) {
 
     protected fun resolve(path: String): Path {
         val resolved = root.resolve(path).normalize()

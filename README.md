@@ -250,14 +250,19 @@ the page hands it, plus the tools named in `markdown.tools`:
 #markdown("description", {"club": $club})     ## pages/club/13Ma/description.md, $club in scope
 ```
 
-```properties
-markdown.resource.loaders = file
-markdown.resource.loader.file.path = /data/content
-markdown.tools = math
+```kotlin
+engine.addMacro("markdown", MarkdownMacro(MarkdownConfig(
+    loader = DirectoryLoader(Path("data/content")),     // or a kroom-webapp-authoring ResourceStore
+    tools = listOf("math"),
+)))
 ```
 
-Blocks are watched by default — strict mode, sandbox (`SecureUberspector`), `introspector.restrict.writes = *`;
-relax any of it under `markdown.*`.
+`#markdown` is a velocity 3.0 native macro: the page engine may be a 3.0 `VelocityEngine` or the classic
+facade, the block renders on its own 3.0 engine either way. With `VelocityPlugin`, the same comes from
+`markdown.*` properties (`markdown.loader`, `markdown.tools`, `markdown.acl`, `markdown.block.wrapper`, …).
+
+Blocks are watched by default — strict mode, the full sandbox (`Sandbox.DEFAULT_ACL` plus `- write *`), and
+of the 2.x conveniences only informal navigation, for prose. Relax any of it in `MarkdownConfig`.
 
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.
@@ -265,23 +270,27 @@ anyway, and kroom's multiplatform scope is model sharing, not rendering.
 ## kroom-webapp-authoring
 
 In-place editing of those blocks: the block a visitor reads is the block an author edits, through the same
-tree — a `ResourceStore` is a velocity `ResourceLoader` first, so a submit writes the very bytes the next
+tree — a `ResourceStore` is a velocity 3.0 `ResourceLoader` first, so a submit writes the very bytes the next
 render reads.
 
 ```kotlin
+val store = FileResourceStore(Path.of("/data/content"))  // or MemoryResourceStore(), or your own
 installSessions { … }
 installVelocity {
-    // authoring cannot choose this: velocity's engine is built at install, before authoring exists
+    // the engine is built at install, before authoring exists: the page side is wired here
+    properties["markdown.loader"] = store                 // blocks read from the tree the editor writes
     properties["markdown.block.wrapper"] = "kroom/block-wrapper.html"
 }
 installAuthoring {
-    store = FileResourceStore(Path.of("/data/content"))  // or MemoryResourceStore(), or your own
+    this.store = store
     lockTimeout = 2.minutes                           // untouched that long, a block is free again
     apiPrefix = "/api/content"                        // must live under /api/ — api.js roots calls there
     canEdit = { session, path -> session?.id in editors }
     placeholder = "*(nothing here yet)*"
 }
 ```
+
+`installContentSite { store = …; canEdit = … }` does all of the above in one call, both template stacks included.
 
 ### The edit API
 
@@ -305,7 +314,7 @@ new revision through the ordinary submit, which keeps the journal honest.
 
 ### The page side
 
-`markdown.block.wrapper` names a template the `#markdown` directive renders in place of the bare html, with
+`markdown.block.wrapper` names a template the `#markdown` macro renders in place of the bare html, with
 `$path`, `$name` and `$html` added to the page context. This module ships the default one at the classpath
 root as `kroom/block-wrapper.html` — root, so it resolves under every engine shape (dev's `classpath` loader,
 production's `root` loader) — and it emits the block plus, for an author `$authoring.canEdit` accepts, two

@@ -33,8 +33,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         devMode = config.devDir != null
         devDir = config.devDir
         // the `%` stack: blocks read through the very store the editor writes to
-        properties["markdown.resource.loaders"] = "content"
-        properties["markdown.resource.loader.content.instance"] = config.store
+        properties["markdown.loader"] = config.store
         properties["markdown.block.wrapper"] = config.wrapper
         config.placeholder?.let { properties["markdown.missing"] = it }
         if (config.blockTools.isNotEmpty()) properties["markdown.tools"] = config.blockTools.joinToString(",")

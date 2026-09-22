@@ -25,7 +25,7 @@ class ResourceStoreTest {
         assertEquals("## Les Vagabonds\n\nUn club.", block.body)
         assertEquals("admin", block.author)
 
-        val source = store.getResourceReader("club/description.md", "UTF-8").readText()
+        val source = store.load("club/description.md")
         assertEquals("%%@ author admin\n%%@ updated 1757000000\n\n## Les Vagabonds\n\nUn club.", source)
     }
 
