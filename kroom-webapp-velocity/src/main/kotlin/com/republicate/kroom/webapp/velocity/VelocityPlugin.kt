@@ -65,6 +65,14 @@ class VelocityPlugin(config: VelocityConfig) {
         }
 
         init()
+
+        // kroom-markdown, when deployed: a velocity 3.0 native macro, configured by the `markdown.*`
+        // properties (prefix stripped). Same classpath question as the directives above, asked the same way.
+        try {
+            val factory = ClassUtils.getClass(MARKDOWN_MACRO).getMethod("fromProperties", Map::class.java)
+            val markdown = config.properties.filterKeys { it.startsWith("markdown.") }.mapKeys { it.key.removePrefix("markdown.") }
+            addMacro("markdown", factory.invoke(null, markdown) as org.apache.velocity.engine.VtlMacro)
+        } catch (_: ClassNotFoundException) { /* kroom-markdown not deployed */ }
     }
 
     val versionCache: WebResourceVersionCache? = config.versionCache
@@ -138,9 +146,10 @@ class VelocityPlugin(config: VelocityConfig) {
     companion object {
         /** Sibling modules' custom directives, by name: each registers iff its module is deployed.
          *  No dependency either way — the classpath is the only thing asked. */
+        private const val MARKDOWN_MACRO = "com.republicate.kroom.markdown.MarkdownMacro"
+
         private val OPTIONAL_DIRECTIVES = listOf(
-            "com.republicate.kroom.webapp.l10n.TranslateDirective",
-            "com.republicate.kroom.markdown.MarkdownDirective"
+            "com.republicate.kroom.webapp.l10n.TranslateDirective"
         )
 
         private var instance: VelocityPlugin? = null
