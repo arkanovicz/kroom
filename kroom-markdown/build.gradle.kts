@@ -22,10 +22,7 @@ val grammarTemplate: Configuration by configurations.creating
 dependencies {
     api(project(":kroom-common"))              // PathTemplate: page routing and block inclusion share it
     api(libs.velocity.engine.common)                    // LexerSource, Config, parse — this module's public surface
-    // classic facade: the sub-engine is one (it owns the resource-loader properties an app configures
-    // under `markdown.`), and MarkdownDirective IS a classic Directive — both are public surface
-    api(libs.velocity.engine.core)
-    implementation(libs.velocity.engine.scripting)      // the runtime compiler: markdown templates are authored, hence interpreted
+    implementation(libs.velocity.engine.scripting)      // the runtime compiler (and its sandbox): blocks are authored, hence interpreted
     implementation(libs.antlr.kotlin)
     // md→html, JVM-only by design; nothing of it crosses this module's API
     implementation(libs.flexmark)
@@ -34,6 +31,7 @@ dependencies {
     implementation(libs.flexmark.ext.gfm.tasklist)
     implementation(libs.flexmark.ext.tables)
     grammarTemplate(libs.velocity.engine.common)
+    testImplementation(libs.velocity.engine.core)       // the classic facade, as one page engine among two the tests run
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

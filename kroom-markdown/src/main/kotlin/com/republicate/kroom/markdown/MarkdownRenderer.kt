@@ -7,38 +7,25 @@ import com.vladsch.flexmark.ext.tables.TablesExtension
 import com.vladsch.flexmark.html.HtmlRenderer
 import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.data.MutableDataSet
-import org.apache.velocity.VelocityContext
-import org.apache.velocity.app.VelocityEngine
-import org.apache.velocity.context.Context
-import org.apache.velocity.runtime.RuntimeConstants
-import org.apache.velocity.exception.ResourceNotFoundException
-import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader
-import java.io.StringWriter
-import java.io.Writer
-
-/** The encoding markdown blocks are authored and served in. Not configurable: content is UTF-8. */
-private const val ENCODING = "UTF-8"
-
-/** Property naming the missing-block snippet (under `markdown.` on the host engine). */
-private const val MISSING = "missing"
+import org.apache.velocity.engine.Context
+import org.apache.velocity.engine.ResourceNotFoundException
+import org.apache.velocity.engine.VelocityContext
+import org.apache.velocity.engine.VelocityEngine
+import org.apache.velocity.engine.jvm.ScriptingCompiler
+import org.apache.velocity.engine.runtime.introspection.Acl
+import org.apache.velocity.engine.runtime.introspection.Sandbox
 
 /**
  * Renders a `%`-dialect markdown template to HTML: merge first, convert second. The order is the whole
  * point — a block is VTL that *produces* markdown, so `%foreach` may emit list items and `$name` may
  * land inside a heading, and flexmark sees a finished document rather than a template.
  *
- * ktor-free and engine-free at the call site: hand it a [Context] (any one — the caller's, inside
- * `#markdown`) and it answers HTML.
- *
- * [properties] are the sub-engine's Velocity properties, canonical 2.x keys, already stripped of the
- * `markdown.` prefix an application writes them under. The lexer is not among them.
+ * Built on velocity 3.0 directly, never on the classic facade: whatever engine the application renders its
+ * pages with, blocks run on this one, configured by [MarkdownConfig] alone.
  */
-class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
+class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
 
-    private val engine = markdownEngine(properties)
-
-    /** What a page shows where a block has not been written yet: a `%` markdown snippet, `$name` in scope. */
-    private val missing = properties[MISSING]?.toString() ?: "*No content for **\$name**.*"
+    private val engine = markdownEngine(config)
 
     // flexmark's parser and renderer are immutable and thread-safe once built — built once, here.
     private val options = MutableDataSet().set(
@@ -53,63 +40,44 @@ class MarkdownRenderer(properties: Map<String, Any?> = emptyMap()) {
     private val parser: Parser = Parser.builder(options).build()
     private val html: HtmlRenderer = HtmlRenderer.builder(options).build()
 
-    /** Render the markdown template at [path], resolved by the sub-engine's loaders. */
-    fun render(path: String, context: Context): String =
-        StringWriter().also { render(path, context, it) }.toString()
-
-    fun render(path: String, context: Context, out: Writer) {
-        val markdown = StringWriter()
-        try {
-            engine.mergeTemplate(path, ENCODING, scoped(context), markdown)
+    /** Render the markdown template at [path], as [MarkdownConfig.loader] serves it. */
+    fun render(path: String, context: Context): String {
+        val markdown = try {
+            engine.mergeTemplate(path, scoped(context))
         } catch (_: ResourceNotFoundException) {
             // an unwritten block is a normal state of a live content tree, not a failure
             val name = path.substringAfterLast('/').substringBeforeLast('.')
-            engine.evaluate(scoped(context).also { it.put("name", name) }, markdown.also { it.buffer.setLength(0) }, MISSING, missing)
+            engine.evaluate(config.missing, scoped(context).also { it.put("name", name) }, "missing")
         }
-        emit(markdown.toString(), out)
+        return emit(markdown)
     }
 
     /** Render markdown the caller already holds — an editor preview, a draft never written to a loader. */
     fun renderSource(source: String, context: Context, name: String = "markdown"): String =
-        StringWriter().also { renderSource(source, context, it, name) }.toString()
+        emit(engine.evaluate(source, scoped(context), name))
 
-    fun renderSource(source: String, context: Context, out: Writer, name: String = "markdown") {
-        val markdown = StringWriter()
-        engine.evaluate(scoped(context), markdown, name, source)
-        emit(markdown.toString(), out)
-    }
-
-    private fun emit(markdown: String, out: Writer) = html.render(parser.parse(markdown), out)
+    private fun emit(markdown: String): String = html.render(parser.parse(markdown))
 }
 
 /**
  * The context a caller hands in comes back as it went: reads fall through to it, writes (`%set($x = 1)`)
- * stay in the child and die at the block's boundary — whichever entry point, `render` or `renderSource`.
- * (Which names that context holds is `#markdown`'s business: a block's arguments and the named tools.)
- *
- * It scopes *bindings*, not objects: `%set($club.name = "x")` goes through the uberspector to the caller's
- * own object. Refusing that is the application's policy (`markdown.introspector.restrict.writes`).
+ * stay in the child and die at the block's boundary. (Which names that context holds is `#markdown`'s
+ * business: a block's arguments and the named tools.)
  */
-private fun scoped(context: Context): VelocityContext = VelocityContext(context)
+private fun scoped(context: Context): VelocityContext = VelocityContext(parent = context)
 
 /**
- * The one place a `%` sub-engine is built. Blocks are user-authored, so the defaults watch them: strict
- * references (and the header contract), the sandbox, no writes on objects. All overridable through
- * `markdown.`-prefixed properties.
- *
- * [properties] arrive last but one, so an application overrides the defaults; the lexer arrives last,
- * because a markdown block is `%`-VTL by definition and no property may say otherwise.
+ * The one place a `%` sub-engine is built. The sandbox's parent loader is the thread-context one, the
+ * application's (so ktor's dev reload still sees fresh classes). The lexer is forced last: a markdown
+ * block is `%`-VTL by definition, and no configuration may say otherwise.
  */
-private fun markdownEngine(properties: Map<String, Any?>): VelocityEngine = VelocityEngine().apply {
-    setProperty(RuntimeConstants.INPUT_ENCODING, ENCODING)
-    // self-sufficient default: blocks at classpath root. An app points `markdown.resource.loader.*`
-    // at wherever its content actually lives.
-    setProperty(RuntimeConstants.RESOURCE_LOADERS, "classpath")
-    setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
-    setProperty("runtime.strict_mode.enable", true)
-    setProperty("introspector.uberspect.class", "org.apache.velocity.util.introspection.SecureUberspector")
-    setProperty("introspector.restrict.writes", "*")
-    properties.forEach { (key, value) -> setProperty(key, value) }
-    setProperty(RuntimeConstants.PARSER_LEXER_CLASS, MarkdownVtl::class.java.name)
-    init()
+private fun markdownEngine(config: MarkdownConfig): VelocityEngine {
+    val sandbox = config.acl?.let {
+        Sandbox(Acl.parse(it), Thread.currentThread().contextClassLoader ?: MarkdownRenderer::class.java.classLoader)
+    }
+    return VelocityEngine(
+        compiler = ScriptingCompiler(sandbox = sandbox),
+        loader = config.loader,
+        config = config.engine.copy(lexerSource = MarkdownVtl),
+    )
 }
