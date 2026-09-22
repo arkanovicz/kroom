@@ -60,7 +60,7 @@ All notable changes to kroom will be documented in this file.
   consumer's call, configured on their side.
 
 ### Build
-- velocity `3.0.0-BETA-20260921-02` (header defaults, header mode, strict header contract, full sandbox,
+- velocity `3.0.0-BETA-20260922-01` (header defaults, header mode, strict header contract, full sandbox,
   write ACL, kotlin default arguments and extension functions); antlr-kotlin 1.0.10, matching the
   engine's runtime.
 - The build version is now `0.23-kmp-velocity-SNAPSHOT`; maven-local pre-releases are dated from here on,
