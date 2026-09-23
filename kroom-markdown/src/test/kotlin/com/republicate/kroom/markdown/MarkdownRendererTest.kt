@@ -2,6 +2,7 @@ package com.republicate.kroom.markdown
 
 import org.apache.velocity.engine.ResourceLoader
 import org.apache.velocity.engine.ResourceNotFoundException
+import org.apache.velocity.engine.SandboxViolationException
 import org.apache.velocity.engine.StrictReferenceException
 import org.apache.velocity.engine.VelocityContext
 import org.apache.velocity.runtime.RuntimeConstants
@@ -272,14 +273,39 @@ class MarkdownRendererTest {
         assertStrict { renderer.renderSource("%%@ needed: String\n\$needed\n", ctx("needed" to 42)) }
     }
 
-    /** The class-linkage layer: a typed Kotlin island naming a restricted class does not even link. */
+    /**
+     * Capability discipline: a sandboxed block derives from what it is handed and conjures nothing. Pinned
+     * on the two shapes that matter — a static member, and a constructor for a class the block was never
+     * given (which is how a block reached the filesystem before velocity `-20260923-01`).
+     */
     @Test
     fun `blocks are sandboxed by default`() {
-        val island = "\${\"\" + java.lang.Runtime.getRuntime()}\n"
-        val failure = assertFails { renderer.renderSource(island, ctx()) }
-        assertTrue(causes(failure).any { it is NoClassDefFoundError }, failure.toString())
-        // the pin has teeth: the same island links and renders once the application opts out
-        assertContains(MarkdownRenderer(config("sandbox" to "false")).renderSource(island, ctx()), "java.lang.Runtime@")
+        val statics = "\${\"\" + java.lang.Runtime.getRuntime()}\n"
+        val conjured = "\${\"\" + java.io.File(\"/etc/hostname\").exists()}\n"
+        for (island in listOf(statics, conjured)) {
+            val failure = assertFails { renderer.renderSource(island, ctx()) }
+            assertTrue(
+                causes(failure).any { it is SandboxViolationException },
+                "expected a sandbox refusal for $island, got $failure"
+            )
+        }
+        // the pin has teeth: the same islands run once the application opts out of the sandbox
+        val open = MarkdownRenderer(config("sandbox" to "false"))
+        assertContains(open.renderSource(statics, ctx()), "java.lang.Runtime@")
+        assertContains(open.renderSource(conjured, ctx()), "true")
+    }
+
+    /**
+     * The other side of that rule: what an author legitimately writes still works — literals the engine
+     * owns, a loop over one, and members of the values the page handed the block.
+     */
+    @Test
+    fun `the capability rule leaves an author's own material alone`() {
+        val club = ctx("club" to Club("Les Vagabonds"))
+        assertEquals("<p>1</p>\n", renderer.renderSource("%set(\$m = {\"a\": 1})\$m.a\n", ctx()))
+        assertEquals("<p>3</p>\n", renderer.renderSource("%set(\$l = [1, 2, 3])\$l.size\n", ctx()))
+        assertEquals("<p>1 2</p>\n", renderer.renderSource("%foreach(\$i in [1, 2])\$i %end\n", ctx()))
+        assertEquals("<p>Les</p>\n", renderer.renderSource("\${club.name.substring(0, 3)}\n", club))
     }
 
     private fun causes(failure: Throwable) = generateSequence(failure) { it.cause }.toList()

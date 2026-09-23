@@ -26,8 +26,9 @@ All notable changes to kroom will be documented in this file.
   `MarkdownConfig` (or `markdown.*` properties: `loader`, `acl`, `sandbox`, `tools`, `block.wrapper`,
   `missing`, plus any velocity 3.0 key). A block does not inherit the page's context: it sees what the page
   passes, `#markdown("description", {"club": $club})`, plus the tools named in `markdown.tools`. Blocks are
-  user-authored, so they are watched by default: strict mode (including the header contract), the full
-  two-layer sandbox with `- write *`, and of VTL's 2.x conveniences only informal navigation (prose writes
+  user-authored, so they are watched by default: strict mode (including the header contract), the sandbox
+  — whose capability rule (velocity `-20260923-01`) means a block derives from what it is handed and
+  conjures nothing: no constructors, no statics, no reflection — plus `- write *`, and of VTL's 2.x conveniences only informal navigation (prose writes
   `$club.name` unbraced). `validate(source, declared)` reports, at save time, the roots a block reads that
   its includer does not declare.
 
@@ -60,7 +61,7 @@ All notable changes to kroom will be documented in this file.
   consumer's call, configured on their side.
 
 ### Build
-- velocity `3.0.0-BETA-20260922-01` (header defaults, header mode, strict header contract, full sandbox,
+- velocity `3.0.0-BETA-20260923-01` (header defaults, header mode, strict header contract, full sandbox,
   write ACL, kotlin default arguments and extension functions); antlr-kotlin 1.0.10, matching the
   engine's runtime.
 - The build version is now `0.23-kmp-velocity-SNAPSHOT`; maven-local pre-releases are dated from here on,
