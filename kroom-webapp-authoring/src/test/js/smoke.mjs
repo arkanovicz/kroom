@@ -86,8 +86,8 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
 
     click('.kroom-submit');
     await sleep(20);
-    check('submit carries the rev it started from', calls[calls.length - 1],
-        { url: `/api/content/${PATH}`, method: 'POST', body: { rev: 'abc123', body: '## Titre\n\nnouveau' } });
+    check('submit carries its page and the rev it started from', calls[calls.length - 1],
+        { url: `/api/content/${PATH}`, method: 'POST', body: { page: '/club/13Ma', rev: 'abc123', body: '## Titre\n\nnouveau' } });
 }
 
 // --- someone else wrote meanwhile -----------------------------------------------------------------

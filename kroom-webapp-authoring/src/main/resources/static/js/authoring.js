@@ -227,7 +227,9 @@
         const held = session;
         status('saving\u2026');
         try {
-            await api.postJson(held.root + held.path, { rev: held.rev, body: held.textarea.value });
+            // the page comes along: the server renders it with this body, and refuses one that breaks it
+            await api.postJson(held.root + held.path,
+                { page: window.location.pathname, rev: held.rev, body: held.textarea.value });
             // the block's html only exists as part of a page render, and the submit answers a rev, not html
             session = null;
             location.reload();

@@ -8,6 +8,7 @@ import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
 import com.republicate.kroom.webapp.velocity.resolvePage
 import com.republicate.kroom.webapp.velocity.velocity
+import com.republicate.kroom.webapp.velocity.velocityOrNull
 import com.republicate.kson.Json
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -21,8 +22,8 @@ import io.ktor.server.routing.*
  * GET    {path...}[?rev=]   the block, its lock and whether the caller may edit it
  * POST   /lock/{path...}    take the block (409 when someone else holds it)
  * DELETE /lock/{path...}    give it back, unwritten
- * POST   {path...}          submit {rev, body} (409 on a stale rev, with theirs)
- * POST   /preview/{path...} render {page, body} — the page itself, this body standing in
+ * POST   {path...}          submit {page, rev, body} (409 on a stale rev, with theirs; 422 if it breaks the page)
+ * POST   /preview/{path...} render {page, body} — the page itself, this body standing in (422 if it breaks)
  * GET    /history/{path...} revisions of one block   ] 404 unless the store is Versioned
  * GET    /journal           the site-wide log        ]
  * ```
@@ -33,7 +34,7 @@ import io.ktor.server.routing.*
  * A submit carries the rev the author started from, so a block edited meanwhile is answered with *theirs*
  * instead of being overwritten — the lock is the polite path, the rev check is the safe one.
  */
-/** The context key `#markdown` reads a draft from (kroom-markdown's `MarkdownDirective.DRAFTS`). */
+/** The context key `#markdown` reads a draft from (kroom-markdown's `MarkdownMacro.DRAFTS`). */
 private const val DRAFTS = "kroomDrafts"
 
 fun Route.authoringRoutes() {
@@ -63,13 +64,7 @@ fun Route.authoringRoutes() {
                 return@post respondError("the lock on $path is not yours", HttpStatusCode.Conflict)
 
             val asked = receiveJsonObject()
-            val page = asked.getString("page") ?: return@post respondError("preview needs the page it is in")
-            val (template, bound) = application.resolvePage(page)
-                ?: return@post respondError("no page at $page", HttpStatusCode.NotFound)
-
-            val html = application.velocity.renderForCall(
-                call, template, bound + mapOf(DRAFTS to mapOf(path to (asked.getString("body") ?: "")))
-            )
+            val html = renderDraft(asked, path) ?: return@post
             respondJson { set("page", html) }
         }
 
@@ -112,6 +107,9 @@ fun Route.authoringRoutes() {
                 return@post respondError("the lock on $path is not yours", HttpStatusCode.Conflict)
 
             val submitted = receiveJsonObject()
+            // what would break the page once published is refused now, while its author is still there
+            // (no velocity, no page to break: the edit API stands on its own)
+            if (application.velocityOrNull != null) renderDraft(submitted, path) ?: return@post
             val theirs = plugin.store.read(path)
             if ((submitted.getString("rev") ?: "") != (theirs?.rev ?: "")) {
                 return@post respondJson(HttpStatusCode.Conflict) {
@@ -133,6 +131,32 @@ fun Route.authoringRoutes() {
                 set("meta", meta(written))
             }
         }
+    }
+}
+
+/**
+ * The page at `page`, rendered with `body` standing in for the block at [path] — or null having answered:
+ * 400/404 for a missing or unknown page, 422 with the author's problem when the body breaks the render.
+ */
+private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String): String? {
+    val page = asked.getString("page")
+    if (page == null) {
+        respondError("a block is rendered within the page it is in: page missing")
+        return null
+    }
+    val (template, bound) = call.application.resolvePage(page) ?: run {
+        respondError("no page at $page", HttpStatusCode.NotFound)
+        return null
+    }
+    return try {
+        call.application.velocity.renderForCall(
+            call, template, bound + mapOf(DRAFTS to mapOf(path to (asked.getString("body") ?: "")))
+        )
+    } catch (e: Exception) {
+        // the engine's wrappers say where it surfaced; the innermost cause says what the author wrote wrong
+        val cause = generateSequence<Throwable>(e) { it.cause }.last { it.message != null }
+        respondError(cause.message!!, HttpStatusCode.UnprocessableEntity)
+        null
     }
 }
 

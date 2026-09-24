@@ -69,7 +69,7 @@ class DemoSiteTest {
         val rev = Regex(""""rev"\s*:\s*"([^"]*)"""").find(held.bodyAsText())!!.groupValues[1]
         val submitted = author.post("/api/content/$path") {
             contentType(ContentType.Application.Json)
-            setBody("""{"rev":"$rev","body":"## Les Vagabonds\n\nOn joue le mardi, salle **Jean Moulin**."}""")
+            setBody("""{"page":"/club/13Ma","rev":"$rev","body":"## Les Vagabonds\n\nOn joue le mardi, salle **Jean Moulin**."}""")
         }
         assertEquals(HttpStatusCode.OK, submitted.status)
 
@@ -99,6 +99,29 @@ class DemoSiteTest {
         assertContains(html, "brouillon <em>en cours</em>")
         assertContains(html, "<h1>13Ma</h1>")          // the page, not a fragment
         assertEquals(null, store.read(path))           // and nothing was written
+    }
+
+    /**
+     * A body that would break the page is refused before it is published — by rendering the page as the
+     * preview does, the draft validated against what the page passes it — and the author is told why.
+     */
+    @Test
+    fun `a body that would break the page is refused, positioned, and nothing is written`() = testApplication {
+        site()
+        val author = visitor("admin")
+        val path = "pages/club/13Ma/description.md"
+        author.post("/api/content/lock/$path")
+        val broken = """{"page":"/club/13Ma","rev":"","body":"## ${'$'}club\n\n%if(false)${'$'}secret%end"}"""
+
+        for (route in listOf("preview/$path", path)) {
+            val answer = author.post("/api/content/$route") {
+                contentType(ContentType.Application.Json)
+                setBody(broken)
+            }
+            assertEquals(HttpStatusCode.UnprocessableEntity, answer.status, route)
+            assertContains(answer.bodyAsText(), "$path: line 3, column 11: undeclared reference ${'$'}secret")
+        }
+        assertEquals(null, store.read(path))
     }
 
     @Test

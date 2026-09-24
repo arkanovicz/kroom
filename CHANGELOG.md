@@ -42,7 +42,9 @@ All notable changes to kroom will be documented in this file.
 - New module: block-based content editing over a `ResourceStore` — a velocity `ResourceLoader` that also
   writes, so the bytes a visitor's page renders are the ones a submit wrote, with no publication step.
   Concurrency is one lock per block with a timeout read at access (no scheduler, no SSE, no room); a submit
-  carries the rev it started from and is answered with theirs rather than overwriting. `Versioned` stores
+  carries the rev it started from and is answered with theirs rather than overwriting — and, with velocity
+  installed, the page it sits in: the page is rendered with the body as the preview does, and a body that
+  would break it is refused (422, the author's problem positioned). `Versioned` stores
   (`VersionedMemoryResourceStore`, an application's git-backed one) add history and a site-wide journal.
   The editor ships with it: a default block wrapper, `authoring.js` (textarea in place, diff on conflict and
   in history), and `installContentSite`, which puts both template stacks, the edit API and placeholder page
