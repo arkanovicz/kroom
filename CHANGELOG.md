@@ -65,9 +65,10 @@ All notable changes to kroom will be documented in this file.
   consumer's call, configured on their side.
 
 ### Build
-- velocity `3.0.0-BETA-20260923-01` (header defaults, header mode, strict header contract, full sandbox,
+- velocity `3.0.0-BETA-20260924-01` (header defaults, header mode, strict header contract, full sandbox,
   write ACL, kotlin default arguments and extension functions); antlr-kotlin 1.0.10, matching the
-  engine's runtime.
+  engine's runtime. A kotlin default argument called reflectively needs kotlin-reflect at runtime (it
+  comes with velocity-engine-scripting); without it the call throws, naming the fix.
 - The build version is now `0.23-kmp-velocity-SNAPSHOT`; maven-local pre-releases are dated from here on,
   `0.23-kmp-velocity-<yyyymmdd>-<nn>` (same scheme as the velocity betas), tagged at the built commit.
 - velocity `3.0.0-BETA-20260901-01` → `3.0.0-BETA-20260916-01`. Two months of engine work (classic
