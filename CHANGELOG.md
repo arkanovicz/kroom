@@ -14,10 +14,6 @@ All notable changes to kroom will be documented in this file.
   The probe now goes through the engine's `ClassUtils`, so it asks exactly the question the engine
   will answer.
 
-#### kroom-webapp-assets, kroom-webapp-authoring
-- `KroomAssets` and `AuthoringAssets` helpers are `@JvmOverloads`: `$kroomAssets.coreScripts()` no longer
-  depends on velocity's `introspector.default_arguments` and a transitive kotlin-reflect to resolve.
-
 ### Added
 
 #### kroom-markdown

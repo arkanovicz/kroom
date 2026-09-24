@@ -77,29 +77,26 @@ private suspend fun serveAsset(path: String, call: ApplicationCall) {
 }
 
 /**
- * Version info for cache busting.
- *
- * `@JvmOverloads`: templates call these bare (`$kroomAssets.coreScripts()`), and a real zero-arg method
- * resolves by plain reflection — no kotlin-reflect, whatever `introspector.default_arguments` says.
+ * Version info for cache busting
  */
 object KroomAssets {
     /** Version is generated from project.version at build time */
     const val VERSION = KROOM_VERSION
 
     /** Script tag for domhelper.js */
-    @JvmOverloads fun domhelperScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/domhelper.js?v=$VERSION"></script>"""
+    fun domhelperScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/domhelper.js?v=$VERSION"></script>"""
 
     /** Script tag for api.js */
-    @JvmOverloads fun apiScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/api.js?v=$VERSION"></script>"""
+    fun apiScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/api.js?v=$VERSION"></script>"""
 
     /** Script tag for store.js */
-    @JvmOverloads fun storeScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/store.js?v=$VERSION"></script>"""
+    fun storeScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/store.js?v=$VERSION"></script>"""
 
     /** Script tag for sse.js */
-    @JvmOverloads fun sseScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/sse.js?v=$VERSION"></script>"""
+    fun sseScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/sse.js?v=$VERSION"></script>"""
 
     /** All core scripts in order (domhelper, api, store, sse) */
-    @JvmOverloads fun coreScripts(prefix: String = "") = listOf(
+    fun coreScripts(prefix: String = "") = listOf(
         domhelperScript(prefix),
         apiScript(prefix),
         storeScript(prefix),

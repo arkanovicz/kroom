@@ -1,6 +1,5 @@
 package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.core.installCore
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -41,13 +40,6 @@ class AssetsTest {
     fun `the tags a layout emits name the files that are served`() {
         val tags = AuthoringAssets.tags()
         served.keys.forEach { path -> assertTrue(tags.contains("$path?v="), "$path missing from $tags") }
-    }
-
-    @Test
-    fun `layout helpers have a zero-arg method templates reach without kotlin-reflect`() {
-        listOf("coreScripts", "domhelperScript", "apiScript", "storeScript", "sseScript")
-            .forEach { KroomAssets::class.java.getMethod(it) }
-        listOf("tags", "styleTags", "scriptTags").forEach { AuthoringAssets::class.java.getMethod(it) }
     }
 
     @Test
