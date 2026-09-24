@@ -5,6 +5,7 @@ import org.apache.velocity.engine.Merge
 import org.apache.velocity.engine.VelocityContext
 import org.apache.velocity.engine.VelocityException
 import org.apache.velocity.engine.VtlMacro
+import org.slf4j.LoggerFactory
 
 /**
  * `#markdown(name)`, `#markdown(name, {"club": $club})` — the bridge between a developer's `#` page and an
@@ -16,6 +17,10 @@ import org.apache.velocity.engine.VtlMacro
  *
  * The block does NOT inherit the page's context: it sees what the page passes as the second argument, plus
  * the tools named in [MarkdownConfig.tools] — a block is a function, called with its arguments.
+ *
+ * A stored block that fails renders [MarkdownConfig.broken] and is logged: authored content never takes
+ * a visitor's page down. A draft ([DRAFTS]) fails loudly instead — validated against the arguments this
+ * call passes, then rendered — so an editor's preview shows the error and a submit can refuse the body.
  */
 class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
 
@@ -31,10 +36,22 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
         } catch (e: IllegalArgumentException) {
             throw VelocityException("#markdown(): ${e.message} in ${page ?: "an unnamed template"}", e)
         }
-        val block = blockScope(context, args.getOrNull(1) as? Map<*, *>)
+        val arguments = blockArguments(context, args.getOrNull(1) as? Map<*, *>)
+        val block = VelocityContext(arguments)
         // a draft in the context stands in for what the store holds: the editor's preview IS the page render
         val draft = (context[DRAFTS] as? Map<*, *>)?.get(path)?.toString()
-        val html = if (draft != null) renderer.renderSource(draft, block, path) else renderer.render(path, block)
+        val html = if (draft != null) {
+            // the author's own text: every problem is theirs to see, including in branches this render skips
+            val problems = validate(draft, arguments.keys, path)
+            if (problems.isNotEmpty()) throw BlockException(path, problems)
+            renderer.renderSource(draft, block, path)
+        } else try {
+            renderer.render(path, block)
+        } catch (e: Exception) {
+            // a stored block is already published: a visitor gets the page, the operator gets the log
+            log.error("#markdown(): $path failed to render", e)
+            renderer.renderSource(config.broken, VelocityContext(mutableMapOf("name" to blockName(path))), "broken")
+        }
 
         val wrapper = config.wrapper
         val interpret = scope.interpret
@@ -46,8 +63,8 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
      * What a block sees: the named tools, looked up in the page's context, and what the page passes —
      * nothing else. A null argument is left out, so the block's own `%%@` default can still apply.
      */
-    private fun blockScope(page: Context, arguments: Map<*, *>?): VelocityContext {
-        val scope = VelocityContext()
+    private fun blockArguments(page: Context, arguments: Map<*, *>?): MutableMap<String, Any?> {
+        val scope = mutableMapOf<String, Any?>()
         for (tool in config.tools) page[tool]?.let { scope[tool] = it }
         arguments?.forEach { (key, value) -> if (value != null) scope[key.toString()] = value }
         return scope
@@ -60,7 +77,7 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
      */
     private fun decoration(page: Context, path: String, html: String) = VelocityContext(parent = page).apply {
         this["path"] = path
-        this["name"] = path.substringAfterLast('/').substringBeforeLast('.')
+        this["name"] = blockName(path)
         this["html"] = html
     }
 
@@ -68,8 +85,15 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
         /** Context key an editor sets: block path → the body being written, rendered instead of the stored one. */
         const val DRAFTS = "kroomDrafts"
 
+        private val log = LoggerFactory.getLogger(MarkdownMacro::class.java)
+
         /** For hosts configured by properties: the `markdown.*` ones, prefix stripped. */
         @JvmStatic
         fun fromProperties(properties: Map<String, Any?>): MarkdownMacro = MarkdownMacro(MarkdownConfig.fromProperties(properties))
     }
 }
+
+/** A draft that would break once published: what [validate] found, for the author to fix. */
+class BlockException(val path: String, val problems: List<Problem>) : VelocityException(
+    problems.joinToString("; ", "$path: ") { p -> p.line?.let { "line $it, column ${p.column}: ${p.message}" } ?: p.message }
+)

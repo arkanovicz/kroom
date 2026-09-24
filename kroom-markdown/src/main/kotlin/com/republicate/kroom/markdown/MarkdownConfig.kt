@@ -28,19 +28,22 @@ data class MarkdownConfig(
     /** What an unwritten block shows: a `%` snippet, `$name` in scope. */
     val missing: String = "*No content for **\$name**.*",
 
+    /** What a stored block that fails to render shows instead (the failure is logged): a `%` snippet, `$name` in scope. */
+    val broken: String = "*The content of **\$name** cannot be displayed.*",
+
     /** Engine settings, as velocity 3.0 names them; the lexer is forced afterwards, whatever this says. */
     val engine: Config = Config(strictReferences = true, informalNavigation = true),
 ) {
     companion object {
         /**
          * The `markdown.*` properties of a host engine, prefix stripped. kroom's own keys — `loader` (an
-         * instance), `acl`, `sandbox` (`false` to disable), `tools`, `block.wrapper`, `missing` — are read
+         * instance), `acl`, `sandbox` (`false` to disable), `tools`, `block.wrapper`, `missing`, `broken` — are read
          * here; every other key goes to velocity's [Config.fromProperties], over this module's defaults.
          */
         @JvmStatic
         fun fromProperties(properties: Map<String, Any?>): MarkdownConfig {
             val defaults = MarkdownConfig()
-            val own = setOf(LOADER, ACL, SANDBOX, TOOLS, WRAPPER, MISSING)
+            val own = setOf(LOADER, ACL, SANDBOX, TOOLS, WRAPPER, MISSING, BROKEN)
             return MarkdownConfig(
                 loader = properties[LOADER] as? ResourceLoader ?: defaults.loader,
                 acl = when {
@@ -50,6 +53,7 @@ data class MarkdownConfig(
                 tools = properties[TOOLS]?.let { names(it) } ?: defaults.tools,
                 wrapper = properties[WRAPPER]?.toString(),
                 missing = properties[MISSING]?.toString() ?: defaults.missing,
+                broken = properties[BROKEN]?.toString() ?: defaults.broken,
                 engine = Config.fromProperties(properties.filterKeys { it !in own }, defaults.engine),
             )
         }
@@ -60,6 +64,7 @@ data class MarkdownConfig(
         const val TOOLS = "tools"
         const val WRAPPER = "block.wrapper"
         const val MISSING = "missing"
+        const val BROKEN = "broken"
 
         private fun names(value: Any): List<String> = when (value) {
             is Collection<*> -> value.map { it.toString().trim() }

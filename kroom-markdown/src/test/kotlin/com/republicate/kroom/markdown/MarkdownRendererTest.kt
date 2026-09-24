@@ -120,10 +120,40 @@ class MarkdownRendererTest {
         )
     }
 
-    /** Blocks are strict by default: a missing need is a positioned error, not a page quietly showing `$needed`. */
+    /**
+     * A stored block is published content: when it fails (here strict mode, on an unsatisfied need), the
+     * visitor still gets the page, with a placeholder where the block would be — and, through the wrapper,
+     * the editor still gets a block to open and fix.
+     */
     @Test
-    fun `an unsatisfied header need is an error by default`() {
-        assertStrict { host("layout.html", "view" to mapOf("path" to "/need.md")) }
+    fun `a stored block that fails renders the broken placeholder, wrapped like any block`() {
+        val view = "view" to mapOf("path" to "/need.md")
+        assertEquals(
+            "<main><p><em>The content of <strong>need</strong> cannot be displayed.</em></p>\n</main>",
+            host("layout.html", view)
+        )
+        assertEquals(
+            "<main><section data-content=\"need.md\" data-name=\"need\"><p>cassé</p>\n</section></main>",
+            host("layout.html", ClassicContext(mutableMapOf(view)), classicHost("block.wrapper" to "wrapper.html", "broken" to "cassé"))
+        )
+    }
+
+    /**
+     * A draft is the author's own text: it fails loudly, so a preview shows why and a submit can refuse it.
+     * It is validated against what the page passes, so a read in a branch this render skips still counts.
+     */
+    @Test
+    fun `a draft that would break is an error naming the block, positioned`() {
+        fun draft(body: String) = assertFails {
+            host("pages/club/_code_.html", "code" to "13Ma", "club" to Club("Les Vagabonds"),
+                "kroomDrafts" to mapOf("pages/club/13Ma/description.md" to body))
+        }.let { failure -> causes(failure).firstNotNullOf { it as? BlockException } }
+
+        val skipped = draft("## \$club.name\n\n%if(false)\$tone%end\n")
+        assertEquals(listOf(Problem("undeclared reference \$tone", 3, 11)), skipped.problems)
+        assertContains(skipped.message.orEmpty(), "pages/club/13Ma/description.md: line 3, column 11: undeclared reference \$tone")
+
+        assertTrue(draft("%if(\$club)\nno end\n").problems.single().line != null)
     }
 
     // --- where a block lives: beside its page, under the page's own placeholders -------------------
@@ -219,8 +249,11 @@ class MarkdownRendererTest {
      */
     @Test
     fun `a block does not inherit the page's context`() {
-        val failure = assertFails { host("bare.html", "club" to Club("Les Vagabonds")) }
-        assertContains(causes(failure).joinToString { it.message.orEmpty() }, "club")
+        val club = "club" to Club("Les Vagabonds")
+        assertContains(host("bare.html", club), "cannot be displayed")
+        val draft = "kroomDrafts" to mapOf("intro.md" to "\$club.name\n")
+        val failure = assertFails { host("bare.html", club, draft) }
+        assertContains(causes(failure).joinToString { it.message.orEmpty() }, "undeclared reference \$club")
     }
 
     /** The one opening an application makes on purpose: tools every block may use, named once. */

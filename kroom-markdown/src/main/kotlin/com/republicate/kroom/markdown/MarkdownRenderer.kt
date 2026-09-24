@@ -46,8 +46,7 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
             engine.mergeTemplate(path, scoped(context))
         } catch (_: ResourceNotFoundException) {
             // an unwritten block is a normal state of a live content tree, not a failure
-            val name = path.substringAfterLast('/').substringBeforeLast('.')
-            engine.evaluate(config.missing, scoped(context).also { it.put("name", name) }, "missing")
+            engine.evaluate(config.missing, scoped(context).also { it.put("name", blockName(path)) }, "missing")
         }
         return emit(markdown)
     }
@@ -58,6 +57,9 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
 
     private fun emit(markdown: String): String = html.render(parser.parse(markdown))
 }
+
+/** A block's name, as `missing`, `broken` and the wrapper see it: `pages/club/13Ma/description.md` → `description`. */
+internal fun blockName(path: String) = path.substringAfterLast('/').substringBeforeLast('.')
 
 /**
  * The context a caller hands in comes back as it went: reads fall through to it, writes (`%set($x = 1)`)

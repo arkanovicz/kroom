@@ -28,13 +28,15 @@ All notable changes to kroom will be documented in this file.
   `addMacro("markdown", …)` on whichever page engine the application runs, a 3.0 `VelocityEngine` or the
   classic facade; the block renders on its own always-interpreted 3.0 engine, configured by
   `MarkdownConfig` (or `markdown.*` properties: `loader`, `acl`, `sandbox`, `tools`, `block.wrapper`,
-  `missing`, plus any velocity 3.0 key). A block does not inherit the page's context: it sees what the page
+  `missing`, `broken`, plus any velocity 3.0 key). A block does not inherit the page's context: it sees what the page
   passes, `#markdown("description", {"club": $club})`, plus the tools named in `markdown.tools`. Blocks are
   user-authored, so they are watched by default: strict mode (including the header contract), the sandbox
   — whose capability rule (velocity `-20260923-01`) means a block derives from what it is handed and
   conjures nothing: no constructors, no statics, no reflection — plus `- write *`, and of VTL's 2.x conveniences only informal navigation (prose writes
-  `$club.name` unbraced). `validate(source, declared)` reports, at save time, the roots a block reads that
-  its includer does not declare.
+  `$club.name` unbraced). A stored block that fails to render is logged and shows `broken` in its place —
+  published content never takes the page down; a draft (the editor's `kroomDrafts`) fails loudly instead,
+  checked by `validate(source, declared)` against the arguments the page passes — the roots it reads that
+  nobody provides, even in a branch this render skips — then rendered (`BlockException`, positioned).
 
 #### kroom-webapp-authoring
 - New module: block-based content editing over a `ResourceStore` — a velocity `ResourceLoader` that also
