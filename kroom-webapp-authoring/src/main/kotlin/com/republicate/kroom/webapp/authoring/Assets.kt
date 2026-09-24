@@ -13,13 +13,13 @@ object AuthoringAssets {
 
     const val VERSION = KroomAssets.VERSION
 
-    fun styleTags(prefix: String = "") =
+    @JvmOverloads fun styleTags(prefix: String = "") =
         """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/authoring.css?v=$VERSION">"""
 
-    fun scriptTags(prefix: String = "") = listOf(
+    @JvmOverloads fun scriptTags(prefix: String = "") = listOf(
         """<script src="${prefix.trimEnd('/')}/lib/diff-match-patch/diff_match_patch.js?v=$VERSION"></script>""",
         """<script src="${prefix.trimEnd('/')}/js/authoring.js?v=$VERSION"></script>"""
     ).joinToString("\n")
 
-    fun tags(prefix: String = "") = styleTags(prefix) + "\n" + scriptTags(prefix)
+    @JvmOverloads fun tags(prefix: String = "") = styleTags(prefix) + "\n" + scriptTags(prefix)
 }
