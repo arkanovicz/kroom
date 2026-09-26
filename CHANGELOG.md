@@ -47,6 +47,8 @@ All notable changes to kroom will be documented in this file.
   transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms mails each
   message to its `notify` address when the site has a mailer. seo takes a page's own words:
   `$seo.title(…)`, `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`, over the site-wide settings.
+  redirects matches `{name}` captures in the path and the query (`/tournoi.php?id={id} /tournament/{id}`,
+  values encoded), hands them to an application's resolver (`@player`), and counts what nothing answered.
 
 #### kroom-webapp-velocity
 - `pages()` leaves a path no template backs unanswered instead of answering 404 itself, so an application's
