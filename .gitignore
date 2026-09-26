@@ -7,3 +7,6 @@ kotlin-js-store
 .claude
 CLAUDE.md
 /private
+
+# the dockerized demo's Gradle home
+kroom-webapp-authoring/demo/data/

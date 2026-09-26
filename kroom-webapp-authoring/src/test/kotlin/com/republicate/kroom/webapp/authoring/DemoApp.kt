@@ -2,6 +2,7 @@ package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.plugins.analytics.Analytics
 import com.republicate.kroom.plugins.forms.Forms
+import com.republicate.kroom.plugins.mail.Mail
 import com.republicate.kroom.plugins.redirects.Redirects
 import com.republicate.kroom.plugins.seo.Seo
 import com.republicate.kroom.plugins.webhook.Webhook
@@ -22,8 +23,8 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 /**
- * The demo, as a thing you can click: `./gradlew :kroom-webapp-authoring:demo` (`-Pport=9000` for another
- * port), then the URL it prints — log in (admin / admin, editor / editor), edit a block, submit, log out to read it as a
+ * The demo, as a thing you can click: `docker compose -f kroom-webapp-authoring/demo/compose.yml up` (with a
+ * mailbox), or `./gradlew :kroom-webapp-authoring:demo` (`-Pport=9000` for another port), then the URL it prints — log in (admin / admin, editor / editor), edit a block, submit, log out to read it as a
  * visitor does. As admin, the bar on the left lists the pages, the journal, the plugins and their settings.
  *
  * Same call an application makes ([installContentSite]), a memory store that remembers its revisions, and
@@ -51,7 +52,19 @@ fun Application.demo() {
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet.*"
         // an admin sees them in the bar on the left; a block may call `$forms.contact()`
-        plugins += listOf(Seo(), Redirects(), Forms(), Analytics(), Webhook())
+        plugins += listOf(Seo(), Redirects(), Forms(), Analytics(), Webhook(), Mail())
+    }
+
+    // dockerized (demo/compose.yml), mail goes to Mailpit, and each form message to the admin
+    System.getenv("KROOM_SMTP")?.let { smtp ->
+        storage.settings("mail").apply {
+            set("host", smtp.substringBefore(':'))
+            set("port", smtp.substringAfter(':', "25"))
+            set("security", "none")
+            set("from", "kroom demo <demo@kroom.test>")
+            set("inbox", System.getenv("KROOM_INBOX"))
+        }
+        storage.settings("forms")["notify"] = "admin@kroom.test"
     }
     velocity.registerApplication("kroomAssets") { KroomAssets }
     velocity.registerApplication("demoStore") { storage.content }
