@@ -472,8 +472,10 @@ mails each message to its `notify` address through it).
 `$site.foot()` emits, for whoever holds `site.admin`, a bar on the left of the page — pages (every template
 and the pages its blocks say exist), journal, plugins with their settings forms (a secret is never read
 back), roles, then the plugins' entries. Its data comes from `/api/site/{pages, plugins, plugins/{id}/settings,
-roles}`; its markup is built by `admin.js`, words and pictograms overridable through `kroomAdmin.strings` /
-`kroomAdmin.icons` as the editor's are.
+roles}`; its markup is built by `admin.js`. Its words share the editor's table — `installContentSite {
+strings["journal"] = "journal" }` reaches both — and a plugin's words are keyed by its ids (`<entry id>`,
+`<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`), defaulting to what
+the plugin says. Pictograms: `kroomAdmin.icons`.
 
 ## Table (for seat-based games)
 

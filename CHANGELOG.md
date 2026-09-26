@@ -56,6 +56,11 @@ All notable changes to kroom will be documented in this file.
   so the editor never received `noPage`, `noHistory` or `noSuchRevision` (reported from site2026). Only a 404
   without a body gets one now.
 
+#### kroom-webapp-authoring
+- The admin bar spoke English whatever the application said: its words sat in admin.js, out of reach of the
+  editor's table. One table now reaches both, and a plugin's labels are translatable by key (reported from
+  site2026).
+
 #### kroom-webapp-velocity
 - A partial beside the pages (`header.inc.html`) was listed by the template catalog — and, under a
   placeholder directory, mounted as a route (`/city/{name}/header.inc`). The catalog now keeps only what

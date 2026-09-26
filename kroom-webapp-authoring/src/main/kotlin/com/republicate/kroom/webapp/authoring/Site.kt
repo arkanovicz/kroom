@@ -166,9 +166,12 @@ class Site internal constructor(
                 })
             }
         }.toString()
-        val content = application.authoringOrNull?.apiPrefix ?: ""
+        val authoring = application.authoringOrNull
+        val content = authoring?.apiPrefix ?: ""
         val v = AuthoringAssets.VERSION
-        return """<link rel="stylesheet" href="/css/admin.css?v=$v">
+        // one table of words for the editor and the bar: the application's overrides reach both
+        val words = authoring?.assets?.stringTags("kroomAdmin").orEmpty()
+        return """<link rel="stylesheet" href="/css/admin.css?v=$v">$words
 <aside class="kroom-admin" data-api="${htmlEscape(apiPrefix)}" data-content-api="${htmlEscape(content)}" data-entries="${htmlEscape(json)}"></aside>
 <script src="/js/admin.js?v=$v"></script>"""
     }

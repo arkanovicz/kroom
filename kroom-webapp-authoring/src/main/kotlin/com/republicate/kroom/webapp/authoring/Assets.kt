@@ -22,12 +22,13 @@ class AuthoringAssets(private val strings: Map<String, String> = emptyMap()) {
     fun styleTags(prefix: String = "") =
         """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/authoring.css?v=$VERSION">"""
 
-    fun stringTags(): String {
+    /** The overrides, for the script whose global is [target] — the editor's, or the admin bar's (`kroomAdmin`). */
+    fun stringTags(target: String = "kroomAuthoring"): String {
         if (strings.isEmpty()) return ""
         // `</` would close the script element early, whatever the JSON says
         val json = Json.MutableObject().apply { strings.forEach { (key, value) -> set(key, value) } }.toString()
             .replace("</", "<\\/")
-        return "<script>Object.assign(((window.kroomAuthoring ??= {}).strings ??= {}), $json);</script>"
+        return "<script>Object.assign(((window.$target ??= {}).strings ??= {}), $json);</script>"
     }
 
     fun scriptTags(prefix: String = "") = listOfNotNull(

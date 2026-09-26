@@ -10,7 +10,10 @@
     const bar = document.querySelector('aside.kroom-admin');
     if (!bar) return;
 
-    // Every word the bar says. Overridable like the editor's: Object.assign(kroomAdmin.strings, {…}).
+    // Every word the bar says. One table with the editor's: the application's overrides
+    // (installContentSite { strings[…] }) are emitted for both scripts. A plugin's words are keyed by its
+    // ids — `<entry id>` for an entry, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>` and
+    // `<plugin>.<setting>.help` — and default to what the plugin says.
     const strings = Object.assign({
         pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', roles: 'roles', close: 'close',
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
@@ -18,7 +21,7 @@
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
         unknownAuthor: 'unknown', noPlugin: 'no plugin installed', save: 'save', saved: 'saved',
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
-        yours: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
+        yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
     }, window.kroomAdmin?.strings);
 
     // one stroked path each, on the editor's 24px grid
@@ -34,6 +37,8 @@
     window.kroomAdmin = Object.assign(window.kroomAdmin || {}, { strings, icons });
 
     const t = (key, args = {}) => (strings[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => args[name] ?? '');
+    /** A word a plugin brought: the table's, when the application translated it. */
+    const own = (key, fallback) => strings[key] ?? fallback;
     const said = (err) => t('error', { message: err.data?.message || err.message });
 
     // api.js roots every call at /api/
@@ -68,7 +73,7 @@
     let open = null;
 
     for (const entry of entries) {
-        const label = entry.builtin ? t(entry.id) : entry.label;
+        const label = entry.builtin ? t(entry.id) : own(entry.id, entry.label);
         const control = element(entry.href ? 'a' : 'button');
         if (entry.href) control.href = entry.href; else control.type = 'button';
         control.title = label;
@@ -190,15 +195,16 @@
             if (!plugins.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noPlugin')));
             for (const plugin of plugins) {
                 const details = body.appendChild(element('details', 'kroom-admin-plugin'));
-                details.appendChild(element('summary', null, plugin.name));
-                if (plugin.description) details.appendChild(element('p', 'kroom-admin-muted', plugin.description));
+                details.appendChild(element('summary', null, own(`${plugin.id}.name`, plugin.name)));
+                const description = own(`${plugin.id}.description`, plugin.description);
+                if (description) details.appendChild(element('p', 'kroom-admin-muted', description));
                 if (plugin.settings.length) details.appendChild(settingsForm(plugin));
             }
         },
 
         async roles(body) {
             const answer = await api.getJson(siteApi + 'roles');
-            body.appendChild(element('p', 'kroom-admin-muted', t('yours', { roles: answer.yours.join(', ') })));
+            body.appendChild(element('p', 'kroom-admin-muted', t('yourRoles', { roles: answer.yours.join(', ') })));
             const list = body.appendChild(element('dl', 'kroom-admin-roles'));
             for (const [role, grants] of Object.entries(answer.roles)) {
                 list.appendChild(element('dt', null, role));
@@ -209,7 +215,11 @@
 
     function settingsForm(plugin) {
         const form = element('form', 'kroom-admin-settings');
-        for (const setting of plugin.settings) {
+        for (const declared of plugin.settings) {
+            const setting = Object.assign({}, declared, {
+                label: own(`${plugin.id}.${declared.key}`, declared.label),
+                help: own(`${plugin.id}.${declared.key}.help`, declared.help)
+            });
             const label = form.appendChild(element('label'));
             let input;
             if (setting.type === 'boolean') {

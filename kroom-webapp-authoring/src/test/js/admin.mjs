@@ -47,16 +47,19 @@ window.fetch = async (url, options = {}) => {
     calls.push({ url, method: options.method || 'GET', body: options.body && JSON.parse(options.body) });
     return new Response(JSON.stringify(answers[url] ?? {}), { status: 200, headers: { 'content-type': 'application/json' } });
 };
+// what `$site.foot()` emits ahead of admin.js when the application says it in French
+const words = `Object.assign(((window.kroomAdmin ??= {}).strings ??= {}), { pages: 'pages du site', 'forms': 'Messages reçus', 'seo.title': 'Titre' });`;
 window.eval(['domhelper.js', 'api.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
-    .concat(readFileSync(`${OWN}/js/admin.js`, 'utf8')).join('\n;\n'));
+    .concat(words, readFileSync(`${OWN}/js/admin.js`, 'utf8')).join('\n;\n'));
 const $ = (s) => window.document.querySelector(s);
 const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 
 check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'plugins', 'roles', 'forms', 'inbox']);
-check('builtins get a pictogram, a plugin without one its initial', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'F']);
+check('builtins get a pictogram, a plugin without one the initial of its (translated) label', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'M']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
+check("the application's words, for kroom's entries and a plugin's", [entry('pages').title, entry('forms').title], ['pages du site', 'Messages reçus']);
 
 click(entry('pages'));
 await sleep(20);
@@ -83,6 +86,7 @@ click(entry('plugins'));
 await sleep(20);
 const form = $('.kroom-admin-settings');
 check('a secret is never filled in', form.elements.key.value, '');
+check("a plugin's setting in the application's words", form.elements.title.closest('label').firstChild.textContent, 'Titre');
 check('a boolean is a checkbox', form.elements.index.checked, true);
 check('a choice is a select, on its value', [form.elements.mode.tagName, form.elements.mode.value], ['SELECT', 'tls']);
 form.elements.title.value = 'Les Vagabonds';
