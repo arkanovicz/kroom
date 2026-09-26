@@ -32,6 +32,9 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-webapp-velocity
 - `pageCatalog()`: every page template and the route it is served at.
+- `privateSegments` (default `inc`): directory names never served as pages — `pages/inc/header.html` is a
+  partial, no longer answered at `/inc/header`; one rule for `pages()`, `placeholderPages()`, `resolvePage`
+  and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
 

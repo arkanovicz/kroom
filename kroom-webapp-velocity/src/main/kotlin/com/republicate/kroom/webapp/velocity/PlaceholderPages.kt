@@ -46,6 +46,7 @@ fun Application.resolvePage(
     extension: String = "html"
 ): Pair<String, Map<String, String>>? {
     val path = url.trim('/').substringBefore('?')
+    if (!velocity.routable(path.split('/'))) return null
     val concrete = "${prefix.trimEnd('/')}/$path.${extension.trimStart('.')}"
     if (velocity.engine.resourceExists(concrete)) return concrete to emptyMap()
     for (template in catalog(velocity, prefix, extension)) {
@@ -69,13 +70,11 @@ private val catalogs = ConcurrentHashMap<String, List<String>>()
 
 private fun catalog(velocity: VelocityPlugin, prefix: String, extension: String): List<String> =
     catalogs.computeIfAbsent("${System.identityHashCode(velocity)}/$prefix.$extension") {
-        templateCatalog(velocity.templatePath, velocity.devDir, prefix, extension).filter { routable(it, prefix, extension) }
+        // what [servePage] would serve: partials (`header.inc.html`, `inc/…`) sit beside pages, and are none
+        templateCatalog(velocity.templatePath, velocity.devDir, prefix, extension).filter {
+            velocity.routable(it.removePrefix("${prefix.trimEnd('/')}/").removeSuffix(".${extension.trimStart('.')}").split('/'))
+        }
     }
-
-/** What [servePage] would serve: a partial (`header.inc.html`) sits beside pages, and is none. */
-private fun routable(template: String, prefix: String, extension: String): Boolean =
-    template.removePrefix("${prefix.trimEnd('/')}/").removeSuffix(".${extension.trimStart('.')}")
-        .split('/').all { SAFE_SEGMENT.matches(it) }
 
 /** `pages/club/_code_/index.html` → `/club/{code}`; `pages/club/_code_.html` → the same. */
 private fun route(pattern: String, prefix: String, extension: String): String =

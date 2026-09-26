@@ -38,6 +38,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         templatePath = config.templatePath
         devMode = config.devDir != null
         devDir = config.devDir?.let { dir -> config.templatePath?.let { dir.resolve(it) } ?: dir }
+        privateSegments = config.privateSegments
         // the `%` stack: blocks read through the very store the editor writes to
         properties["markdown.loader"] = config.storage.content
         properties["markdown.block.wrapper"] = config.wrapper
@@ -104,6 +105,9 @@ class ContentSiteConfig {
     var devDir: File? = null
 
     var pagePrefix: String = "pages"
+
+    /** Directory names under [pagePrefix] holding partials, never served as pages. */
+    var privateSegments: Set<String> = setOf("inc")
     var pageExtension: String = "html"
 
     /** The template decorating each block; kroom's own ships in this module. */

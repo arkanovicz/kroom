@@ -68,6 +68,26 @@ class PlaceholderPagesTest {
     }
 
     @Test
+    fun `a private directory is neither routed nor catalogued, unless the application says otherwise`() = testApplication {
+        application {
+            installVelocity { templatePath = null }
+            routing { pages() }
+            assertEquals(null, pageCatalog().keys.firstOrNull { "/inc/" in it })
+            assertEquals(null, resolvePage("/inc/footer"))
+        }
+        assertEquals(HttpStatusCode.NotFound, client.get("/inc/footer").status)
+    }
+
+    @Test
+    fun `privateSegments is the application's`() = testApplication {
+        application {
+            installVelocity { templatePath = null; privateSegments = emptySet() }
+            routing { pages() }
+        }
+        assertEquals("inc partial", client.get("/inc/footer").bodyAsText().trim())
+    }
+
+    @Test
     fun `an unbacked path is still a 404`() = testApplication {
         app()
         assertEquals(HttpStatusCode.NotFound, client.get("/city/paris/extra").status)

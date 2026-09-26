@@ -81,6 +81,8 @@ class VelocityPlugin(config: VelocityConfig) {
     val templatePath: String? = config.templatePath
     val devDir: File? = config.devDir?.takeIf { config.devMode }
 
+    val privateSegments: Set<String> = config.privateSegments
+
     // Live scope registries. Populated at install (config block) and post-install by other
     // plugins (e.g. l10n registers $lang). Read-only at render time; mutated only during startup.
     private val applicationProviders = LinkedHashMap(config.applicationProviders)
@@ -198,6 +200,12 @@ class VelocityConfig {
     internal val sessionProviders = LinkedHashMap<String, (ApplicationCall) -> Any?>()
     internal val requestProviders = LinkedHashMap<String, (ApplicationCall) -> Any?>()
 
+    /**
+     * Directory names never served as pages, wherever they sit — where partials live beside the pages that
+     * `#parse` them (`pages/inc/header.html`). A dotted name (`header.inc.html`) is never served either way.
+     */
+    var privateSegments: Set<String> = setOf("inc")
+
     /** How `Route.pages()` renders a resolved template; null keeps the default `respondVelocity`. */
     var pageRenderer: (suspend ApplicationCall.(String) -> Unit)? = null
 
@@ -286,7 +294,11 @@ suspend fun RoutingContext.respondVelocity(
 
 // A path segment safe to splice into a resource lookup: no dots (kills `..`, dotfiles, and any
 // `foo.txt`/`header.inc` suffix), no slashes (kills `%2f`-smuggled separators), no empties.
-internal val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
+private val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
+
+/** Whether a page path made of [segments] may be served: every segment clean, none private (`inc/`). */
+internal fun VelocityPlugin.routable(segments: List<String>): Boolean =
+    segments.isNotEmpty() && segments.all { SAFE_SEGMENT.matches(it) && it !in privateSegments }
 
 /**
  * Resolve [path] (one or more `/`-separated clean segments, e.g. `source` or `legal/terms`) to a
@@ -307,7 +319,7 @@ suspend fun ApplicationCall.servePage(
     extension: String = "html"
 ): Boolean {
     val segments = path.split('/').filter { it.isNotEmpty() }
-    if (segments.isEmpty() || segments.any { !SAFE_SEGMENT.matches(it) }) return false
+    if (!velocity.routable(segments)) return false
     val template = "${prefix.trimEnd('/')}/${segments.joinToString("/")}.${extension.trimStart('.')}"
     if (!velocity.engine.resourceExists(template)) return false
     velocity.pageRenderer(this, template)
