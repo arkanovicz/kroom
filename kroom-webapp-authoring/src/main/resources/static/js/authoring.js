@@ -1,19 +1,56 @@
 // authoring.js - in-place editing of kroom content blocks
 // Part of kroom-webapp-authoring. Needs domhelper.js, api.js and lib/diff-match-patch.
 //
-// The wrapper template ships only the block and its two buttons; every piece of editor markup below is
+// The wrapper template ships only the block and its edit button; every piece of editor markup below is
 // built here, so a visitor who cannot edit downloads nothing of it.
 //
 // The preview is the page itself: the server re-renders the page this block sits in, with what you are
-// typing standing in for the stored block, and the fold below the textarea shows that block's part of it.
+// typing standing in for the stored block, and the preview tab shows that block's part of it.
 // Same layout, same context, same renderer — nothing here guesses what markdown becomes.
 
 (function () {
 
-    const PREVIEW_DELAY = 700;             // idle before the preview is re-rendered (and the lock refreshed)
-    const FOLD_KEY = 'kroom.authoring.preview';
+    const HEARTBEAT_DELAY = 700;           // idle before the lock is refreshed
 
-    // one block at a time: { block, root, path, rev, textarea, editor, body, timer }
+    // Every word the editor says, error codes of the edit API included. kroom translates nothing: an
+    // application overrides them — server side (AuthoringConfig.strings, emitted ahead of this script), or
+    // client side, before or after it: Object.assign(kroomAuthoring.strings, { preview: 'aperçu' }).
+    const strings = Object.assign({
+        edit: 'edit',
+        markdown: 'markdown', preview: 'preview', history: 'history',
+        submit: 'submit', cancel: 'cancel',
+        bold: 'bold (Ctrl+B)', italic: 'italic (Ctrl+I)', heading: 'heading', link: 'link (Ctrl+K)',
+        bullets: 'bulleted list', numbers: 'numbered list', quote: 'quote', code: 'code',
+        // what a formatting button writes when nothing is selected
+        boldText: 'bold', italicText: 'italic', linkText: 'text', codeText: 'code',
+        otherBlock: 'finish the block you are editing first',
+        saving: 'saving\u2026',
+        lockLost: 'lock lost: {message}',
+        conflict: 'This block changed while you were editing',
+        yours: 'yours', theirs: 'theirs', keepMine: 'keep mine', takeTheirs: 'take theirs',
+        keptMine: 'editing against their revision \u2014 submitting now overwrites it',
+        revision: '{time} \u2014 {author}', current: '(current)', unknownAuthor: 'unknown',
+        noRevision: 'no revision yet', restore: 'restore', back: 'back',
+        restored: '{time} restored \u2014 submit to write it',
+        // the edit API's errors: each said through `error`, by its code when the table has it
+        error: 'Error: {message}',
+        lockHeld: 'block held by {owner}', notYourLock: 'the lock on {path} is not yours',
+        stale: '{path} changed since you started editing', notAuthenticated: 'not authenticated',
+        forbidden: 'not allowed to edit {path}', noHistory: 'this content store keeps no history',
+        noSuchRevision: 'no such revision: {rev}', noPage: 'no page at {page}',
+        pageMissing: 'a block is rendered within the page it is in: page missing',
+        invalidPath: 'invalid content path', broken: '{message}'
+    }, window.kroomAuthoring?.strings);
+    window.kroomAuthoring = Object.assign(window.kroomAuthoring || {}, { strings });
+
+    const t = (key, args = {}) => (strings[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => args[name] ?? '');
+
+    /** An API error in the application's words when its code has some, in the server's otherwise. */
+    const reason = (err) => err.data?.code && strings[err.data.code] !== undefined
+        ? t(err.data.code, err.data.args) : err.message;
+    const said = (err) => t('error', { message: reason(err) });
+
+    // one block at a time: { block, root, path, rev, textarea, editor, body, timer, previewed }
     let session = null;
 
     // --- plumbing --------------------------------------------------------------------------------
@@ -29,18 +66,6 @@
     }
 
     const encodePath = (path) => path.split('/').map(encodeURIComponent).join('/');
-
-    const remember = {
-        get(key, fallback) {
-            try {
-                const value = localStorage.getItem(key);
-                return value === null ? fallback : value === 'true';
-            } catch (_) { return fallback; }
-        },
-        set(key, value) {
-            try { localStorage.setItem(key, String(value)); } catch (_) { /* private window */ }
-        }
-    };
 
     function element(tag, className, text) {
         const el = document.createElement(tag);
@@ -101,9 +126,8 @@
         return btn;
     }
 
-    /** A left/right diff view inside a dialog, with its two column captions. */
-    function diffView(dlg, leftTitle, rightTitle, left, right) {
-        const pane = $('.kroom-dialog-body', dlg);
+    /** A left/right diff view in [pane], with its two column captions. */
+    function diffView(pane, leftTitle, rightTitle, left, right) {
         pane.clear();
         const columns = element('div', 'kroom-diff');
         const leftCol = columns.appendChild(element('section'));
@@ -118,11 +142,10 @@
 
     // --- editing ---------------------------------------------------------------------------------
 
-    /** Take the block, then open it on what the lock answered. [seed] overrides the stored body. */
-    async function edit(block, seed) {
+    /** Take the block, then open it on what the lock answered. */
+    async function edit(block) {
         if (session) {
-            if (session.block !== block) return notice(block, 'finish the block you are editing first');
-            if (seed !== undefined) fill(seed);
+            if (session.block !== block) notice(block, t('otherBlock'));
             return;
         }
         const root = apiRoot(block);
@@ -130,54 +153,82 @@
         const path = encodePath(block.data('content'));
         try {
             const held = await api.postJson(root + 'lock/' + path);
-            build(block, root, path, held, seed);
+            build(block, root, path, held);
         } catch (err) {
-            notice(block, err.message);
+            notice(block, said(err));
         }
     }
 
-    function build(block, root, path, held, seed) {
+    function build(block, root, path, held) {
         const body = block.querySelector('.kroom-block-body');
         const editor = element('div', 'kroom-editor');
-
-        // the preview: the published rendering to start with, re-rendered from the server as you type
-        const preview = element('details', 'kroom-preview');
-        preview.open = remember.get(FOLD_KEY, true);
-        preview.appendChild(element('summary', null, 'preview'));
-        // unfolding shows what the server last rendered; it only costs a render if you typed meanwhile
-        preview.on('toggle', () => {
-            remember.set(FOLD_KEY, preview.open);
-            if (preview.open && preview.hasClass('kroom-stale')) refresh();
-        });
         block.insertBefore(editor, body);
-        preview.appendChild(body);
-        editor.appendChild(preview);
 
-        const textarea = editor.appendChild(element('textarea', 'kroom-source'));
-        textarea.value = seed !== undefined ? seed : held.body;
+        const bar = editor.appendChild(element('nav', 'kroom-editor-bar'));
+        const tabs = bar.appendChild(element('div', 'kroom-tabs'));
+        tabs.attr('role', 'tablist');
+        tabs.appendChild(button(t('markdown'), 'kroom-tab', () => tab('source'))).data('tab', 'source');
+        tabs.appendChild(button(t('preview'), 'kroom-tab', () => tab('preview'))).data('tab', 'preview');
+        tabs.appendChild(button(t('history'), 'kroom-tab', () => tab('history'))).data('tab', 'history');
+        const format = bar.appendChild(element('div', 'kroom-format'));
+        FORMATS.forEach(f => {
+            const btn = format.appendChild(button(f.label, `kroom-format-${f.name}`, () => f.apply(session.textarea)));
+            btn.title = t(f.name);
+            btn.attr('aria-label', t(f.name));
+        });
+
+        const source = editor.appendChild(element('div', 'kroom-pane'));
+        source.attr('role', 'tabpanel').data('pane', 'source');
+        const textarea = source.appendChild(element('textarea', 'kroom-source'));
+        textarea.value = held.body;
         textarea.spellcheck = false;
 
+        // the preview starts as the published rendering, and is re-rendered by the server when shown
+        const preview = editor.appendChild(element('div', 'kroom-pane kroom-preview'));
+        preview.attr('role', 'tabpanel').data('pane', 'preview');
+        preview.appendChild(body);
+
+        const past = editor.appendChild(element('div', 'kroom-pane kroom-past'));
+        past.attr('role', 'tabpanel').data('pane', 'history');
+
         const tools = editor.appendChild(element('nav', 'kroom-editor-tools'));
-        tools.appendChild(button('\u2713', 'kroom-submit', submit));
-        tools.appendChild(button('\u2717', 'kroom-cancel secondary', cancel));
+        [['\u2713', 'submit', submit], ['\u2717', 'cancel', cancel]].forEach(([glyph, name, onClick]) => {
+            const btn = tools.appendChild(button(glyph, `kroom-${name}${name === 'cancel' ? ' secondary' : ''}`, onClick));
+            btn.title = t(name);
+            btn.attr('aria-label', t(name));
+        });
         tools.appendChild(element('span', 'kroom-status'));
 
-        session = { block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: textarea.value };
+        session = { block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: held.body };
         block.addClass('kroom-editing');
         textarea.on('input', typed);
-        grow(textarea);
-        textarea.focus();
-        if (seed !== undefined) {
-            preview.addClass('kroom-stale');
-            status('loaded from history \u2014 submit to write it');
-            refresh();
+        textarea.on('keydown', shortcut);
+        tab('source');
+    }
+
+    /** Show one pane; the preview re-renders on the way in, if the text moved since it last did. */
+    function tab(name) {
+        const editor = session.editor;
+        editor.querySelectorAll('.kroom-tab').forEach(b => b.attr('aria-selected', String(b.data('tab') === name)));
+        editor.querySelectorAll('.kroom-pane').forEach(p => { p.hidden = p.data('pane') !== name; });
+        $('.kroom-format', editor).hidden = name !== 'source';
+        // history submits nothing: restoring goes back to the markdown tab first
+        editor.querySelectorAll('.kroom-editor-tools button').forEach(b => { b.hidden = name === 'history'; });
+        if (name !== 'source') {
+            // the other panes take the height the source had, so switching does not jump the page
+            $(`.kroom-pane[data-pane="${name}"]`, editor).style.minHeight = `${session.textarea.offsetHeight}px`;
+            if (name === 'preview') refresh();
+            else history();
+        } else {
+            grow(session.textarea);
+            session.textarea.focus();
         }
     }
 
     function fill(text) {
         session.textarea.value = text;
         typed();
-        session.textarea.focus();
+        tab('source');
     }
 
     function grow(textarea) {
@@ -185,26 +236,27 @@
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-    /** Typing means two things: the preview is behind, and the lock is alive. Both settle once you pause. */
+    /** Typing means the lock is alive; say so once you pause. */
     function typed() {
         grow(session.textarea);
-        $('.kroom-preview', session.editor).addClass('kroom-stale');
         clearTimeout(session.timer);
-        session.timer = setTimeout(refresh, PREVIEW_DELAY);
+        session.timer = setTimeout(heartbeat, HEARTBEAT_DELAY);
+    }
+
+    function heartbeat() {
+        const held = session;
+        if (held) api.postJson(held.root + 'lock/' + held.path).catch(err => status(t('lockLost', { message: reason(err) })));
     }
 
     /** Re-render the page around this block, with the textarea standing in for what the store holds. */
     async function refresh() {
         const held = session;
-        if (!held) return;
         const preview = $('.kroom-preview', held.editor);
         const body = held.textarea.value;
-        // folded, or nothing new to show: the lock still needs its heartbeat, the renderer does not
-        if (!preview.open || body === held.previewed) {
-            preview.removeClass('kroom-stale');
-            api.postJson(held.root + 'lock/' + held.path).catch(err => status(`lock lost: ${err.message}`));
-            return;
-        }
+        // nothing new to show, or already on its way
+        if (body === held.previewed || body === held.rendering) return;
+        held.rendering = body;
+        preview.addClass('kroom-stale');
         try {
             // the whole page comes back — the block's own header bindings only exist in that render — but
             // only its body reaches the DOM, and only when it actually differs
@@ -219,13 +271,95 @@
             preview.removeClass('kroom-stale');
             status('');
         } catch (err) {
-            status(err.message);
+            status(said(err));
+        } finally {
+            if (held.rendering === body) held.rendering = null;
         }
+    }
+
+    // --- formatting ------------------------------------------------------------------------------
+
+    /**
+     * Replace [start, end) with [text], then select [selStart, selEnd) relative to [start]. Through
+     * execCommand when the browser still has it: that edit lands on the textarea's own undo stack.
+     */
+    function replace(textarea, start, end, text, selStart = text.length, selEnd = selStart) {
+        textarea.focus();
+        textarea.setSelectionRange(start, end);
+        let native = false;
+        try { native = document.execCommand('insertText', false, text); } catch (_) { /* gone */ }
+        if (!native) {
+            textarea.setRangeText(text, start, end);
+            typed();
+        }
+        textarea.setSelectionRange(start + selStart, start + selEnd);
+    }
+
+    /** `**bold**` around the selection, or off it when it already wears it. */
+    function wrap(textarea, mark, placeholder, close = mark) {
+        const { value, selectionStart: s, selectionEnd: e } = textarea;
+        if (value.slice(s - mark.length, s) === mark && value.slice(e, e + close.length) === close) {
+            return replace(textarea, s - mark.length, e + close.length, value.slice(s, e), 0, e - s);
+        }
+        const inner = value.slice(s, e) || placeholder;
+        replace(textarea, s, e, mark + inner + close, mark.length, mark.length + inner.length);
+    }
+
+    /** A prefix on every line the selection touches — or off them all, when they all have it. The selection stays on the text. */
+    function prefix(textarea, marker) {
+        const { value, selectionStart: s, selectionEnd: e } = textarea;
+        const start = s > 0 ? value.lastIndexOf('\n', s - 1) + 1 : 0;
+        const found = value.indexOf('\n', e > s && value[e - 1] === '\n' ? e - 1 : e);
+        const end = found < 0 ? value.length : found;
+        const lines = value.slice(start, end).split('\n');
+        const pattern = typeof marker === 'string' ? new RegExp('^' + marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) : marker.pattern;
+        const on = lines.every(line => pattern.test(line));
+        const text = lines.map((line, i) => on ? line.replace(pattern, '')
+            : (typeof marker === 'string' ? marker : marker.make(i)) + line).join('\n');
+        const first = text.split('\n')[0].length - lines[0].length;   // what the first line gained or lost
+        const selStart = Math.max(0, s - start + first);
+        replace(textarea, start, end, text, selStart, Math.max(selStart, e - start + text.length - (end - start)));
+    }
+
+    function link(textarea) {
+        const { value, selectionStart: s, selectionEnd: e } = textarea;
+        const selected = value.slice(s, e);
+        if (/^https?:\/\/\S+$/.test(selected)) {
+            const text = t('linkText');
+            return replace(textarea, s, e, `[${text}](${selected})`, 1, 1 + text.length);
+        }
+        const label = selected || t('linkText');
+        replace(textarea, s, e, `[${label}](https://)`, label.length + 3, label.length + 11);
+    }
+
+    function code(textarea) {
+        const { value, selectionStart: s, selectionEnd: e } = textarea;
+        if (value.slice(s, e).includes('\n')) wrap(textarea, '```\n', '', '\n```');
+        else wrap(textarea, '`', t('codeText'));
+    }
+
+    const FORMATS = [
+        { name: 'bold', label: 'B', key: 'b', apply: ta => wrap(ta, '**', t('boldText')) },
+        { name: 'italic', label: 'I', key: 'i', apply: ta => wrap(ta, '_', t('italicText')) },
+        { name: 'heading', label: 'H', apply: ta => prefix(ta, '## ') },
+        { name: 'link', label: '\u{1F517}', key: 'k', apply: link },
+        { name: 'bullets', label: '\u2022', apply: ta => prefix(ta, '- ') },
+        { name: 'numbers', label: '1.', apply: ta => prefix(ta, { pattern: /^\d+\. /, make: i => `${i + 1}. ` }) },
+        { name: 'quote', label: '\u201C', apply: ta => prefix(ta, '> ') },
+        { name: 'code', label: '</>', apply: code }
+    ];
+
+    function shortcut(event) {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+        const format = FORMATS.find(f => f.key === event.key.toLowerCase());
+        if (!format) return;
+        event.preventDefault();
+        format.apply(session.textarea);
     }
 
     async function submit() {
         const held = session;
-        status('saving\u2026');
+        status(t('saving'));
         try {
             // the page comes along: the server renders it with this body, and refuses one that breaks it
             await api.postJson(held.root + held.path,
@@ -235,21 +369,21 @@
             location.reload();
         } catch (err) {
             if (err.status === 409 && err.data && err.data.theirs) conflict(err.data.theirs);
-            else status(err.message);
+            else status(said(err));
         }
     }
 
     /** Someone wrote the block while it was open. Show both, and adopt their revision either way. */
     function conflict(theirs) {
-        const dlg = dialog('This block changed while you were editing');
-        diffView(dlg, 'yours', 'theirs', session.textarea.value, theirs.body);
+        const dlg = dialog(t('conflict'));
+        diffView($('.kroom-dialog-body', dlg), t('yours'), t('theirs'), session.textarea.value, theirs.body);
         const footer = $('footer', dlg);
-        footer.appendChild(button('keep mine', 'kroom-keep', () => {
+        footer.appendChild(button(t('keepMine'), 'kroom-keep', () => {
             session.rev = theirs.rev;
             dlg.close();
-            status('editing against their revision \u2014 submitting now overwrites it');
+            status(t('keptMine'));
         }));
-        footer.appendChild(button('take theirs', 'secondary', () => {
+        footer.appendChild(button(t('takeTheirs'), 'secondary', () => {
             session.rev = theirs.rev;
             dlg.close();
             fill(theirs.body);
@@ -272,55 +406,68 @@
 
     // --- history ---------------------------------------------------------------------------------
 
-    async function history(block) {
-        const root = apiRoot(block);
-        if (!root) return;
-        const path = encodePath(block.data('content'));
+    /** What the store remembers of this block, asked again each time the tab is shown. */
+    async function history() {
+        const held = session;
+        const pane = $('.kroom-past', held.editor);
         let log;
         try {
-            log = await api.getJson(root + 'history/' + path);
+            log = await api.getJson(held.root + 'history/' + held.path);
         } catch (err) {
-            return notice(block, err.status === 404 ? 'this content store keeps no history' : err.message);
+            pane.clear();
+            pane.appendChild(element('p', 'kroom-empty', said(err)));
+            return;
         }
-        const dlg = dialog(block.data('name') || block.data('content'));
-        const pane = $('.kroom-dialog-body', dlg);
-        if (log.length === 0) pane.appendChild(element('p', null, 'no revision yet'));
+        if (session !== held) return;
+        pane.clear();
+        if (log.length === 0) return pane.appendChild(element('p', 'kroom-empty', t('noRevision')));
         const list = pane.appendChild(element('ul', 'kroom-revisions'));
         log.forEach(revision => {
-            const line = list.appendChild(element('li'));
-            line.appendChild(button(
-                `${new Date(revision.time).toLocaleString()} \u2014 ${revision.author || 'unknown'}`,
-                'kroom-revision secondary outline',
-                () => show(dlg, block, root, path, revision)
-            ));
+            const label = t('revision', { time: new Date(revision.time).toLocaleString(), author: revision.author || t('unknownAuthor') })
+                + (revision.rev === held.rev ? ` ${t('current')}` : '');
+            list.appendChild(element('li')).appendChild(
+                button(label, 'kroom-revision secondary outline', () => revisit(revision)));
         });
-        $('footer', dlg).appendChild(button('close', 'secondary', () => dlg.close()));
     }
 
-    /** One revision against the block as it stands now; restoring it is an edit like any other. */
-    async function show(dlg, block, root, path, revision) {
-        const [past, now] = await Promise.all([
-            api.getJson(`${root}${path}?rev=${encodeURIComponent(revision.rev)}`),
-            api.getJson(root + path)
-        ]);
-        diffView(dlg, new Date(revision.time).toLocaleString(), 'now', past.body, now.body);
-        const footer = $('footer', dlg);
-        footer.clear();
-        footer.appendChild(button('restore', 'kroom-restore', () => {
-            dlg.close();
-            edit(block, past.body);
+    /** One revision against what you are writing; restoring it is an edit like any other. */
+    async function revisit(revision) {
+        const held = session;
+        const pane = $('.kroom-past', held.editor);
+        let past;
+        try {
+            past = await api.getJson(`${held.root}${held.path}?rev=${encodeURIComponent(revision.rev)}`);
+        } catch (err) {
+            return status(said(err));
+        }
+        if (session !== held) return;
+        const when = new Date(revision.time).toLocaleString();
+        diffView(pane, when, t('yours'), past.body, held.textarea.value);
+        const tools = pane.appendChild(element('nav', 'kroom-past-tools'));
+        tools.appendChild(button(t('restore'), 'kroom-restore', () => {
+            fill(past.body);
+            status(t('restored', { time: when }));
         }));
-        footer.appendChild(button('close', 'secondary', () => dlg.close()));
+        tools.appendChild(button(t('back'), 'kroom-back secondary', history));
     }
 
     // --- wiring ----------------------------------------------------------------------------------
+
+    // the wrapper template carries no words: the edit handle is named here, with the rest
+    function name(root) {
+        root.querySelectorAll('.kroom-block-tools .kroom-edit').forEach(btn => {
+            btn.title = t('edit');
+            btn.attr('aria-label', t('edit'));
+        });
+    }
+    if (document.readyState === 'loading') document.on('DOMContentLoaded', () => name(document));
+    else name(document);
 
     document.on('click', event => {
         const btn = event.target.closest('.kroom-block-tools button');
         if (!btn) return;
         const block = btn.closest('.kroom-block');
         if (btn.hasClass('kroom-edit')) edit(block);
-        else if (btn.hasClass('kroom-history')) history(block);
     });
 
     // leaving with the block open loses the text; the lock itself needs no goodbye, it expires

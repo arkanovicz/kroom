@@ -46,6 +46,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         lockTimeout = config.lockTimeout
         canEdit = config.canEdit
         placeholder = config.placeholder
+        strings.putAll(config.strings)
     }
 
     routing {
@@ -82,6 +83,9 @@ class ContentSiteConfig {
 
     /** What a page shows where a block has not been written yet (`%` markdown, `$name` in scope). */
     var placeholder: String? = null
+
+    /** The editor's words, over its English ones — see [AuthoringConfig.strings]. */
+    val strings = LinkedHashMap<String, String>()
 
     var lockTimeout: Duration = 2.minutes
     var canEdit: (UserSession?, String) -> Boolean = { session, _ -> session != null }

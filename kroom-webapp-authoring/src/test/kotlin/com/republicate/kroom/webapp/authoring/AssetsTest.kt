@@ -38,8 +38,17 @@ class AssetsTest {
 
     @Test
     fun `the tags a layout emits name the files that are served`() {
-        val tags = AuthoringAssets.tags()
+        val tags = AuthoringAssets().tags()
         served.keys.forEach { path -> assertTrue(tags.contains("$path?v="), "$path missing from $tags") }
+        assertTrue("kroomAuthoring" !in tags, "no strings, no script for them")
+    }
+
+    @Test
+    fun `an application's words reach the page before authoring js, safe inside a script`() {
+        val tags = AuthoringAssets(mapOf("preview" to "aperçu", "evil" to "</script><b>")).tags()
+        val words = tags.indexOf("\"preview\":\"aperçu\"")
+        assertTrue(words in 0 until tags.indexOf("/js/authoring.js"), tags)
+        assertTrue("</script><b>" !in tags, tags)
     }
 
     @Test

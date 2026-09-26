@@ -300,7 +300,9 @@ In dev, `devDir = File("src/main/resources")` serves that tree live instead of t
 GET    {prefix}/{path...}[?rev=]   the block, its lock, whether the caller may edit it
 POST   {prefix}/lock/{path...}     take the block — 409 names who holds it, re-entrant for its owner
 DELETE {prefix}/lock/{path...}     give it back, unwritten
-POST   {prefix}/{path...}          submit {rev, body} — 409 answers {message, theirs} on a stale rev
+POST   {prefix}/{path...}          submit {page, rev, body} — 409 answers {message, theirs} on a stale rev,
+                                   422 when the body breaks its page
+POST   {prefix}/preview/{path...}  render {page, body}: the page itself, this body standing in
 GET    {prefix}/history/{path...}  revisions of one block   ] 404 unless the store is Versioned
 GET    {prefix}/journal            the site-wide log        ]
 ```
@@ -309,6 +311,9 @@ GET    {prefix}/journal            the site-wide log        ]
 because a ktor tailcard takes every remaining segment. A submit carries the rev it started from, so an edit
 made meanwhile — a concurrent author, a `git pull` — is answered with *theirs* instead of being overwritten:
 the lock is the polite path, the rev check is the safe one.
+
+An error answers `{message, code, args}`: `message` in English, `code` (`lockHeld`, `stale`, `forbidden`,
+`broken`, …) and `args` for a client that says it its own way — see *The editor's words* below.
 
 **History and the journal exist only when the store is `Versioned`** — a plain `FileResourceStore` keeps no
 past, and both routes answer 404. There is no `revert` route either: restoring an old body writes it as a
@@ -319,8 +324,8 @@ new revision through the ordinary submit, which keeps the journal honest.
 `markdown.block.wrapper` names a template the `#markdown` macro renders in place of the bare html, with
 `$path`, `$name` and `$html` added to the page context. This module ships the default one at the classpath
 root as `kroom/block-wrapper.html` — root, so it resolves under every engine shape (dev's `classpath` loader,
-production's `root` loader) — and it emits the block plus, for an author `$authoring.canEdit` accepts, two
-buttons. The editor markup itself is built by `authoring.js` when editing starts: a visitor downloads none
+production's `root` loader) — and it emits the block plus, for an author `$authoring.canEdit` accepts, one
+edit button. The editor markup itself is built by `authoring.js` when editing starts: a visitor downloads none
 of it.
 
 The layout carries three files, after the house stack (domhelper.js, api.js), which `authoring.js` builds on:
@@ -336,17 +341,34 @@ which read `static/` from any jar on the classpath — authoring mounts no route
 
 ### What the editor does
 
-✎ takes the lock and swaps in a textarea holding the body; typing refreshes the lock (debounced, 700ms);
-✓ submits `{rev, body}`, ✗ gives the block back. ⟲ lists the revisions in a `<dialog>`; picking one diffs it
-against the block as it stands, and *restore* loads that body into the editor for you to submit — an undo is
-an edit like any other. A 409 on submit shows yours beside theirs, word-diffed, and you leave it editing
-against their revision, keeping your text or taking theirs.
+✎ takes the lock and opens the block in three tabs; typing refreshes the lock (debounced, 700ms), ✓ submits
+`{page, rev, body}`, ✗ gives the block back.
 
-There is no preview, because there is no route that renders a body nobody has submitted: markdown is
-rendered on the server, inside a page. So editing keeps the *published* rendering — the very nodes the page
-rendered — in a fold beside the textarea, marked "before your changes" as soon as you type. It answers what
-you are changing, never what it will become. For the same reason a successful submit reloads the page: the
-submit answers a rev, and the page is the only thing that knows how to render the block.
+- **markdown** — the textarea, with formatting buttons (bold, italic, heading, link, lists, quote, code;
+  Ctrl+B/I/K) that toggle their markup and go through the textarea's own undo stack.
+- **preview** — the page itself, re-rendered by the server with the textarea standing in for the stored
+  block, of which this block's part is shown; rendered when the tab is shown, and only if the text moved.
+- **history** — the store's revisions (none when it is not `Versioned`); picking one diffs it against what
+  you are writing, and *restore* loads it into the markdown tab for you to submit — an undo is an edit like
+  any other. ✓ and ✗ are hidden there.
+
+A 409 on submit shows yours beside theirs, word-diffed, and you leave it editing against their revision,
+keeping your text or taking theirs. A successful submit reloads the page: the submit answers a rev, and the
+page is the only thing that knows how to render the block.
+
+### The editor's words
+
+kroom translates nothing, but every word the editor says — labels, tooltips, statuses, the placeholder text
+a formatting button writes, and the edit API's error codes — sits in one `strings` table at the top of
+`authoring.js`, `{name}` for arguments, every server error introduced by `error` (`Error: {message}`). An
+application overrides any of them server side, emitted by `$authoring.assets.tags()` ahead of the script:
+
+```kotlin
+installContentSite { strings["preview"] = "aperçu"; strings["error"] = "Erreur : {message}" }
+```
+
+or client side, before or after `authoring.js`: `Object.assign(kroomAuthoring.strings, { … })`. An error code
+the table lacks falls back to the server's English message.
 
 ## Table (for seat-based games)
 

@@ -3,18 +3,21 @@
 :root {
     --kroom-diff-insert: #d5f2de;
     --kroom-diff-delete: #ffdcdc;
+    --kroom-diff-caption: #eceff3;
 }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --kroom-diff-insert: #14351f;
         --kroom-diff-delete: #3d1b1b;
+        --kroom-diff-caption: #2a2f38;
     }
 }
 
 :root[data-theme="dark"] {
     --kroom-diff-insert: #14351f;
     --kroom-diff-delete: #3d1b1b;
+    --kroom-diff-caption: #2a2f38;
 }
 
 /* --- the block and its handle ------------------------------------------------------------------ */
@@ -58,18 +61,69 @@
 
 /* --- the editor --------------------------------------------------------------------------------- */
 
-.kroom-editor .kroom-preview > summary {
+.kroom-editor-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: .25rem;
+    border-bottom: 1px solid var(--pico-muted-border-color, #ddd);
+    margin-bottom: .5rem;
+}
+
+.kroom-tabs,
+.kroom-format {
+    display: flex;
+    gap: .125rem;
+}
+
+.kroom-editor-bar button {
+    width: auto;
+    margin: 0;
+    padding: .25rem .6rem;
     font-size: .8rem;
+    line-height: 1.4;
+    background: none;
+    border: 1px solid transparent;
+    color: inherit;
+    box-shadow: none;
+}
+
+.kroom-tabs button {
+    border-radius: var(--pico-border-radius, .25rem) var(--pico-border-radius, .25rem) 0 0;
+    margin-bottom: -1px;
     opacity: .7;
 }
 
-/* the preview lags one pause behind the textarea — say so while it does */
-.kroom-editor .kroom-preview.kroom-stale > summary::after {
-    content: " \2026";
+.kroom-tabs button[aria-selected="true"] {
+    opacity: 1;
+    border-color: var(--pico-muted-border-color, #ddd);
+    border-bottom-color: var(--pico-background-color, #fff);
 }
 
-.kroom-editor .kroom-preview[open] > .kroom-block-body {
-    opacity: .85;
+.kroom-format {
+    margin-bottom: .25rem;
+}
+
+.kroom-format button {
+    min-width: 1.9rem;
+}
+
+.kroom-format button:hover,
+.kroom-format button:focus-visible {
+    border-color: var(--pico-muted-border-color, #ddd);
+}
+
+.kroom-format-bold { font-weight: 700; }
+.kroom-format-italic { font-style: italic; font-family: serif; }
+.kroom-format-code { font-family: var(--pico-font-family-monospace, ui-monospace, monospace); }
+
+.kroom-editor [hidden] { display: none; }
+
+/* the preview lags until the server answers — say so while it does */
+.kroom-preview.kroom-stale > .kroom-block-body {
+    opacity: .5;
+    transition: opacity .15s ease-in-out;
 }
 
 textarea.kroom-source {
@@ -108,6 +162,15 @@ textarea.kroom-source {
     gap: 1rem;
 }
 
+.kroom-diff h6 {
+    margin: 0 0 .25rem;
+    padding: .25rem .5rem;
+    border-radius: var(--pico-border-radius, .25rem);
+    background: var(--kroom-diff-caption);
+    font-size: .9rem;
+    font-weight: 600;
+}
+
 .kroom-diff pre {
     max-height: 50vh;
     overflow: auto;
@@ -120,6 +183,24 @@ textarea.kroom-source {
 .diff-delete { background: var(--kroom-diff-delete); text-decoration: line-through; }
 
 .kroom-dialog article { max-width: 60rem; }
+
+.kroom-past .kroom-empty {
+    font-size: .875rem;
+    opacity: .7;
+}
+
+.kroom-past-tools {
+    display: flex;
+    gap: .5rem;
+    margin-top: .5rem;
+}
+
+.kroom-past-tools button {
+    width: auto;
+    margin: 0;
+    padding: .25rem .75rem;
+    font-size: .875rem;
+}
 
 ul.kroom-revisions {
     list-style: none;

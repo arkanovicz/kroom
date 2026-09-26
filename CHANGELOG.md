@@ -71,8 +71,19 @@ All notable changes to kroom will be documented in this file.
   `templates/`: layouts are read from `<devDir>/<templatePath>` and static files from `<devDir>/static`,
   so a stylesheet edit shows without a restart, as a layout edit already did.
 
+- The editor opens a block in three tabs — **markdown** (with formatting buttons: bold, italic, heading,
+  link, lists, quote, code; Ctrl+B/I/K), **preview** (rendered when shown, replacing the fold beside the
+  textarea) and **history** (was a ⟲ button and a dialog; a revision now diffs against what you are
+  writing). Before editing, an author sees only ✎.
+- Every word of the editor is in one overridable `strings` table (`kroomAuthoring.strings` client side,
+  `AuthoringConfig.strings` / `ContentSiteConfig.strings` server side), edit API error codes included; the
+  default wrapper carries no text. `AuthoringAssets` is a class carrying those strings (`VERSION` in its
+  companion).
+
 #### kroom-webapp-core
 - Dev-mode static routes answer `Cache-Control: no-cache`, classpath fallback included (was one hour).
+- `respondError(message, status, code, args)`: an optional `code` and `args` beside the English message, for
+  a client that translates. The edit API answers one for every error.
 
 ### Build
 - velocity `3.0.0-BETA-20260924-01` (header defaults, header mode, strict header contract, full sandbox,

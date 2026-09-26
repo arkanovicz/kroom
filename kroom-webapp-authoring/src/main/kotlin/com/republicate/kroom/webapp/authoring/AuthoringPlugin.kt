@@ -33,6 +33,12 @@ class AuthoringConfig {
 
     /** What a page shows in place of a block nobody has written yet. */
     var placeholder: String? = null
+
+    /**
+     * The editor's words, by key, over authoring.js's English ones (the `strings` table at its top, error
+     * codes included): kroom translates nothing, an application says it its own way.
+     */
+    val strings = LinkedHashMap<String, String>()
 }
 
 class AuthoringPlugin(private val config: AuthoringConfig) {
@@ -44,8 +50,8 @@ class AuthoringPlugin(private val config: AuthoringConfig) {
     val apiPrefix: String get() = config.apiPrefix
     val placeholder: String? get() = config.placeholder
 
-    /** The editor's script and stylesheet, for a layout to emit — `$authoring.assets.tags()`. */
-    val assets = AuthoringAssets
+    /** The editor's script, stylesheet and words, for a layout to emit — `$authoring.assets.tags()`. */
+    val assets = AuthoringAssets(config.strings)
 
     fun canEdit(session: UserSession?, path: String): Boolean = config.canEdit(session, path)
 }

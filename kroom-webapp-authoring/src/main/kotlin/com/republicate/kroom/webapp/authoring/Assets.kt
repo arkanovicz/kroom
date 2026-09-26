@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.webapp.assets.KroomAssets
+import com.republicate.kson.Json
 
 /**
  * The editor's own files. They live under this jar's `static/`, which `installCore`'s `staticRoutes`
@@ -8,15 +9,29 @@ import com.republicate.kroom.webapp.assets.KroomAssets
  *
  * The tags go in the application's layout, **after** the house stack (domhelper.js, api.js): authoring.js
  * builds on it and does not reload it. From a velocity layout, `$authoring.assets.tags()`.
+ *
+ * [strings] override the editor's words ([AuthoringConfig.strings]); they reach the page ahead of
+ * authoring.js, which reads them at load — a script of the application's can still override them after.
  */
-object AuthoringAssets {
+class AuthoringAssets(private val strings: Map<String, String> = emptyMap()) {
 
-    const val VERSION = KroomAssets.VERSION
+    companion object {
+        const val VERSION = KroomAssets.VERSION
+    }
 
     fun styleTags(prefix: String = "") =
         """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/authoring.css?v=$VERSION">"""
 
-    fun scriptTags(prefix: String = "") = listOf(
+    fun stringTags(): String {
+        if (strings.isEmpty()) return ""
+        // `</` would close the script element early, whatever the JSON says
+        val json = Json.MutableObject().apply { strings.forEach { (key, value) -> set(key, value) } }.toString()
+            .replace("</", "<\\/")
+        return "<script>Object.assign(((window.kroomAuthoring ??= {}).strings ??= {}), $json);</script>"
+    }
+
+    fun scriptTags(prefix: String = "") = listOfNotNull(
+        stringTags().takeIf { it.isNotEmpty() },
         """<script src="${prefix.trimEnd('/')}/lib/diff-match-patch/diff_match_patch.js?v=$VERSION"></script>""",
         """<script src="${prefix.trimEnd('/')}/js/authoring.js?v=$VERSION"></script>"""
     ).joinToString("\n")

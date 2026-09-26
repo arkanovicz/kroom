@@ -31,6 +31,9 @@ import io.ktor.server.routing.*
  * The lock routes read `/lock/…` rather than `…/lock`: a ktor tailcard takes every remaining segment, so
  * nothing can follow `{path...}` in a route pattern.
  *
+ * An error answers a `code` (and its `args`) beside its English `message`: the client's strings table is
+ * keyed by those codes, so an application translates the server's words where it translates the editor's.
+ *
  * A submit carries the rev the author started from, so a block edited meanwhile is answered with *theirs*
  * instead of being overwritten — the lock is the polite path, the rev check is the safe one.
  */
@@ -61,7 +64,7 @@ fun Route.authoringRoutes() {
             val path = blockPath() ?: return@post
             val session = editorOf(plugin, path) ?: return@post
             if (!plugin.locks.touch(path, session.id))
-                return@post respondError("the lock on $path is not yours", HttpStatusCode.Conflict)
+                return@post notYourLock(path)
 
             val asked = receiveJsonObject()
             val html = renderDraft(asked, path) ?: return@post
@@ -73,9 +76,9 @@ fun Route.authoringRoutes() {
                 val path = blockPath() ?: return@post
                 val session = editorOf(plugin, path) ?: return@post
                 val lock = plugin.locks.acquire(path, session.id)
-                    ?: return@post respondError(
-                        "block held by ${plugin.locks.holder(path)?.owner}", HttpStatusCode.Conflict
-                    )
+                    ?: return@post plugin.locks.holder(path)?.owner.let { owner ->
+                        respondError("block held by $owner", HttpStatusCode.Conflict, "lockHeld", mapOf("owner" to owner))
+                    }
                 respondJson(payload(plugin, path, plugin.store.read(path), lock, session))
             }
 
@@ -94,7 +97,7 @@ fun Route.authoringRoutes() {
             val block = when (asked) {
                 null -> plugin.store.read(path)
                 else -> (plugin.store as? Versioned)?.read(path, asked)
-                    ?: return@get respondError("no such revision: $asked", HttpStatusCode.NotFound)
+                    ?: return@get respondError("no such revision: $asked", HttpStatusCode.NotFound, "noSuchRevision", mapOf("rev" to asked))
             }
             respondJson(payload(plugin, path, block, plugin.locks.holder(path), session))
         }
@@ -104,7 +107,7 @@ fun Route.authoringRoutes() {
             val session = editorOf(plugin, path) ?: return@post
             // the same call refreshes the lock and proves it is his — a submit without it is a lost edit
             if (!plugin.locks.touch(path, session.id))
-                return@post respondError("the lock on $path is not yours", HttpStatusCode.Conflict)
+                return@post notYourLock(path)
 
             val submitted = receiveJsonObject()
             // what would break the page once published is refused now, while its author is still there
@@ -114,6 +117,8 @@ fun Route.authoringRoutes() {
             if ((submitted.getString("rev") ?: "") != (theirs?.rev ?: "")) {
                 return@post respondJson(HttpStatusCode.Conflict) {
                     set("message", "$path changed since you started editing")
+                    set("code", "stale")
+                    set("args", Json.MutableObject().apply { set("path", path) })
                     set("theirs", Json.MutableObject().apply {
                         set("body", theirs?.body ?: "")
                         set("rev", theirs?.rev ?: "")
@@ -141,11 +146,11 @@ fun Route.authoringRoutes() {
 private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String): String? {
     val page = asked.getString("page")
     if (page == null) {
-        respondError("a block is rendered within the page it is in: page missing")
+        respondError("a block is rendered within the page it is in: page missing", code = "pageMissing")
         return null
     }
     val (template, bound) = call.application.resolvePage(page) ?: run {
-        respondError("no page at $page", HttpStatusCode.NotFound)
+        respondError("no page at $page", HttpStatusCode.NotFound, "noPage", mapOf("page" to page))
         return null
     }
     return try {
@@ -155,7 +160,7 @@ private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String)
     } catch (e: Exception) {
         // the engine's wrappers say where it surfaced; the innermost cause says what the author wrote wrong
         val cause = generateSequence<Throwable>(e) { it.cause }.last { it.message != null }
-        respondError(cause.message!!, HttpStatusCode.UnprocessableEntity)
+        respondError(cause.message!!, HttpStatusCode.UnprocessableEntity, "broken", mapOf("message" to cause.message))
         null
     }
 }
@@ -164,7 +169,7 @@ private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String)
 private suspend fun RoutingContext.blockPath(): String? {
     val segments = call.parameters.getAll("path").orEmpty().filter { it.isNotEmpty() }
     if (segments.isEmpty() || segments.any { it == ".." }) {
-        respondError("invalid content path")
+        respondError("invalid content path", code = "invalidPath")
         return null
     }
     return segments.joinToString("/")
@@ -174,11 +179,11 @@ private suspend fun RoutingContext.blockPath(): String? {
 private suspend fun RoutingContext.editorOf(plugin: AuthoringPlugin, path: String): UserSession? {
     val session = call.userSession
     if (session == null) {
-        respondError("not authenticated", HttpStatusCode.Unauthorized)
+        respondError("not authenticated", HttpStatusCode.Unauthorized, "notAuthenticated")
         return null
     }
     if (!plugin.canEdit(session, path)) {
-        respondError("not allowed to edit $path", HttpStatusCode.Forbidden)
+        respondError("not allowed to edit $path", HttpStatusCode.Forbidden, "forbidden", mapOf("path" to path))
         return null
     }
     return session
@@ -187,9 +192,12 @@ private suspend fun RoutingContext.editorOf(plugin: AuthoringPlugin, path: Strin
 /** The store's history, or null having answered 404 — a store that keeps no past mounts no history. */
 private suspend fun RoutingContext.versionedStore(plugin: AuthoringPlugin): Versioned? {
     val versioned = plugin.store as? Versioned
-    if (versioned == null) respondError("this content store keeps no history", HttpStatusCode.NotFound)
+    if (versioned == null) respondError("this content store keeps no history", HttpStatusCode.NotFound, "noHistory")
     return versioned
 }
+
+private suspend fun RoutingContext.notYourLock(path: String) =
+    respondError("the lock on $path is not yours", HttpStatusCode.Conflict, "notYourLock", mapOf("path" to path))
 
 private fun RoutingContext.limit() = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
 

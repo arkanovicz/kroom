@@ -26,11 +26,22 @@ suspend fun RoutingContext.respondSuccess(message: String? = null) {
     }
 }
 
-suspend fun RoutingContext.respondError(message: String, status: HttpStatusCode = HttpStatusCode.BadRequest) {
+/**
+ * An error the client can show as is ([message]) or say its own way: [code] names it, [args] fill it —
+ * so a client app translates without the server knowing about it.
+ */
+suspend fun RoutingContext.respondError(
+    message: String,
+    status: HttpStatusCode = HttpStatusCode.BadRequest,
+    code: String? = null,
+    args: Map<String, Any?> = emptyMap()
+) {
     call.respondText(
         Json.MutableObject().apply {
             set("success", false)
             set("message", message)
+            code?.let { set("code", it) }
+            if (args.isNotEmpty()) set("args", Json.MutableObject().apply { args.forEach { (k, v) -> set(k, v) } })
         }.toString(),
         ContentType.Application.Json,
         status
