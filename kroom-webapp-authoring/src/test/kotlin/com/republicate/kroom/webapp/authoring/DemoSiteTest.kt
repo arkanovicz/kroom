@@ -25,10 +25,10 @@ class DemoSiteTest {
 
     private fun ApplicationTestBuilder.site() = application {
         installContentSite {
-            store = this@DemoSiteTest.store
+            storage = MemoryStorage(this@DemoSiteTest.store)
             sessionSecret = "demo-secret"
             placeholder = "*Pas encore de contenu pour **\$name**.*"
-            canEdit = { session, _ -> session?.id == "admin" }
+            identity = IdentityProvider { if (it.id == "admin") setOf(Roles.ADMIN) else emptySet() }
         }
         routing {
             get("/login/{who}") {

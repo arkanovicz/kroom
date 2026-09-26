@@ -34,13 +34,13 @@ class EditApiTest {
     private fun ApplicationTestBuilder.serve(
         store: ResourceStore = MemoryResourceStore(),
         timeout: Duration = 2.minutes,
-        mayEdit: (UserSession?, String) -> Boolean = { session, _ -> session != null }
+        identity: IdentityProvider = IdentityProvider { setOf(Roles.EDITOR) }
     ) = application {
         installSessions { sessionSecret = "test-secret" }
         installAuthoring {
             this.store = store
             lockTimeout = timeout
-            canEdit = mayEdit
+            this.identity = identity
         }
         // the test's way in: a session cookie for whoever asks
         routing {
@@ -156,7 +156,7 @@ class EditApiTest {
 
     @Test
     fun `an author the application refuses is 403`() = testApplication {
-        serve(mayEdit = { _, _ -> false })
+        serve(identity = IdentityProvider { emptySet() })
         val alice = actor("alice")
         assertEquals(HttpStatusCode.Forbidden, alice.get("/api/content/$path").status)
         assertEquals(HttpStatusCode.Forbidden, alice.lock(path).status)

@@ -27,9 +27,11 @@ class AuthoringConfig {
     /** Where the edit API mounts. */
     var apiPrefix: String = "/api/content"
 
-    /** The application's authorization, the only thing kroom asks about roles. The path is "" for the
-     *  site-wide journal. */
-    var canEdit: (UserSession?, String) -> Boolean = { session, _ -> session != null }
+    /** Who is who, and their roles. The default knows nobody: nothing is editable until one is given. */
+    var identity: IdentityProvider = MemoryIdentityProvider()
+
+    /** What each role may do; editing a block asks for [Permissions.EDIT] on its path. */
+    var roles: Roles = Roles()
 
     /** What a page shows in place of a block nobody has written yet. */
     var placeholder: String? = null
@@ -53,7 +55,17 @@ class AuthoringPlugin(private val config: AuthoringConfig) {
     /** The editor's script, stylesheet and words, for a layout to emit — `$authoring.assets.tags()`. */
     val assets = AuthoringAssets(config.strings)
 
-    fun canEdit(session: UserSession?, path: String): Boolean = config.canEdit(session, path)
+    val identity: IdentityProvider get() = config.identity
+    val roles: Roles get() = config.roles
+
+    fun roles(session: UserSession?): Set<String> = session?.let { identity.roles(it) }.orEmpty()
+
+    /** Whether [session] (null: a visitor) may [permission] on [target] — "" when site-wide. */
+    fun can(session: UserSession?, permission: String, target: String = ""): Boolean =
+        session != null && roles.can(roles(session), permission, target)
+
+    /** The path is "" for the site-wide journal. */
+    fun canEdit(session: UserSession?, path: String): Boolean = can(session, Permissions.EDIT, path)
 }
 
 private val AuthoringKey = AttributeKey<AuthoringPlugin>("KroomAuthoring")
