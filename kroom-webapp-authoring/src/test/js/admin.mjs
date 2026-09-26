@@ -18,7 +18,8 @@ const entries = JSON.stringify([
     { id: 'pages', label: 'pages', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
     { id: 'media', label: 'media', builtin: true },
     { id: 'plugins', label: 'plugins', builtin: true }, { id: 'roles', label: 'roles', builtin: true },
-    { id: 'forms', label: 'Forms', table: '/api/forms/entries', builtin: false }
+    { id: 'forms', label: 'Forms', table: '/api/forms/entries', builtin: false },
+    { id: 'inbox', label: 'Mailbox', frame: '/mail/inbox', builtin: false }
 ]).replace(/"/g, '&quot;');
 
 const answers = {
@@ -28,7 +29,8 @@ const answers = {
     '/api/site/plugins': [{ id: 'seo', name: 'SEO', description: 'meta', settings: [
         { key: 'title', label: 'Title', type: 'text', value: 'Club' },
         { key: 'index', label: 'Indexed', type: 'boolean', value: 'true' },
-        { key: 'key', label: 'Key', type: 'secret', set: true }] }],
+        { key: 'key', label: 'Key', type: 'secret', set: true },
+        { key: 'mode', label: 'Mode', type: 'choice', choices: ['starttls', 'tls', 'none'], value: 'tls' }] }],
     '/api/content/media': [{ name: 'a-photo.png', url: '/media/a-photo.png', type: 'image/png', size: 2048, time: 0 },
                            { name: 'b-doc.pdf', url: '/media/b-doc.pdf', type: 'application/pdf', size: 10, time: 0 }],
     '/api/site/roles': { roles: { admin: ['*'], editor: ['content.*'] }, yours: ['admin'] },
@@ -52,7 +54,7 @@ const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 
-check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'plugins', 'roles', 'forms']);
+check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'plugins', 'roles', 'forms', 'inbox']);
 check('builtins get a pictogram, a plugin without one its initial', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'F']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
 
@@ -82,11 +84,12 @@ await sleep(20);
 const form = $('.kroom-admin-settings');
 check('a secret is never filled in', form.elements.key.value, '');
 check('a boolean is a checkbox', form.elements.index.checked, true);
+check('a choice is a select, on its value', [form.elements.mode.tagName, form.elements.mode.value], ['SELECT', 'tls']);
 form.elements.title.value = 'Les Vagabonds';
 form.dispatchEvent(new window.Event('submit', { cancelable: true }));
 await sleep(20);
 check('save puts every setting, a secret left empty', calls.at(-1),
-    { url: '/api/site/plugins/seo/settings', method: 'PUT', body: { title: 'Les Vagabonds', index: 'true', key: '' } });
+    { url: '/api/site/plugins/seo/settings', method: 'PUT', body: { title: 'Les Vagabonds', index: 'true', key: '', mode: 'tls' } });
 
 click(entry('roles'));
 await sleep(20);
@@ -95,6 +98,11 @@ check('roles: the table', $$('.kroom-admin-roles dt').map(d => d.textContent), [
 click(entry('forms'));
 await sleep(20);
 check('a plugin table, its cells as text', $$('.kroom-admin-table td').map(td => td.innerHTML), ['Alice', '&lt;b&gt;hi&lt;/b&gt;']);
+
+click(entry('inbox'));
+await sleep(20);
+check('a framed entry: its page in a wide panel', [$('.kroom-admin-frame')?.getAttribute('src'),
+    $('.kroom-admin-panel').classList.contains('kroom-admin-wide')], ['/mail/inbox', true]);
 
 window.document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
 check('Escape closes', $('.kroom-admin-panel').hidden, true);

@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.PathTemplate
+import com.republicate.kroom.webapp.core.Mailer
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
 import com.republicate.kroom.webapp.velocity.pageCatalog
@@ -57,6 +58,12 @@ class Site internal constructor(
     }
 
     fun plugin(id: String): Plugin? = registered[id]
+
+    /**
+     * How the site sends mail — set by a mail plugin as it installs (or by the application), read by whoever
+     * sends at send time, so install order does not matter. Null: the site sends none.
+     */
+    @Volatile var mailer: Mailer? = null
 
     // --- services ----------------------------------------------------------------------------------
 
@@ -154,6 +161,7 @@ class Site internal constructor(
                 push(Json.MutableObject().apply {
                     set("id", entry.id); set("label", entry.label)
                     entry.icon?.let { set("icon", it) }; entry.href?.let { set("href", it) }; entry.table?.let { set("table", it) }
+                    entry.frame?.let { set("frame", it) }
                     set("builtin", entry in builtinEntries)
                 })
             }

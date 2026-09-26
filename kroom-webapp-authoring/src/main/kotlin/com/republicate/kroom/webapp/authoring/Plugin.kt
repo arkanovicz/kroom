@@ -27,18 +27,25 @@ interface Plugin {
     fun install(site: Site)
 }
 
-/** One configurable value. Its [default] applies until an admin sets it; a [Type.SECRET] is never read back. */
+/**
+ * One configurable value. Its [default] applies until an admin sets it; a [Type.SECRET] is never read back; a
+ * [Type.CHOICE] is one of [choices].
+ */
 data class Setting(
     val key: String,
     val label: String = key,
     val default: String = "",
     val type: Type = Type.TEXT,
-    val help: String? = null
+    val help: String? = null,
+    val choices: List<String> = emptyList()
 ) {
-    enum class Type { TEXT, TEXTAREA, BOOLEAN, NUMBER, SECRET }
+    enum class Type { TEXT, TEXTAREA, BOOLEAN, NUMBER, SECRET, CHOICE }
 }
 
-/** An entry of the admin bar: a link ([href]) or a [table] — an API answering `{columns, rows}`. */
+/**
+ * An entry of the admin bar: a link ([href]), a [table] — an API answering `{columns, rows}` — or a [frame],
+ * another application's page shown in the panel (a webmail, a dashboard).
+ */
 data class AdminEntry(
     val id: String,
     val label: String,
@@ -46,5 +53,6 @@ data class AdminEntry(
     val icon: String? = null,
     val href: String? = null,
     val table: String? = null,
+    val frame: String? = null,
     val permission: String = Permissions.ADMIN
 )

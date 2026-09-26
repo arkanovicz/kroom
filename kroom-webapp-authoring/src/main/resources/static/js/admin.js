@@ -94,7 +94,10 @@
         shut.addEventListener('click', close);
         const body = panel.appendChild(element('div', 'kroom-admin-body'));
         panel.hidden = false;
-        const show = entry.builtin ? panels[entry.id] : (into) => table(relative(entry.table), into);
+        panel.classList.toggle('kroom-admin-wide', !!entry.frame);
+        const show = entry.builtin ? panels[entry.id]
+            : entry.frame ? (into) => frame(entry.frame, label, into)
+            : (into) => table(relative(entry.table), into);
         show(body).catch(err => body.replaceChildren(element('p', 'kroom-admin-error', said(err))));
     }
 
@@ -215,6 +218,15 @@
                 input.checked = setting.value === 'true';
                 label.appendChild(input);
                 label.appendChild(document.createTextNode(' ' + setting.label));
+            } else if (setting.type === 'choice') {
+                label.appendChild(document.createTextNode(setting.label));
+                input = element('select');
+                setting.choices.forEach(choice => {
+                    const option = input.appendChild(element('option', null, choice));
+                    option.value = choice;
+                });
+                input.value = setting.value ?? '';
+                label.appendChild(input);
             } else {
                 label.appendChild(document.createTextNode(setting.label));
                 input = element(setting.type === 'textarea' ? 'textarea' : 'input');
@@ -250,6 +262,13 @@
             }
         });
         return form;
+    }
+
+    /** Another application's page, in the panel: whatever it shows, it shows on its own origin. */
+    async function frame(url, title, body) {
+        const iframe = body.appendChild(element('iframe', 'kroom-admin-frame'));
+        iframe.src = url;
+        iframe.title = title;
     }
 
     /** A plugin's panel: {columns: [..], rows: [[..], ..]} — cells are text, never html. */

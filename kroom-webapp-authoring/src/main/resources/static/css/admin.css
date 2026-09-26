@@ -73,6 +73,25 @@ body:has(> .kroom-admin) {
     box-shadow: .25rem 0 1rem rgb(0 0 0 / .15);
 }
 
+/* a framed application needs room: most of the page */
+.kroom-admin-panel.kroom-admin-wide {
+    width: min(64rem, calc(100vw - var(--kroom-admin-width)));
+    display: flex;
+    flex-direction: column;
+}
+
+.kroom-admin-wide .kroom-admin-body {
+    flex: 1;
+    padding: 0;
+}
+
+.kroom-admin-frame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+}
+
 .kroom-admin-panel > header {
     position: sticky;
     top: 0;
@@ -137,7 +156,7 @@ body:has(> .kroom-admin) {
     margin-bottom: .5rem;
 }
 
-.kroom-admin-settings :is(input:not([type="checkbox"]), textarea) {
+.kroom-admin-settings :is(input:not([type="checkbox"]), textarea, select) {
     display: block;
     width: 100%;
     margin: .15rem 0 0;
