@@ -6,6 +6,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-assets
+- Dated releases carried `KROOM_VERSION = "…-SNAPSHOT"`, so every `?v=` asset link (and its one-year
+  cache) stayed the same across upgrades: `generateVersion` declared no input and stayed UP-TO-DATE
+  when the publish script changed the version. The version is now a task input.
+
 #### kroom-webapp-velocity
 - The `TranslateDirective` auto-registration probe asked the wrong classloader. It used
   `Class.forName`, resolving against the plugin class's own loader, while the engine resolves a

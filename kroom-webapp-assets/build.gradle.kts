@@ -18,6 +18,9 @@ val generatedSrcDir = layout.buildDirectory.dir("generated/src/main/kotlin")
 val generateVersion by tasks.registering {
     val outputDir = generatedSrcDir.get().asFile
     val versionFile = File(outputDir, "com/republicate/kroom/webapp/assets/Version.kt")
+    val version = project.version.toString()
+    // without it the task stays UP-TO-DATE across version bumps, and releases ship ?v=…-SNAPSHOT
+    inputs.property("version", version)
     outputs.file(versionFile)
     doLast {
         versionFile.parentFile.mkdirs()
@@ -25,7 +28,7 @@ val generateVersion by tasks.registering {
             package com.republicate.kroom.webapp.assets
 
             /** Generated from project.version - do not edit */
-            const val KROOM_VERSION = "${project.version}"
+            const val KROOM_VERSION = "$version"
         """.trimIndent() + "\n")
     }
 }
