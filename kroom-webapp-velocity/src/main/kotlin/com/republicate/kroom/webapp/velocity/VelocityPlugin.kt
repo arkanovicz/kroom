@@ -286,7 +286,7 @@ suspend fun RoutingContext.respondVelocity(
 
 // A path segment safe to splice into a resource lookup: no dots (kills `..`, dotfiles, and any
 // `foo.txt`/`header.inc` suffix), no slashes (kills `%2f`-smuggled separators), no empties.
-private val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
+internal val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
 
 /**
  * Resolve [path] (one or more `/`-separated clean segments, e.g. `source` or `legal/terms`) to a

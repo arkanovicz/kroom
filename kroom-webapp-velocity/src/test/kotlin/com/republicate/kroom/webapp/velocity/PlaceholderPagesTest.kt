@@ -54,6 +54,19 @@ class PlaceholderPagesTest {
         client.get("/city/paris")   // the application is only built on first call
     }
 
+    /** A partial (`header.inc.html`) is no page: routing refuses a dotted segment, and the catalog follows it. */
+    @Test
+    fun `a partial is neither routed nor catalogued, under a placeholder or not`() = testApplication {
+        application {
+            installVelocity { templatePath = null }
+            routing { placeholderPages(); pages() }
+            val catalog = pageCatalog()
+            assertEquals(null, catalog.keys.firstOrNull { ".inc" in it }, "catalog: $catalog")
+        }
+        assertEquals(HttpStatusCode.NotFound, client.get("/city/paris/header.inc").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/footer.inc").status)
+    }
+
     @Test
     fun `an unbacked path is still a 404`() = testApplication {
         app()

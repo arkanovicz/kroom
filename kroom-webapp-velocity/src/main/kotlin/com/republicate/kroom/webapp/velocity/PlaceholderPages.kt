@@ -69,8 +69,13 @@ private val catalogs = ConcurrentHashMap<String, List<String>>()
 
 private fun catalog(velocity: VelocityPlugin, prefix: String, extension: String): List<String> =
     catalogs.computeIfAbsent("${System.identityHashCode(velocity)}/$prefix.$extension") {
-        templateCatalog(velocity.templatePath, velocity.devDir, prefix, extension)
+        templateCatalog(velocity.templatePath, velocity.devDir, prefix, extension).filter { routable(it, prefix, extension) }
     }
+
+/** What [servePage] would serve: a partial (`header.inc.html`) sits beside pages, and is none. */
+private fun routable(template: String, prefix: String, extension: String): Boolean =
+    template.removePrefix("${prefix.trimEnd('/')}/").removeSuffix(".${extension.trimStart('.')}")
+        .split('/').all { SAFE_SEGMENT.matches(it) }
 
 /** `pages/club/_code_/index.html` → `/club/{code}`; `pages/club/_code_.html` → the same. */
 private fun route(pattern: String, prefix: String, extension: String): String =
