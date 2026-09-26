@@ -7,6 +7,8 @@ All notable changes to kroom will be documented in this file.
 ### Changed (breaking)
 
 #### kroom-webapp-authoring
+- `$site.head()` now emits the house scripts, and the editor's for a logged-in author: a layout calling
+  `$kroomAssets.coreScripts()` and `$authoring.assets.tags()` besides must drop them, or load them twice.
 - `installContentSite { store = … }` is now `storage = …` (a `Storage`; its `content` is the former store),
   and `canEdit = { session, path -> … }` is gone: `identity = IdentityProvider { session -> roles }` answers
   roles, `roles` (a `Roles` table) says what each may do, and editing asks `content.edit` on the block's path.
@@ -33,6 +35,11 @@ All notable changes to kroom will be documented in this file.
 - Media, a fourth `Storage` kind: uploads told by their bytes (PNG, JPEG, GIF, WebP, AVIF, PDF — no SVG),
   named once and served immutable under `/media/`; `MemoryStorage` keeps them within a byte budget (100 MB) and
   refuses past it. The editor uploads a picked, pasted or dropped file and writes it in as markdown.
+- Themes: a page `#define`s its regions (`$content`, `$aside`, `$hero`) and ends with `#layout(name)`; the
+  active theme's layout renders them where it places them, straight to the response. `Theme` (a plugin naming
+  its layouts, under `themes/<id>/layouts/`), `$nav` (`NavItem`s, `here`, `trail`), `$theme` (its settings),
+  a themes panel in the admin bar (switch live, `?theme=` preview for admins), and `BasicTheme` (pico),
+  which a site without a theme wears.
 - `Site.requestTool(name) { call -> }`: `$name`, one value per request — what a page sets and a fragment reads
   back in the same render.
 - `Site.notFound { call -> }`: a request nothing answered, before it becomes a 404 — to log it or still

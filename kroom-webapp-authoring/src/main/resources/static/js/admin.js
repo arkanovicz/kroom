@@ -15,7 +15,8 @@
     // ids — `<entry id>` and `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`,
     // `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>` — and default to what it says.
     const strings = Object.assign({
-        pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', roles: 'roles', close: 'close',
+        pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
+        activate: 'use it', active: 'in use', preview: 'preview', layouts: 'layouts: {layouts}',
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
         noPages: 'no page template', instances: '{count} pages', noInstance: 'none written yet',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
@@ -30,6 +31,7 @@
         journal: 'M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v4h-4',
         media: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         plugins: 'M9 3v4M15 3v4M7 7h10v5a5 5 0 0 1-10 0zM12 17v4',
+        themes: 'M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14.5 15 16 15h2a3 3 0 0 0 3-3 9 9 0 0 0-9-9zM7.5 12h.01M9.5 7.5h.01M14.5 7.5h.01',
         roles: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 8l2 2 4-4',
         close: 'M6 6l12 12M18 6L6 18'
     }, window.kroomAdmin?.icons);
@@ -199,6 +201,37 @@
                 const description = own(`${plugin.id}.description`, plugin.description);
                 if (description) details.appendChild(element('p', 'kroom-admin-muted', description));
                 if (plugin.settings.length) details.appendChild(settingsForm(plugin));
+            }
+        },
+
+        async themes(body) {
+            const themes = await api.getJson(siteApi + 'themes');
+            const list = body.appendChild(element('ul', 'kroom-admin-list'));
+            for (const theme of themes) {
+                const item = list.appendChild(element('li'));
+                item.appendChild(element('strong', null, own(`${theme.id}.name`, theme.name)));
+                const description = own(`${theme.id}.description`, theme.description);
+                if (description) item.appendChild(element('p', 'kroom-admin-muted', description));
+                item.appendChild(element('small', 'kroom-admin-muted', t('layouts', { layouts: theme.layouts.join(', ') })));
+                const actions = item.appendChild(element('div', 'kroom-admin-actions'));
+                // this very page, dressed in it — for an admin only, nobody else's page changes
+                const url = new URL(location.href);
+                url.searchParams.set('theme', theme.id);
+                actions.appendChild(link(url.pathname + url.search, t('preview')));
+                if (theme.active) {
+                    actions.appendChild(element('small', null, t('active')));
+                } else {
+                    const use = actions.appendChild(element('button', null, t('activate')));
+                    use.type = 'button';
+                    use.addEventListener('click', async () => {
+                        try {
+                            await api.putJson(siteApi + 'theme', { id: theme.id });
+                            location.reload();
+                        } catch (err) {
+                            actions.appendChild(element('small', 'kroom-admin-error', said(err)));
+                        }
+                    });
+                }
             }
         },
 

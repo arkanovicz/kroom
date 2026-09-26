@@ -1,0 +1,3 @@
+## #layout("sidebar") — the page's last word: the active theme's layout, rendered in the page's own context,
+## where it writes the regions the page #define'd straight to the response. #layout() is the default one.
+#macro(layout $name)#parse($site.layout($name))#end

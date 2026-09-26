@@ -1,26 +1,7 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>$club</title>
-    $kroomAssets.coreScripts()
-    $authoring.assets.tags()
-    $site.head()
-</head>
-<body>
-<nav class="demo-session">
-    #if($logged)
-        <span>$logged.name</span>
-        <form method="post" action="/logout"><button type="submit" class="secondary">log out</button></form>
-    #else
-        <a href="/login" role="button">log in</a>
-    #end
-</nav>
-<main>
+#set($title = $club)
+#define($content)
     <h1>$club</h1>
     #markdown("description", {"club": $club})
     #markdown("agenda")
-</main>
-$site.foot()
-</body>
-</html>
+#end
+#layout()

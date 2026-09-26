@@ -465,7 +465,7 @@ optional `group`, under which the admin form gathers it.
 | `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
 
 A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `$site.foot()` at the end of
-`<body>`. The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **webmaster** (the health of
+`<body>` (see *Themes*). The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **webmaster** (the health of
 the site's URLs, one concern seen from three sides: meta and Open Graph tags — a page's own through `$seo` —,
 robots.txt and sitemap.xml over `site.pages()`; redirect rules with captures and application resolvers, answered
 before routing, and the 404s counted; every page walked on a schedule, every link and picture tried), **forms** (`$forms.contact()` in any block, a honeypot, messages as records
@@ -474,6 +474,42 @@ for `forms.read`, daily retention), **analytics** (a cookieless counter's script
 `Mailer` kroom-webapp-auth sends its codes through —, a log of what was sent, a webmail framed in the bar; forms
 mails each message to its `notify` address through it). Audience counting stays out of webmaster: it is about
 visitors' privacy, not URLs, and its provider is swapped on its own.
+
+### Themes
+
+A page says *what* it is and hands its parts down as closures — Velocity's `#define`, rendered where the
+layout places them, straight to the response, nothing buffered — then names its layout:
+
+```velocity
+#set($title = "Les Vagabonds")
+$seo.description("Un club de go à Marseille")
+#define($aside) <article>…</article> #end
+#define($content)
+  <h1>Les Vagabonds</h1>
+  #markdown("description", {"club": $club})
+#end
+#layout("sidebar")
+```
+
+The page's top level only sets things (they are known before the layout writes `<head>`); its regions render
+inside the layout. A page without `#layout` is a full document, as before.
+
+A theme is a plugin (`Theme`) naming the layouts it provides. The contract:
+
+- layouts at `themes/<id>/layouts/<name>.html`: `default` required; `article`, `sidebar`, `landing` when it
+  has them (a missing one falls back to `default`); private partials under `themes/<id>/inc/`, assets under
+  `static/{css,js,img,fonts}/<id>/`; a theme jar keeps them at the classpath root, an application's own theme
+  in its templates directory;
+- a layout renders `$content`, and `$aside` / `$hero` when defined (`#if($aside)` tests without rendering);
+  `$title`; `$site.head()` at the end of `<head>` — the house scripts, the editor's for a logged-in author,
+  every plugin's fragments — and `$site.foot()` at the end of `<body>`;
+- `$nav`: the menu (`items` of `NavItem(label, href, description, external, children)`), where the request
+  stands (`here`, `trail`, `contains(item)`) — the application's (`installContentSite { navigation = … }`),
+  or one derived from the pages the site serves; `$theme`: the theme's own settings; `$site.login`.
+
+Several themes may be installed, one active — the admin bar's *themes* panel switches it, live — and an admin
+previews another on any page with `?theme=<id>`. A site without a theme wears kroom's `BasicTheme` (pico, the
+menu, a footer).
 
 ### The admin bar
 

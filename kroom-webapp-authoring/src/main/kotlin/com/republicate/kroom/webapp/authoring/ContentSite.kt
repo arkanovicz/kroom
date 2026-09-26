@@ -34,6 +34,8 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     val site = Site(this, config.storage, config.roles, config.siteApiPrefix, config.pagePrefix, config.pageExtension)
     putSite(site)
     config.plugins.forEach(site::register)
+    // a page's #layout never lands on nothing: without a theme of its own, a site wears kroom's
+    if (site.themes.isEmpty()) site.register(BasicTheme())
 
     installVelocity {
         templatePath = config.templatePath
@@ -43,6 +45,8 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         // the `%` stack: blocks read through the very store the editor writes to
         properties["markdown.loader"] = config.storage.content
         properties["markdown.block.wrapper"] = config.wrapper
+        // #layout(name): a page's parts, handed down to its theme's layout
+        properties["velocimacro.library.path"] = "kroom-macros.vtl,kroom/layout.vtl"
         config.placeholder?.let { properties["markdown.missing"] = it }
         val blockTools = config.blockTools + site.blockTools
         if (blockTools.isNotEmpty()) properties["markdown.tools"] = blockTools.joinToString(",")
@@ -61,6 +65,13 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     }
 
     velocity.registerRequest("site") { site.view(it) }
+    velocity.registerRequest("theme") { call -> site.theme(call)?.let { site.settings(it) } }
+    velocity.registerRequest("nav") { call -> Navigation(site.navigation(call), call.request.local.uri.substringBefore('?')) }
+    config.navigation?.let { site.navigation = it }
+    config.loginPage?.let { page ->
+        site.hiddenPages += page
+        site.loginRoute = "/" + page.removePrefix("${config.pagePrefix}/").removeSuffix(".${config.pageExtension}")
+    }
     site.tools.forEach { (name, value) -> velocity.registerApplication(name) { value } }
     site.requestTools.keys.forEach { name -> velocity.registerRequest(name) { call -> site.requestValue(name, call) } }
     if (site.interceptors.isNotEmpty()) intercept(ApplicationCallPipeline.Plugins) {
@@ -146,6 +157,9 @@ class ContentSiteConfig {
 
     /** What the site gains beyond its pages — see [Plugin]. Installed in this order. */
     val plugins = mutableListOf<Plugin>()
+
+    /** The menu `$nav` offers a theme, per request; null derives one from the pages the site serves. */
+    var navigation: ((ApplicationCall) -> List<NavItem>)? = null
 
     /** Where the admin API mounts; under `/api/`, where api.js roots its calls. */
     var siteApiPrefix: String = "/api/site"

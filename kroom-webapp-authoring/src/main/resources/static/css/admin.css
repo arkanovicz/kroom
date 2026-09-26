@@ -185,6 +185,20 @@ body:has(> .kroom-admin) {
     align-items: center;
 }
 
+.kroom-admin-actions {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+    margin-top: .25rem;
+}
+
+.kroom-admin-actions button {
+    margin: 0;
+    padding: .2rem .6rem;
+    font-size: .8rem;
+    width: auto;
+}
+
 .kroom-admin-roles dt {
     font-weight: bold;
     margin-top: .5rem;

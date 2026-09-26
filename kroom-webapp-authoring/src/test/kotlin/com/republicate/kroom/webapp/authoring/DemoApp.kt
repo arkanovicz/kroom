@@ -5,7 +5,6 @@ import com.republicate.kroom.plugins.forms.Forms
 import com.republicate.kroom.plugins.mail.Mail
 import com.republicate.kroom.plugins.webmaster.Webmaster
 import com.republicate.kroom.plugins.webhook.Webhook
-import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.velocity.respondVelocity
 import com.republicate.kroom.webapp.velocity.velocity
@@ -65,7 +64,6 @@ fun Application.demo() {
         }
         storage.settings("forms")["notify"] = "admin@kroom.test"
     }
-    velocity.registerApplication("kroomAssets") { KroomAssets }
     velocity.registerApplication("demoStore") { storage.content }
 
     routing {

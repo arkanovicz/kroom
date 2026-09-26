@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.PathTemplate
+import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.core.Mailer
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
@@ -53,6 +54,7 @@ class Site internal constructor(
 
     internal fun register(plugin: Plugin) {
         segment(plugin.id)
+        require(plugin.id != SITE) { "'$SITE' is the site's own namespace" }
         require(plugin.id !in registered) { "plugin '${plugin.id}' registered twice" }
         registered[plugin.id] = plugin
         plugin.install(this)
@@ -60,6 +62,44 @@ class Site internal constructor(
     }
 
     fun plugin(id: String): Plugin? = registered[id]
+
+    // --- themes ------------------------------------------------------------------------------------
+
+    val themes: List<Theme> get() = registered.values.filterIsInstance<Theme>()
+
+    /** The theme a request is dressed in: an admin's `?theme=` preview, else the site's choice, else the first. */
+    fun theme(call: ApplicationCall): Theme? {
+        call.request.queryParameters["theme"]?.let { asked ->
+            themes.firstOrNull { it.id == asked }?.takeIf { can(call.userSession, Permissions.ADMIN) }?.let { return it }
+        }
+        val chosen = storage.settings(SITE)["theme"]
+        return themes.firstOrNull { it.id == chosen } ?: themes.firstOrNull()
+    }
+
+    /** Make [theme] the one visitors get. */
+    fun activate(theme: Theme) { storage.settings(SITE)["theme"] = theme.id }
+
+    /** The template of layout [name] in the request's theme — its `default` when it has no such layout. */
+    fun layout(call: ApplicationCall, name: String?): String {
+        val theme = theme(call) ?: error("#layout: no theme installed")
+        val layout = name?.takeIf { it in theme.layouts } ?: "default"
+        return "themes/${theme.id}/layouts/$layout.html"
+    }
+
+    internal var navigation: (ApplicationCall) -> List<NavItem> = { defaultNavigation() }
+
+    /** Every page a visitor may land on, by its route — what a site without a menu of its own shows. */
+    private fun defaultNavigation(): List<NavItem> = pages()
+        .filter { it.template !in hiddenPages }
+        .flatMap { it.urls }
+        .filter { it != "/index" }
+        .map { NavItem(it.substringAfterLast('/').replace('-', ' ').replaceFirstChar(Char::titlecase), it) }
+
+    internal val hiddenPages = HashSet<String>()
+
+    /** Where one logs in, when the site has its own login page. */
+    var loginRoute: String? = null
+        internal set
 
     /**
      * How the site sends mail — set by a mail plugin as it installs (or by the application), read by whoever
@@ -171,11 +211,11 @@ class Site internal constructor(
     /** The entries [session] may open: kroom's own, then the plugins'. */
     internal fun adminEntries(session: UserSession?): List<AdminEntry> =
         if (!can(session, Permissions.ADMIN)) emptyList()
-        else (builtinEntries + entries).filter { can(session, it.permission) }
+        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries).filter { can(session, it.permission) }
 
     private val builtinEntries = listOf(
         AdminEntry("pages", "pages"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
-        AdminEntry("plugins", "plugins"), AdminEntry("roles", "roles")
+        AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
 
     /**
@@ -229,11 +269,29 @@ class Site internal constructor(
 
 data class Page(val template: String, val route: String, val urls: List<String>)
 
-/** `$site` in a page: the slots a layout calls, and the one question a template may ask. */
+/** `$site` in a page: the slots a layout calls, the layout a page asks for, and the one question a template may ask. */
 class SiteView internal constructor(private val site: Site, private val call: ApplicationCall) {
-    fun head(): String = site.head(call)
+    /**
+     * Everything kroom and its plugins put in `<head>`: the house scripts, the editor's for whoever is logged
+     * in (a visitor downloads none of it), then the plugins' fragments.
+     */
+    fun head(): String = listOfNotNull(
+        KroomAssets.coreScripts(),
+        call.userSession?.let { site.application.authoringOrNull?.assets?.tags() },
+        site.head(call).takeIf { it.isNotEmpty() }
+    ).joinToString("\n")
+
     fun foot(): String = site.foot(call)
     fun can(permission: String, target: String = ""): Boolean = site.can(call.userSession, permission, target)
+
+    /** What `#layout(name)` parses. */
+    fun layout(name: String?): String = site.layout(call, name)
+
+    /** Where one logs in — null when the application handles it elsewhere. */
+    val login: String? get() = site.loginRoute
+
+    /** For cache-busting a theme's assets: `?v=$site.version`. */
+    val version: String get() = AuthoringAssets.VERSION
 }
 
 private class DefaultedSettings(private val stored: Settings, private val declared: List<Setting>) : Settings {
@@ -245,6 +303,9 @@ private class DefaultedSettings(private val stored: Settings, private val declar
 /** Text made safe for HTML — content and double-quoted attributes alike. */
 fun htmlEscape(value: String) =
     value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+/** The site's own settings namespace (the active theme…) — no plugin may take it. */
+internal const val SITE = "site"
 
 private val SiteKey = AttributeKey<Site>("KroomSite")
 

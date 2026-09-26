@@ -18,6 +18,8 @@ import io.ktor.server.routing.*
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
  * PUT {prefix}/plugins/{id}/settings   {key: value} — declared keys only; "" keeps a secret, null resets
  * GET {prefix}/roles                   what each role may do, and the caller's roles
+ * GET {prefix}/themes                  the installed themes, their layouts, which one is active
+ * PUT {prefix}/theme                   {id} — what visitors get from now on
  * ```
  */
 fun Route.siteRoutes() {
@@ -85,6 +87,31 @@ fun Route.siteRoutes() {
                 if (declared[key]!!.type == "secret" && text == "") continue
                 settings[key] = text
             }
+            respondSuccess()
+        }
+
+        get("/themes") {
+            val session = admin(site) ?: return@get
+            val active = site.theme(call)
+            respondJson(Json.MutableArray().apply {
+                site.themes.forEach { theme ->
+                    push(Json.MutableObject().apply {
+                        set("id", theme.id)
+                        set("name", theme.name)
+                        set("description", theme.description)
+                        set("layouts", Json.MutableArray().apply { theme.layouts.sorted().forEach { push(it) } })
+                        set("active", theme == active)
+                    })
+                }
+            })
+        }
+
+        put("/theme") {
+            admin(site) ?: return@put
+            val id = receiveJsonObject().getString("id")
+            val theme = site.themes.firstOrNull { it.id == id }
+                ?: return@put respondError("no theme $id", HttpStatusCode.NotFound, "noTheme", mapOf("id" to id))
+            site.activate(theme)
             respondSuccess()
         }
 

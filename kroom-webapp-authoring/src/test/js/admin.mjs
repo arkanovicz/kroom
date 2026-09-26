@@ -17,6 +17,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const entries = JSON.stringify([
     { id: 'pages', label: 'pages', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
     { id: 'media', label: 'media', builtin: true },
+    { id: 'themes', label: 'themes', builtin: true },
     { id: 'plugins', label: 'plugins', builtin: true }, { id: 'roles', label: 'roles', builtin: true },
     { id: 'forms', label: 'Forms', tables: [{ id: 'entries', label: 'Entries', url: '/api/forms/entries' }], builtin: false },
     { id: 'web', label: 'Webmaster', builtin: false, tables: [{ id: 'redirects', label: 'Redirects', url: '/api/web/redirects' },
@@ -35,6 +36,8 @@ const answers = {
         { key: 'mode', label: 'Mode', type: 'choice', choices: ['starttls', 'tls', 'none'], value: 'tls' }] }],
     '/api/content/media': [{ name: 'a-photo.png', url: '/media/a-photo.png', type: 'image/png', size: 2048, time: 0 },
                            { name: 'b-doc.pdf', url: '/media/b-doc.pdf', type: 'application/pdf', size: 10, time: 0 }],
+    '/api/site/themes': [{ id: 'basic', name: 'Basic', description: 'pico', layouts: ['default', 'sidebar'], active: true },
+                         { id: 'editorial', name: 'Editorial', description: '', layouts: ['default'], active: false }],
     '/api/site/roles': { roles: { admin: ['*'], editor: ['content.*'] }, yours: ['admin'] },
     '/api/web/redirects': { columns: ['from', 'to'], rows: [['/old', '/new']] },
     '/api/web/missing': { columns: ['uri', 'count'], rows: [['/gone', 3]] },
@@ -60,7 +63,7 @@ const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 
-check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'plugins', 'roles', 'forms', 'web', 'inbox']);
+check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'themes', 'plugins', 'roles', 'forms', 'web', 'inbox']);
 check('builtins get a pictogram, a plugin without one the initial of its (translated) label', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'M']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
 check("the application's words, for kroom's entries and a plugin's", [entry('pages').title, entry('forms').title], ['pages du site', 'Messages reçus']);
@@ -85,6 +88,14 @@ click($('.kroom-admin-remove'));
 await sleep(20);
 check('delete asks the server, and the file leaves the grid', [calls.at(-1).method, calls.at(-1).url, $$('.kroom-admin-media li').length],
     ['DELETE', '/api/content/media/a-photo.png', 1]);
+
+click(entry('themes'));
+await sleep(20);
+check('themes: each with a preview of this page, the one in use says so', [$$('.kroom-admin-actions a').map(a => a.getAttribute('href')),
+    $$('.kroom-admin-actions button').length], [['/club/13Ma?theme=basic', '/club/13Ma?theme=editorial'], 1]);
+click($('.kroom-admin-actions button'));
+await sleep(20);
+check('using one puts it', [calls.at(-1).method, calls.at(-1).url, calls.at(-1).body], ['PUT', '/api/site/theme', { id: 'editorial' }]);
 
 click(entry('plugins'));
 await sleep(20);
