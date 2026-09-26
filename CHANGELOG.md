@@ -64,6 +64,16 @@ All notable changes to kroom will be documented in this file.
   literal `.b`). kroom's own templates are therefore formal-only; a consumer's templates stay the
   consumer's call, configured on their side.
 
+### Changed
+
+#### kroom-webapp-authoring
+- `ContentSiteConfig.devDir` is the source resources directory (`src/main/resources`), no longer its
+  `templates/`: layouts are read from `<devDir>/<templatePath>` and static files from `<devDir>/static`,
+  so a stylesheet edit shows without a restart, as a layout edit already did.
+
+#### kroom-webapp-core
+- Dev-mode static routes answer `Cache-Control: no-cache`, classpath fallback included (was one hour).
+
 ### Build
 - velocity `3.0.0-BETA-20260924-01` (header defaults, header mode, strict header contract, full sandbox,
   write ACL, kotlin default arguments and extension functions); antlr-kotlin 1.0.10, matching the

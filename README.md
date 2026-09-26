@@ -105,7 +105,7 @@ installCore {
         // Default prefixes: css, js, img, fonts, lib, snd
         prefixes = listOf("css", "js", "img", "fonts", "lib", "snd")
 
-        // Dev mode: serve from filesystem first, fallback to classpath
+        // Dev mode: serve from filesystem first, fallback to classpath; no-cache either way
         devMode = true
         devDir = File("src/main/resources/static")
     }
@@ -291,6 +291,8 @@ installAuthoring {
 ```
 
 `installContentSite { store = …; canEdit = … }` does all of the above in one call, both template stacks included.
+In dev, `devDir = File("src/main/resources")` serves that tree live instead of the classpath — layouts from its
+`templates/`, static files from its `static/`, neither cached by the browser.
 
 ### The edit API
 

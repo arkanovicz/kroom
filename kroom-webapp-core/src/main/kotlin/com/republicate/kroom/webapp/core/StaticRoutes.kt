@@ -9,7 +9,7 @@ import java.io.File
  * Mount static routes for serving CSS, JS, images, fonts, sounds and other static assets.
  *
  * In production mode: assets loaded from classpath resources under /static/
- * In dev mode: assets loaded from filesystem first, falling back to classpath
+ * In dev mode: assets loaded from filesystem first, falling back to classpath, never cached by the browser
  */
 fun Route.staticRoutes(config: StaticConfig = StaticConfig()) {
     val devDir = if (config.devMode) config.devDir else null
@@ -38,6 +38,7 @@ private suspend fun RoutingContext.serveStatic(prefix: String, path: String?, de
         val file = File(devDir, "$prefix/$path")
         if (file.isFile) {
             val contentType = contentTypeFor(path)
+            call.response.header(HttpHeaders.CacheControl, "no-cache")
             call.respondBytes(file.readBytes(), contentType)
             return
         }
@@ -55,10 +56,10 @@ private suspend fun RoutingContext.serveStatic(prefix: String, path: String?, de
 
     val contentType = contentTypeFor(path)
 
-    // Long cache (1 year) when versioned (?v=...), short cache otherwise
+    // Long cache (1 year) when versioned (?v=...), short cache otherwise; none in dev, where a rebuild changes it
     val hasVersion = call.request.queryParameters.contains("v")
     val maxAge = if (hasVersion) 31536000 else 3600  // 1 year vs 1 hour
-    call.response.header(HttpHeaders.CacheControl, "public, max-age=$maxAge")
+    call.response.header(HttpHeaders.CacheControl, if (devDir != null) "no-cache" else "public, max-age=$maxAge")
     call.respondBytes(resource.readBytes(), contentType)
 }
 

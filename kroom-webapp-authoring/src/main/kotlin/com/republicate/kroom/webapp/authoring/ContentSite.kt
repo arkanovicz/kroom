@@ -25,13 +25,14 @@ import kotlin.time.Duration.Companion.minutes
 fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     val config = ContentSiteConfig().apply(block)
 
-    installCore()
+    // one tree in dev, laid out as the classpath production reads: `<devDir>/templates`, `<devDir>/static`
+    installCore { static { devMode = config.devDir != null; devDir = config.devDir?.resolve("static") } }
     if (config.sessions) installSessions { config.sessionSecret?.let { sessionSecret = it } }
 
     installVelocity {
         templatePath = config.templatePath
         devMode = config.devDir != null
-        devDir = config.devDir
+        devDir = config.devDir?.let { dir -> config.templatePath?.let { dir.resolve(it) } ?: dir }
         // the `%` stack: blocks read through the very store the editor writes to
         properties["markdown.loader"] = config.store
         properties["markdown.block.wrapper"] = config.wrapper
@@ -61,7 +62,10 @@ class ContentSiteConfig {
     /** Classpath root of the `#` layouts; null keeps them at the classpath root. */
     var templatePath: String? = "templates"
 
-    /** A source directory to serve layouts from instead, hot-reloaded — dev only. */
+    /**
+     * A source resources directory (`src/main/resources`) to serve from instead of the classpath, hot-reloaded:
+     * the layouts under its [templatePath], the static files under its `static/` — dev only.
+     */
     var devDir: File? = null
 
     var pagePrefix: String = "pages"
