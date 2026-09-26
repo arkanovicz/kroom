@@ -2,6 +2,7 @@ package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.plugins.analytics.Analytics
 import com.republicate.kroom.plugins.forms.Forms
+import com.republicate.kroom.plugins.linkcheck.LinkCheck
 import com.republicate.kroom.plugins.mail.Mail
 import com.republicate.kroom.plugins.redirects.Redirects
 import com.republicate.kroom.plugins.seo.Seo
@@ -52,7 +53,7 @@ fun Application.demo() {
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet.*"
         // an admin sees them in the bar on the left; a block may call `$forms.contact()`
-        plugins += listOf(Seo(), Redirects(), Forms(), Analytics(), Webhook(), Mail())
+        plugins += listOf(Seo(), Redirects(), Forms(), Analytics(), Webhook(), Mail(), LinkCheck())
     }
 
     // dockerized (demo/compose.yml), mail goes to Mailpit, and each form message to the admin

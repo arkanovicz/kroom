@@ -26,7 +26,7 @@ include("kroom-markdown")
 include("kroom-webapp-authoring")
 
 // Authoring plugins: what a site gains beyond its pages, one artifact each
-for (plugin in listOf("seo", "redirects", "forms", "analytics", "webhook", "mail")) {
+for (plugin in listOf("seo", "redirects", "forms", "analytics", "webhook", "mail", "linkcheck")) {
     include("kroom-plugin-$plugin")
     project(":kroom-plugin-$plugin").projectDir = file("kroom-webapp-authoring/plugins/$plugin")
 }

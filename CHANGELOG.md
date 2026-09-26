@@ -42,13 +42,15 @@ All notable changes to kroom will be documented in this file.
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
 
-#### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook, -mail
+#### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook, -mail, -linkcheck
 - Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. mail is an SMTP
   transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms mails each
   message to its `notify` address when the site has a mailer. seo takes a page's own words:
   `$seo.title(…)`, `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`, over the site-wide settings.
   redirects matches `{name}` captures in the path and the query (`/tournoi.php?id={id} /tournament/{id}`,
   values encoded), hands them to an application's resolver (`@player`), and counts what nothing answered.
+  linkcheck walks every page the site serves from its public URL, tries each link and picture, and lists the
+  broken ones with their page.
 
 #### kroom-webapp-velocity
 - `pages()` leaves a path no template backs unanswered instead of answering 404 itself, so an application's

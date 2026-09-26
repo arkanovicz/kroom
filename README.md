@@ -18,7 +18,7 @@ kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
-kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): seo, redirects, forms, analytics, webhook
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): seo, redirects, forms, analytics, webhook, mail, linkcheck
 ```
 
 ## Features
@@ -451,7 +451,9 @@ installContentSite { plugins += Seo() }
 | `settings(plugin)`, `records(plugin, c)` | configuration, owned rows | options, custom tables |
 | `tool(name, value, blocks = true)` | `$name` in pages — and in `%` blocks | shortcodes |
 | `routes { }` | public or guarded endpoints (`site.can`) | REST routes, admin-ajax |
+| `requestTool(name) { call -> }` | `$name`, one value per request: what a page says of itself | `wp_title`-style filters |
 | `intercept { call -> }` | before routing: redirects, firewall, cache | `template_redirect`, drop-ins |
+| `notFound { call -> }` | what nothing answered: log it, or still answer it | `404_template` |
 | `head { }`, `foot { }` | fragments at `$site.head()` / `$site.foot()` | `wp_head`, `wp_footer` |
 | `admin(AdminEntry)` | an entry of the admin bar: a link, or a `{columns, rows}` table | `add_menu_page` |
 | `onPublish { block, author -> }` | after each submit, off the request | `save_post` |
@@ -465,7 +467,8 @@ routing, hit counts in the bar), **forms** (`$forms.contact()` in any block, a h
 for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
 **webhook** (a signed POST on each publish), **mail** (the site's SMTP transport as `site.mailer` — the same
 `Mailer` kroom-webapp-auth sends its codes through —, a log of what was sent, a webmail framed in the bar; forms
-mails each message to its `notify` address through it).
+mails each message to its `notify` address through it), **linkcheck** (every page walked on a schedule, every
+link and picture tried, the broken ones listed with their page).
 
 ### The admin bar
 
