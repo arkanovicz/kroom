@@ -30,6 +30,8 @@ All notable changes to kroom will be documented in this file.
 - Media, a fourth `Storage` kind: uploads told by their bytes (PNG, JPEG, GIF, WebP, AVIF, PDF — no SVG),
   named once and served immutable under `/media/`; `MemoryStorage` keeps them within a byte budget (100 MB) and
   refuses past it. The editor uploads a picked, pasted or dropped file and writes it in as markdown.
+- `Site.notFound { call -> }`: a request nothing answered, before it becomes a 404 — to log it or still
+  answer it (a phase of its own ahead of `Fallback`, where the engine answers first).
 - `Site.mailer`: how the site sends mail, set by a mail plugin, read at send time.
 - The demo runs dockerized (`kroom-webapp-authoring/demo/compose.yml`): the repository's wrapper in a JDK
   container, Mailpit beside it, framed in the admin bar.
@@ -44,6 +46,8 @@ All notable changes to kroom will be documented in this file.
   message to its `notify` address when the site has a mailer.
 
 #### kroom-webapp-velocity
+- `pages()` leaves a path no template backs unanswered instead of answering 404 itself, so an application's
+  fallbacks see it; the client still gets a 404.
 - `pageCatalog()`: every page template and the route it is served at.
 - `privateSegments` (default `inc`): directory names never served as pages — `pages/inc/header.html` is a
   partial, no longer answered at `/inc/header`; one rule for `pages()`, `placeholderPages()`, `resolvePage`

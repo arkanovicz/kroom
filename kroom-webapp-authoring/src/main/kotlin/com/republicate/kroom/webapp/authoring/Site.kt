@@ -43,6 +43,7 @@ class Site internal constructor(
     internal val blockTools = LinkedHashSet<String>()
     internal val routes = ArrayList<Route.() -> Unit>()
     internal val interceptors = ArrayList<suspend (ApplicationCall) -> Unit>()
+    internal val notFoundHandlers = ArrayList<suspend (ApplicationCall) -> Unit>()
     internal val publishListeners = ArrayList<suspend (Block, UserSession) -> Unit>()
     internal val jobs = ArrayList<Pair<Duration, suspend () -> Unit>>()
     private val heads = ArrayList<(ApplicationCall) -> String?>()
@@ -109,6 +110,12 @@ class Site internal constructor(
 
     /** Runs before routing, for every request; answering the call ends it there (redirects, firewall, cache). */
     fun intercept(handler: suspend (ApplicationCall) -> Unit) { interceptors += handler }
+
+    /**
+     * Runs for a request nothing answered — no route, no page — before it becomes a 404: log it, or answer it
+     * (a redirect learned too late for [intercept]). The first handler to answer ends it.
+     */
+    fun notFound(handler: suspend (ApplicationCall) -> Unit) { notFoundHandlers += handler }
 
     /** A fragment for `<head>` (meta, links, scripts); null or empty adds nothing. */
     fun head(fragment: (ApplicationCall) -> String?) { heads += fragment }

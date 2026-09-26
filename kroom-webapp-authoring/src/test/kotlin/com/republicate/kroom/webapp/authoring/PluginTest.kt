@@ -21,6 +21,7 @@ import kotlin.test.assertFalse
 class PluginTest {
 
     private val published = CompletableDeferred<String>()
+    private val missed = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     private val probe = object : Plugin {
         override val id = "probe"
@@ -33,6 +34,8 @@ class PluginTest {
             site.admin(AdminEntry("probe", "Probe", table = "/api/probe/rows", permission = "probe.read"))
             site.routes { get("/api/probe/rows") { call.respondText("""{"columns":["a"],"rows":[["1"]]}""", ContentType.Application.Json) } }
             site.intercept { call -> if (call.request.local.uri == "/old") call.respondRedirect("/club/13Ma", permanent = true) }
+            site.notFound { call -> missed += call.request.local.uri }
+            site.notFound { call -> if (call.request.local.uri == "/late") call.respondRedirect("/club/13Ma") }
             site.onPublish { block, _ -> published.complete(block.path) }
         }
     }
@@ -113,6 +116,15 @@ class PluginTest {
             setBody("""{"page":"/club/13Ma","rev":"","body":"Mardi."}""")
         }.let { assertEquals(HttpStatusCode.OK, it.status) }
         assertEquals("pages/club/13Ma/agenda.md", withTimeout(5000) { published.await() })
+    }
+
+    @Test
+    fun `what nothing answers is seen by notFound handlers, which may still answer it`() = testApplication {
+        site()
+        assertEquals(HttpStatusCode.NotFound, client.get("/nowhere").status)
+        assertEquals(HttpStatusCode.Found, visitor().get("/late").status)
+        assertEquals(HttpStatusCode.OK, client.get("/club/13Ma").status)
+        assertEquals(listOf("/nowhere", "/late"), missed)
     }
 
     @Test

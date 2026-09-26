@@ -331,14 +331,16 @@ suspend fun ApplicationCall.servePage(
  * `/legal/terms` → `pages/legal/terms.html`. A content page becomes *just a template* — no route,
  * no model.
  *
- * Mount it **last**, after all specific and param routes: it claims any otherwise-unmatched GET,
- * 404ing paths with no backing template. Note ktor scores a param route (`/{x}`) **above** this
+ * Mount it **last**, after all specific and param routes: it serves any otherwise-unmatched GET a template
+ * backs, and leaves the others unanswered — a 404, once the application's fallbacks have had their look. Note ktor scores a param route (`/{x}`) **above** this
  * tailcard, so an app with a root param route should instead delegate from that handler via
  * [servePage]. See [servePage] for the lookup/security details.
  */
 fun Route.pages(prefix: String = "pages", extension: String = "html") {
     get("/{path...}") {
         val path = call.parameters.getAll("path").orEmpty().joinToString("/")
-        if (!call.servePage(path, prefix, extension)) call.respond(HttpStatusCode.NotFound)
+        // a miss is left unanswered, not answered 404: whatever handles unhandled calls (a redirect, a log)
+        // still gets to see it, and the engine says 404 if nothing does
+        call.servePage(path, prefix, extension)
     }
 }

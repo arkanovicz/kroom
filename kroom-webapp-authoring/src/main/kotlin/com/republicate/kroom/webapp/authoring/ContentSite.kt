@@ -8,6 +8,7 @@ import com.republicate.kroom.webapp.velocity.pages
 import com.republicate.kroom.webapp.velocity.placeholderPages
 import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.server.application.*
+import io.ktor.util.pipeline.PipelinePhase
 import io.ktor.server.routing.routing
 import java.io.File
 import kotlin.time.Duration
@@ -65,6 +66,17 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         for (interceptor in site.interceptors) {
             interceptor(call)
             if (call.isHandled) return@intercept finish()
+        }
+    }
+    // a phase of our own, ahead of Fallback, where the engine answers 404 before any later interceptor looks
+    if (site.notFoundHandlers.isNotEmpty()) {
+        val notFound = PipelinePhase("KroomNotFound")
+        insertPhaseBefore(ApplicationCallPipeline.Fallback, notFound)
+        intercept(notFound) {
+            for (handler in site.notFoundHandlers) {
+                if (call.isHandled) return@intercept
+                handler(call)
+            }
         }
     }
     site.startJobs()
