@@ -30,7 +30,9 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
 
     override fun render(args: List<Any?>, bodyContent: ((Appendable) -> Unit)?, context: Context, out: Appendable, scope: Merge) {
         val argument = args.getOrNull(0) ?: throw VelocityException("#markdown(): missing or null block argument")
-        val page = scope.currentTemplateName.takeUnless { it == "<undef>" }
+        // the page is the template the merge started from, not the one rendering now: a region a page
+        // #define's is rendered from inside its layout, and a partial's blocks are its page's too
+        val page = scope.templateNames.firstOrNull()?.takeUnless { it == "<undef>" }
         val path = try {
             blockPath(argument.toString(), page) { context[it] }
         } catch (e: IllegalArgumentException) {

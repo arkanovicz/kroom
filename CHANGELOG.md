@@ -75,6 +75,10 @@ All notable changes to kroom will be documented in this file.
   editor's table. One table now reaches both, and a plugin's labels are translatable by key (reported from
   site2026).
 
+#### kroom-markdown
+- A block is its page's: its path derives from the template the merge started from, not the one rendering
+  now — a region a page `#define`s and its layout renders found the layout's blocks instead.
+
 #### kroom-webapp-velocity
 - A partial beside the pages (`header.inc.html`) was listed by the template catalog — and, under a
   placeholder directory, mounted as a route (`/city/{name}/header.inc`). The catalog now keeps only what

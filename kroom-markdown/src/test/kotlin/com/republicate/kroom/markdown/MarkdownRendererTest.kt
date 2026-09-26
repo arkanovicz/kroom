@@ -186,6 +186,20 @@ class MarkdownRendererTest {
         )
     }
 
+    /**
+     * A block belongs to its PAGE — the template the merge started from — even when the call renders from
+     * elsewhere: a region the page `#define`s is rendered by its theme's layout, and must still find the
+     * page's blocks, not the layout's.
+     */
+    @Test
+    fun `a block called from a region the layout renders is still its page's`() {
+        // the layout is #parse'd by computed name, as #layout does: that #parse stacks its template
+        assertEquals(
+            "<main><h2>Les Vagabonds</h2>\n<p>club 13Ma</p>\n</main>",
+            host("pages/themed/_code_.html", "code" to "13Ma", "club" to Club("Les Vagabonds"))
+        )
+    }
+
     /** An unwritten block is a normal state of a live content tree: the page still renders. */
     @Test
     fun `a block that does not exist yet renders the placeholder`() {
