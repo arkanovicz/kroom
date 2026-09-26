@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.core
 
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.defaultheaders.*
@@ -41,8 +42,9 @@ fun Application.installCore(block: CoreConfig.() -> Unit = {}) {
                 status = HttpStatusCode.InternalServerError
             )
         }
-        status(HttpStatusCode.NotFound) { call, _ ->
-            call.respondText("Not Found", status = HttpStatusCode.NotFound)
+        // only a 404 nobody explained: one that carries a body (an API's JSON error) says why itself
+        status(HttpStatusCode.NotFound) { _ ->
+            if (content is OutgoingContent.NoContent) call.respondText("Not Found", status = HttpStatusCode.NotFound)
         }
     }
 

@@ -51,6 +51,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-core
+- `installCore`'s 404 handler replaced every 404 body with plain `Not Found` — an API's JSON error included,
+  so the editor never received `noPage`, `noHistory` or `noSuchRevision` (reported from site2026). Only a 404
+  without a body gets one now.
+
 #### kroom-webapp-velocity
 - A partial beside the pages (`header.inc.html`) was listed by the template catalog — and, under a
   placeholder directory, mounted as a route (`/city/{name}/header.inc`). The catalog now keeps only what
