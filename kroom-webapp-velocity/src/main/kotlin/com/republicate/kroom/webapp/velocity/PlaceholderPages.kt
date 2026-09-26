@@ -56,6 +56,14 @@ fun Application.resolvePage(
     return null
 }
 
+/**
+ * Every page template under [prefix], with the route it is served at: `pages/login.html` → `/login`,
+ * `pages/club/_code_.html` → `/club/{code}`. The same scan [placeholderPages] mounts from — for whoever lists
+ * a site's pages (an admin menu, a sitemap).
+ */
+fun Application.pageCatalog(prefix: String = "pages", extension: String = "html"): Map<String, String> =
+    catalog(velocity, prefix, extension).sorted().associateWith { route(PathTemplate(it).pattern, prefix, extension).ifEmpty { "/" } }
+
 /** Scanned once per (plugin, prefix): a jar's entries do not change under a running server. */
 private val catalogs = ConcurrentHashMap<String, List<String>>()
 
