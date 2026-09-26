@@ -26,7 +26,10 @@ All notable changes to kroom will be documented in this file.
   entries, publish listeners, scheduled jobs, role grants. `Site.pages()` lists every page the site serves.
 - The admin bar, left of every page for `site.admin`: pages, journal, media, plugins and their settings,
   roles, and the plugins' entries — a link, a `{columns, rows}` table, or another application framed (a
-  webmail); `/api/site/*` behind it, `admin.js`/`admin.css` in front. Settings may be `CHOICE`s.
+  webmail); `/api/site/*` behind it, `admin.js`/`admin.css` in front.
+- `Setting` is made by the function naming its kind — `Setting.text`, `.textarea`, `.number`, `.boolean`,
+  `.secret`, `.choice(key, choices = …)` — with an optional `group` the admin form gathers it under. An
+  `AdminEntry` holds `tables` (`AdminTable(id, label, url)`), shown one under the other.
 - Media, a fourth `Storage` kind: uploads told by their bytes (PNG, JPEG, GIF, WebP, AVIF, PDF — no SVG),
   named once and served immutable under `/media/`; `MemoryStorage` keeps them within a byte budget (100 MB) and
   refuses past it. The editor uploads a picked, pasted or dropped file and writes it in as markdown.
@@ -42,15 +45,15 @@ All notable changes to kroom will be documented in this file.
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
 
-#### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook, -mail, -linkcheck
-- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. mail is an SMTP
-  transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms mails each
-  message to its `notify` address when the site has a mailer. seo takes a page's own words:
-  `$seo.title(…)`, `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`, over the site-wide settings.
-  redirects matches `{name}` captures in the path and the query (`/tournoi.php?id={id} /tournament/{id}`,
-  values encoded), hands them to an application's resolver (`@player`), and counts what nothing answered.
-  linkcheck walks every page the site serves from its public URL, tries each link and picture, and lists the
-  broken ones with their page.
+#### kroom-plugin-webmaster, -forms, -analytics, -webhook, -mail
+- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo.
+- webmaster: the health of the site's URLs — meta and Open Graph tags (a page's own through `$seo.title(…)`,
+  `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`), robots.txt and sitemap.xml; redirect rules with
+  `{name}` captures in the path and the query (values encoded) and application resolvers (`@player`), the 404s
+  counted; every page walked on a schedule, every link and picture tried, the broken ones listed with their
+  page. One public URL, grouped settings, one admin entry with three tables.
+- mail: an SMTP transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms
+  mails each message to its `notify` address when the site has a mailer.
 
 #### kroom-webapp-velocity
 - `pages()` leaves a path no template backs unanswered instead of answering 404 itself, so an application's

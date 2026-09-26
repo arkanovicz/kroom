@@ -2,8 +2,8 @@
 // Part of kroom-webapp-authoring. Needs api.js. Emitted by `$site.foot()` for Permissions.ADMIN only.
 //
 // The server hands the entries as data (kroom's own, then the plugins'); every piece of markup is built
-// here. A panel opens beside the bar: pages, journal, plugins and their settings, roles — or a plugin's
-// table, any API answering {columns, rows}.
+// here. A panel opens beside the bar: pages, journal, media, plugins and their settings, roles — or a
+// plugin's tables (APIs answering {columns, rows}), or another application, framed.
 
 (function () {
 
@@ -12,8 +12,8 @@
 
     // Every word the bar says. One table with the editor's: the application's overrides
     // (installContentSite { strings[…] }) are emitted for both scripts. A plugin's words are keyed by its
-    // ids — `<entry id>` for an entry, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>` and
-    // `<plugin>.<setting>.help` — and default to what the plugin says.
+    // ids — `<entry id>` and `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`,
+    // `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>` — and default to what it says.
     const strings = Object.assign({
         pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', roles: 'roles', close: 'close',
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
@@ -102,7 +102,7 @@
         panel.classList.toggle('kroom-admin-wide', !!entry.frame);
         const show = entry.builtin ? panels[entry.id]
             : entry.frame ? (into) => frame(entry.frame, label, into)
-            : (into) => table(relative(entry.table), into);
+            : (into) => tables(entry, into);
         show(body).catch(err => body.replaceChildren(element('p', 'kroom-admin-error', said(err))));
     }
 
@@ -215,12 +215,19 @@
 
     function settingsForm(plugin) {
         const form = element('form', 'kroom-admin-settings');
+        let group = null, into = form;
         for (const declared of plugin.settings) {
             const setting = Object.assign({}, declared, {
                 label: own(`${plugin.id}.${declared.key}`, declared.label),
                 help: own(`${plugin.id}.${declared.key}.help`, declared.help)
             });
-            const label = form.appendChild(element('label'));
+            // consecutive settings of one group share a fieldset, under the group's name
+            if ((declared.group ?? null) !== group) {
+                group = declared.group ?? null;
+                into = group ? form.appendChild(element('fieldset')) : form;
+                if (group) into.appendChild(element('legend', null, own(`${plugin.id}.${group}`, group)));
+            }
+            const label = into.appendChild(element('label'));
             let input;
             if (setting.type === 'boolean') {
                 input = element('input');
@@ -281,7 +288,16 @@
         iframe.title = title;
     }
 
-    /** A plugin's panel: {columns: [..], rows: [[..], ..]} — cells are text, never html. */
+    /** A plugin's tables, one under the other — each under its label when there are several. */
+    async function tables(entry, body) {
+        for (const tbl of entry.tables || []) {
+            const section = body.appendChild(element('section', 'kroom-admin-section'));
+            if (entry.tables.length > 1) section.appendChild(element('h4', null, own(`${entry.id}.${tbl.id}`, tbl.label)));
+            await table(relative(tbl.url), section);
+        }
+    }
+
+    /** One {columns: [..], rows: [[..], ..]} — cells are text, never html. */
     async function table(url, body) {
         const data = await api.getJson(url);
         if (!data.rows?.length) return body.appendChild(element('p', 'kroom-admin-muted', t('empty')));

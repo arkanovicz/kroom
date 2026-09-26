@@ -25,13 +25,13 @@ class PluginTest {
 
     private val probe = object : Plugin {
         override val id = "probe"
-        override val settings = listOf(Setting("greeting", default = "hello"), Setting("token", type = Setting.Type.SECRET))
+        override val settings = listOf(Setting.text("greeting", default = "hello"), Setting.secret("token"))
         override fun install(site: Site) {
             site.grant(Roles.EDITOR, "probe.read")
             site.tool("probe", Greeter(site, this), blocks = true)
             site.head { """<meta name="probe" content="${site.settings(this)["greeting"]}">""" }
             site.foot { "<!-- probe foot -->" }
-            site.admin(AdminEntry("probe", "Probe", table = "/api/probe/rows", permission = "probe.read"))
+            site.admin(AdminEntry("probe", "Probe", tables = listOf(AdminTable("rows", "Rows", "/api/probe/rows")), permission = "probe.read"))
             site.routes { get("/api/probe/rows") { call.respondText("""{"columns":["a"],"rows":[["1"]]}""", ContentType.Application.Json) } }
             site.intercept { call -> if (call.request.local.uri == "/old") call.respondRedirect("/club/13Ma", permanent = true) }
             site.notFound { call -> missed += call.request.local.uri }

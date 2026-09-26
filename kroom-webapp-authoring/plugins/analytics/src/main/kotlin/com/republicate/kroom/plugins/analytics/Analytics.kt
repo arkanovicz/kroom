@@ -2,7 +2,6 @@ package com.republicate.kroom.plugins.analytics
 
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Setting
-import com.republicate.kroom.webapp.authoring.Setting.Type.BOOLEAN
 import com.republicate.kroom.webapp.authoring.Site
 import com.republicate.kroom.webapp.authoring.htmlEscape
 import com.republicate.kroom.webapp.session.userSession
@@ -17,9 +16,9 @@ class Analytics : Plugin {
     override val name = "Analytics"
     override val description = "A privacy-friendly audience counter (Plausible or alike)"
     override val settings = listOf(
-        Setting("domain", "Counted domain", help = "example.org — nothing is emitted while empty"),
-        Setting("script", "Script URL", default = "https://plausible.io/js/script.js"),
-        Setting("countAuthors", "Count logged-in authors too", default = "false", type = BOOLEAN)
+        Setting.text("domain", "Counted domain", help = "example.org — nothing is emitted while empty"),
+        Setting.text("script", "Script URL", default = "https://plausible.io/js/script.js"),
+        Setting.boolean("countAuthors", "Count logged-in authors too")
     )
 
     override fun install(site: Site) {

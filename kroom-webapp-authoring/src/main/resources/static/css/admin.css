@@ -162,6 +162,23 @@ body:has(> .kroom-admin) {
     margin: .15rem 0 0;
 }
 
+.kroom-admin-settings fieldset {
+    border: 1px solid var(--pico-muted-border-color, #d1d5db);
+    border-radius: .375rem;
+    padding: .5rem .75rem;
+    margin: 0 0 .75rem;
+}
+
+.kroom-admin-settings legend {
+    font-weight: bold;
+    padding: 0 .25rem;
+}
+
+.kroom-admin-section h4 {
+    margin: .75rem 0 .25rem;
+    font-size: .95rem;
+}
+
 .kroom-admin-settings footer {
     display: flex;
     gap: .75rem;

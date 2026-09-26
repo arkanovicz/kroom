@@ -1,10 +1,10 @@
 package com.republicate.kroom.plugins.forms
 
 import com.republicate.kroom.webapp.authoring.AdminEntry
+import com.republicate.kroom.webapp.authoring.AdminTable
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Roles
 import com.republicate.kroom.webapp.authoring.Setting
-import com.republicate.kroom.webapp.authoring.Setting.Type.NUMBER
 import com.republicate.kroom.webapp.authoring.Site
 import com.republicate.kroom.webapp.authoring.htmlEscape
 import com.republicate.kroom.webapp.core.respondError
@@ -39,9 +39,9 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
     override val name = "Forms"
     override val description = "A contact form blocks can call; its messages kept, listed and expired"
     override val settings = listOf(
-        Setting("thanks", "Thank-you message", default = "Thank you, your message was sent."),
-        Setting("notify", "Tell", help = "An address each message is mailed to — needs a mailer (the mail plugin)"),
-        Setting("retentionDays", "Keep messages for (days)", default = "365", type = NUMBER)
+        Setting.text("thanks", "Thank-you message", default = "Thank you, your message was sent."),
+        Setting.text("notify", "Tell", help = "An address each message is mailed to — needs a mailer (the mail plugin)"),
+        Setting.number("retentionDays", "Keep messages for (days)", default = 365)
     )
 
     companion object {
@@ -74,7 +74,7 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
     override fun install(site: Site) {
         site.grant(Roles.EDITOR, READ)
         site.tool("forms", Tool(site), blocks = true)
-        site.admin(AdminEntry("forms", "Messages", icon = "M4 6h16v12H4zM4 7l8 6 8-6", table = "/api/forms/messages", permission = READ))
+        site.admin(AdminEntry("forms", "Messages", icon = "M4 6h16v12H4zM4 7l8 6 8-6", tables = listOf(AdminTable("messages", "Messages", "/api/forms/messages")), permission = READ))
         site.every(1.days) { purge(site, System.currentTimeMillis()) }
 
         // sent with fetch, the form stays on its page and says thanks; without scripts, the post comes back to it

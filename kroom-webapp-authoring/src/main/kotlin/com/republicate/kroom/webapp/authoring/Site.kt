@@ -188,7 +188,10 @@ class Site internal constructor(
             shown.forEach { entry ->
                 push(Json.MutableObject().apply {
                     set("id", entry.id); set("label", entry.label)
-                    entry.icon?.let { set("icon", it) }; entry.href?.let { set("href", it) }; entry.table?.let { set("table", it) }
+                    entry.icon?.let { set("icon", it) }; entry.href?.let { set("href", it) }
+                    if (entry.tables.isNotEmpty()) set("tables", Json.MutableArray().apply {
+                        entry.tables.forEach { table -> push(Json.MutableObject().apply { set("id", table.id); set("label", table.label); set("url", table.url) }) }
+                    })
                     entry.frame?.let { set("frame", it) }
                     set("builtin", entry in builtinEntries)
                 })

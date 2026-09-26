@@ -1,12 +1,10 @@
 package com.republicate.kroom.plugins.mail
 
 import com.republicate.kroom.webapp.authoring.AdminEntry
+import com.republicate.kroom.webapp.authoring.AdminTable
 import com.republicate.kroom.webapp.authoring.Permissions
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Setting
-import com.republicate.kroom.webapp.authoring.Setting.Type.CHOICE
-import com.republicate.kroom.webapp.authoring.Setting.Type.NUMBER
-import com.republicate.kroom.webapp.authoring.Setting.Type.SECRET
 import com.republicate.kroom.webapp.authoring.Site
 import com.republicate.kroom.webapp.core.Mailer
 import com.republicate.kroom.webapp.core.respondError
@@ -42,13 +40,13 @@ class Mail(private val logDays: Int = 30) : Plugin {
     override val name = "Mail"
     override val description = "The site's SMTP transport, what it sent, and a webmail"
     override val settings = listOf(
-        Setting("host", "SMTP host", help = "Nothing is sent while empty"),
-        Setting("port", "SMTP port", default = "587", type = NUMBER),
-        Setting("security", "Security", default = "starttls", type = CHOICE, choices = listOf("starttls", "tls", "none")),
-        Setting("username", "User"),
-        Setting("password", "Password", type = SECRET),
-        Setting("from", "Sender", help = "Site <noreply@example.org>"),
-        Setting("inbox", "Webmail", help = "An URL shown in the admin bar — e.g. http://localhost:8025 for Mailpit")
+        Setting.text("host", "SMTP host", help = "Nothing is sent while empty"),
+        Setting.number("port", "SMTP port", default = 587),
+        Setting.choice("security", "Security", choices = listOf("starttls", "tls", "none")),
+        Setting.text("username", "User"),
+        Setting.secret("password", "Password"),
+        Setting.text("from", "Sender", help = "Site <noreply@example.org>"),
+        Setting.text("inbox", "Webmail", help = "An URL shown in the admin bar — e.g. http://localhost:8025 for Mailpit")
     )
 
     override fun install(site: Site) {
@@ -71,7 +69,7 @@ class Mail(private val logDays: Int = 30) : Plugin {
             log.list(Int.MAX_VALUE).forEach { (id, entry) -> if ((entry.getLong("time") ?: 0) < cutoff) log.delete(id) }
         }
 
-        site.admin(AdminEntry("mail-log", "Sent mail", icon = "M3 11l18-7-7 18-2-8zM12 14l9-10", table = "/api/mail/log"))
+        site.admin(AdminEntry("mail-log", "Sent mail", icon = "M3 11l18-7-7 18-2-8zM12 14l9-10", tables = listOf(AdminTable("log", "Sent mail", "/api/mail/log"))))
         site.admin(AdminEntry("mail-inbox", "Mailbox", icon = "M4 6h16v12H4zM4 7l8 6 8-6", frame = "/mail/inbox"))
 
         site.routes {

@@ -2,7 +2,6 @@ package com.republicate.kroom.plugins.webhook
 
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Setting
-import com.republicate.kroom.webapp.authoring.Setting.Type.SECRET
 import com.republicate.kroom.webapp.authoring.Site
 import com.republicate.kson.Json
 import kotlinx.coroutines.future.await
@@ -28,8 +27,8 @@ class Webhook : Plugin {
     override val name = "Webhook"
     override val description = "A signed POST to an URL of yours on each publish"
     override val settings = listOf(
-        Setting("url", "Receiver URL", help = "Nothing is sent while empty"),
-        Setting("secret", "Signing secret", type = SECRET)
+        Setting.text("url", "Receiver URL", help = "Nothing is sent while empty"),
+        Setting.secret("secret", "Signing secret")
     )
 
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()

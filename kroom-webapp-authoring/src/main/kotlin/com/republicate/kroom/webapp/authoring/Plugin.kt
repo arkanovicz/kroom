@@ -28,23 +28,48 @@ interface Plugin {
 }
 
 /**
- * One configurable value. Its [default] applies until an admin sets it; a [Type.SECRET] is never read back; a
- * [Type.CHOICE] is one of [choices].
+ * One configurable value, made by the function that names its kind — `Setting.text("host")`,
+ * `Setting.choice("security", choices = listOf("starttls", "tls", "none"))` — its [default] applying until an
+ * admin sets one. Values are strings: a boolean is `true`/`false`, a number its digits. A secret is never read
+ * back. [group] gathers settings under one heading, for a plugin with several concerns.
  */
-data class Setting(
+class Setting private constructor(
     val key: String,
-    val label: String = key,
-    val default: String = "",
-    val type: Type = Type.TEXT,
-    val help: String? = null,
-    val choices: List<String> = emptyList()
+    val label: String,
+    val default: String,
+    /** `text`, `textarea`, `number`, `boolean`, `secret` or `choice` — what the admin form shows. */
+    val type: String,
+    val help: String?,
+    val choices: List<String>,
+    val group: String?
 ) {
-    enum class Type { TEXT, TEXTAREA, BOOLEAN, NUMBER, SECRET, CHOICE }
+    companion object {
+        fun text(key: String, label: String = key, default: String = "", help: String? = null, group: String? = null) =
+            Setting(key, label, default, "text", help, emptyList(), group)
+
+        fun textarea(key: String, label: String = key, default: String = "", help: String? = null, group: String? = null) =
+            Setting(key, label, default, "textarea", help, emptyList(), group)
+
+        fun number(key: String, label: String = key, default: Long? = null, help: String? = null, group: String? = null) =
+            Setting(key, label, default?.toString().orEmpty(), "number", help, emptyList(), group)
+
+        fun boolean(key: String, label: String = key, default: Boolean = false, help: String? = null, group: String? = null) =
+            Setting(key, label, default.toString(), "boolean", help, emptyList(), group)
+
+        fun secret(key: String, label: String = key, help: String? = null, group: String? = null) =
+            Setting(key, label, "", "secret", help, emptyList(), group)
+
+        fun choice(key: String, label: String = key, choices: List<String>, default: String = choices.first(), help: String? = null, group: String? = null): Setting {
+            require(default in choices) { "$key: $default is none of $choices" }
+            return Setting(key, label, default, "choice", help, choices, group)
+        }
+    }
 }
 
 /**
- * An entry of the admin bar: a link ([href]), a [table] — an API answering `{columns, rows}` — or a [frame],
- * another application's page shown in the panel (a webmail, a dashboard).
+ * An entry of the admin bar: a link ([href]), [tables] — APIs answering `{columns, rows}`, one under the other,
+ * each under its label when there are several — or a [frame], another application's page shown in the panel
+ * (a webmail, a dashboard).
  */
 data class AdminEntry(
     val id: String,
@@ -52,7 +77,10 @@ data class AdminEntry(
     /** One SVG path on a 24px grid, stroked like the editor's pictograms; null shows the label's initial. */
     val icon: String? = null,
     val href: String? = null,
-    val table: String? = null,
+    val tables: List<AdminTable> = emptyList(),
     val frame: String? = null,
     val permission: String = Permissions.ADMIN
 )
+
+/** A table of an admin entry: its label, and the API answering `{columns, rows}`. */
+data class AdminTable(val id: String, val label: String, val url: String)

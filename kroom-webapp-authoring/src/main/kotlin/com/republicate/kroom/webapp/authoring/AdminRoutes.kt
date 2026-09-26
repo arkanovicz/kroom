@@ -52,10 +52,11 @@ fun Route.siteRoutes() {
                                 push(Json.MutableObject().apply {
                                     set("key", setting.key)
                                     set("label", setting.label)
-                                    set("type", setting.type.name.lowercase())
+                                    set("type", setting.type)
                                     setting.help?.let { set("help", it) }
+                                    setting.group?.let { set("group", it) }
                                     if (setting.choices.isNotEmpty()) set("choices", Json.MutableArray().apply { setting.choices.forEach { push(it) } })
-                                    if (setting.type == Setting.Type.SECRET) set("set", !values[setting.key].isNullOrEmpty())
+                                    if (setting.type == "secret") set("set", !values[setting.key].isNullOrEmpty())
                                     else set("value", values[setting.key])
                                 })
                             }
@@ -76,12 +77,12 @@ fun Route.siteRoutes() {
                 return@put respondError("$id has no setting $key", code = "noSetting", args = mapOf("key" to key))
             }
             val settings = site.settings(plugin)
-            asked.entries.firstOrNull { (key, value) -> declared[key]!!.let { it.type == Setting.Type.CHOICE && value != null && value.toString() !in it.choices } }?.let { (key, value) ->
+            asked.entries.firstOrNull { (key, value) -> declared[key]!!.let { it.type == "choice" && value != null && value.toString() !in it.choices } }?.let { (key, value) ->
                 return@put respondError("$value is not a choice of $key", code = "noChoice", args = mapOf("key" to key, "value" to value))
             }
             for ((key, value) in asked) {
                 val text = value?.toString()
-                if (declared[key]!!.type == Setting.Type.SECRET && text == "") continue
+                if (declared[key]!!.type == "secret" && text == "") continue
                 settings[key] = text
             }
             respondSuccess()

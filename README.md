@@ -18,7 +18,7 @@ kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
-kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): seo, redirects, forms, analytics, webhook, mail, linkcheck
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, analytics, webhook, mail
 ```
 
 ## Features
@@ -437,7 +437,7 @@ security, analytics…), ranked by how many categories need each:
 ```kotlin
 class Seo : Plugin {
     override val id = "seo"
-    override val settings = listOf(Setting("description", "Description", type = TEXTAREA))
+    override val settings = listOf(Setting.textarea("description", "Description"))
     override fun install(site: Site) {
         site.head { call -> """<meta name="description" content="${htmlEscape(site.settings(this)["description"]!!)}">""" }
         site.routes { get("/sitemap.xml") { … site.pages() … } }
@@ -445,6 +445,10 @@ class Seo : Plugin {
 }
 installContentSite { plugins += Seo() }
 ```
+
+A setting is made by the function naming its kind — `Setting.text`, `.textarea`, `.number`, `.boolean`,
+`.secret` (never read back), `.choice(key, choices = listOf(…))` — each with a default, a help line and an
+optional `group`, under which the admin form gathers it.
 
 | `Site` call | for | WordPress |
 |---|---|---|
@@ -455,20 +459,21 @@ installContentSite { plugins += Seo() }
 | `intercept { call -> }` | before routing: redirects, firewall, cache | `template_redirect`, drop-ins |
 | `notFound { call -> }` | what nothing answered: log it, or still answer it | `404_template` |
 | `head { }`, `foot { }` | fragments at `$site.head()` / `$site.foot()` | `wp_head`, `wp_footer` |
-| `admin(AdminEntry)` | an entry of the admin bar: a link, or a `{columns, rows}` table | `add_menu_page` |
+| `admin(AdminEntry)` | an entry of the admin bar: a link, `{columns, rows}` tables, or an application framed | `add_menu_page` |
 | `onPublish { block, author -> }` | after each submit, off the request | `save_post` |
 | `every(period) { }` | scheduled jobs, from start to stop | WP-Cron |
 | `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
 
 A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `$site.foot()` at the end of
-`<body>`. The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **seo** (meta and Open
-Graph tags, robots.txt, sitemap.xml over `site.pages()`), **redirects** (rules in a setting, answered before
-routing, hit counts in the bar), **forms** (`$forms.contact()` in any block, a honeypot, messages as records
+`<body>`. The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **webmaster** (the health of
+the site's URLs, one concern seen from three sides: meta and Open Graph tags — a page's own through `$seo` —,
+robots.txt and sitemap.xml over `site.pages()`; redirect rules with captures and application resolvers, answered
+before routing, and the 404s counted; every page walked on a schedule, every link and picture tried), **forms** (`$forms.contact()` in any block, a honeypot, messages as records
 for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
 **webhook** (a signed POST on each publish), **mail** (the site's SMTP transport as `site.mailer` — the same
 `Mailer` kroom-webapp-auth sends its codes through —, a log of what was sent, a webmail framed in the bar; forms
-mails each message to its `notify` address through it), **linkcheck** (every page walked on a schedule, every
-link and picture tried, the broken ones listed with their page).
+mails each message to its `notify` address through it). Audience counting stays out of webmaster: it is about
+visitors' privacy, not URLs, and its provider is swapped on its own.
 
 ### The admin bar
 
@@ -477,7 +482,8 @@ and the pages its blocks say exist), journal, plugins with their settings forms 
 back), roles, then the plugins' entries. Its data comes from `/api/site/{pages, plugins, plugins/{id}/settings,
 roles}`; its markup is built by `admin.js`. Its words share the editor's table — `installContentSite {
 strings["journal"] = "journal" }` reaches both — and a plugin's words are keyed by its ids (`<entry id>`,
-`<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`), defaulting to what
+`<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`,
+`<plugin>.<group>`), defaulting to what
 the plugin says. Pictograms: `kroomAdmin.icons`.
 
 ## Table (for seat-based games)
