@@ -391,13 +391,22 @@ interface Storage {
     val content: ResourceStore                                // the blocks
     fun settings(namespace: String): Settings                 // a plugin's configuration: small strings
     fun records(namespace: String, collection: String): Records   // rows it owns: submissions, subscribers
+    val media: Media                                          // uploads, under names the store hands out
 }
 ```
 
 A namespace is a plugin id, so no plugin reads another's by accident. `MemoryStorage` (tests, demos) and
 `FileStorage(Path.of("data"))` ship — the latter as plain files an operator can read and git can version:
-`content/…`, `settings/<ns>.properties`, `records/<ns>/<collection>/<id>.json`. A real site maps the three
-kinds onto what it runs: a git content tree, a database through skorm (a collection is a table's rows).
+`content/…`, `settings/<ns>.properties`, `records/<ns>/<collection>/<id>.json`, `media/<name>`. A real site
+maps the four kinds onto what it runs: a git content tree, a database through skorm (a collection is a table's
+rows), an object store.
+
+**Media.** An editor picks, pastes or drops a picture or a PDF into the textarea; it is uploaded
+(`POST {apiPrefix}/media`, `content.upload`) and written in as `![name](/media/<name>)`. What may be uploaded is
+told by the bytes, never by the claimed type — PNG, JPEG, GIF, WebP, AVIF, PDF; no SVG, which served from the
+site's origin is a stored XSS. A name is never reused, so `/media/<name>` is served to anyone as immutable.
+`MemoryStorage` keeps media within a byte budget (100 MB by default) and refuses what would not fit rather than
+forget a picture a page still shows; the admin bar lists and deletes them.
 
 ### Identity and roles
 
@@ -454,7 +463,9 @@ A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `
 Graph tags, robots.txt, sitemap.xml over `site.pages()`), **redirects** (rules in a setting, answered before
 routing, hit counts in the bar), **forms** (`$forms.contact()` in any block, a honeypot, messages as records
 for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
-**webhook** (a signed POST on each publish).
+**webhook** (a signed POST on each publish), **mail** (the site's SMTP transport as `site.mailer` — the same
+`Mailer` kroom-webapp-auth sends its codes through —, a log of what was sent, a webmail framed in the bar; forms
+mails each message to its `notify` address through it).
 
 ### The admin bar
 
@@ -513,6 +524,11 @@ Ideal for games with chat: game state is authoritative, chat history is replayed
 ```bash
 ./gradlew :kroom-server:run           # SSE playground at :8080/playground
 ./gradlew :kroom-examples:chifoumi:run  # Rock-paper-scissors at :8081
+
+# the authoring demo, every example plugin installed, a Mailpit mailbox beside it — admin / admin
+KROOM_UID=$(id -u) KROOM_GID=$(id -g) docker compose -f kroom-webapp-authoring/demo/compose.yml up
+#   http://localhost:8099/login, Mailpit on :8025 (KROOM_DEMO_PORT, KROOM_MAILPIT_PORT to move them)
+./gradlew :kroom-webapp-authoring:demo -Pport=8099   # the same without docker, and without mail
 ```
 
 ## License

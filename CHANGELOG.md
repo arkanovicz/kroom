@@ -24,11 +24,24 @@ All notable changes to kroom will be documented in this file.
 - Plugins: `Plugin` (`id`, declared `settings`, `install(site)`) registering on `Site` — tools and block tools,
   routes, interceptors run before routing, head/foot fragments (`$site.head()`, `$site.foot()`), admin-bar
   entries, publish listeners, scheduled jobs, role grants. `Site.pages()` lists every page the site serves.
-- The admin bar, left of every page for `site.admin`: pages, journal, plugins and their settings, roles, and
-  the plugins' entries; `/api/site/*` behind it, `admin.js`/`admin.css` in front.
+- The admin bar, left of every page for `site.admin`: pages, journal, media, plugins and their settings,
+  roles, and the plugins' entries — a link, a `{columns, rows}` table, or another application framed (a
+  webmail); `/api/site/*` behind it, `admin.js`/`admin.css` in front. Settings may be `CHOICE`s.
+- Media, a fourth `Storage` kind: uploads told by their bytes (PNG, JPEG, GIF, WebP, AVIF, PDF — no SVG),
+  named once and served immutable under `/media/`; `MemoryStorage` keeps them within a byte budget (100 MB) and
+  refuses past it. The editor uploads a picked, pasted or dropped file and writes it in as markdown.
+- `Site.mailer`: how the site sends mail, set by a mail plugin, read at send time.
+- The demo runs dockerized (`kroom-webapp-authoring/demo/compose.yml`): the repository's wrapper in a JDK
+  container, Mailpit beside it, framed in the admin bar.
 
-#### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook
-- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all five in the demo.
+#### kroom-webapp-core
+- `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
+  through the application's transport.
+
+#### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook, -mail
+- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. mail is an SMTP
+  transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms mails each
+  message to its `notify` address when the site has a mailer.
 
 #### kroom-webapp-velocity
 - `pageCatalog()`: every page template and the route it is served at.
