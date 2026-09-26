@@ -1,13 +1,11 @@
 package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.PathTemplate
 import com.republicate.kroom.webapp.core.receiveJsonObject
 import com.republicate.kroom.webapp.core.respondError
 import com.republicate.kroom.webapp.core.respondJson
 import com.republicate.kroom.webapp.core.respondSuccess
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
-import com.republicate.kroom.webapp.velocity.pageCatalog
 import com.republicate.kson.Json
 import io.ktor.http.*
 import io.ktor.server.routing.*
@@ -29,17 +27,12 @@ fun Route.siteRoutes() {
 
         get("/pages") {
             admin(site) ?: return@get
-            val blockDirs = site.storage.content.list("${site.pagePrefix}/").map { it.substringBeforeLast('/') }.toSet()
             respondJson(Json.MutableArray().apply {
-                application.pageCatalog(site.pagePrefix, site.pageExtension).forEach { (template, route) ->
-                    // a page's blocks sit in its own folder: `pages/club/_code_(/index).html` → `pages/club/13Ma/…`
-                    val folder = PathTemplate(template.removeSuffix(".${site.pageExtension}").removeSuffix("/index"))
-                    val urls = if (folder.isConcrete) listOf(route)
-                        else blockDirs.mapNotNull { dir -> folder.match(dir)?.let { "/" + folder.expand(it).removePrefix("${site.pagePrefix}/") } }.sorted()
+                site.pages().forEach { page ->
                     push(Json.MutableObject().apply {
-                        set("template", template)
-                        set("route", route)
-                        set("urls", Json.MutableArray().apply { urls.forEach { push(it) } })
+                        set("template", page.template)
+                        set("route", page.route)
+                        set("urls", Json.MutableArray().apply { page.urls.forEach { push(it) } })
                     })
                 }
             })

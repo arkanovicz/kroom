@@ -1,5 +1,10 @@
 package com.republicate.kroom.webapp.authoring
 
+import com.republicate.kroom.plugins.analytics.Analytics
+import com.republicate.kroom.plugins.forms.Forms
+import com.republicate.kroom.plugins.redirects.Redirects
+import com.republicate.kroom.plugins.seo.Seo
+import com.republicate.kroom.plugins.webhook.Webhook
 import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.velocity.respondVelocity
@@ -19,7 +24,7 @@ import io.ktor.server.sessions.set
 /**
  * The demo, as a thing you can click: `./gradlew :kroom-webapp-authoring:demo` (`-Pport=9000` for another
  * port), then the URL it prints — log in (admin / admin, editor / editor), edit a block, submit, log out to read it as a
- * visitor does.
+ * visitor does. As admin, the bar on the left lists the pages, the journal, the plugins and their settings.
  *
  * Same call an application makes ([installContentSite]), a memory store that remembers its revisions, and
  * nothing else. [DemoSiteTest] asserts this same flow without the browser.
@@ -45,6 +50,8 @@ fun Application.demo() {
         loginPage = "pages/login.html"
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet.*"
+        // an admin sees them in the bar on the left; a block may call `$forms.contact()`
+        plugins += listOf(Seo(), Redirects(), Forms(), Analytics(), Webhook())
     }
     velocity.registerApplication("kroomAssets") { KroomAssets }
     velocity.registerApplication("demoStore") { storage.content }

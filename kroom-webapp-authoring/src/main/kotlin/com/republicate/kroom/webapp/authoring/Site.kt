@@ -1,7 +1,9 @@
 package com.republicate.kroom.webapp.authoring
 
+import com.republicate.kroom.PathTemplate
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
+import com.republicate.kroom.webapp.velocity.pageCatalog
 import com.republicate.kson.Json
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
@@ -71,6 +73,21 @@ class Site internal constructor(
     /** Whether [session] (null: a visitor) may [permission] on [target] — "" when site-wide. */
     fun can(session: UserSession?, permission: String, target: String = ""): Boolean =
         application.authoring.can(session, permission, target)
+
+    /**
+     * Every page template, its route, and the URLs it serves: a concrete page its own; a placeholder page
+     * those its blocks say exist — `pages/club/_code_.html` gives its blocks `pages/club/13Ma/…`, so a block
+     * written there means `/club/13Ma` is a page. For an admin menu, a sitemap.
+     */
+    fun pages(): List<Page> {
+        val blockDirs = storage.content.list("$pagePrefix/").map { it.substringBeforeLast('/') }.toSet()
+        return application.pageCatalog(pagePrefix, pageExtension).map { (template, route) ->
+            val folder = PathTemplate(template.removeSuffix(".$pageExtension").removeSuffix("/index"))
+            val urls = if (folder.isConcrete) listOf(route)
+                else blockDirs.mapNotNull { dir -> folder.match(dir)?.let { "/" + folder.expand(it).removePrefix("$pagePrefix/") } }.sorted()
+            Page(template, route, urls)
+        }
+    }
 
     // --- registration, while plugins install ---------------------------------------------------------
 
@@ -144,7 +161,7 @@ class Site internal constructor(
         val content = application.authoringOrNull?.apiPrefix ?: ""
         val v = AuthoringAssets.VERSION
         return """<link rel="stylesheet" href="/css/admin.css?v=$v">
-<aside class="kroom-admin" data-api="${attr(apiPrefix)}" data-content-api="${attr(content)}" data-entries="${attr(json)}"></aside>
+<aside class="kroom-admin" data-api="${htmlEscape(apiPrefix)}" data-content-api="${htmlEscape(content)}" data-entries="${htmlEscape(json)}"></aside>
 <script src="/js/admin.js?v=$v"></script>"""
     }
 
@@ -168,6 +185,8 @@ class Site internal constructor(
     }
 }
 
+data class Page(val template: String, val route: String, val urls: List<String>)
+
 /** `$site` in a page: the slots a layout calls, and the one question a template may ask. */
 class SiteView internal constructor(private val site: Site, private val call: ApplicationCall) {
     fun head(): String = site.head(call)
@@ -181,7 +200,8 @@ private class DefaultedSettings(private val stored: Settings, private val declar
     override fun all(): Map<String, String> = declared.associate { it.key to it.default } + stored.all()
 }
 
-internal fun attr(value: String) =
+/** Text made safe for HTML — content and double-quoted attributes alike. */
+fun htmlEscape(value: String) =
     value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
 private val SiteKey = AttributeKey<Site>("KroomSite")

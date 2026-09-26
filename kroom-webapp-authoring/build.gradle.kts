@@ -22,6 +22,8 @@ dependencies {
     api(libs.velocity.engine.core)
     testImplementation(project(":kroom-markdown"))       // the demo renders real `%` blocks
     testImplementation(libs.ktor.server.netty)           // …and the demo app serves them
+    // …with the example plugins installed (they depend on this module's main, not its tests: no cycle)
+    listOf("seo", "redirects", "forms", "analytics", "webhook").forEach { testImplementation(project(":kroom-plugin-$it")) }
     testRuntimeOnly(libs.slf4j.simple)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
