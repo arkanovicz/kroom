@@ -17,7 +17,8 @@ kroom-webapp-oauth    OIDC authentication
 kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
-kroom-webapp-authoring in-place block editing (locks, content stores, edit API, editor)
+kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): seo, redirects, forms, analytics, webhook
 ```
 
 ## Features
@@ -285,12 +286,12 @@ installAuthoring {
     this.store = store
     lockTimeout = 2.minutes                           // untouched that long, a block is free again
     apiPrefix = "/api/content"                        // must live under /api/ — api.js roots calls there
-    canEdit = { session, path -> session?.id in editors }
+    identity = myDirectory                            // who is who, and their roles — see below
     placeholder = "*(nothing here yet)*"
 }
 ```
 
-`installContentSite { store = …; canEdit = … }` does all of the above in one call, both template stacks included.
+`installContentSite { storage = …; identity = … }` does all of the above in one call, both template stacks included.
 In dev, `devDir = File("src/main/resources")` serves that tree live instead of the classpath — layouts from its
 `templates/`, static files from its `static/`, neither cached by the browser.
 
@@ -307,7 +308,7 @@ GET    {prefix}/history/{path...}  revisions of one block   ] 404 unless the sto
 GET    {prefix}/journal            the site-wide log        ]
 ```
 
-401 without a session, 403 when `canEdit` says no. The lock routes read `/lock/…` rather than `…/lock`
+401 without a session, 403 without `content.edit` on the block's path. The lock routes read `/lock/…` rather than `…/lock`
 because a ktor tailcard takes every remaining segment. A submit carries the rev it started from, so an edit
 made meanwhile — a concurrent author, a `git pull` — is answered with *theirs* instead of being overwritten:
 the lock is the polite path, the rev check is the safe one.
@@ -380,6 +381,88 @@ The pictograms follow the same door: `kroomAuthoring.icons` maps each button (`e
 `cancel`) to one SVG path on a 24px grid, stroked in the text's colour. CSS variables size and colour them:
 `--kroom-icon-size` (1.5rem), `--kroom-icon-stroke` (1.75), `--kroom-edit-color`, `--kroom-submit-color`,
 `--kroom-cancel-color`.
+
+### Storage
+
+Everything a site keeps, by kind, behind one interface — what kroom and its plugins write against:
+
+```kotlin
+interface Storage {
+    val content: ResourceStore                                // the blocks
+    fun settings(namespace: String): Settings                 // a plugin's configuration: small strings
+    fun records(namespace: String, collection: String): Records   // rows it owns: submissions, subscribers
+}
+```
+
+A namespace is a plugin id, so no plugin reads another's by accident. `MemoryStorage` (tests, demos) and
+`FileStorage(Path.of("data"))` ship — the latter as plain files an operator can read and git can version:
+`content/…`, `settings/<ns>.properties`, `records/<ns>/<collection>/<id>.json`. A real site maps the three
+kinds onto what it runs: a git content tree, a database through skorm (a collection is a table's rows).
+
+### Identity and roles
+
+The provider knows people, the site knows what roles may do:
+
+```kotlin
+fun interface IdentityProvider {
+    fun roles(session: UserSession): Set<String>                             // asked per call, never cached
+    suspend fun authenticate(login: String, password: String): UserSession? = null   // null: login is a redirect
+}
+installContentSite {
+    identity = MemoryIdentityProvider().user("admin", "admin", Roles.ADMIN)    // the demo's; or LDAP, OIDC claims…
+    roles.grant("moderator", "forms.*")                   // admin: *, editor: content.* by default
+    loginPage = "pages/login.html"                        // POST /login, /logout over the provider
+}
+```
+
+`Roles.can(roles, permission, target)` is open, for rights a flat table cannot say (an editor of one club's
+pages only). kroom asks `content.edit` (target: the block path) and `site.admin`.
+
+### Plugins
+
+A plugin is one object: an `id` that namespaces its settings, records, permissions and API, declared
+`settings`, and `install(site)`, which only *registers* — `installContentSite` wires each piece where the
+engines need it. The surface follows what WordPress's most installed plugins hook into (SEO, forms, caching,
+security, analytics…), ranked by how many categories need each:
+
+```kotlin
+class Seo : Plugin {
+    override val id = "seo"
+    override val settings = listOf(Setting("description", "Description", type = TEXTAREA))
+    override fun install(site: Site) {
+        site.head { call -> """<meta name="description" content="${htmlEscape(site.settings(this)["description"]!!)}">""" }
+        site.routes { get("/sitemap.xml") { … site.pages() … } }
+    }
+}
+installContentSite { plugins += Seo() }
+```
+
+| `Site` call | for | WordPress |
+|---|---|---|
+| `settings(plugin)`, `records(plugin, c)` | configuration, owned rows | options, custom tables |
+| `tool(name, value, blocks = true)` | `$name` in pages — and in `%` blocks | shortcodes |
+| `routes { }` | public or guarded endpoints (`site.can`) | REST routes, admin-ajax |
+| `intercept { call -> }` | before routing: redirects, firewall, cache | `template_redirect`, drop-ins |
+| `head { }`, `foot { }` | fragments at `$site.head()` / `$site.foot()` | `wp_head`, `wp_footer` |
+| `admin(AdminEntry)` | an entry of the admin bar: a link, or a `{columns, rows}` table | `add_menu_page` |
+| `onPublish { block, author -> }` | after each submit, off the request | `save_post` |
+| `every(period) { }` | scheduled jobs, from start to stop | WP-Cron |
+| `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
+
+A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `$site.foot()` at the end of
+`<body>`. The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **seo** (meta and Open
+Graph tags, robots.txt, sitemap.xml over `site.pages()`), **redirects** (rules in a setting, answered before
+routing, hit counts in the bar), **forms** (`$forms.contact()` in any block, a honeypot, messages as records
+for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
+**webhook** (a signed POST on each publish).
+
+### The admin bar
+
+`$site.foot()` emits, for whoever holds `site.admin`, a bar on the left of the page — pages (every template
+and the pages its blocks say exist), journal, plugins with their settings forms (a secret is never read
+back), roles, then the plugins' entries. Its data comes from `/api/site/{pages, plugins, plugins/{id}/settings,
+roles}`; its markup is built by `admin.js`, words and pictograms overridable through `kroomAdmin.strings` /
+`kroomAdmin.icons` as the editor's are.
 
 ## Table (for seat-based games)
 

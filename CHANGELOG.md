@@ -2,6 +2,44 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [Unreleased]
+
+### Changed (breaking)
+
+#### kroom-webapp-authoring
+- `installContentSite { store = … }` is now `storage = …` (a `Storage`; its `content` is the former store),
+  and `canEdit = { session, path -> … }` is gone: `identity = IdentityProvider { session -> roles }` answers
+  roles, `roles` (a `Roles` table) says what each may do, and editing asks `content.edit` on the block's path.
+  `installAuthoring` takes `identity`/`roles` likewise. The default provider knows nobody: nothing is editable
+  until one is given (it used to be any session).
+
+### Added
+
+#### kroom-webapp-authoring
+- `Storage`: content, settings and records, namespaced per plugin; `MemoryStorage` and `FileStorage` (plain
+  files: `content/`, `settings/<ns>.properties`, `records/<ns>/<collection>/<id>.json`).
+- `IdentityProvider` (roles, optional password `authenticate`), `Roles` (patterns per role — `admin: *`,
+  `editor: content.*` — its `can` open for target-scoped rights), `MemoryIdentityProvider`, and `loginPage`:
+  `POST /login` and `/logout` over the provider.
+- Plugins: `Plugin` (`id`, declared `settings`, `install(site)`) registering on `Site` — tools and block tools,
+  routes, interceptors run before routing, head/foot fragments (`$site.head()`, `$site.foot()`), admin-bar
+  entries, publish listeners, scheduled jobs, role grants. `Site.pages()` lists every page the site serves.
+- The admin bar, left of every page for `site.admin`: pages, journal, plugins and their settings, roles, and
+  the plugins' entries; `/api/site/*` behind it, `admin.js`/`admin.css` in front.
+
+#### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook
+- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all five in the demo.
+
+#### kroom-webapp-velocity
+- `pageCatalog()`: every page template and the route it is served at.
+
+### Fixed
+
+#### kroom-webapp-velocity
+- A partial beside the pages (`header.inc.html`) was listed by the template catalog — and, under a
+  placeholder directory, mounted as a route (`/city/{name}/header.inc`). The catalog now keeps only what
+  `servePage` would serve.
+
 ## [0.23-kmp-velocity-05]
 
 ### Fixed
