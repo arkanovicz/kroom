@@ -16,6 +16,9 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 import java.net.URI
 import kotlin.time.Duration.Companion.days
 
@@ -26,7 +29,8 @@ import kotlin.time.Duration.Companion.days
  * default), and forgotten after the retention the admin sets.
  *
  * Spam is met with a honeypot: a field people never see and robots fill, answered as a success and dropped.
- * Mailing the messages out is left to a mail plugin that does not exist yet — kroom has no mail transport.
+ * Each message is also mailed to `notify`, when set and the site has a mailer ([Site.mailer], the mail plugin):
+ * off the request, a failed send only logged — the message is kept either way.
  *
  * [strings] are the form's words, overridable as the editor's are.
  */
@@ -36,6 +40,7 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
     override val description = "A contact form blocks can call; its messages kept, listed and expired"
     override val settings = listOf(
         Setting("thanks", "Thank-you message", default = "Thank you, your message was sent."),
+        Setting("notify", "Tell", help = "An address each message is mailed to — needs a mailer (the mail plugin)"),
         Setting("retentionDays", "Keep messages for (days)", default = "365", type = NUMBER)
     )
 
@@ -84,12 +89,14 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
                     val fields = listOf("name", "email", "message").associateWith { form[it]?.trim().orEmpty() }
                     if (fields.values.any { it.isEmpty() || it.length > MAX } || '@' !in fields["email"]!!)
                         return@post respondError(words["error"]!!, code = "invalid")
+                    val topic = form["topic"]?.take(100) ?: "contact"
                     site.records(this@Forms, "messages").add(Json.MutableObject().apply {
                         set("time", System.currentTimeMillis())
-                        set("topic", form["topic"]?.take(100) ?: "contact")
+                        set("topic", topic)
                         fields.forEach { (key, value) -> set(key, value) }
                         set("page", back)
                     })
+                    notify(site, topic, fields, back)
                 }
                 if (json) respondSuccess() else call.respondRedirect(back)
             }
@@ -114,6 +121,20 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
         }
     }
 
+    private fun notify(site: Site, topic: String, fields: Map<String, String>, page: String) {
+        val to = site.settings(this)["notify"]?.trim().orEmpty().takeIf { it.isNotEmpty() } ?: return
+        val mailer = site.mailer ?: return logger.warn("forms: notify is set, but the site has no mailer")
+        site.application.launch {
+            try {
+                mailer.send(to, "[$topic] ${fields["name"]}", "${fields["name"]} <${fields["email"]}> wrote, on $page:\n\n${fields["message"]}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warn("forms: could not mail {} — the message is kept", to, e)
+            }
+        }
+    }
+
     /** Forget what is older than the retention the admin set; answers how many were dropped. */
     fun purge(site: Site, now: Long): Int {
         val days = site.settings(this)["retentionDays"]?.toLongOrNull() ?: return 0
@@ -128,6 +149,8 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
         return if (uri.host == null || uri.host == host) (uri.rawPath ?: "/").ifEmpty { "/" } else "/"
     }
 }
+
+private val logger = LoggerFactory.getLogger("kroom.plugins.forms")
 
 private val SCRIPT = """<script>
 document.addEventListener('submit', async (e) => {

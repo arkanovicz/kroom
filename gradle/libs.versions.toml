@@ -9,6 +9,8 @@ bouncycastle = "1.81"
 commons-collections4 = "4.5.0"
 commons-lang3 = "3.18.0"
 essential-kson = "2.14"
+angus-mail = "2.0.5"
+greenmail = "2.1.14"
 # last 0.64.x; JVM-only by design — server-side rendering, not part of kroom's KMP surface
 flexmark = "0.64.8"
 h2 = "2.3.232"
@@ -39,6 +41,8 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 commons-collections4 = { module = "org.apache.commons:commons-collections4", version.ref = "commons-collections4" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 essential-kson = { module = "com.republicate.kson:essential-kson", version.ref = "essential-kson" }
+angus-mail = { module = "org.eclipse.angus:angus-mail", version.ref = "angus-mail" }
+greenmail = { module = "com.icegreen:greenmail", version.ref = "greenmail" }
 evo-inflector = { module = "org.atteo:evo-inflector", version.ref = "evo-inflector" }
 # core + the GFM set; no flexmark-all, and no subscript ext (it fights strikethrough over `~`)
 flexmark = { module = "com.vladsch.flexmark:flexmark", version.ref = "flexmark" }

@@ -5,6 +5,7 @@ import com.republicate.kroom.webapp.authoring.MemoryStorage
 import com.republicate.kroom.webapp.authoring.Roles
 import com.republicate.kroom.webapp.authoring.installContentSite
 import com.republicate.kroom.webapp.authoring.site
+import com.republicate.kroom.webapp.core.Mailer
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kson.Json
 import io.ktor.client.plugins.cookies.*
@@ -68,6 +69,22 @@ class FormsTest {
         })
         assertEquals(0, messages.list().size)
         assertEquals(HttpStatusCode.BadRequest, client.submitForm("/forms/contact", parameters { append("name", "Alice") }).status)
+    }
+
+    @Test
+    fun `each message is mailed to notify, when the site has a mailer`() = testApplication {
+        site()
+        startApplication()
+        val sent = kotlinx.coroutines.CompletableDeferred<Triple<String, String, String>>()
+        application.site.mailer = Mailer { to, subject, body -> sent.complete(Triple(to, subject, body)) }
+        storage.settings("forms")["notify"] = "bureau@example.org"
+        client.submitForm("/forms/contact", parameters {
+            append("topic", "adhésion"); append("name", "Alice"); append("email", "alice@example.org"); append("message", "Bonjour")
+        })
+        val (to, subject, body) = kotlinx.coroutines.withTimeout(5000) { sent.await() }
+        assertEquals("bureau@example.org", to)
+        assertEquals("[adhésion] Alice", subject)
+        assertContains(body, "Bonjour")
     }
 
     @Test
