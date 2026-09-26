@@ -23,7 +23,6 @@
         bullets: 'bulleted list', numbers: 'numbered list', quote: 'quote', code: 'code',
         // what a formatting button writes when nothing is selected
         boldText: 'bold', italicText: 'italic', linkText: 'text', codeText: 'code',
-        otherBlock: 'finish the block you are editing first',
         saving: 'saving\u2026',
         lockLost: 'lock lost: {message}',
         conflict: 'This block changed while you were editing',
@@ -31,6 +30,8 @@
         keptMine: 'editing against their revision \u2014 submitting now overwrites it',
         revision: '{time} \u2014 {author}', current: '(current)', unknownAuthor: 'unknown',
         noRevision: 'no revision yet', restore: 'restore', back: 'back',
+        draft: '{time} \u2014 unsaved draft', draftBase: 'before it',
+        draftBack: 'your unsaved draft is back \u2014 submit to write it',
         restored: '{time} restored \u2014 submit to write it',
         // the edit API's errors: each said through `error`, by its code when the table has it
         error: 'Error: {message}',
@@ -41,7 +42,24 @@
         pageMissing: 'a block is rendered within the page it is in: page missing',
         invalidPath: 'invalid content path', broken: '{message}'
     }, window.kroomAuthoring?.strings);
-    window.kroomAuthoring = Object.assign(window.kroomAuthoring || {}, { strings });
+
+    // The editor's pictograms: one stroked path each on a 24px grid, in the text's colour — overridable
+    // like the words (kroomAuthoring.icons), their stroke width a CSS variable (--kroom-icon-stroke).
+    const icons = Object.assign({
+        edit: 'M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4',
+        bold: 'M7 5h5.5a3.5 3.5 0 0 1 0 7H7zM7 12h6.5a3.5 3.5 0 0 1 0 7H7z',
+        italic: 'M11 5h7M6 19h7M14.5 5l-5 14',
+        heading: 'M4 5v14M14 5v14M4 12h10M18 14l2-1.5V19',
+        link: 'M10 14a4 4 0 0 0 5.66 0l3.17-3.17a4 4 0 0 0-5.66-5.66L12 6.34M14 10a4 4 0 0 0-5.66 0l-3.17 3.17a4 4 0 0 0 5.66 5.66L12 17.66',
+        bullets: 'M5 6.5h.01M5 12h.01M5 17.5h.01M10 6.5h10M10 12h10M10 17.5h10',
+        numbers: 'M4 5.5l1.5-1V10M4 14.8a1.5 1.5 0 0 1 3 .2c0 1.3-3 2.4-3 4.5h3M11 7h9M11 12h9M11 17h9',
+        quote: 'M9.5 7C6.5 8 5 10 5 13v4h4.5v-4.5H5M19 7c-3 1-4.5 3-4.5 6v4H19v-4.5h-4.5',
+        code: 'M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14',
+        submit: 'M4.5 12.5l4.5 4.5L19.5 6.5',
+        cancel: 'M6 6l12 12M18 6L6 18'
+    }, window.kroomAuthoring?.icons);
+
+    window.kroomAuthoring = Object.assign(window.kroomAuthoring || {}, { strings, icons });
 
     const t = (key, args = {}) => (strings[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => args[name] ?? '');
 
@@ -126,6 +144,26 @@
         return btn;
     }
 
+    const SVG = 'http://www.w3.org/2000/svg';
+
+    function icon(name) {
+        const svg = document.createElementNS(SVG, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('class', 'kroom-icon');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.appendChild(document.createElementNS(SVG, 'path')).setAttribute('d', icons[name]);
+        return svg;
+    }
+
+    /** A button showing a pictogram, named by the strings table for tooltips and screen readers. */
+    function iconButton(name, className, onClick) {
+        const btn = button(undefined, className, onClick);
+        btn.appendChild(icon(name));
+        btn.title = t(name);
+        btn.attr('aria-label', t(name));
+        return btn;
+    }
+
     /** A left/right diff view in [pane], with its two column captions. */
     function diffView(pane, leftTitle, rightTitle, left, right) {
         pane.clear();
@@ -144,10 +182,7 @@
 
     /** Take the block, then open it on what the lock answered. */
     async function edit(block) {
-        if (session) {
-            if (session.block !== block) notice(block, t('otherBlock'));
-            return;
-        }
+        if (session) return;             // one block at a time: the others show no handle meanwhile
         const root = apiRoot(block);
         if (!root) return;
         const path = encodePath(block.data('content'));
@@ -171,11 +206,7 @@
         tabs.appendChild(button(t('preview'), 'kroom-tab', () => tab('preview'))).data('tab', 'preview');
         tabs.appendChild(button(t('history'), 'kroom-tab', () => tab('history'))).data('tab', 'history');
         const format = bar.appendChild(element('div', 'kroom-format'));
-        FORMATS.forEach(f => {
-            const btn = format.appendChild(button(f.label, `kroom-format-${f.name}`, () => f.apply(session.textarea)));
-            btn.title = t(f.name);
-            btn.attr('aria-label', t(f.name));
-        });
+        FORMATS.forEach(f => format.appendChild(iconButton(f.name, `kroom-format-${f.name}`, () => f.apply(session.textarea))));
 
         const source = editor.appendChild(element('div', 'kroom-pane'));
         source.attr('role', 'tabpanel').data('pane', 'source');
@@ -192,15 +223,16 @@
         past.attr('role', 'tabpanel').data('pane', 'history');
 
         const tools = editor.appendChild(element('nav', 'kroom-editor-tools'));
-        [['\u2713', 'submit', submit], ['\u2717', 'cancel', cancel]].forEach(([glyph, name, onClick]) => {
-            const btn = tools.appendChild(button(glyph, `kroom-${name}${name === 'cancel' ? ' secondary' : ''}`, onClick));
-            btn.title = t(name);
-            btn.attr('aria-label', t(name));
-        });
+        tools.appendChild(iconButton('submit', 'kroom-submit', submit));
+        tools.appendChild(iconButton('cancel', 'kroom-cancel secondary', cancel));
         tools.appendChild(element('span', 'kroom-status'));
 
-        session = { block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: held.body };
+        session = {
+            block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: held.body,
+            stored: held.body, startRev: held.rev, draft: drafts.read(block), kept: true
+        };
         block.addClass('kroom-editing');
+        document.documentElement.addClass('kroom-busy');
         textarea.on('input', typed);
         textarea.on('keydown', shortcut);
         tab('source');
@@ -239,6 +271,7 @@
     /** Typing means the lock is alive; say so once you pause. */
     function typed() {
         grow(session.textarea);
+        keep();
         clearTimeout(session.timer);
         session.timer = setTimeout(heartbeat, HEARTBEAT_DELAY);
     }
@@ -339,14 +372,14 @@
     }
 
     const FORMATS = [
-        { name: 'bold', label: 'B', key: 'b', apply: ta => wrap(ta, '**', t('boldText')) },
-        { name: 'italic', label: 'I', key: 'i', apply: ta => wrap(ta, '_', t('italicText')) },
-        { name: 'heading', label: 'H', apply: ta => prefix(ta, '## ') },
-        { name: 'link', label: '\u{1F517}', key: 'k', apply: link },
-        { name: 'bullets', label: '\u2022', apply: ta => prefix(ta, '- ') },
-        { name: 'numbers', label: '1.', apply: ta => prefix(ta, { pattern: /^\d+\. /, make: i => `${i + 1}. ` }) },
-        { name: 'quote', label: '\u201C', apply: ta => prefix(ta, '> ') },
-        { name: 'code', label: '</>', apply: code }
+        { name: 'bold', key: 'b', apply: ta => wrap(ta, '**', t('boldText')) },
+        { name: 'italic', key: 'i', apply: ta => wrap(ta, '_', t('italicText')) },
+        { name: 'heading', apply: ta => prefix(ta, '## ') },
+        { name: 'link', key: 'k', apply: link },
+        { name: 'bullets', apply: ta => prefix(ta, '- ') },
+        { name: 'numbers', apply: ta => prefix(ta, { pattern: /^\d+\. /, make: i => `${i + 1}. ` }) },
+        { name: 'quote', apply: ta => prefix(ta, '> ') },
+        { name: 'code', apply: code }
     ];
 
     function shortcut(event) {
@@ -365,6 +398,7 @@
             await api.postJson(held.root + held.path,
                 { page: window.location.pathname, rev: held.rev, body: held.textarea.value });
             // the block's html only exists as part of a page render, and the submit answers a rev, not html
+            drafts.drop(held.block);
             session = null;
             location.reload();
         } catch (err) {
@@ -380,6 +414,7 @@
         const footer = $('footer', dlg);
         footer.appendChild(button(t('keepMine'), 'kroom-keep', () => {
             session.rev = theirs.rev;
+            keep();
             dlg.close();
             status(t('keptMine'));
         }));
@@ -393,6 +428,7 @@
     function cancel() {
         const held = session;
         api.deleteJson(held.root + 'lock/' + held.path).catch(err => console.warn(err.message));
+        drafts.drop(held.block);
         restore();
     }
 
@@ -401,27 +437,31 @@
         session.block.insertBefore(session.body, session.editor);
         session.editor.remove();
         session.block.removeClass('kroom-editing');
+        document.documentElement.removeClass('kroom-busy');
         session = null;
     }
 
     // --- history ---------------------------------------------------------------------------------
 
-    /** What the store remembers of this block, asked again each time the tab is shown. */
+    /** The draft, if any, then what the store remembers of this block — asked again each time the tab is shown. */
     async function history() {
         const held = session;
         const pane = $('.kroom-past', held.editor);
-        let log;
+        let log = [], failure = null;
         try {
             log = await api.getJson(held.root + 'history/' + held.path);
         } catch (err) {
-            pane.clear();
-            pane.appendChild(element('p', 'kroom-empty', said(err)));
-            return;
+            failure = said(err);
         }
         if (session !== held) return;
         pane.clear();
-        if (log.length === 0) return pane.appendChild(element('p', 'kroom-empty', t('noRevision')));
         const list = pane.appendChild(element('ul', 'kroom-revisions'));
+        if (held.draft) {
+            const draft = held.draft;
+            list.appendChild(element('li')).appendChild(button(t('draft', { time: new Date(draft.time).toLocaleString() }),
+                'kroom-revision kroom-draft secondary outline', () => redraft(draft)));
+        }
+        if (failure || (!held.draft && log.length === 0)) pane.appendChild(element('p', 'kroom-empty', failure || t('noRevision')));
         log.forEach(revision => {
             const label = t('revision', { time: new Date(revision.time).toLocaleString(), author: revision.author || t('unknownAuthor') })
                 + (revision.rev === held.rev ? ` ${t('current')}` : '');
@@ -451,17 +491,102 @@
         tools.appendChild(button(t('back'), 'kroom-back secondary', history));
     }
 
+    /** A draft against the revision it started from: what it changes. Restoring it takes that revision back. */
+    async function redraft(draft) {
+        const held = session;
+        const pane = $('.kroom-past', held.editor);
+        let base = held.stored;
+        if (draft.rev !== held.startRev) {
+            try {
+                base = (await api.getJson(`${held.root}${held.path}?rev=${encodeURIComponent(draft.rev)}`)).body;
+            } catch (_) { /* out of reach: shown against the block as stored */ }
+        }
+        if (session !== held) return;
+        const when = new Date(draft.time).toLocaleString();
+        diffView(pane, t('draftBase'), t('draft', { time: when }), base, draft.body);
+        const tools = pane.appendChild(element('nav', 'kroom-past-tools'));
+        if (draft.body !== held.textarea.value) tools.appendChild(button(t('restore'), 'kroom-restore', () => {
+            held.rev = draft.rev;           // a draft older than the block meets the ordinary conflict on submit
+            fill(draft.body);
+            status(t('restored', { time: when }));
+        }));
+        tools.appendChild(button(t('back'), 'kroom-back secondary', history));
+    }
+
+    // --- drafts ----------------------------------------------------------------------------------
+
+    // What is typed outlives the page: kept as it is typed, under the author and the block, with the rev it
+    // started from — so a draft the block moved past meets the ordinary conflict on submit. Submit and
+    // cancel drop it; a browser that refuses to store it keeps the leave-page warning instead.
+    const drafts = {
+        key: (block) => `kroom.draft:${block.data('user')}:${block.data('content')}`,
+        read(block) {
+            try { return JSON.parse(localStorage.getItem(this.key(block))); } catch (_) { return null; }
+        },
+        write(block, draft) {
+            try { localStorage.setItem(this.key(block), JSON.stringify(draft)); return true; } catch (_) { return false; }
+        },
+        drop(block) {
+            try { localStorage.removeItem(this.key(block)); } catch (_) { /* nothing was kept */ }
+        }
+    };
+
+    function keep() {
+        const held = session;
+        if (held.textarea.value === held.stored && held.rev === held.startRev) {
+            drafts.drop(held.block);
+            held.draft = null;
+            held.kept = true;
+        } else {
+            held.draft = { rev: held.rev, body: held.textarea.value, time: Date.now() };
+            held.kept = drafts.write(held.block, held.draft);
+        }
+    }
+
+    /**
+     * A draft whose lock is still ours is a page reloaded mid-edit: open it again, as it was. An older one
+     * (its lock gone) opens nothing — it waits in the history tab of its block.
+     */
+    async function resume() {
+        const found = [...document.querySelectorAll('.kroom-block[data-user]')]
+            .map(block => ({ block, draft: drafts.read(block) }))
+            .filter(found => found.draft)
+            .sort((a, b) => b.draft.time - a.draft.time);
+        for (const { block, draft } of found) {
+            const root = apiRoot(block);
+            if (!root) continue;
+            let now;
+            try {
+                now = await api.getJson(root + encodePath(block.data('content')));
+            } catch (_) { continue; }
+            if (now.lock?.owner !== block.data('user')) continue;
+            await edit(block);
+            if (!session) return;
+            session.rev = draft.rev;
+            fill(draft.body);
+            status(t('draftBack'));
+            return;
+        }
+    }
+
     // --- wiring ----------------------------------------------------------------------------------
 
-    // the wrapper template carries no words: the edit handle is named here, with the rest
-    function name(root) {
+    // the wrapper template carries no words and no picture: the edit handle is dressed here, with the rest
+    // (a wrapper of the application's that draws its own keeps it)
+    function ready() {
+        dress(document);
+        resume();
+    }
+
+    function dress(root) {
         root.querySelectorAll('.kroom-block-tools .kroom-edit').forEach(btn => {
+            if (!btn.textContent.trim() && !btn.firstElementChild) btn.appendChild(icon('edit'));
             btn.title = t('edit');
             btn.attr('aria-label', t('edit'));
         });
     }
-    if (document.readyState === 'loading') document.on('DOMContentLoaded', () => name(document));
-    else name(document);
+    if (document.readyState === 'loading') document.on('DOMContentLoaded', ready);
+    else ready();
 
     document.on('click', event => {
         const btn = event.target.closest('.kroom-block-tools button');
@@ -470,9 +595,9 @@
         if (btn.hasClass('kroom-edit')) edit(block);
     });
 
-    // leaving with the block open loses the text; the lock itself needs no goodbye, it expires
+    // leaving loses nothing a draft keeps; the lock itself needs no goodbye, it expires
     window.on('beforeunload', event => {
-        if (!session) return;
+        if (!session || session.kept) return;
         event.preventDefault();
         event.returnValue = '';
     });

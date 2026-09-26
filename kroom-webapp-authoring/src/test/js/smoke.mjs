@@ -23,8 +23,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 /** A page holding one editable block, the scripts loaded as a browser loads them: one shared scope. */
 function page(responder, preset = '') {
     const dom = new JSDOM(`<!doctype html><html><body>
-        <div class="kroom-block" data-content="${PATH}" data-api="/api/content" data-name="description">
-          <nav class="kroom-block-tools"><button class="kroom-edit">e</button></nav>
+        <div class="kroom-block" data-content="${PATH}" data-api="/api/content" data-name="description" data-user="admin">
+          <nav class="kroom-block-tools"><button class="kroom-edit"></button></nav>
           <div class="kroom-block-body"><p>published text</p></div>
         </div></body></html>`, { runScripts: 'outside-only', url: 'http://localhost/club/13Ma' });
     const { window } = dom;
@@ -50,12 +50,16 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
 
 // --- taking a block, and giving it back -----------------------------------------------------------
 {
-    const { calls, click, $ } = page((url) => url.includes('/lock/') ? held : { payload: { rev: 'def456' } });
+    const { calls, click, $, window } = page((url) => url.includes('/lock/') ? held : { payload: { rev: 'def456' } });
+    await sleep(20);
+    check('the empty edit handle is given its pictogram', !!$('.kroom-edit svg.kroom-icon'), true);
     click('.kroom-edit');
     await sleep(20);
     check('edit takes the lock', calls[0], { url: `/api/content/lock/${PATH}`, method: 'POST', body: undefined });
     check('the stored body is what you edit', $('.kroom-block textarea')?.value, '## Titre');
     check('the published rendering is kept beside it', $('.kroom-preview')?.textContent.includes('published text'), true);
+    check('every button of the editor shows its pictogram',
+        [...window.document.querySelectorAll('.kroom-format button, .kroom-editor-tools button')].every(b => b.querySelector('svg.kroom-icon path')), true);
     check('the markdown tab is the one shown', [$('.kroom-pane[data-pane="source"]').hidden, $('.kroom-preview').hidden], [false, true]);
 
     click('.kroom-cancel');
@@ -135,11 +139,13 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
 // --- the application's words ---------------------------------------------------------------------
 {
     // as AuthoringAssets.stringTags() emits them, ahead of authoring.js
-    const preset = `Object.assign(((window.kroomAuthoring ??= {}).strings ??= {}), {"preview":"aperçu","edit":"modifier","lockHeld":"{owner} y travaille"});`;
+    const preset = `Object.assign(((window.kroomAuthoring ??= {}).strings ??= {}), {"preview":"aperçu","edit":"modifier","lockHeld":"{owner} y travaille"});
+        window.kroomAuthoring.icons = { edit: 'M0 0h24' };`;
     const taken = { status: 409, payload: { message: 'block held by nestor', code: 'lockHeld', args: { owner: 'nestor' } } };
     const { click, $, window } = page(() => taken, preset);
     await sleep(20);   // the handle is named once the document is loaded
     check('the edit handle is named in the application\'s words', $('.kroom-edit').title, 'modifier');
+    check('and drawn with its pictogram', $('.kroom-edit path')?.getAttribute('d'), 'M0 0h24');
     click('.kroom-edit');
     await sleep(20);
     check('an API error is said by its code', $('.kroom-notice')?.textContent, 'Error: nestor y travaille');
@@ -158,6 +164,64 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
     await sleep(20);
     check('tabs read the table when the editor opens', [...second.window.document.querySelectorAll('.kroom-tab')].map(b => b.textContent),
         ['source', 'aperçu', 'history']);
+}
+
+// --- drafts -------------------------------------------------------------------------------------
+const KEY = `kroom.draft:admin:${PATH}`;
+const seeded = (draft) => `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(JSON.stringify(draft))});`;
+{
+    const { click, $, window } = page(() => held);
+    click('.kroom-edit');
+    await sleep(20);
+    check('while editing, no block offers its handle', window.document.documentElement.classList.contains('kroom-busy'), true);
+    const textarea = $('.kroom-block textarea');
+    textarea.value = '## Titre\n\nen cours';
+    textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const kept = JSON.parse(window.localStorage.getItem(KEY));
+    check('what is typed is kept, with the rev it started from', [kept?.rev, kept?.body], ['abc123', '## Titre\n\nen cours']);
+    const leaving = new window.Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    check('so leaving the page warns of nothing', leaving.defaultPrevented, false);
+    textarea.value = '## Titre';
+    textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+    check('typing back to the stored text drops it', window.localStorage.getItem(KEY), null);
+    textarea.value = '## Titre\n\nencore';
+    textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+    click('.kroom-cancel');
+    await sleep(20);
+    check('cancel drops it too', window.localStorage.getItem(KEY), null);
+    check('and the handles are back', window.document.documentElement.classList.contains('kroom-busy'), false);
+}
+{
+    // reloaded mid-edit: the lock is still ours
+    const draft = { rev: 'old999', body: '## Titre\n\nmon brouillon', time: Date.now() };
+    const { calls, click, $ } = page(() => held, seeded(draft));
+    await sleep(50);
+    check('a draft whose lock is still ours reopens its block', $('.kroom-block textarea')?.value, draft.body);
+    check('saying so', $('.kroom-status')?.textContent, 'your unsaved draft is back \u2014 submit to write it');
+    click('.kroom-submit');
+    await sleep(20);
+    check('and submits against the rev it started from', calls[calls.length - 1].body?.rev, 'old999');
+}
+{
+    // an old draft: its lock is gone
+    const draft = { rev: 'abc123', body: '## Titre\n\nun vieux brouillon', time: 1757000000000 };
+    const log = { payload: [{ rev: 'abc123', path: PATH, author: 'admin', time: 1757000000000 }] };
+    const { click, $, window } = page((url) =>
+        url.includes('/history/') ? log : url.includes('/lock/') ? held : { payload: { ...held.payload, lock: null } }, seeded(draft));
+    await sleep(50);
+    check('an old draft opens nothing', $('.kroom-block textarea'), null);
+    click('.kroom-edit');
+    await sleep(20);
+    check('the editor opens on the stored text', $('.kroom-block textarea')?.value, '## Titre');
+    click('.kroom-tab[data-tab="history"]');
+    await sleep(20);
+    check('the draft heads the history', $('.kroom-past li .kroom-draft') !== null, true);
+    click('.kroom-draft');
+    await sleep(20);
+    check('shown against the revision it started from', !!$('.kroom-past .kroom-diff'), true);
+    click('.kroom-restore');
+    check('and restored like one', $('.kroom-block textarea')?.value, draft.body);
 }
 
 // --- someone else wrote meanwhile -----------------------------------------------------------------

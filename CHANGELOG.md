@@ -79,6 +79,14 @@ All notable changes to kroom will be documented in this file.
   `AuthoringConfig.strings` / `ContentSiteConfig.strings` server side), edit API error codes included; the
   default wrapper carries no text. `AuthoringAssets` is a class carrying those strings (`VERSION` in its
   companion).
+- Pictograms: one stroked SVG path per button on a 24px grid, overridable (`kroomAuthoring.icons`), sized and
+  stroked by CSS variables; edit, submit and cancel are coloured (blue, green, red — variables too), raised,
+  and pressed when clicked. The default wrapper's edit button is empty: authoring.js draws and names it.
+- Drafts: what is typed is kept in `localStorage` per author and block, with the rev it started from, and
+  dropped on submit or cancel; a reload mid-edit (the lock still ours) reopens the block as it was, an older
+  draft heads the block's history. The leave-page warning remains only where storage fails. The wrapper
+  carries `data-user`.
+- While a block is edited, no block shows its edit handle.
 
 #### kroom-webapp-core
 - Dev-mode static routes answer `Cache-Control: no-cache`, classpath fallback included (was one hour).

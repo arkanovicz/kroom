@@ -341,16 +341,22 @@ which read `static/` from any jar on the classpath — authoring mounts no route
 
 ### What the editor does
 
-✎ takes the lock and opens the block in three tabs; typing refreshes the lock (debounced, 700ms), ✓ submits
-`{page, rev, body}`, ✗ gives the block back.
+✎ takes the lock and opens the block in three tabs — while it is open, no block shows its handle; typing
+refreshes the lock (debounced, 700ms), ✓ submits `{page, rev, body}`, ✗ gives the block back.
 
 - **markdown** — the textarea, with formatting buttons (bold, italic, heading, link, lists, quote, code;
   Ctrl+B/I/K) that toggle their markup and go through the textarea's own undo stack.
 - **preview** — the page itself, re-rendered by the server with the textarea standing in for the stored
   block, of which this block's part is shown; rendered when the tab is shown, and only if the text moved.
-- **history** — the store's revisions (none when it is not `Versioned`); picking one diffs it against what
-  you are writing, and *restore* loads it into the markdown tab for you to submit — an undo is an edit like
-  any other. ✓ and ✗ are hidden there.
+- **history** — the unsaved draft, if any, then the store's revisions (none when it is not `Versioned`);
+  picking a revision diffs it against what you are writing, and *restore* loads it into the markdown tab for
+  you to submit — an undo is an edit like any other. ✓ and ✗ are hidden there.
+
+**Drafts.** What is typed is kept in `localStorage` as it is typed — key `kroom.draft:<user>:<block path>`,
+value `{rev, body, time}`, `rev` being the revision it started from — and dropped on submit or cancel. At page
+load, a draft whose lock is still its author's (a reload mid-edit) reopens its block as it was; an older one
+waits at the head of its block's history. A draft the block moved past meets the ordinary 409 on submit. The
+leave-page warning only remains for a browser that refuses to store the draft.
 
 A 409 on submit shows yours beside theirs, word-diffed, and you leave it editing against their revision,
 keeping your text or taking theirs. A successful submit reloads the page: the submit answers a rev, and the
@@ -369,6 +375,11 @@ installContentSite { strings["preview"] = "aperçu"; strings["error"] = "Erreur 
 
 or client side, before or after `authoring.js`: `Object.assign(kroomAuthoring.strings, { … })`. An error code
 the table lacks falls back to the server's English message.
+
+The pictograms follow the same door: `kroomAuthoring.icons` maps each button (`edit`, `bold`, …, `submit`,
+`cancel`) to one SVG path on a 24px grid, stroked in the text's colour. CSS variables size and colour them:
+`--kroom-icon-size` (1.5rem), `--kroom-icon-stroke` (1.75), `--kroom-edit-color`, `--kroom-submit-color`,
+`--kroom-cancel-color`.
 
 ## Table (for seat-based games)
 

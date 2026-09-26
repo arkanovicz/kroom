@@ -8,10 +8,10 @@
 ##
 ## `== true`: the engine types a context root as Any?, and a condition must be a Boolean
 #set($kroomEditable = $authoring.canEdit($logged, $path) == true)
-<div class="kroom-block" data-content="$path"#if($kroomEditable) data-api="$authoring.apiPrefix" data-name="$name"#end>
+<div class="kroom-block" data-content="$path"#if($kroomEditable) data-api="$authoring.apiPrefix" data-name="$name" data-user="$logged.id"#end>
 #if($kroomEditable)
   <nav class="kroom-block-tools" aria-label="$name">
-    <button type="button" class="kroom-edit">&#9998;</button>
+    <button type="button" class="kroom-edit"></button>
   </nav>
 #end
   <div class="kroom-block-body">$html</div>
