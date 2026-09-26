@@ -30,6 +30,8 @@ All notable changes to kroom will be documented in this file.
 - Media, a fourth `Storage` kind: uploads told by their bytes (PNG, JPEG, GIF, WebP, AVIF, PDF — no SVG),
   named once and served immutable under `/media/`; `MemoryStorage` keeps them within a byte budget (100 MB) and
   refuses past it. The editor uploads a picked, pasted or dropped file and writes it in as markdown.
+- `Site.requestTool(name) { call -> }`: `$name`, one value per request — what a page sets and a fragment reads
+  back in the same render.
 - `Site.notFound { call -> }`: a request nothing answered, before it becomes a 404 — to log it or still
   answer it (a phase of its own ahead of `Fallback`, where the engine answers first).
 - `Site.mailer`: how the site sends mail, set by a mail plugin, read at send time.
@@ -43,7 +45,8 @@ All notable changes to kroom will be documented in this file.
 #### kroom-plugin-seo, -redirects, -forms, -analytics, -webhook, -mail
 - Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. mail is an SMTP
   transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms mails each
-  message to its `notify` address when the site has a mailer.
+  message to its `notify` address when the site has a mailer. seo takes a page's own words:
+  `$seo.title(…)`, `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`, over the site-wide settings.
 
 #### kroom-webapp-velocity
 - `pages()` leaves a path no template backs unanswered instead of answering 404 itself, so an application's

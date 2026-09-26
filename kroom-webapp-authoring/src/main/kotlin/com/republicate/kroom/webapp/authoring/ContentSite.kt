@@ -62,6 +62,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
 
     velocity.registerRequest("site") { site.view(it) }
     site.tools.forEach { (name, value) -> velocity.registerApplication(name) { value } }
+    site.requestTools.keys.forEach { name -> velocity.registerRequest(name) { call -> site.requestValue(name, call) } }
     if (site.interceptors.isNotEmpty()) intercept(ApplicationCallPipeline.Plugins) {
         for (interceptor in site.interceptors) {
             interceptor(call)

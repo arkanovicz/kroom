@@ -40,6 +40,7 @@ class Site internal constructor(
     val plugins: Collection<Plugin> get() = registered.values
 
     internal val tools = LinkedHashMap<String, Any>()
+    internal val requestTools = LinkedHashMap<String, (ApplicationCall) -> Any>()
     internal val blockTools = LinkedHashSet<String>()
     internal val routes = ArrayList<Route.() -> Unit>()
     internal val interceptors = ArrayList<suspend (ApplicationCall) -> Unit>()
@@ -104,6 +105,26 @@ class Site internal constructor(
         tools[name] = value
         if (blocks) blockTools += name
     }
+
+    /**
+     * `$name` in every page, one value per request, made on first use by [provider] and kept for that request
+     * — state a page sets and a fragment reads back later in the same render (`$seo.description("…")` before
+     * `$site.head()`). With [blocks], blocks see it too.
+     */
+    fun requestTool(name: String, blocks: Boolean = false, provider: (ApplicationCall) -> Any) {
+        requestTools[name] = provider
+        if (blocks) blockTools += name
+    }
+
+    /** The value [requestTool] gave [name] for this [call], made now if it was not yet. */
+    fun requestValue(name: String, call: ApplicationCall): Any? {
+        val provider = requestTools[name] ?: return null
+        @Suppress("UNCHECKED_CAST")
+        val key = requestKeys.computeIfAbsent(name) { AttributeKey<Any>("kroom.tool.$it") } as AttributeKey<Any>
+        return call.attributes.computeIfAbsent(key) { provider(call) }
+    }
+
+    private val requestKeys = java.util.concurrent.ConcurrentHashMap<String, AttributeKey<*>>()
 
     /** Routes of the plugin's own: public endpoints (a form's submit, a webhook) or guarded ones ([can]). */
     fun routes(block: Route.() -> Unit) { routes += block }

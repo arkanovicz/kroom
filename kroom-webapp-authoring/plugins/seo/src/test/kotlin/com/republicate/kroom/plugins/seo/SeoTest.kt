@@ -47,6 +47,17 @@ class SeoTest {
     }
 
     @Test
+    fun `a page says its own description and title, and may keep itself out of search`() = testApplication {
+        site()
+        val page = client.get("/legal/terms").bodyAsText()
+        assertContains(page, """<meta name="description" content="Qui publie ce site">""")
+        assertContains(page, """<meta property="og:title" content="Mentions légales">""")
+        assertContains(page, """<meta name="robots" content="noindex, nofollow">""")
+        assertFalse(page.contains("Go &amp; more"))
+        assertFalse(client.get("/index").bodyAsText().contains("noindex"), "one page's word is that page's only")
+    }
+
+    @Test
     fun `an unindexed site says so, to robots and in every head`() = testApplication {
         storage.settings("seo")["indexed"] = "false"
         site()

@@ -15,6 +15,9 @@ import io.ktor.server.routing.*
  * What search engines and share previews read: description and Open Graph tags in every page's head, a
  * `robots.txt`, and a `sitemap.xml` listing every page the site serves — placeholder pages included, one
  * URL per page their blocks say exists ([Site.pages]). Titles stay the layout's: they are the page's words.
+ *
+ * A page says its own before the head is rendered — `$seo.description("…")`, `$seo.title(…)`, `$seo.image(…)`,
+ * `$seo.noindex()` — and wins over the site-wide settings for that request.
  */
 class Seo : Plugin {
     override val id = "seo"
@@ -29,24 +32,42 @@ class Seo : Plugin {
         Setting("exclude", "Left out of the sitemap", default = "/login", type = TEXTAREA, help = "One route per line")
     )
 
+    /** `$seo` in a page: what this one request says of itself. Each call renders nothing. */
+    class Page {
+        internal var title: String? = null
+        internal var description: String? = null
+        internal var image: String? = null
+        internal var indexed = true
+
+        fun title(value: String) = "".also { title = value }
+        fun description(value: String) = "".also { description = value }
+        fun image(value: String) = "".also { image = value }
+        fun noindex() = "".also { indexed = false }
+    }
+
     override fun install(site: Site) {
         val settings = site.settings(this)
         fun base() = settings["baseUrl"].orEmpty().trimEnd('/')
 
+        site.requestTool("seo") { Page() }
+
         site.head { call ->
+            val page = site.requestValue("seo", call) as Page
             val tags = ArrayList<String>()
             fun meta(attribute: String, key: String, value: String?) {
                 if (!value.isNullOrBlank()) tags += """<meta $attribute="$key" content="${htmlEscape(value.trim())}">"""
             }
-            meta("name", "description", settings["description"])
+            val description = page.description ?: settings["description"]
+            meta("name", "description", description)
             meta("property", "og:site_name", settings["siteName"])
-            meta("property", "og:description", settings["description"])
-            meta("property", "og:image", settings["image"])
+            meta("property", "og:title", page.title)
+            meta("property", "og:description", description)
+            meta("property", "og:image", page.image ?: settings["image"])
             if (base().isNotEmpty()) {
                 meta("property", "og:url", base() + call.request.path())
                 tags += """<link rel="canonical" href="${htmlEscape(base() + call.request.path())}">"""
             }
-            if (settings["indexed"] != "true") meta("name", "robots", "noindex, nofollow")
+            if (settings["indexed"] != "true" || !page.indexed) meta("name", "robots", "noindex, nofollow")
             tags.joinToString("\n")
         }
 
