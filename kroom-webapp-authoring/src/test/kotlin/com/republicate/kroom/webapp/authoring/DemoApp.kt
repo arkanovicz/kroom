@@ -47,8 +47,8 @@ fun Application.demo() {
     routing {
         get("/") { call.respondRedirect("/club/13Ma") }
 
-        // a login worth exactly what a demo needs: admin / admin, and the author it stamps on what you write
-        get("/login") { call.respondVelocity("login.html") }
+        // a login worth exactly what a demo needs: admin / admin, and the author it stamps on what you write;
+        // the form itself is a page like any other, /login -> pages/login.html
         post("/login") {
             val form = call.receiveParameters()
             val who = form["user"].orEmpty()
@@ -56,7 +56,7 @@ fun Application.demo() {
                 call.sessions.set(UserSession(who, who, null, "demo"))
                 call.respondRedirect(form["from"] ?: "/")
             } else {
-                call.respondVelocity("login.html", mapOf("failed" to true))
+                call.respondVelocity("pages/login.html", mapOf("failed" to true))
             }
         }
         post("/logout") {
