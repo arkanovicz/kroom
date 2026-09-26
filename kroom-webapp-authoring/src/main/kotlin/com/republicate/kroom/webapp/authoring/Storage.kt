@@ -8,16 +8,19 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * - [content]: the blocks, read by the renderer and written by the editor (a velocity `ResourceLoader`);
  * - [settings]: a handful of named strings per namespace — a plugin's configuration;
- * - [records]: rows a plugin owns, per collection — form submissions, redirect rules, subscribers.
+ * - [records]: rows a plugin owns, per collection — form submissions, redirect rules, subscribers;
+ * - [media]: uploaded files, under names the store hands out.
  *
  * A namespace is a plugin id (`[a-z0-9_-]+`), so no plugin reads another's by accident. The shipped
- * [MemoryStorage] and [FileStorage] are demo-grade; an application maps the same three kinds onto what it
- * already runs (a git content tree, a database through skorm — a collection is a table's worth of rows).
+ * [MemoryStorage] and [FileStorage] are demo-grade; an application maps the same four kinds onto what it
+ * already runs (a git content tree, a database through skorm — a collection is a table's worth of rows —, an
+ * object store).
  */
 interface Storage {
     val content: ResourceStore
     fun settings(namespace: String): Settings
     fun records(namespace: String, collection: String): Records
+    val media: Media
 }
 
 /** A namespace's configuration: small strings, read often, written by an admin. */

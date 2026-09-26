@@ -16,6 +16,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const entries = JSON.stringify([
     { id: 'pages', label: 'pages', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
+    { id: 'media', label: 'media', builtin: true },
     { id: 'plugins', label: 'plugins', builtin: true }, { id: 'roles', label: 'roles', builtin: true },
     { id: 'forms', label: 'Forms', table: '/api/forms/entries', builtin: false }
 ]).replace(/"/g, '&quot;');
@@ -28,6 +29,8 @@ const answers = {
         { key: 'title', label: 'Title', type: 'text', value: 'Club' },
         { key: 'index', label: 'Indexed', type: 'boolean', value: 'true' },
         { key: 'key', label: 'Key', type: 'secret', set: true }] }],
+    '/api/content/media': [{ name: 'a-photo.png', url: '/media/a-photo.png', type: 'image/png', size: 2048, time: 0 },
+                           { name: 'b-doc.pdf', url: '/media/b-doc.pdf', type: 'application/pdf', size: 10, time: 0 }],
     '/api/site/roles': { roles: { admin: ['*'], editor: ['content.*'] }, yours: ['admin'] },
     '/api/forms/entries': { columns: ['name', 'message'], rows: [['Alice', '<b>hi</b>']] }
 };
@@ -49,7 +52,7 @@ const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 
-check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'plugins', 'roles', 'forms']);
+check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'plugins', 'roles', 'forms']);
 check('builtins get a pictogram, a plugin without one its initial', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'F']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
 
@@ -64,6 +67,15 @@ check('clicking it again closes', $('.kroom-admin-panel').hidden, true);
 click(entry('journal'));
 await sleep(20);
 check('journal: one revision', $('.kroom-admin-body li div')?.textContent, 'pages/club/13Ma/description.md');
+
+click(entry('media'));
+await sleep(20);
+check('media: pictures as thumbnails, the rest by name', [$$('.kroom-admin-media img').map(i => i.getAttribute('src')),
+    $$('.kroom-admin-media a')[1].textContent], [['/media/a-photo.png'], 'b-doc.pdf']);
+click($('.kroom-admin-remove'));
+await sleep(20);
+check('delete asks the server, and the file leaves the grid', [calls.at(-1).method, calls.at(-1).url, $$('.kroom-admin-media li').length],
+    ['DELETE', '/api/content/media/a-photo.png', 1]);
 
 click(entry('plugins'));
 await sleep(20);

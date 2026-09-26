@@ -67,6 +67,8 @@ object Permissions {
     const val CONTENT = "content"
     /** Write a block — target: its path. */
     const val EDIT = "content.edit"
+    /** Add a file to the media. */
+    const val UPLOAD = "content.upload"
     /** The admin bar, the plugin list, every plugin's settings. */
     const val ADMIN = "site.admin"
 }

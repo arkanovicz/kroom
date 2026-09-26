@@ -33,6 +33,15 @@ class AuthoringConfig {
     /** What each role may do; editing a block asks for [Permissions.EDIT] on its path. */
     var roles: Roles = Roles()
 
+    /** Uploaded files, served under [mediaPrefix]; null mounts no media route. */
+    var media: Media? = null
+
+    /** Where media is served — public: a page shows it to anyone. */
+    var mediaPrefix: String = "/media"
+
+    /** The largest upload accepted, in bytes. */
+    var mediaMaxSize: Long = 10L * 1024 * 1024
+
     /** Told of each submitted block once it is written (plugins' `onPublish`); it must not throw. */
     var published: suspend (Block, UserSession) -> Unit = { _, _ -> }
 
@@ -53,6 +62,9 @@ class AuthoringPlugin(private val config: AuthoringConfig) {
     val locks = Locks(config.lockTimeout)
 
     val apiPrefix: String get() = config.apiPrefix
+    val media: Media? get() = config.media
+    val mediaPrefix: String get() = config.mediaPrefix
+    internal val mediaMaxSize: Long get() = config.mediaMaxSize
     internal val published get() = config.published
     val placeholder: String? get() = config.placeholder
 
@@ -100,5 +112,8 @@ fun Application.installAuthoring(block: AuthoringConfig.() -> Unit = {}) {
         velocity.registerApplication("authoring") { plugin }
     }
 
-    routing { authoringRoutes() }
+    routing {
+        authoringRoutes()
+        if (plugin.media != null) mediaRoutes()
+    }
 }

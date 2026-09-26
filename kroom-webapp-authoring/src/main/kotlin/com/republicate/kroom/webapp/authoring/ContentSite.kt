@@ -53,6 +53,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         lockTimeout = config.lockTimeout
         identity = config.identity
         roles = config.roles
+        media = config.storage.media
         placeholder = config.placeholder
         strings.putAll(config.strings)
         published = site::published

@@ -6,6 +6,10 @@ import java.nio.file.Path
 import java.util.Properties
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.fileSize
+import kotlin.io.path.getLastModifiedTime
+import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
@@ -21,6 +25,7 @@ import kotlin.io.path.writer
  * <root>/content/…                         the blocks (FileResourceStore)
  * <root>/settings/<namespace>.properties
  * <root>/records/<namespace>/<collection>/<id>.json
+ * <root>/media/<name>                      the type is the extension's: the store names every file
  * ```
  */
 class FileStorage(
@@ -33,6 +38,34 @@ class FileStorage(
 
     override fun records(namespace: String, collection: String): Records =
         FileRecords(root.resolve("records").resolve(segment(namespace)).resolve(segment(collection)))
+
+    override val media: Media = FileMedia(root.resolve("media"))
+}
+
+private class FileMedia(private val dir: Path) : Media {
+
+    private fun file(name: String): Path? = mediaNameOrNull(name)?.let { dir.resolve(it) }
+
+    override fun put(name: String, type: String, bytes: ByteArray): MediaFile {
+        val stored = mediaName(name, type)
+        dir.resolve(stored).createParentDirectories().writeBytes(bytes)
+        return get(stored)!!
+    }
+
+    override fun get(name: String): MediaFile? {
+        val path = file(name)?.takeIf { it.isRegularFile() } ?: return null
+        val type = MediaTypes.ofName(name) ?: return null
+        return MediaFile(name, type, path.fileSize(), path.getLastModifiedTime().toMillis())
+    }
+
+    override fun read(name: String): ByteArray? = file(name)?.takeIf { it.isRegularFile() }?.readBytes()
+
+    override fun delete(name: String) = file(name)?.deleteIfExists() ?: false
+
+    override fun list(limit: Int): List<MediaFile> {
+        if (!Files.isDirectory(dir)) return emptyList()
+        return dir.listDirectoryEntries().map { it.name }.sortedDescending().asSequence().mapNotNull { get(it) }.take(limit).toList()
+    }
 }
 
 // one lock for every settings file: writes are rare, and a read-modify-write must not interleave

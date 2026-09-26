@@ -139,7 +139,7 @@ class Site internal constructor(
         else (builtinEntries + entries).filter { can(session, it.permission) }
 
     private val builtinEntries = listOf(
-        AdminEntry("pages", "pages"), AdminEntry("journal", "journal"),
+        AdminEntry("pages", "pages"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("roles", "roles")
     )
 

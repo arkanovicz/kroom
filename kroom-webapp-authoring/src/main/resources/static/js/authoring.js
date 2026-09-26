@@ -21,6 +21,7 @@
         submit: 'submit', cancel: 'cancel',
         bold: 'bold (Ctrl+B)', italic: 'italic (Ctrl+I)', heading: 'heading', link: 'link (Ctrl+K)',
         bullets: 'bulleted list', numbers: 'numbered list', quote: 'quote', code: 'code',
+        image: 'picture or PDF (or paste, or drop one)', uploading: 'uploading {name}\u2026',
         // what a formatting button writes when nothing is selected
         boldText: 'bold', italicText: 'italic', linkText: 'text', codeText: 'code',
         saving: 'saving\u2026',
@@ -40,7 +41,9 @@
         forbidden: 'not allowed to edit {path}', noHistory: 'this content store keeps no history',
         noSuchRevision: 'no such revision: {rev}', noPage: 'no page at {page}',
         pageMissing: 'a block is rendered within the page it is in: page missing',
-        invalidPath: 'invalid content path', broken: '{message}'
+        invalidPath: 'invalid content path', broken: '{message}',
+        mediaTooLarge: 'larger than {max} bytes', mediaType: 'not a picture nor a PDF',
+        mediaFull: 'no room left for media', notAllowed: 'not allowed: {permission}'
     }, window.kroomAuthoring?.strings);
 
     // The editor's pictograms: one stroked path each on a 24px grid, in the text's colour — overridable
@@ -55,6 +58,7 @@
         numbers: 'M4 5.5l1.5-1V10M4 14.8a1.5 1.5 0 0 1 3 .2c0 1.3-3 2.4-3 4.5h3M11 7h9M11 12h9M11 17h9',
         quote: 'M9.5 7C6.5 8 5 10 5 13v4h4.5v-4.5H5M19 7c-3 1-4.5 3-4.5 6v4H19v-4.5h-4.5',
         code: 'M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14',
+        image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         submit: 'M4.5 12.5l4.5 4.5L19.5 6.5',
         cancel: 'M6 6l12 12M18 6L6 18'
     }, window.kroomAuthoring?.icons);
@@ -235,6 +239,9 @@
         document.documentElement.addClass('kroom-busy');
         textarea.on('input', typed);
         textarea.on('keydown', shortcut);
+        textarea.on('paste', pasted);
+        textarea.on('drop', dropped);
+        textarea.on('dragover', e => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
         tab('source');
     }
 
@@ -379,8 +386,56 @@
         { name: 'bullets', apply: ta => prefix(ta, '- ') },
         { name: 'numbers', apply: ta => prefix(ta, { pattern: /^\d+\. /, make: i => `${i + 1}. ` }) },
         { name: 'quote', apply: ta => prefix(ta, '> ') },
-        { name: 'code', apply: code }
+        { name: 'code', apply: code },
+        { name: 'image', apply: pick }
     ];
+
+    // --- media: picked, pasted or dropped, uploaded, then written in where the caret is ----------------
+
+    const ACCEPTED = 'image/png,image/jpeg,image/gif,image/webp,image/avif,application/pdf';
+
+    function pick(textarea) {
+        const input = element('input');
+        input.type = 'file';
+        input.accept = ACCEPTED;
+        input.multiple = true;
+        input.on('change', () => uploads(textarea, input.files));
+        input.click();
+    }
+
+    async function uploads(textarea, files) {
+        for (const file of files) await upload(textarea, file);
+    }
+
+    /** One file to the media store; a picture comes back as `![name](url)`, anything else as a link. */
+    async function upload(textarea, file) {
+        const held = session;
+        status(t('uploading', { name: file.name }));
+        const resp = await fetch(`/api/${held.root}media?name=${encodeURIComponent(file.name)}`,
+            { method: 'POST', body: file, credentials: 'same-origin' });
+        const answer = await resp.json().catch(() => ({}));
+        if (session !== held) return;                     // the block was closed meanwhile
+        if (!resp.ok) return status(said({ data: answer, message: answer.message || resp.statusText }));
+        status('');
+        const label = file.name.replace(/\.[^.]*$/, '').replace(/[\[\]]/g, '');
+        const text = answer.type.startsWith('image/') ? `![${label}](${answer.url})` : `[${label}](${answer.url})`;
+        const { selectionStart: s, selectionEnd: e } = textarea;
+        replace(textarea, s, e, text);
+    }
+
+    function dropped(event) {
+        const files = event.dataTransfer?.files;
+        if (!files?.length) return;
+        event.preventDefault();
+        uploads(session.textarea, files);
+    }
+
+    function pasted(event) {
+        const files = event.clipboardData?.files;
+        if (!files?.length) return;
+        event.preventDefault();
+        uploads(session.textarea, files);
+    }
 
     function shortcut(event) {
         if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;

@@ -32,7 +32,7 @@ function page(responder, preset = '') {
     // real Response objects: api.js branches on `instanceof Response` to carry a status and a payload
     window.Response = Response;
     window.fetch = async (url, options = {}) => {
-        calls.push({ url, method: options.method || 'GET', body: options.body && JSON.parse(options.body) });
+        calls.push({ url, method: options.method || 'GET', body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
         const { status = 200, payload = {} } = responder(url, options.method || 'GET') || {};
         return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
     };
@@ -259,6 +259,26 @@ const seeded = (draft) => `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.s
     check('restoring fills the editor, back on the markdown tab',
         [$('.kroom-block textarea').value, $('.kroom-pane[data-pane="source"]').hidden], ['## Ancien', false]);
     check('and submit is back', $('.kroom-submit').hidden, false);
+}
+
+// --- a picture dropped in: uploaded as it is, written in where the caret is ------------------------
+{
+    const uploaded = { payload: { name: 'x-club.png', url: '/media/x-club.png', type: 'image/png', size: 3 } };
+    const { calls, click, $, window } = page((url) => url.includes('/media') ? uploaded : held);
+    click('.kroom-edit');
+    await sleep(20);
+    check('the toolbar offers a picture', !!$('.kroom-format-image'), true);
+    const textarea = $('.kroom-block textarea');
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    const file = new window.File([new Uint8Array([1, 2, 3])], 'Club [photo].png', { type: 'image/png' });
+    const drop = new window.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } });
+    textarea.dispatchEvent(drop);
+    await sleep(20);
+    const post = calls.find(c => c.url.includes('/media'));
+    check('the file is posted as it is, its name in the query', [post?.url, post?.body === file],
+        ['/api/content/media?name=Club%20%5Bphoto%5D.png', true]);
+    check('and comes back as markdown at the caret', textarea.value, '## Titre![Club photo](/media/x-club.png)');
 }
 
 console.log(failures ? `\n${failures} failure(s)` : '\nall good');

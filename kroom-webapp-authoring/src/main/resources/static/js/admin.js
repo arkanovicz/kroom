@@ -12,7 +12,8 @@
 
     // Every word the bar says. Overridable like the editor's: Object.assign(kroomAdmin.strings, {…}).
     const strings = Object.assign({
-        pages: 'pages', journal: 'journal', plugins: 'plugins', roles: 'roles', close: 'close',
+        pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', roles: 'roles', close: 'close',
+        noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
         noPages: 'no page template', instances: '{count} pages', noInstance: 'none written yet',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
         unknownAuthor: 'unknown', noPlugin: 'no plugin installed', save: 'save', saved: 'saved',
@@ -24,6 +25,7 @@
     const icons = Object.assign({
         pages: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
         journal: 'M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v4h-4',
+        media: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         plugins: 'M9 3v4M15 3v4M7 7h10v5a5 5 0 0 1-10 0zM12 17v4',
         roles: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 8l2 2 4-4',
         close: 'M6 6l12 12M18 6L6 18'
@@ -147,6 +149,36 @@
                     time: new Date(rev.time).toLocaleString(), author: rev.author || t('unknownAuthor')
                 })));
                 item.appendChild(element('div', null, rev.path));
+            }
+        },
+
+        async media(body) {
+            const files = await api.getJson(contentApi + 'media');
+            if (!files.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noMedia')));
+            const grid = body.appendChild(element('ul', 'kroom-admin-media'));
+            for (const file of files) {
+                const item = grid.appendChild(element('li'));
+                const open = item.appendChild(link(file.url, ''));
+                if (file.type.startsWith('image/')) {
+                    const img = open.appendChild(element('img'));
+                    img.src = file.url;
+                    img.alt = file.name;
+                    img.loading = 'lazy';
+                } else {
+                    open.textContent = file.name;
+                }
+                item.title = file.name;
+                item.appendChild(element('small', 'kroom-admin-muted', t('size', { kb: Math.ceil(file.size / 1024) })));
+                const remove = item.appendChild(element('button', 'kroom-admin-remove', t('remove')));
+                remove.type = 'button';
+                remove.addEventListener('click', async () => {
+                    try {
+                        await api.deleteJson(contentApi + 'media/' + encodeURIComponent(file.name));
+                        item.remove();
+                    } catch (err) {
+                        item.appendChild(element('small', 'kroom-admin-error', said(err)));
+                    }
+                });
             }
         },
 

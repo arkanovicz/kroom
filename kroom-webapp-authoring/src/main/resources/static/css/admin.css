@@ -158,6 +158,37 @@ body:has(> .kroom-admin) {
     margin-left: 1rem;
 }
 
+.kroom-admin-media {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+    gap: .5rem;
+}
+
+.kroom-admin-media li {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    overflow: hidden;
+    word-break: break-all;
+    font-size: .75rem;
+}
+
+.kroom-admin-media img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: .25rem;
+}
+
+.kroom-admin-remove {
+    all: unset;
+    cursor: pointer;
+    color: var(--kroom-cancel-color, #dc2626);
+    font-size: .75rem;
+}
+
 .kroom-admin-table {
     width: 100%;
     font-size: .85rem;
