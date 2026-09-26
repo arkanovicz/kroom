@@ -6,7 +6,8 @@ import com.republicate.kroom.webapp.session.installSessions
 import com.republicate.kroom.webapp.velocity.installVelocity
 import com.republicate.kroom.webapp.velocity.pages
 import com.republicate.kroom.webapp.velocity.placeholderPages
-import io.ktor.server.application.Application
+import com.republicate.kroom.webapp.velocity.velocity
+import io.ktor.server.application.*
 import io.ktor.server.routing.routing
 import java.io.File
 import kotlin.time.Duration
@@ -28,6 +29,11 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     installCore { static { devMode = config.devDir != null; devDir = config.devDir?.resolve("static") } }
     if (config.sessions) installSessions { config.sessionSecret?.let { sessionSecret = it } }
 
+    // plugins only register: what they bring is wired below, each piece where the engines need it
+    val site = Site(this, config.storage, config.roles, config.siteApiPrefix, config.pagePrefix, config.pageExtension)
+    putSite(site)
+    config.plugins.forEach(site::register)
+
     installVelocity {
         templatePath = config.templatePath
         devMode = config.devDir != null
@@ -36,7 +42,8 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         properties["markdown.loader"] = config.storage.content
         properties["markdown.block.wrapper"] = config.wrapper
         config.placeholder?.let { properties["markdown.missing"] = it }
-        if (config.blockTools.isNotEmpty()) properties["markdown.tools"] = config.blockTools.joinToString(",")
+        val blockTools = config.blockTools + site.blockTools
+        if (blockTools.isNotEmpty()) properties["markdown.tools"] = blockTools.joinToString(",")
         properties.putAll(config.velocityProperties)
     }
 
@@ -47,11 +54,24 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         roles = config.roles
         placeholder = config.placeholder
         strings.putAll(config.strings)
+        published = site::published
     }
+
+    velocity.registerRequest("site") { site.view(it) }
+    site.tools.forEach { (name, value) -> velocity.registerApplication(name) { value } }
+    if (site.interceptors.isNotEmpty()) intercept(ApplicationCallPipeline.Plugins) {
+        for (interceptor in site.interceptors) {
+            interceptor(call)
+            if (call.isHandled) return@intercept finish()
+        }
+    }
+    site.startJobs()
 
     routing {
         kroomAssets()                 // /js/kroom/*: the house stack authoring.js builds on
         config.loginPage?.let { loginRoutes(it) }
+        siteRoutes()
+        site.routes.forEach { it() }
         placeholderPages(config.pagePrefix, config.pageExtension)
         pages(config.pagePrefix, config.pageExtension)
     }
@@ -105,6 +125,12 @@ class ContentSiteConfig {
 
     var sessions: Boolean = true
     var sessionSecret: String? = null
+
+    /** What the site gains beyond its pages — see [Plugin]. Installed in this order. */
+    val plugins = mutableListOf<Plugin>()
+
+    /** Where the admin API mounts; under `/api/`, where api.js roots its calls. */
+    var siteApiPrefix: String = "/api/site"
 
     /** Applied last over everything above — the open door. */
     val velocityProperties = LinkedHashMap<String, Any?>()

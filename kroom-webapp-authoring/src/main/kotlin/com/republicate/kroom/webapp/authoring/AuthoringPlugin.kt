@@ -33,6 +33,9 @@ class AuthoringConfig {
     /** What each role may do; editing a block asks for [Permissions.EDIT] on its path. */
     var roles: Roles = Roles()
 
+    /** Told of each submitted block once it is written (plugins' `onPublish`); it must not throw. */
+    var published: suspend (Block, UserSession) -> Unit = { _, _ -> }
+
     /** What a page shows in place of a block nobody has written yet. */
     var placeholder: String? = null
 
@@ -50,6 +53,7 @@ class AuthoringPlugin(private val config: AuthoringConfig) {
     val locks = Locks(config.lockTimeout)
 
     val apiPrefix: String get() = config.apiPrefix
+    internal val published get() = config.published
     val placeholder: String? get() = config.placeholder
 
     /** The editor's script, stylesheet and words, for a layout to emit — `$authoring.assets.tags()`. */

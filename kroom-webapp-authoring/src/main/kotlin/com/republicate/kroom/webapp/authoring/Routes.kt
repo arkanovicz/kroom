@@ -131,6 +131,7 @@ fun Route.authoringRoutes() {
                 mapOf("author" to session.id, "updated" to System.currentTimeMillis().toString())
             )
             plugin.locks.release(path, session.id)
+            plugin.published(written, session)
             respondJson {
                 set("rev", written.rev)
                 set("meta", meta(written))
