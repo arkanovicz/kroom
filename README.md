@@ -18,7 +18,7 @@ kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
-kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, analytics, webhook, mail
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, analytics, webhook, mail, dummy-theme
 ```
 
 ## Features
@@ -509,7 +509,8 @@ A theme is a plugin (`Theme`) naming the layouts it provides. The contract:
 
 Several themes may be installed, one active — the admin bar's *themes* panel switches it, live — and an admin
 previews another on any page with `?theme=<id>`. A site without a theme wears kroom's `BasicTheme` (pico, the
-menu, a footer).
+menu, a footer). `kroom-plugin-dummy-theme` provides every layout of the vocabulary, plainly and unmistakably —
+for testing a theme's path end to end.
 
 ### The admin bar
 

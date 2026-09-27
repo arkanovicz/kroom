@@ -1,0 +1,18 @@
+/* the dummy theme: plain on purpose — monospace, one accent, dashed borders — so nobody mistakes it */
+body { margin: 0; font: 15px/1.5 ui-monospace, monospace; color: #222; background: #fffdf7; }
+a { color: var(--dummy-accent); }
+.dummy-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding: .75rem 1rem; border-bottom: 2px dashed var(--dummy-accent); }
+.dummy-brand { font-weight: bold; text-decoration: none; }
+.dummy-header nav { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.dummy-header [aria-current] { text-decoration: underline wavy; }
+.dummy-header form { margin: 0; }
+.dummy-header button { font: inherit; background: none; border: 1px dashed var(--dummy-accent); cursor: pointer; }
+main { padding: 1rem; }
+.dummy-article { max-width: 38rem; margin: 0 auto; }
+.dummy-sidebar { display: grid; grid-template-columns: minmax(0, 1fr); }
+.dummy-sidebar aside { padding: 1rem; border-left: 2px dashed var(--dummy-accent); }
+@media (min-width: 50rem) { .dummy-sidebar { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); } }
+.dummy-hero { padding: 3rem 1rem; text-align: center; background: var(--dummy-accent); color: #fff; }
+.dummy-hero a { color: #fff; }
+.dummy-footer { padding: .75rem 1rem; border-top: 2px dashed var(--dummy-accent); font-size: .85em; }

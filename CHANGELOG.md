@@ -52,8 +52,10 @@ All notable changes to kroom will be documented in this file.
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
 
-#### kroom-plugin-webmaster, -forms, -analytics, -webhook, -mail
+#### kroom-plugin-webmaster, -forms, -analytics, -webhook, -mail, -dummy-theme
 - Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo.
+- dummy-theme: every layout of the theme contract (`default`, `article`, `sidebar`, `landing`) and both
+  regions, in a look nobody mistakes — for testing themes end to end.
 - webmaster: the health of the site's URLs — meta and Open Graph tags (a page's own through `$seo.title(…)`,
   `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`), robots.txt and sitemap.xml; redirect rules with
   `{name}` captures in the path and the query (values encoded) and application resolvers (`@player`), the 404s

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en" data-layout="landing">
+<head>
+#parse("themes/dummy/inc/head.html")
+</head>
+<body>
+#parse("themes/dummy/inc/header.html")
+#if($hero)<section class="dummy-hero">$hero</section>#end
+<main class="dummy-landing">
+$content
+</main>
+#parse("themes/dummy/inc/footer.html")
+</body>
+</html>
