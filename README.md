@@ -347,6 +347,8 @@ refreshes the lock (debounced, 700ms), ✓ submits `{page, rev, body}`, ✗ give
 
 - **markdown** — the textarea, with formatting buttons (bold, italic, heading, link, lists, quote, code;
   Ctrl+B/I/K) that toggle their markup and go through the textarea's own undo stack.
+- **?** — a cheat sheet beside the editor (a manual popover: it stays while you type, Escape, × or ? close
+  it), two pages: *markdown*, the syntax a block renders; *model*, the `%` directives and `$references`.
 - **preview** — the page itself, re-rendered by the server with the textarea standing in for the stored
   block, of which this block's part is shown; rendered when the tab is shown, and only if the text moved.
 - **history** — the unsaved draft, if any, then the store's revisions (none when it is not `Versioned`);
@@ -365,19 +367,20 @@ page is the only thing that knows how to render the block.
 
 ### The editor's words
 
-kroom translates nothing, but every word the editor says — labels, tooltips, statuses, the placeholder text
-a formatting button writes, and the edit API's error codes — sits in one `strings` table at the top of
-`authoring.js`, `{name}` for arguments, every server error introduced by `error` (`Error: {message}`). An
-application overrides any of them server side, emitted by `$authoring.assets.tags()` ahead of the script:
+The editor and the admin bar ship in English and French — every label, tooltip, status, help line and edit
+API error code sits in one table at the top of each script, English the floor the other fills up from. Which
+language they speak is the application's choice:
 
 ```kotlin
-installContentSite { strings["preview"] = "aperçu"; strings["error"] = "Erreur : {message}" }
+installContentSite { language = "fr" }                   // "auto" by default: the browser's first stocked language
 ```
 
-or client side, before or after `authoring.js`: `Object.assign(kroomAuthoring.strings, { … })`. An error code
-the table lacks falls back to the server's English message.
+`auto` reads `navigator.languages` and takes the first one kroom stocks, English otherwise. kroom's own words
+are not up for rewording; what the admin bar says of a *plugin* is the plugin's, and the application's to
+translate — `installContentSite { strings["forms.name"] = "Formulaires" }`, keyed by the plugin's ids (see
+*The admin bar*). An error code the table lacks falls back to the server's English message.
 
-The pictograms follow the same door: `kroomAuthoring.icons` maps each button (`edit`, `bold`, …, `submit`,
+The pictograms are the application's to redraw: `kroomAuthoring.icons` maps each button (`edit`, `bold`, …, `submit`,
 `cancel`) to one SVG path on a 24px grid, stroked in the text's colour. CSS variables size and colour them:
 `--kroom-icon-size` (1.5rem), `--kroom-icon-stroke` (1.75), `--kroom-edit-color`, `--kroom-submit-color`,
 `--kroom-cancel-color`.
@@ -517,11 +520,10 @@ for testing a theme's path end to end.
 `$site.foot()` emits, for whoever holds `site.admin`, a bar on the left of the page — pages (every template
 and the pages its blocks say exist), journal, plugins with their settings forms (a secret is never read
 back), roles, then the plugins' entries. Its data comes from `/api/site/{pages, plugins, plugins/{id}/settings,
-roles}`; its markup is built by `admin.js`. Its words share the editor's table — `installContentSite {
-strings["journal"] = "journal" }` reaches both — and a plugin's words are keyed by its ids (`<entry id>`,
+roles}`; its markup is built by `admin.js`. It speaks the editor's language (*The editor's words*); a plugin's
+words are the application's to translate, `installContentSite { strings[…] }` keyed by the plugin's ids (`<entry id>`,
 `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`,
-`<plugin>.<group>`), defaulting to what
-the plugin says. Pictograms: `kroomAdmin.icons`.
+`<plugin>.<group>`), defaulting to what the plugin says. Pictograms: `kroomAdmin.icons`.
 
 ## Table (for seat-based games)
 

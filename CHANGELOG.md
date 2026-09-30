@@ -7,6 +7,9 @@ All notable changes to kroom will be documented in this file.
 ### Changed (breaking)
 
 #### kroom-webapp-authoring
+- `strings` no longer rewords the editor or the admin bar: kroom ships their words (en, fr, `language`).
+  `installContentSite { strings[…] }` remains for what the bar says of a plugin, keyed by the plugin's ids;
+  `installAuthoring { strings }` and `kroomAuthoring.strings` are gone.
 - `$site.head()` now emits the house scripts, and the editor's for a logged-in author: a layout calling
   `$kroomAssets.coreScripts()` and `$authoring.assets.tags()` besides must drop them, or load them twice.
 - `installContentSite { store = … }` is now `storage = …` (a `Storage`; its `content` is the former store),
@@ -18,6 +21,9 @@ All notable changes to kroom will be documented in this file.
 ### Added
 
 #### kroom-webapp-authoring
+- The editor has a help button: a popover cheat sheet of the markdown syntax, the `%` directives and the
+  editor's own features. The editor and the admin bar now come in English and French —
+  `installContentSite { language = "fr" }`, `auto` (the default) following the browser.
 - `Storage`: content, settings and records, namespaced per plugin; `MemoryStorage` and `FileStorage` (plain
   files: `content/`, `settings/<ns>.properties`, `records/<ns>/<collection>/<id>.json`).
 - `IdentityProvider` (roles, optional password `authenticate`), `Roles` (patterns per role — `admin: *`,

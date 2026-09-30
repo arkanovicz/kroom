@@ -12,28 +12,42 @@
 
     const HEARTBEAT_DELAY = 700;           // idle before the lock is refreshed
 
-    // Every word the editor says, error codes of the edit API included. kroom translates nothing: an
-    // application overrides them — server side (AuthoringConfig.strings, emitted ahead of this script), or
-    // client side, before or after it: Object.assign(kroomAuthoring.strings, { preview: 'aperçu' }).
-    const strings = Object.assign({
+    // Every word the editor says, error codes of the edit API included, in the languages kroom ships. An
+    // application picks one (AuthoringConfig.language, emitted ahead of this script as kroomAuthoring.language;
+    // `auto`, the default, follows the browser) and rewords nothing: the editor is kroom's. English is the floor
+    // every table fills up from.
+    const STOCK = { en: {
         edit: 'edit',
         markdown: 'markdown', preview: 'preview', history: 'history',
         submit: 'submit', cancel: 'cancel',
         bold: 'bold (Ctrl+B)', italic: 'italic (Ctrl+I)', heading: 'heading', link: 'link (Ctrl+K)',
         bullets: 'bulleted list', numbers: 'numbered list', quote: 'quote', code: 'code',
-        image: 'picture or PDF (or paste, or drop one)', uploading: 'uploading {name}\u2026',
+        image: 'picture or PDF (or paste, or drop one)', uploading: 'uploading {name}…',
         // what a formatting button writes when nothing is selected
         boldText: 'bold', italicText: 'italic', linkText: 'text', codeText: 'code',
-        saving: 'saving\u2026',
+        saving: 'saving…',
         lockLost: 'lock lost: {message}',
         conflict: 'This block changed while you were editing',
         yours: 'yours', theirs: 'theirs', keepMine: 'keep mine', takeTheirs: 'take theirs',
-        keptMine: 'editing against their revision \u2014 submitting now overwrites it',
-        revision: '{time} \u2014 {author}', current: '(current)', unknownAuthor: 'unknown',
+        keptMine: 'editing against their revision — submitting now overwrites it',
+        revision: '{time} — {author}', current: '(current)', unknownAuthor: 'unknown',
         noRevision: 'no revision yet', restore: 'restore', back: 'back',
-        draft: '{time} \u2014 unsaved draft', draftBase: 'before it',
-        draftBack: 'your unsaved draft is back \u2014 submit to write it',
-        restored: '{time} restored \u2014 submit to write it',
+        draft: '{time} — unsaved draft', draftBase: 'before it',
+        draftBack: 'your unsaved draft is back — submit to write it',
+        restored: '{time} restored — submit to write it',
+        // the help panel: its title and sections, then one line per row of HELP below
+        help: 'help', close: 'close',
+        'help.markdown': 'Markdown', 'help.model': 'Model',
+        'help.heading': 'heading (more # for a smaller one)', 'help.bold': 'bold', 'help.italic': 'italic',
+        'help.strike': 'struck through', 'help.link': 'link', 'help.image': 'picture',
+        'help.autolink': 'a bare address becomes a link', 'help.bullets': 'bulleted list',
+        'help.numbers': 'numbered list', 'help.task': 'task list ([x] when done)', 'help.quote': 'quote',
+        'help.code': 'code, as typed', 'help.fence': 'a block of code', 'help.table': 'table',
+        'help.rule': 'horizontal rule', 'help.break': 'line break within a paragraph (a blank line starts a new one)',
+        'help.ref': 'a value the page hands the block', 'help.formal': 'a field of one, or a method',
+        'help.if': 'shown only when true', 'help.foreach': 'repeated for each item',
+        'help.set': 'a value of your own', 'help.comment': 'a note nobody sees', 'help.escape': 'a literal $',
+        'help.hash': 'a # starts a heading, never a directive',
         // the edit API's errors: each said through `error`, by its code when the table has it
         error: 'Error: {message}',
         lockHeld: 'block held by {owner}', notYourLock: 'the lock on {path} is not yours',
@@ -44,7 +58,91 @@
         invalidPath: 'invalid content path', broken: '{message}',
         mediaTooLarge: 'larger than {max} bytes', mediaType: 'not a picture nor a PDF',
         mediaFull: 'no room left for media', notAllowed: 'not allowed: {permission}'
-    }, window.kroomAuthoring?.strings);
+    }, fr: {
+        edit: 'modifier',
+        markdown: 'markdown', preview: 'aperçu', history: 'historique',
+        submit: 'soumettre', cancel: 'annuler',
+        bold: 'gras (Ctrl+B)', italic: 'italique (Ctrl+I)', heading: 'titre', link: 'lien (Ctrl+K)',
+        bullets: 'liste à puces', numbers: 'liste numérotée', quote: 'citation', code: 'code',
+        image: 'image ou PDF (ou collez-en, ou déposez-en un)', uploading: 'envoi de {name}…',
+        // what a formatting button writes when nothing is selected
+        boldText: 'gras', italicText: 'italique', linkText: 'texte', codeText: 'code',
+        saving: 'enregistrement…',
+        lockLost: 'verrou perdu : {message}',
+        conflict: 'Ce bloc a changé pendant que vous le modifiiez',
+        yours: 'le vôtre', theirs: 'le leur', keepMine: 'garder le mien', takeTheirs: 'prendre le leur',
+        keptMine: 'modification sur leur révision — soumettre maintenant l’écrase',
+        revision: '{time} — {author}', current: '(actuelle)', unknownAuthor: 'inconnu',
+        noRevision: 'aucune révision pour l’instant', restore: 'restaurer', back: 'retour',
+        draft: '{time} — brouillon non enregistré', draftBase: 'avant lui',
+        draftBack: 'votre brouillon non enregistré est revenu — soumettez pour l’écrire',
+        restored: '{time} restaurée — soumettez pour l’écrire',
+        // the help panel: its title and sections, then one line per row of HELP below
+        help: 'aide', close: 'fermer',
+        'help.markdown': 'Markdown', 'help.model': 'Modèle',
+        'help.heading': 'titre (plus de # pour un plus petit)', 'help.bold': 'gras', 'help.italic': 'italique',
+        'help.strike': 'barré', 'help.link': 'lien', 'help.image': 'image',
+        'help.autolink': 'une adresse seule devient un lien', 'help.bullets': 'liste à puces',
+        'help.numbers': 'liste numérotée', 'help.task': 'liste de tâches ([x] une fois faite)', 'help.quote': 'citation',
+        'help.code': 'code, tel que tapé', 'help.fence': 'un bloc de code', 'help.table': 'tableau',
+        'help.rule': 'ligne horizontale', 'help.break': 'saut de ligne dans un paragraphe (une ligne vide en commence un autre)',
+        'help.ref': 'une valeur que la page passe au bloc', 'help.formal': 'un champ de celle-ci, ou une méthode',
+        'help.if': 'affiché seulement si vrai', 'help.foreach': 'répété pour chaque élément',
+        'help.set': 'une valeur à vous', 'help.comment': 'une note que personne ne voit', 'help.escape': 'un $ littéral',
+        'help.hash': 'un # ouvre un titre, jamais une directive',
+        // the edit API's errors: each said through `error`, by its code when the table has it
+        error: 'Erreur : {message}',
+        lockHeld: 'bloc verrouillé par {owner}', notYourLock: 'le verrou sur {path} n’est pas le vôtre',
+        stale: '{path} a changé depuis le début de votre modification', notAuthenticated: 'non authentifié',
+        forbidden: 'pas le droit de modifier {path}', noHistory: 'ce stockage de contenu ne garde pas d’historique',
+        noSuchRevision: 'révision inconnue : {rev}', noPage: 'aucune page à {page}',
+        pageMissing: 'un bloc est rendu dans sa page : page introuvable',
+        invalidPath: 'chemin de contenu invalide', broken: '{message}',
+        mediaTooLarge: 'plus de {max} octets', mediaType: 'ni une image ni un PDF',
+        mediaFull: 'plus de place pour les médias', notAllowed: 'non autorisé : {permission}'
+    } };
+
+    /** The stock language asked for, or the browser's first one that is stocked; English otherwise. */
+    function pickLanguage(stock, asked) {
+        const wanted = asked && asked !== 'auto' ? [asked] : (navigator.languages || [navigator.language]);
+        return wanted.map(l => String(l).toLowerCase().split('-')[0]).find(l => stock[l]) || 'en';
+    }
+
+    const language = pickLanguage(STOCK, window.kroomAuthoring?.language);
+    const strings = Object.assign({}, STOCK.en, STOCK[language]);
+
+    // What the help panel shows: a section per page, a row per syntax — what you type, and the word (above)
+    // saying what it does. The editor itself gets no page: its tabs and buttons say what they do.
+    const HELP = {
+        markdown: [
+            { syntax: '## Title', says: 'help.heading' },
+            { syntax: '**bold**', says: 'help.bold' },
+            { syntax: '_italic_', says: 'help.italic' },
+            { syntax: '~~struck~~', says: 'help.strike' },
+            { syntax: '[text](https://…)', says: 'help.link' },
+            { syntax: '![name](/media/…)', says: 'help.image' },
+            { syntax: 'https://…', says: 'help.autolink' },
+            { syntax: '- item', says: 'help.bullets' },
+            { syntax: '1. item', says: 'help.numbers' },
+            { syntax: '- [ ] task', says: 'help.task' },
+            { syntax: '> quote', says: 'help.quote' },
+            { syntax: '`code`', says: 'help.code' },
+            { syntax: '```\ncode\n```', says: 'help.fence' },
+            { syntax: '| a | b |\n|---|---|\n| 1 | 2 |', says: 'help.table' },
+            { syntax: '---', says: 'help.rule' },
+            { syntax: 'text\\', says: 'help.break' }
+        ],
+        model: [
+            { syntax: '$name', says: 'help.ref' },
+            { syntax: '${name.field}', says: 'help.formal' },
+            { syntax: '%if($x) … %else … %end', says: 'help.if' },
+            { syntax: '%foreach($x in $list) … %end', says: 'help.foreach' },
+            { syntax: '%set($x = 1)', says: 'help.set' },
+            { syntax: '%* … *%', says: 'help.comment' },
+            { syntax: '\\$', says: 'help.escape' },
+            { syntax: '#', says: 'help.hash' }
+        ]
+    };
 
     // The editor's pictograms: one stroked path each on a 24px grid, in the text's colour — overridable
     // like the words (kroomAuthoring.icons), their stroke width a CSS variable (--kroom-icon-stroke).
@@ -60,10 +158,13 @@
         code: 'M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14',
         image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         submit: 'M4.5 12.5l4.5 4.5L19.5 6.5',
-        cancel: 'M6 6l12 12M18 6L6 18'
+        cancel: 'M6 6l12 12M18 6L6 18',
+        help: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1.2-1.5 2.5M12 17h.01',
+        close: 'M6 6l12 12M18 6L6 18',
+        back: 'M19 12H5M11 6l-6 6 6 6'
     }, window.kroomAuthoring?.icons);
 
-    window.kroomAuthoring = Object.assign(window.kroomAuthoring || {}, { strings, icons });
+    window.kroomAuthoring = Object.assign(window.kroomAuthoring || {}, { strings, icons, language, stock: STOCK });
 
     const t = (key, args = {}) => (strings[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => args[name] ?? '');
 
@@ -182,6 +283,49 @@
         pane.appendChild(columns);
     }
 
+    // --- help ------------------------------------------------------------------------------------
+
+    /**
+     * The `?` of the bar and the panel it toggles: a manual popover (top layer, so above any theme; no light
+     * dismiss, a cheat sheet is read while typing), closed by the `?` again, its ×, or Escape. A tree: the
+     * landing names the sections, each opens its table, ← comes back.
+     */
+    function help(editor) {
+        const panel = editor.appendChild(element('div', 'kroom-help'));
+        panel.id = 'kroom-help';
+        panel.attr('popover', 'manual');
+        const header = panel.appendChild(element('header'));
+        const back = header.appendChild(iconButton('back', 'kroom-help-back', () => show(null)));
+        const title = header.appendChild(element('strong'));
+        // the close button works declaratively: a click handler hiding the panel would run first, and the toggle reopen it
+        const close = header.appendChild(iconButton('close', 'kroom-help-close', () => {}));
+        close.attr('popovertarget', panel.id).attr('popovertargetaction', 'hide');
+        const landing = panel.appendChild(element('nav', 'kroom-help-sections'));
+        const pages = Object.fromEntries(Object.entries(HELP).map(([name, rows]) => {
+            landing.appendChild(button(t(`help.${name}`), 'kroom-help-section outline', () => show(name)));
+            const table = panel.appendChild(element('table', 'kroom-help-page'));
+            table.data('section', name);
+            rows.forEach(row => {
+                const tr = table.appendChild(element('tr'));
+                tr.appendChild(element('td')).appendChild(element('code', null, row.syntax));
+                tr.appendChild(element('td', null, t(row.says)));
+            });
+            return [name, table];
+        }));
+        function show(name) {
+            title.textContent = name ? t(`help.${name}`) : t('help');
+            back.hidden = !name;
+            landing.hidden = !!name;
+            Object.entries(pages).forEach(([n, table]) => { table.hidden = n !== name; });
+        }
+        show(null);
+        // Escape closes the panel from wherever the author types (the popover is in the editor's subtree)
+        editor.on('keydown', event => { if (event.key === 'Escape') panel.hidePopover?.(); });
+        const toggle = iconButton('help', 'kroom-help-toggle', () => {});
+        toggle.attr('popovertarget', panel.id);
+        return toggle;
+    }
+
     // --- editing ---------------------------------------------------------------------------------
 
     /** Take the block, then open it on what the lock answered. */
@@ -211,6 +355,7 @@
         tabs.appendChild(button(t('history'), 'kroom-tab', () => tab('history'))).data('tab', 'history');
         const format = bar.appendChild(element('div', 'kroom-format'));
         FORMATS.forEach(f => format.appendChild(iconButton(f.name, `kroom-format-${f.name}`, () => f.apply(session.textarea))));
+        bar.appendChild(help(editor));
 
         const source = editor.appendChild(element('div', 'kroom-pane'));
         source.attr('role', 'tabpanel').data('pane', 'source');
@@ -227,9 +372,9 @@
         past.attr('role', 'tabpanel').data('pane', 'history');
 
         const tools = editor.appendChild(element('nav', 'kroom-editor-tools'));
-        tools.appendChild(iconButton('submit', 'kroom-submit', submit));
-        tools.appendChild(iconButton('cancel', 'kroom-cancel secondary', cancel));
         tools.appendChild(element('span', 'kroom-status'));
+        tools.appendChild(iconButton('cancel', 'kroom-cancel secondary', cancel));
+        tools.appendChild(iconButton('submit', 'kroom-submit', submit));
 
         session = {
             block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: held.body,

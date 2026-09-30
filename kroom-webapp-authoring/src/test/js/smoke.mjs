@@ -136,34 +136,75 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
         ['voir [ici](https://)', 'https://']);
 }
 
-// --- the application's words ---------------------------------------------------------------------
+// --- the pictograms are the application's, the words are kroom's ------------------------------------
 {
-    // as AuthoringAssets.stringTags() emits them, ahead of authoring.js
-    const preset = `Object.assign(((window.kroomAuthoring ??= {}).strings ??= {}), {"preview":"aperçu","edit":"modifier","lockHeld":"{owner} y travaille"});
+    // nothing an application emits ahead of authoring.js rewords the editor; its pictograms it may redraw
+    const preset = `Object.assign(((window.kroomAuthoring ??= {}).strings ??= {}), {"edit":"modifier","lockHeld":"{owner} y travaille"});
         window.kroomAuthoring.icons = { edit: 'M0 0h24' };`;
     const taken = { status: 409, payload: { message: 'block held by nestor', code: 'lockHeld', args: { owner: 'nestor' } } };
     const { click, $, window } = page(() => taken, preset);
     await sleep(20);   // the handle is named once the document is loaded
-    check('the edit handle is named in the application\'s words', $('.kroom-edit').title, 'modifier');
-    check('and drawn with its pictogram', $('.kroom-edit path')?.getAttribute('d'), 'M0 0h24');
+    check('the edit handle keeps kroom\'s word', $('.kroom-edit').title, 'edit');
+    check('and is drawn with the application\'s pictogram', $('.kroom-edit path')?.getAttribute('d'), 'M0 0h24');
     click('.kroom-edit');
     await sleep(20);
-    check('an API error is said by its code', $('.kroom-notice')?.textContent, 'Error: nestor y travaille');
-    window.kroomAuthoring.strings.lockHeld = undefined;
+    check('an API error is said by its code, in kroom\'s words', $('.kroom-notice')?.textContent, 'Error: block held by nestor');
+    const unknown = { status: 409, payload: { message: 'the server says so', code: 'neverHeardOf' } };
+    const other = page(() => unknown);
+    other.click('.kroom-edit');
+    await sleep(20);
+    check('a code the table lacks falls back to the server\'s message', other.$('.kroom-notice')?.textContent, 'Error: the server says so');
+}
+
+// --- the stocked languages ------------------------------------------------------------------------
+{
+    const opened = async (preset) => {
+        const p = page(() => held, preset);
+        p.click('.kroom-edit');
+        await sleep(20);
+        return p;
+    };
+    const english = await opened();
+    const stock = english.window.kroomAuthoring.stock;
+    check('French says every word English does', Object.keys(stock.fr).sort(), Object.keys(stock.en).sort());
+    check('a jsdom browser (en-US) gets English', [english.$('.kroom-tab')?.textContent, english.window.kroomAuthoring.language], ['markdown', 'en']);
+
+    const french = await opened(`window.kroomAuthoring = { language: 'fr' };`);
+    check('an application asking for French gets it', [french.$('.kroom-tab[data-tab="preview"]')?.textContent, french.window.kroomAuthoring.language],
+        ['aperçu', 'fr']);
+    check('the help panel is titled in it too', french.$('#kroom-help header strong')?.textContent, 'aide');
+
+    const auto = page(() => held, `Object.defineProperty(window.navigator, 'languages', { value: ['fr-FR', 'en'], configurable: true });
+        window.kroomAuthoring = { language: 'auto' };`);
+    check('auto follows the browser\'s first stocked language', auto.window.kroomAuthoring.language, 'fr');
+
+    check('a language kroom does not stock falls back to English',
+        page(() => held, `window.kroomAuthoring = { language: 'de' };`).window.kroomAuthoring.language, 'en');
+}
+
+// --- help: a manual popover, a tree of two pages ----------------------------------------------------
+// jsdom has no popover API: what is checked is the markup the browser acts on, never showPopover()
+{
+    const { click, $, window } = page(() => held);
     click('.kroom-edit');
     await sleep(20);
-    check('a code the table lacks falls back to the server\'s message', $('.kroom-notice')?.textContent, 'Error: block held by nestor');
-    window.kroomAuthoring.strings.error = 'Erreur : {message}';
-    click('.kroom-edit');
-    await sleep(20);
-    check('and every error is introduced in the application\'s words', $('.kroom-notice')?.textContent, 'Erreur : block held by nestor');
-    Object.assign(window.kroomAuthoring.strings, { markdown: 'source' });   // after load, client side
-    const second = page(() => held, preset);
-    second.window.kroomAuthoring.strings.markdown = 'source';
-    second.click('.kroom-edit');
-    await sleep(20);
-    check('tabs read the table when the editor opens', [...second.window.document.querySelectorAll('.kroom-tab')].map(b => b.textContent),
-        ['source', 'aperçu', 'history']);
+    const panel = $('#kroom-help');
+    check('the bar offers help, toggling its panel', $('.kroom-editor-bar .kroom-help-toggle')?.getAttribute('popovertarget'), 'kroom-help');
+    check('a manual popover', panel?.getAttribute('popover'), 'manual');
+    check('its × hides it', $('.kroom-help-close')?.getAttribute('popovertargetaction'), 'hide');
+    const shown = () => [...panel.querySelectorAll('.kroom-help-sections, .kroom-help-page')].filter(e => !e.hidden).map(e => e.dataset.section || 'landing');
+    check('the landing names the pages, and shows nothing else', [shown(), [...panel.querySelectorAll('.kroom-help-section')].map(b => b.textContent)],
+        [['landing'], ['Markdown', 'Model']]);
+    check('with no way back from it', [$('.kroom-help-back').hidden, $('#kroom-help header strong').textContent], [true, 'help']);
+    panel.querySelectorAll('.kroom-help-section')[0].dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    check('a page opens alone, titled', [shown(), $('#kroom-help header strong').textContent, $('.kroom-help-back').hidden], [['markdown'], 'Markdown', false]);
+    check('its first row says how to write a heading', $('.kroom-help-page[data-section="markdown"] tr td code')?.textContent, '## Title');
+    check('the model page knows the dialect', [...panel.querySelectorAll('.kroom-help-page[data-section="model"] code')].map(c => c.textContent).slice(0, 3),
+        ['$name', '${name.field}', '%if($x) … %else … %end']);
+    click('.kroom-help-back');
+    check('← comes back to the landing', shown(), ['landing']);
+    check('✓ sits last, ✗ before it, the status first', [...$('.kroom-editor-tools').children].map(e => e.className.split(' ')[0]),
+        ['kroom-status', 'kroom-cancel', 'kroom-submit']);
 }
 
 // --- drafts -------------------------------------------------------------------------------------

@@ -40,6 +40,9 @@ class Site internal constructor(
     private val registered = LinkedHashMap<String, Plugin>()
     val plugins: Collection<Plugin> get() = registered.values
 
+    /** The plugins' words in the admin bar, as the application translates them — `ContentSiteConfig.strings`. */
+    internal val words = LinkedHashMap<String, String>()
+
     internal val tools = LinkedHashMap<String, Any>()
     internal val requestTools = LinkedHashMap<String, (ApplicationCall) -> Any>()
     internal val blockTools = LinkedHashSet<String>()
@@ -240,8 +243,8 @@ class Site internal constructor(
         val authoring = application.authoringOrNull
         val content = authoring?.apiPrefix ?: ""
         val v = AuthoringAssets.VERSION
-        // one table of words for the editor and the bar: the application's overrides reach both
-        val words = authoring?.assets?.stringTags("kroomAdmin").orEmpty()
+        // the editor's language, and the plugins' words the application translated
+        val words = authoring?.assets?.stringTags("kroomAdmin", this.words).orEmpty()
         return """<link rel="stylesheet" href="/css/admin.css?v=$v">$words
 <aside class="kroom-admin" data-api="${htmlEscape(apiPrefix)}" data-content-api="${htmlEscape(content)}" data-entries="${htmlEscape(json)}"></aside>
 <script src="/js/admin.js?v=$v"></script>"""

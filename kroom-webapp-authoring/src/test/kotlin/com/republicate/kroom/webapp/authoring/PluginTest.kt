@@ -49,7 +49,7 @@ class PluginTest {
             sessionSecret = "test-secret"
             identity = IdentityProvider { mapOf("admin" to setOf(Roles.ADMIN), "editor" to setOf(Roles.EDITOR))[it.id].orEmpty() }
             plugins += probe
-            strings["pages"] = "pages du site"
+            strings["probe.name"] = "Sonde"
         }
         routing {
             get("/as/{who}") { call.sessions.set(UserSession(call.parameters["who"]!!, "x", null, "test")); call.respondText("ok") }
@@ -72,8 +72,8 @@ class PluginTest {
         assertContains(admin, """<aside class="kroom-admin"""")
         assertContains(admin, "&quot;id&quot;:&quot;probe&quot;")      // the plugin's entry, as data
         assertContains(admin, "/js/admin.js?v=")
-        // the application's words reach the bar as they reach the editor
-        assertContains(admin, """Object.assign(((window.kroomAdmin ??= {}).strings ??= {}), {"pages":"pages du site"});""")
+        // the plugin's words, as the application translates them, reach the bar
+        assertContains(admin, """Object.assign((window.kroomAdmin.strings ??= {}), {"probe.name":"Sonde"});""")
     }
 
     @Test

@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.days
  * Each message is also mailed to `notify`, when set and the site has a mailer ([Site.mailer], the mail plugin):
  * off the request, a failed send only logged — the message is kept either way.
  *
- * [strings] are the form's words, overridable as the editor's are.
+ * [strings] are the form's words, the application's to translate.
  */
 class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
     override val id = "forms"

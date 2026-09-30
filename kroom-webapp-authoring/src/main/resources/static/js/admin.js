@@ -10,11 +10,13 @@
     const bar = document.querySelector('aside.kroom-admin');
     if (!bar) return;
 
-    // Every word the bar says. One table with the editor's: the application's overrides
-    // (installContentSite { strings[…] }) are emitted for both scripts. A plugin's words are keyed by its
-    // ids — `<entry id>` and `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`,
-    // `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>` — and default to what it says.
-    const strings = Object.assign({
+    // Every word the bar says, in the languages kroom ships; the application's choice of language
+    // (installContentSite { language = … }) is emitted ahead of this script, as for the editor. What the bar
+    // says of a PLUGIN is the plugin's, and the application's to translate: `installContentSite { strings[…] }`
+    // reaches here as kroomAdmin.strings, keyed by the plugin's ids — `<entry id>` and `<entry id>.<table id>`,
+    // `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>`
+    // — and defaults to what the plugin says. The stock words are not up for rewording.
+    const STOCK = { en: {
         pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
         activate: 'use it', active: 'in use', preview: 'preview', layouts: 'layouts: {layouts}',
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
@@ -23,7 +25,25 @@
         unknownAuthor: 'unknown', noPlugin: 'no plugin installed', save: 'save', saved: 'saved',
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
         yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
-    }, window.kroomAdmin?.strings);
+    }, fr: {
+        pages: 'pages', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
+        activate: 'l’utiliser', active: 'utilisé', preview: 'aperçu', layouts: 'mises en page : {layouts}',
+        noMedia: 'rien d’envoyé pour l’instant', remove: 'supprimer', size: '{kb} ko',
+        noPages: 'aucun modèle de page', instances: '{count} pages', noInstance: 'aucune écrite pour l’instant',
+        noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
+        unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', save: 'enregistrer', saved: 'enregistré',
+        secretSet: 'défini — laisser vide pour le garder', secretUnset: 'non défini',
+        yourRoles: 'vos rôles : {roles}', empty: 'rien pour l’instant', error: 'Erreur : {message}'
+    } };
+
+    /** The stock language asked for, or the browser's first one that is stocked; English otherwise. */
+    function pickLanguage(stock, asked) {
+        const wanted = asked && asked !== 'auto' ? [asked] : (navigator.languages || [navigator.language]);
+        return wanted.map(l => String(l).toLowerCase().split('-')[0]).find(l => stock[l]) || 'en';
+    }
+
+    const language = pickLanguage(STOCK, window.kroomAdmin?.language);
+    const strings = Object.assign({}, window.kroomAdmin?.strings, STOCK.en, STOCK[language]);
 
     // one stroked path each, on the editor's 24px grid
     const icons = Object.assign({
@@ -36,7 +56,7 @@
         close: 'M6 6l12 12M18 6L6 18'
     }, window.kroomAdmin?.icons);
 
-    window.kroomAdmin = Object.assign(window.kroomAdmin || {}, { strings, icons });
+    window.kroomAdmin = Object.assign(window.kroomAdmin || {}, { strings, icons, language, stock: STOCK });
 
     const t = (key, args = {}) => (strings[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => args[name] ?? '');
     /** A word a plugin brought: the table's, when the application translated it. */

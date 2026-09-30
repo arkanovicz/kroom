@@ -44,20 +44,24 @@ const answers = {
     '/api/forms/entries': { columns: ['name', 'message'], rows: [['Alice', '<b>hi</b>']] }
 };
 
-const dom = new JSDOM(`<!doctype html><html><body><main>page</main>
-    <aside class="kroom-admin" data-api="/api/site" data-content-api="/api/content" data-entries="${entries}"></aside>
-    </body></html>`, { runScripts: 'outside-only', url: 'http://localhost/club/13Ma' });
-const { window } = dom;
 const calls = [];
-window.Response = Response;
-window.fetch = async (url, options = {}) => {
-    calls.push({ url, method: options.method || 'GET', body: options.body && JSON.parse(options.body) });
-    return new Response(JSON.stringify(answers[url] ?? {}), { status: 200, headers: { 'content-type': 'application/json' } });
-};
+/** A page with the bar, admin.js loaded after `preset` as a browser loads them: one shared scope. */
+function bar(preset) {
+    const { window } = new JSDOM(`<!doctype html><html><body><main>page</main>
+        <aside class="kroom-admin" data-api="/api/site" data-content-api="/api/content" data-entries="${entries}"></aside>
+        </body></html>`, { runScripts: 'outside-only', url: 'http://localhost/club/13Ma' });
+    window.Response = Response;
+    window.fetch = async (url, options = {}) => {
+        calls.push({ url, method: options.method || 'GET', body: options.body && JSON.parse(options.body) });
+        return new Response(JSON.stringify(answers[url] ?? {}), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    window.eval(['domhelper.js', 'api.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
+        .concat(preset, readFileSync(`${OWN}/js/admin.js`, 'utf8')).join('\n;\n'));
+    return window;
+}
 // what `$site.foot()` emits ahead of admin.js when the application says it in French
 const words = `Object.assign(((window.kroomAdmin ??= {}).strings ??= {}), { pages: 'pages du site', 'forms': 'Messages reçus', 'seo.title': 'Titre' });`;
-window.eval(['domhelper.js', 'api.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
-    .concat(words, readFileSync(`${OWN}/js/admin.js`, 'utf8')).join('\n;\n'));
+const window = bar(words);
 const $ = (s) => window.document.querySelector(s);
 const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
@@ -66,7 +70,7 @@ const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'themes', 'plugins', 'roles', 'forms', 'web', 'inbox']);
 check('builtins get a pictogram, a plugin without one the initial of its (translated) label', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'M']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
-check("the application's words, for kroom's entries and a plugin's", [entry('pages').title, entry('forms').title], ['pages du site', 'Messages reçus']);
+check("kroom's entries keep kroom's words, a plugin's take the application's", [entry('pages').title, entry('forms').title], ['pages', 'Messages reçus']);
 
 click(entry('pages'));
 await sleep(20);
@@ -132,6 +136,16 @@ check('a framed entry: its page in a wide panel', [$('.kroom-admin-frame')?.getA
 
 window.document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
 check('Escape closes', $('.kroom-admin-panel').hidden, true);
+
+// --- the stocked languages
+{
+    const stock = window.kroomAdmin.stock;
+    check('French says every word English does', Object.keys(stock.fr).sort(), Object.keys(stock.en).sort());
+    const french = bar(`window.kroomAdmin = { language: 'fr' };`);
+    const roles = french.document.querySelector('.kroom-admin nav [data-entry="roles"]');
+    check('an application asking for French gets its bar in French', [roles?.title, roles?.getAttribute('aria-label'), french.kroomAdmin.language],
+        ['rôles', 'rôles', 'fr']);
+}
 
 console.log(failures ? `\n${failures} FAILED` : '\nall ok');
 process.exit(failures ? 1 : 0);

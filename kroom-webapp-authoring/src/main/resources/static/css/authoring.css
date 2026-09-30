@@ -109,6 +109,19 @@
     opacity: 1;
 }
 
+/* the handle says "edit", the outline says what: the block it targets, as a focused field is ringed */
+.kroom-block[data-api] {
+    outline: 1px solid transparent;
+    outline-offset: .25rem;
+    border-radius: var(--pico-border-radius, .25rem);
+    transition: outline-color .15s ease-in-out;
+}
+
+html:not(.kroom-busy) .kroom-block[data-api]:hover,
+html:not(.kroom-busy) .kroom-block[data-api]:has(.kroom-block-tools:focus-within) {
+    outline-color: var(--kroom-edit-color);
+}
+
 /* while a block is edited, no block offers its handle — that one included */
 .kroom-busy .kroom-block-tools {
     display: none;
@@ -128,6 +141,11 @@
 }
 
 /* --- the editor --------------------------------------------------------------------------------- */
+
+/* room around it: the editor is a thing set in the page, not a line of it */
+.kroom-editor {
+    margin: 1rem 0 2rem;
+}
 
 .kroom-editor-bar {
     display: flex;
@@ -194,6 +212,7 @@
 textarea.kroom-source {
     width: 100%;
     min-height: 6rem;
+    margin-bottom: .25rem;             /* the tools sit right under it (pico's default: 1rem) */
     overflow: hidden;
     resize: vertical;
     font-family: var(--pico-font-family-monospace, ui-monospace, monospace);
@@ -202,10 +221,16 @@ textarea.kroom-source {
     tab-size: 4;
 }
 
+/* the status reads on the left, the buttons gather on the right, ✓ last */
 .kroom-editor-tools {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: .5rem;
+}
+
+.kroom-status {
+    margin-right: auto;
 }
 
 .kroom-editor-tools button {
@@ -283,4 +308,81 @@ ul.kroom-revisions button {
 
 @media (max-width: 40rem) {
     .kroom-diff { grid-template-columns: 1fr; }
+}
+
+/* --- help: a cheat sheet in the top layer, bottom right, that stays while you type ------------------ */
+
+.kroom-help-toggle {
+    color: var(--kroom-edit-color);
+}
+
+.kroom-help {
+    position: fixed;
+    inset: auto 1rem 1rem auto;
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0;
+    padding: .75rem 1rem;
+    border: 1px solid var(--pico-muted-border-color, #ddd);
+    border-radius: var(--pico-border-radius, .25rem);
+    background: var(--pico-background-color, #fff);
+    color: var(--pico-color, inherit);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .2);
+    font-size: .8rem;
+}
+
+.kroom-help header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .5rem;
+}
+
+.kroom-help header button {
+    width: auto;
+    margin: 0;
+    padding: .125rem;
+    background: none;
+    border: none;
+    color: inherit;
+    box-shadow: none;
+    --kroom-icon-size: 1.125rem;
+}
+
+.kroom-help-sections {
+    display: flex;
+    flex-direction: column;
+    gap: .375rem;
+}
+
+.kroom-help-sections button {
+    width: 100%;
+    margin: 0;
+    padding: .375rem .75rem;
+    font-size: inherit;
+    text-align: left;
+}
+
+.kroom-help table {
+    margin: 0;
+    font-size: inherit;
+}
+
+.kroom-help [hidden] { display: none; }
+
+.kroom-help td {
+    padding: .2rem .5rem .2rem 0;
+    vertical-align: top;
+    border: none;
+}
+
+.kroom-help td:first-child {
+    white-space: nowrap;
+}
+
+.kroom-help code {
+    padding: .1rem .3rem;
+    font-size: .75rem;
+    white-space: pre;
 }

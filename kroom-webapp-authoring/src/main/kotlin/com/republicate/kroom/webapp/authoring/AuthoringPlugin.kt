@@ -49,10 +49,10 @@ class AuthoringConfig {
     var placeholder: String? = null
 
     /**
-     * The editor's words, by key, over authoring.js's English ones (the `strings` table at its top, error
-     * codes included): kroom translates nothing, an application says it its own way.
+     * The language the editor (and the admin bar) speaks: one kroom stocks (`en`, `fr`), or `auto` — the
+     * browser's first stocked one, English otherwise.
      */
-    val strings = LinkedHashMap<String, String>()
+    var language: String = "auto"
 }
 
 class AuthoringPlugin(private val config: AuthoringConfig) {
@@ -68,8 +68,8 @@ class AuthoringPlugin(private val config: AuthoringConfig) {
     internal val published get() = config.published
     val placeholder: String? get() = config.placeholder
 
-    /** The editor's script, stylesheet and words, for a layout to emit — `$authoring.assets.tags()`. */
-    val assets = AuthoringAssets(config.strings)
+    /** The editor's script, stylesheet and language, for a layout to emit — `$authoring.assets.tags()`. */
+    val assets = AuthoringAssets(config.language)
 
     val identity: IdentityProvider get() = config.identity
     val roles: Roles get() = config.roles

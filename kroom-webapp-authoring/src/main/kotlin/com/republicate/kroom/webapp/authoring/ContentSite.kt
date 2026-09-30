@@ -33,6 +33,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     // plugins only register: what they bring is wired below, each piece where the engines need it
     val site = Site(this, config.storage, config.roles, config.siteApiPrefix, config.pagePrefix, config.pageExtension)
     putSite(site)
+    site.words.putAll(config.strings)
     config.plugins.forEach(site::register)
     // a page's #layout never lands on nothing: without a theme of its own, a site wears kroom's
     if (site.themes.isEmpty()) site.register(BasicTheme())
@@ -60,7 +61,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         roles = config.roles
         media = config.storage.media
         placeholder = config.placeholder
-        strings.putAll(config.strings)
+        language = config.language
         published = site::published
     }
 
@@ -147,7 +148,14 @@ class ContentSiteConfig {
     /** What a page shows where a block has not been written yet (`%` markdown, `$name` in scope). */
     var placeholder: String? = null
 
-    /** The editor's words, over its English ones — see [AuthoringConfig.strings]. */
+    /** The language the editor and the admin bar speak — see [AuthoringConfig.language]. */
+    var language: String = "auto"
+
+    /**
+     * The plugins' words, by the ids the admin bar keys them on (`<plugin>.name`, `<plugin>.<setting>`,
+     * `<entry id>`, …): what a plugin says of itself is the application's to translate. kroom's own words are
+     * shipped, in [language]'s stock.
+     */
     val strings = LinkedHashMap<String, String>()
 
     var lockTimeout: Duration = 2.minutes

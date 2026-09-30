@@ -44,11 +44,18 @@ class AssetsTest {
     }
 
     @Test
-    fun `an application's words reach the page before authoring js, safe inside a script`() {
-        val tags = AuthoringAssets(mapOf("preview" to "aperçu", "evil" to "</script><b>")).tags()
-        val words = tags.indexOf("\"preview\":\"aperçu\"")
-        assertTrue(words in 0 until tags.indexOf("/js/authoring.js"), tags)
+    fun `the plugins' words reach the admin bar, safe inside a script`() {
+        val tags = AuthoringAssets().stringTags("kroomAdmin", mapOf("probe.name" to "Sonde", "evil" to "</script><b>"))
+        assertTrue("\"probe.name\":\"Sonde\"" in tags, tags)
         assertTrue("</script><b>" !in tags, tags)
+    }
+
+    @Test
+    fun `a chosen language reaches both scripts ahead of them, auto emits nothing`() {
+        assertTrue("language" !in AuthoringAssets().stringTags("kroomAdmin"), "auto is the scripts' own default")
+        val tags = AuthoringAssets(language = "fr").tags()
+        assertTrue(tags.indexOf("\"language\":\"fr\"") in 0 until tags.indexOf("/js/authoring.js"), tags)
+        assertTrue("window.kroomAdmin" in AuthoringAssets(language = "fr").stringTags("kroomAdmin"))
     }
 
     @Test
