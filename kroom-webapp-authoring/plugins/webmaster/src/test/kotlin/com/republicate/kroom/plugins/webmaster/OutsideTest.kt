@@ -9,31 +9,19 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
 
-class SeoTest {
+class OutsideTest {
 
     private val storage = MemoryStorage().apply {
         content.write("pages/club/13Ma/description.md", "Les Vagabonds", emptyMap())
-        settings("webmaster").apply {
-            set("baseUrl", "https://example.org/")
-            set("description", "Go & more")
-        }
+        settings("site")["baseUrl"] = "https://example.org/"
     }
 
     private fun ApplicationTestBuilder.site() = application {
         installContentSite {
-            storage = this@SeoTest.storage
+            storage = this@OutsideTest.storage
             sessionSecret = "test-secret"
             plugins += Webmaster()
         }
-    }
-
-    @Test
-    fun `every page carries its description, canonical URL and share tags`() = testApplication {
-        site()
-        val page = client.get("/club/13Ma").bodyAsText()
-        assertContains(page, """<meta name="description" content="Go &amp; more">""")
-        assertContains(page, """<link rel="canonical" href="https://example.org/club/13Ma">""")
-        assertFalse(page.contains("noindex"))
     }
 
     @Test
@@ -44,16 +32,13 @@ class SeoTest {
         assertContains(sitemap, "<loc>https://example.org/index</loc>")
         assertFalse(sitemap.contains("/login"), "excluded by default")
         assertContains(client.get("/robots.txt").bodyAsText(), "Sitemap: https://example.org/sitemap.xml")
+        assertFalse(client.get("/index").bodyAsText().contains("noindex"))
     }
 
     @Test
-    fun `a page says its own description and title, and may keep itself out of search`() = testApplication {
+    fun `a page may keep itself out of search, and only that page`() = testApplication {
         site()
-        val page = client.get("/legal/terms").bodyAsText()
-        assertContains(page, """<meta name="description" content="Qui publie ce site">""")
-        assertContains(page, """<meta property="og:title" content="Mentions légales">""")
-        assertContains(page, """<meta name="robots" content="noindex, nofollow">""")
-        assertFalse(page.contains("Go &amp; more"))
+        assertContains(client.get("/legal/terms").bodyAsText(), """<meta name="robots" content="noindex, nofollow">""")
         assertFalse(client.get("/index").bodyAsText().contains("noindex"), "one page's word is that page's only")
     }
 

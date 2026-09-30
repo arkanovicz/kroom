@@ -54,6 +54,9 @@ class Site internal constructor(
     /** The site's settings, its declared defaults showing through until an admin sets them. */
     fun settings(): Settings = DefaultedSettings(storage.settings(SITE), declaredSettings)
 
+    /** The site's public URL, no trailing slash; empty when unset. */
+    val baseUrl: String get() = settings()["baseUrl"]?.trim()?.trimEnd('/').orEmpty()
+
     internal val tools = LinkedHashMap<String, Any>()
     internal val requestTools = LinkedHashMap<String, (ApplicationCall) -> Any>()
     internal val blockTools = LinkedHashSet<String>()
@@ -162,7 +165,7 @@ class Site internal constructor(
 
     /**
      * `$name` in every page, one value per request, made on first use by [provider] and kept for that request
-     * — state a page sets and a fragment reads back later in the same render (`$seo.description("…")` before
+     * — state a page sets and a fragment reads back later in the same render (`$page.description("…")` before
      * `$site.head()`). With [blocks], blocks see it too.
      */
     fun requestTool(name: String, blocks: Boolean = false, provider: (ApplicationCall) -> Any) {
@@ -228,7 +231,7 @@ class Site internal constructor(
         else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries).filter { can(session, it.permission) }
 
     private val builtinEntries = listOf(
-        AdminEntry("site", "site"),
+        AdminEntry("site", "site", tables = listOf(AdminTable("rules", "Redirects", "$apiPrefix/rules"), AdminTable("missing", "Not found", "$apiPrefix/missing"))),
         AdminEntry("pages", "pages"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
@@ -316,7 +319,7 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
     val name: String get() = site.settings()["name"].orEmpty()
     val lang: String get() = site.settings()["lang"].orEmpty()
     /** The public URL, no trailing slash; empty when unset. */
-    val baseUrl: String get() = site.settings()["baseUrl"]?.trim()?.trimEnd('/').orEmpty()
+    val baseUrl: String get() = site.baseUrl
     val description: String get() = site.settings()["description"].orEmpty()
     val image: String get() = site.settings()["image"].orEmpty()
 }

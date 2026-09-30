@@ -468,15 +468,21 @@ optional `group`, under which the admin form gathers it.
 | `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
 
 A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `$site.foot()` at the end of
-`<body>` (see *Themes*). The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **webmaster** (the health of
-the site's URLs, one concern seen from three sides: meta and Open Graph tags — a page's own through `$seo` —,
-robots.txt and sitemap.xml over `site.pages()`; redirect rules with captures and application resolvers, answered
-before routing, and the 404s counted; every page walked on a schedule, every link and picture tried), **forms** (`$forms.contact()` in any block, a honeypot, messages as records
-for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
+`<body>` (see *Themes*). The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **webmaster**
+(the site as seen from outside: whether it wants indexing — robots.txt, a robots meta, `$page.noindex()` for
+one page —, sitemap.xml over `site.pages()`, and every page walked on a schedule, every link and picture tried,
+the broken ones listed with their page), **forms** (`$forms.contact()` in any block, a honeypot, messages as
+records for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
 **webhook** (a signed POST on each publish), **mail** (the site's SMTP transport as `site.mailer` — the same
 `Mailer` kroom-webapp-auth sends its codes through —, a log of what was sent, a webmail framed in the bar; forms
-mails each message to its `notify` address through it). Audience counting stays out of webmaster: it is about
-visitors' privacy, not URLs, and its provider is swapped on its own.
+mails each message to its `notify` address through it).
+
+What the site says of itself is not a plugin's: its card — description, Open Graph tags, canonical URL — is
+rendered by kroom in every head from the site's settings, a page's own words over them (`$page.title(…)`,
+`$page.description(…)`, `$page.image(…)` before `$site.head()`); its redirect rules (`/old /new [301]`,
+`{name}` captures in the path and the query, `@resolver` for what only the application knows —
+`installContentSite { redirectResolvers["player"] = { … } }`) answer before routing, and the 404s are counted,
+both under the *site* admin entry.
 
 ### Themes
 
@@ -485,7 +491,7 @@ layout places them, straight to the response, nothing buffered — then names it
 
 ```velocity
 #set($title = "Les Vagabonds")
-$seo.description("Un club de go à Marseille")
+$page.description("Un club de go à Marseille")
 #define($aside) <article>…</article> #end
 #define($content)
   <h1>Les Vagabonds</h1>

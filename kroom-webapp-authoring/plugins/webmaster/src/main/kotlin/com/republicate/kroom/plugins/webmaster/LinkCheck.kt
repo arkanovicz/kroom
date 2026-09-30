@@ -1,6 +1,7 @@
 package com.republicate.kroom.plugins.webmaster
 
 import com.republicate.kroom.webapp.authoring.Site
+import com.republicate.kroom.webapp.authoring.respondTable
 import com.republicate.kson.Json
 import io.ktor.server.routing.*
 import kotlinx.coroutines.future.await
@@ -65,7 +66,7 @@ internal fun Webmaster.installLinkCheck(site: Site) {
 
 /** One walk: answers the broken links found, page to link, and keeps them as the list the admin bar shows. */
 suspend fun Webmaster.checkLinks(site: Site): List<Pair<String, String>> {
-    val base = baseUrl(site).takeIf { it.isNotEmpty() } ?: return emptyList()
+    val base = site.baseUrl.takeIf { it.isNotEmpty() } ?: return emptyList()
     val external = site.settings(this)["external"] == "true"
     val tried = HashMap<String, Int>()
     val broken = ArrayList<Triple<String, String, Int>>()

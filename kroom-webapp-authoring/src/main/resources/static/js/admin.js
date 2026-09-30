@@ -19,7 +19,7 @@
     const STOCK = { en: {
         site: 'site', pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
         // the site's own settings: their labels come from the server in English, said here in each language
-        'site.Site': 'Site', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects',
+        'site.Site': 'Site', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects', 'site.rules': 'Redirects', 'site.missing': 'Not found',
         'site.name': 'Name', 'site.lang': 'Language', 'site.lang.help': 'The content\'s — html lang',
         'site.baseUrl': 'Public URL', 'site.baseUrl.help': 'https://example.org — absolute URLs need it',
         'site.description': 'Description', 'site.description.help': 'What the site is, in a sentence or two',
@@ -38,7 +38,7 @@
     }, fr: {
         site: 'site', pages: 'pages', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
         // the site's own settings: their labels come from the server in English, said here in each language
-        'site.Site': 'Site', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections',
+        'site.Site': 'Site', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections', 'site.rules': 'Redirections', 'site.missing': 'Introuvables',
         'site.name': 'Nom', 'site.lang': 'Langue', 'site.lang.help': 'Celle du contenu — html lang',
         'site.baseUrl': 'URL publique', 'site.baseUrl.help': 'https://exemple.org — pour les URL absolues',
         'site.description': 'Description', 'site.description.help': 'Ce qu’est le site, en une phrase ou deux',
@@ -143,7 +143,7 @@
         const body = panel.appendChild(element('div', 'kroom-admin-body'));
         panel.hidden = false;
         panel.classList.toggle('kroom-admin-wide', !!entry.frame);
-        const show = entry.builtin ? panels[entry.id]
+        const show = entry.builtin ? (into) => panels[entry.id](into, entry)
             : entry.frame ? (into) => frame(entry.frame, label, into)
             : (into) => tables(entry, into);
         show(body).catch(err => body.replaceChildren(element('p', 'kroom-admin-error', said(err))));
@@ -233,9 +233,10 @@
             }
         },
 
-        async site(body) {
+        async site(body, entry) {
             const settings = await api.getJson(siteApi + 'settings');
             body.appendChild(settingsForm({ id: 'site', settings }, siteApi + 'settings'));
+            await tables(entry, body);
         },
 
         async plugins(body) {

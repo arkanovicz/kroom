@@ -15,7 +15,7 @@ const check = (what, got, want) => {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const entries = JSON.stringify([
-    { id: 'site', label: 'site', builtin: true },
+    { id: 'site', label: 'site', builtin: true, tables: [{ id: 'rules', label: 'Redirects', url: '/api/site/rules' }, { id: 'missing', label: 'Not found', url: '/api/site/missing' }] },
     { id: 'pages', label: 'pages', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
     { id: 'media', label: 'media', builtin: true },
     { id: 'themes', label: 'themes', builtin: true },
@@ -30,6 +30,8 @@ const answers = {
     '/api/site/settings': [
         { key: 'name', label: 'Name', type: 'text', value: 'kroom', group: 'Site' },
         { key: 'smtpPassword', label: 'Password', type: 'secret', set: false, group: 'Mail' }],
+    '/api/site/rules': { columns: ['from', 'to', 'status', 'hits'], rows: [['/old', '/new', 301, 2]] },
+    '/api/site/missing': { columns: ['uri', 'count', 'last'], rows: [['/gone', 3, '2026-09-30T00:00:00Z']] },
     '/api/site/pages': [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
                         { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
@@ -129,6 +131,7 @@ siteForm.elements.name.value = 'Les Vagabonds';
 siteForm.dispatchEvent(new window.Event('submit', { cancelable: true }));
 await sleep(20);
 check('saved to the site, not to a plugin', calls.at(-1), { url: '/api/site/settings', method: 'PUT', body: { name: 'Les Vagabonds', smtpPassword: '' } });
+check('the traffic tables under the form, titled in kroom\'s words', $$('.kroom-admin-section h4').map(h => h.textContent), ['Redirects', 'Not found']);
 
 click(entry('roles'));
 await sleep(20);

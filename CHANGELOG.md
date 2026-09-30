@@ -21,6 +21,11 @@ All notable changes to kroom will be documented in this file.
 ### Added
 
 #### kroom-webapp-authoring
+- The site's card (description, Open Graph, canonical; a page's own through `$page.title(…)`, `.description(…)`,
+  `.image(…)`) and its redirects (`redirects` setting, `{name}` captures, `@resolver` through
+  `installContentSite { redirectResolvers }`, the 404s counted — two tables under the *site* entry) move from
+  the webmaster plugin into the site. Webmaster keeps the outside view: `indexed`, robots.txt and the robots
+  meta (`$page.noindex()`), sitemap.xml, the link check; `$seo` is gone.
 - The site's own settings, declared like a plugin's and shown first in the admin bar: *Site* (`name`, `lang`,
   `baseUrl`, `description`, `image`), *Mail*, *Redirects*, plus the application's (`installContentSite {
   settings += … }`); `GET`/`PUT /api/site/settings`; `$site.name`, `$site.lang`, … and `$site.settings.<key>` in

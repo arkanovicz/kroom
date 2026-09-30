@@ -35,6 +35,9 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     putSite(site)
     site.words.putAll(config.strings)
     site.declaredSettings += config.settings
+    // the site's own before the plugins': its card heads the head, its redirects answer first
+    site.installCard()
+    site.installRedirects(config.redirectResolvers)
     config.plugins.forEach(site::register)
     // a page's #layout never lands on nothing: without a theme of its own, a site wears kroom's
     if (site.themes.isEmpty()) site.register(BasicTheme())
@@ -166,6 +169,9 @@ class ContentSiteConfig {
 
     /** The application's own site settings, after kroom's, in the *site* admin entry — see [Site.declaredSettings]. */
     val settings = mutableListOf<Setting>()
+
+    /** `@name` targets of the site's redirect rules: what only the application knows, given the rule's captures. */
+    val redirectResolvers = LinkedHashMap<String, (Map<String, String>) -> String?>()
 
     /** What the site gains beyond its pages — see [Plugin]. Installed in this order. */
     val plugins = mutableListOf<Plugin>()

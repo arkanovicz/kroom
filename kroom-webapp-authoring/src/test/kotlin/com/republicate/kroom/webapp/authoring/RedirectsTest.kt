@@ -1,7 +1,5 @@
-package com.republicate.kroom.plugins.webmaster
+package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.webapp.authoring.MemoryStorage
-import com.republicate.kroom.webapp.authoring.installContentSite
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
@@ -42,25 +40,24 @@ class RedirectsTest {
 
     @Test
     fun `a matching request is redirected before any route sees it, a miss is counted`() = testApplication {
-        val storage = MemoryStorage().apply { settings("webmaster")["rules"] = "/old /index\n/clubs/* /club/* 302" }
+        val storage = MemoryStorage().apply { settings("site")["redirects"] = "/old /about\n/clubs/* /club/* 302" }
         application {
             installContentSite {
                 this.storage = storage
                 sessionSecret = "test-secret"
-                plugins += Webmaster()
             }
         }
         val browser = createClient { followRedirects = false }
         browser.get("/old").let {
             assertEquals(HttpStatusCode.MovedPermanently, it.status)
-            assertEquals("/index", it.headers[HttpHeaders.Location])
+            assertEquals("/about", it.headers[HttpHeaders.Location])
         }
         browser.get("/clubs/13Ma").let {
             assertEquals(HttpStatusCode.Found, it.status)
             assertEquals("/club/13Ma", it.headers[HttpHeaders.Location])
         }
-        assertEquals(HttpStatusCode.OK, browser.get("/index").status)
+        assertEquals(HttpStatusCode.OK, browser.get("/about").status)
         repeat(2) { assertEquals(HttpStatusCode.NotFound, browser.get("/nowhere?x=1").status) }
-        assertEquals(2L, storage.records("webmaster", "misses").list().values.single { it.getString("uri") == "/nowhere?x=1" }.getLong("count"))
+        assertEquals(2L, storage.records("site", "misses").list().values.single { it.getString("uri") == "/nowhere?x=1" }.getLong("count"))
     }
 }

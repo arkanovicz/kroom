@@ -21,7 +21,7 @@ class LinkCheckTest {
 
     @Test
     fun `every page walked, every broken link listed with its page`() = testApplication {
-        val storage = MemoryStorage().apply { settings("webmaster")["baseUrl"] = "http://site" }
+        val storage = MemoryStorage().apply { settings("site")["baseUrl"] = "http://site" }
         // the site answers through the test client, the rest of the web through this table
         val check = Webmaster(http = { url ->
             if (url.startsWith("http://site")) client.get(url.removePrefix("http://site")).let {

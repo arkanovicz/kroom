@@ -1,6 +1,6 @@
-package com.republicate.kroom.plugins.webmaster
+package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.webapp.authoring.Site
+import com.republicate.kroom.webapp.core.respondJson
 import com.republicate.kson.Json
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -78,20 +78,21 @@ class RedirectRule(val from: String, val to: String, val status: Int) {
 private const val MAX_MISSES = 1000
 
 /**
- * Old URLs answered before routing, so a moved page keeps its links and its search ranking; and what nothing
- * answered, counted by URL — the next rule to write, in plain sight.
+ * The site's `redirects` setting: old URLs answered before routing, so a moved page keeps its links and its
+ * search ranking; and what nothing answered, counted by URL — the next rule to write, in plain sight, under
+ * the *site* admin entry. [resolvers] map what only the application knows to today's URLs (`@player`).
  */
-internal fun Webmaster.installRedirects(site: Site) {
-    val misses = site.records(this, "misses")
+internal fun Site.installRedirects(resolvers: Map<String, (Map<String, String>) -> String?>) {
+    val misses = storage.records(SITE, "misses")
     val hits = ConcurrentHashMap<String, AtomicLong>()
     // parsed once per distinct text: the settings are read per request, and change a few times a year
     var cache: Pair<String, Pair<List<RedirectRule>, List<String>>> = "" to (emptyList<RedirectRule>() to emptyList())
     fun rules(): Pair<List<RedirectRule>, List<String>> {
-        val text = site.settings(this)["rules"].orEmpty()
+        val text = settings()["redirects"].orEmpty()
         return cache.takeIf { it.first == text }?.second ?: RedirectRule.parse(text).also { cache = text to it }
     }
 
-    site.intercept { call ->
+    intercept { call ->
         val path = call.request.path()
         for (rule in rules().first) {
             val values = rule.match(path, call.request.queryParameters) ?: continue
@@ -103,7 +104,7 @@ internal fun Webmaster.installRedirects(site: Site) {
         }
     }
 
-    site.notFound { call ->
+    notFound { call ->
         val uri = call.request.uri.take(500)
         val id = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
         val seen = misses.get(id)
@@ -114,24 +115,30 @@ internal fun Webmaster.installRedirects(site: Site) {
             set("last", System.currentTimeMillis())
         })
     }
-    site.every(1.days) {
+    every(1.days) {
         val cutoff = System.currentTimeMillis() - 30.days.inWholeMilliseconds
         misses.list(Int.MAX_VALUE).forEach { (id, miss) -> if ((miss.getLong("last") ?: 0) < cutoff) misses.delete(id) }
     }
 
-    site.routes {
-        get("${Webmaster.API}/redirects") {
-            if (!admin(site)) return@get
+    routes {
+        get("$apiPrefix/rules") {
+            admin(this@installRedirects) ?: return@get
             val (rules, errors) = rules()
             respondTable(listOf("from", "to", "status", "hits"),
                 rules.map { listOf(it.from, it.to, it.status, hits[it.from]?.get() ?: 0L) } +
                     errors.map { listOf(it, "not understood", null, null) })
         }
-        get("${Webmaster.API}/missing") {
-            if (!admin(site)) return@get
+        get("$apiPrefix/missing") {
+            admin(this@installRedirects) ?: return@get
             respondTable(listOf("uri", "count", "last"),
                 misses.list(Int.MAX_VALUE).values.sortedByDescending { it.getLong("count") ?: 0 }.take(200)
                     .map { listOf(it.getString("uri"), it.getLong("count"), Instant.ofEpochMilli(it.getLong("last") ?: 0).toString()) })
         }
     }
+}
+
+/** A `{columns, rows}` answer, the shape every admin table reads. */
+suspend fun RoutingContext.respondTable(columns: List<String>, rows: List<List<Any?>>) = respondJson {
+    set("columns", Json.MutableArray().apply { columns.forEach { push(it) } })
+    set("rows", Json.MutableArray().apply { rows.forEach { row -> push(Json.MutableArray().apply { row.forEach { push(it) } }) } })
 }

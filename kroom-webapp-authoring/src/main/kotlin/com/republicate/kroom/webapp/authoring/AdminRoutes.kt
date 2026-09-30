@@ -151,7 +151,7 @@ private suspend fun RoutingContext.writeSettings(owner: String, declared: List<S
 }
 
 /** The caller if an admin, or null having answered 401/403. */
-private suspend fun RoutingContext.admin(site: Site): UserSession? {
+internal suspend fun RoutingContext.admin(site: Site): UserSession? {
     val session = call.userSession
     if (session == null) {
         respondError("not authenticated", HttpStatusCode.Unauthorized, "notAuthenticated")
