@@ -156,9 +156,22 @@ body:has(> .kroom-admin) {
     margin-bottom: .5rem;
 }
 
+/* compact fields: pico's are sized for a page, these sit in a side panel */
+.kroom-admin-settings {
+    --pico-form-element-spacing-vertical: .35rem;
+    --pico-form-element-spacing-horizontal: .6rem;
+}
+
 .kroom-admin-settings :is(input:not([type="checkbox"]), textarea, select) {
     display: block;
     width: 100%;
+    margin: .15rem 0 0;
+    font-size: .875rem;
+}
+
+/* pico pulls a hint up under a field's default bottom margin, which the field above no longer has */
+.kroom-admin-settings label > small {
+    display: block;
     margin: .15rem 0 0;
 }
 
