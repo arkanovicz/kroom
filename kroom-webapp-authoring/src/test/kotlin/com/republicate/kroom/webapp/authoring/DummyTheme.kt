@@ -1,7 +1,5 @@
-package com.republicate.kroom.plugins.dummy
+package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.webapp.authoring.Setting
-import com.republicate.kroom.webapp.authoring.Theme
 
 /**
  * A theme for testing themes: every layout of the contract (`default`, `article`, `sidebar`, `landing`) and

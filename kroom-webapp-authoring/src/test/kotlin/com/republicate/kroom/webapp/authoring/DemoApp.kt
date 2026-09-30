@@ -1,10 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.plugins.analytics.Analytics
-import com.republicate.kroom.plugins.dummy.DummyTheme
 import com.republicate.kroom.plugins.forms.Forms
 import com.republicate.kroom.plugins.webmaster.Webmaster
-import com.republicate.kroom.plugins.webhook.Webhook
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.velocity.respondVelocity
 import com.republicate.kroom.webapp.velocity.velocity
@@ -50,7 +47,7 @@ fun Application.demo() {
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet.*"
         // an admin sees them in the bar on the left; a block may call `$forms.contact()`; two themes to switch
-        plugins += listOf(Webmaster(), Forms(), Analytics(), Webhook(), BasicTheme(), DummyTheme())
+        plugins += listOf(Webmaster(), Forms(), BasicTheme(), DummyTheme())
     }
 
     // dockerized (demo/compose.yml), mail goes to Mailpit (a debugging mailbox on its own port), and each form

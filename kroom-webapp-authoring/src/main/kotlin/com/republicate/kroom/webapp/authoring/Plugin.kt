@@ -1,7 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
 /**
- * What a site gains without its layouts being rewritten: SEO tags, a contact form, redirects, analytics.
+ * What a site gains without its layouts being rewritten: a contact form, a link check, a theme.
  *
  * A plugin is one object, registered by the application (`installContentSite { plugins += Seo() }`). Its [id]
  * namespaces everything it owns — its settings and records in the [Storage], its permissions (`forms.read`),

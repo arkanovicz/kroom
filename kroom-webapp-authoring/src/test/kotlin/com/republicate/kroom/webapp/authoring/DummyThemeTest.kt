@@ -1,7 +1,5 @@
-package com.republicate.kroom.plugins.dummy
+package com.republicate.kroom.webapp.authoring
 
-import com.republicate.kroom.webapp.authoring.MemoryStorage
-import com.republicate.kroom.webapp.authoring.installContentSite
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.server.testing.*
@@ -27,9 +25,9 @@ class DummyThemeTest {
             assertContains(it, "<p>home body</p>")
         }
         assertContains(client.get("/story").bodyAsText(), """data-layout="article"""")
-        client.get("/club").bodyAsText().let {
+        client.get("/about").bodyAsText().let {
             assertContains(it, """data-layout="sidebar"""")
-            assertContains(it, "<aside><p>members</p></aside>")
+            assertContains(it, "<aside>in the margin</aside>")
         }
         client.get("/welcome").bodyAsText().let {
             assertContains(it, """data-layout="landing"""")

@@ -21,6 +21,8 @@ All notable changes to kroom will be documented in this file.
 ### Added
 
 #### kroom-webapp-authoring
+- The analytics and webhook plugins are gone: a counter's snippet is a line in a layout, and `onPublish` stays
+  on `Site` for whoever wants to be told.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
@@ -70,10 +72,10 @@ All notable changes to kroom will be documented in this file.
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
 
-#### kroom-plugin-webmaster, -forms, -analytics, -webhook, -dummy-theme
-- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo.
-- dummy-theme: every layout of the theme contract (`default`, `article`, `sidebar`, `landing`) and both
-  regions, in a look nobody mistakes — for testing themes end to end.
+#### kroom-plugin-webmaster, -forms
+- Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. A `DummyTheme` —
+  every layout of the theme contract (`default`, `article`, `sidebar`, `landing`) and both regions, in a look
+  nobody mistakes — lives in kroom-webapp-authoring's tests, for testing themes end to end.
 - webmaster: the health of the site's URLs — meta and Open Graph tags (a page's own through `$seo.title(…)`,
   `$seo.description(…)`, `$seo.image(…)`, `$seo.noindex()`), robots.txt and sitemap.xml; redirect rules with
   `{name}` captures in the path and the query (values encoded) and application resolvers (`@player`), the 404s

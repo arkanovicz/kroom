@@ -18,7 +18,7 @@ kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
-kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, analytics, webhook, dummy-theme
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms
 ```
 
 ## Features
@@ -472,8 +472,7 @@ A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `
 (the site as seen from outside: whether it wants indexing — robots.txt, a robots meta, `$page.noindex()` for
 one page —, sitemap.xml over `site.pages()`, and every page walked on a schedule, every link and picture tried,
 the broken ones listed with their page), **forms** (`$forms.contact()` in any block, a honeypot, messages as
-records for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
-**webhook** (a signed POST on each publish). Mail is the site's, not a plugin's: `site.mailer` is SMTP over the
+records for `forms.read`, daily retention). Mail is the site's, not a plugin's: `site.mailer` is SMTP over the
 site's *Mail* settings once a host is set (the same `Mailer` kroom-webapp-auth sends its codes through), or the
 transport the application set; forms mails each message to its `notify` address through it.
 
@@ -518,8 +517,8 @@ A theme is a plugin (`Theme`) naming the layouts it provides. The contract:
 
 Several themes may be installed, one active — the admin bar's *themes* panel switches it, live — and an admin
 previews another on any page with `?theme=<id>`. A site without a theme wears kroom's `BasicTheme` (pico, the
-menu, a footer). `kroom-plugin-dummy-theme` provides every layout of the vocabulary, plainly and unmistakably —
-for testing a theme's path end to end.
+menu, a footer). The authoring tests hold a `DummyTheme` — every layout of the vocabulary, plainly and
+unmistakably — for testing a theme's path end to end; the demo installs it beside the basic one.
 
 ### The admin bar
 
