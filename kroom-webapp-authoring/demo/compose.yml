@@ -1,7 +1,7 @@
 # The authoring demo, with a mailbox — from the repository root:
 #   KROOM_UID=$(id -u) KROOM_GID=$(id -g) docker compose -f kroom-webapp-authoring/demo/compose.yml up
-# then http://localhost:8099/login (admin / admin). The admin bar's Mailbox frames Mailpit (also on :8025),
-# where whatever the site sends lands — a form's notification, for one.
+# then http://localhost:8099/login (admin / admin). Mailpit, on :8025, is a debugging mailbox where whatever the
+# site sends lands — a form's notification, for one.
 #
 # The demo is built by the repository's own wrapper, as the user who runs it; the velocity BETA comes from the
 # host's maven-local and known dependencies from the host's Gradle cache, both read-only.
@@ -17,7 +17,6 @@ services:
       GRADLE_RO_DEP_CACHE: /gradle-ro
       HOME: /kroom/kroom-webapp-authoring/demo/data/home
       KROOM_SMTP: kroom-mailpit:1025
-      KROOM_INBOX: http://localhost:${KROOM_MAILPIT_PORT:-8025}
     volumes:
       - ../..:/kroom
       - ${HOME}/.m2/repository:/m2:ro

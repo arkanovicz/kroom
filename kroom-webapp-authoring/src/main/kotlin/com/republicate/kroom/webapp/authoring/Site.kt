@@ -119,10 +119,14 @@ class Site internal constructor(
         internal set
 
     /**
-     * How the site sends mail — set by a mail plugin as it installs (or by the application), read by whoever
-     * sends at send time, so install order does not matter. Null: the site sends none.
+     * How the site sends mail: the application's own transport when it set one, else SMTP over the site's
+     * *Mail* settings once a host is set — read by whoever sends at send time, so install order does not
+     * matter. Null: the site sends none.
      */
     @Volatile var mailer: Mailer? = null
+        get() = field ?: smtp.takeIf { !settings()["smtpHost"].isNullOrBlank() }
+
+    private val smtp: Mailer = SmtpMailer(this)
 
     // --- services ----------------------------------------------------------------------------------
 

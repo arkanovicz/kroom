@@ -21,6 +21,9 @@ All notable changes to kroom will be documented in this file.
 ### Added
 
 #### kroom-webapp-authoring
+- Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
+  set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
+  site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
 - The site's card (description, Open Graph, canonical; a page's own through `$page.title(…)`, `.description(…)`,
   `.image(…)`) and its redirects (`redirects` setting, `{name}` captures, `@resolver` through
   `installContentSite { redirectResolvers }`, the 404s counted — two tables under the *site* entry) move from
@@ -59,15 +62,15 @@ All notable changes to kroom will be documented in this file.
   back in the same render.
 - `Site.notFound { call -> }`: a request nothing answered, before it becomes a 404 — to log it or still
   answer it (a phase of its own ahead of `Fallback`, where the engine answers first).
-- `Site.mailer`: how the site sends mail, set by a mail plugin, read at send time.
+- `Site.mailer`: how the site sends mail, read at send time.
 - The demo runs dockerized (`kroom-webapp-authoring/demo/compose.yml`): the repository's wrapper in a JDK
-  container, Mailpit beside it, framed in the admin bar.
+  container, Mailpit beside it.
 
 #### kroom-webapp-core
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
 
-#### kroom-plugin-webmaster, -forms, -analytics, -webhook, -mail, -dummy-theme
+#### kroom-plugin-webmaster, -forms, -analytics, -webhook, -dummy-theme
 - Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo.
 - dummy-theme: every layout of the theme contract (`default`, `article`, `sidebar`, `landing`) and both
   regions, in a look nobody mistakes — for testing themes end to end.
@@ -76,8 +79,7 @@ All notable changes to kroom will be documented in this file.
   `{name}` captures in the path and the query (values encoded) and application resolvers (`@player`), the 404s
   counted; every page walked on a schedule, every link and picture tried, the broken ones listed with their
   page. One public URL, grouped settings, one admin entry with three tables.
-- mail: an SMTP transport on angus-mail (tested against an in-process GreenMail), with a sent-mail log; forms
-  mails each message to its `notify` address when the site has a mailer.
+- forms mails each message to its `notify` address when the site has a mailer.
 
 #### kroom-webapp-velocity
 - `pages()` leaves a path no template backs unanswered instead of answering 404 itself, so an application's

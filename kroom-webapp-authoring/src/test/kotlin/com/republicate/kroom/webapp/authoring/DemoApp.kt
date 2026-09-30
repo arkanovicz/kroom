@@ -3,7 +3,6 @@ package com.republicate.kroom.webapp.authoring
 import com.republicate.kroom.plugins.analytics.Analytics
 import com.republicate.kroom.plugins.dummy.DummyTheme
 import com.republicate.kroom.plugins.forms.Forms
-import com.republicate.kroom.plugins.mail.Mail
 import com.republicate.kroom.plugins.webmaster.Webmaster
 import com.republicate.kroom.plugins.webhook.Webhook
 import com.republicate.kroom.webapp.session.UserSession
@@ -51,17 +50,17 @@ fun Application.demo() {
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet.*"
         // an admin sees them in the bar on the left; a block may call `$forms.contact()`; two themes to switch
-        plugins += listOf(Webmaster(), Forms(), Analytics(), Webhook(), Mail(), BasicTheme(), DummyTheme())
+        plugins += listOf(Webmaster(), Forms(), Analytics(), Webhook(), BasicTheme(), DummyTheme())
     }
 
-    // dockerized (demo/compose.yml), mail goes to Mailpit, and each form message to the admin
+    // dockerized (demo/compose.yml), mail goes to Mailpit (a debugging mailbox on its own port), and each form
+    // message to the admin
     System.getenv("KROOM_SMTP")?.let { smtp ->
-        storage.settings("mail").apply {
-            set("host", smtp.substringBefore(':'))
-            set("port", smtp.substringAfter(':', "25"))
-            set("security", "none")
-            set("from", "kroom demo <demo@kroom.test>")
-            set("inbox", System.getenv("KROOM_INBOX"))
+        storage.settings("site").apply {
+            set("smtpHost", smtp.substringBefore(':'))
+            set("smtpPort", smtp.substringAfter(':', "25"))
+            set("smtpSecurity", "none")
+            set("mailFrom", "kroom demo <demo@kroom.test>")
         }
         storage.settings("forms")["notify"] = "admin@kroom.test"
     }

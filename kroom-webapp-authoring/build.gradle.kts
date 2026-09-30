@@ -20,10 +20,12 @@ dependencies {
     // a store IS a velocity ResourceLoader: one tree, read and written — and pages get $logged/$authoring
     api(project(":kroom-webapp-velocity"))
     api(libs.velocity.engine.core)
+    implementation(libs.angus.mail)                      // the site's SMTP transport
+    testImplementation(libs.greenmail)                   // …tested against an in-process server
     testImplementation(project(":kroom-markdown"))       // the demo renders real `%` blocks
     testImplementation(libs.ktor.server.netty)           // …and the demo app serves them
     // …with the example plugins installed (they depend on this module's main, not its tests: no cycle)
-    listOf("webmaster", "forms", "analytics", "webhook", "mail", "dummy-theme").forEach { testImplementation(project(":kroom-plugin-$it")) }
+    listOf("webmaster", "forms", "analytics", "webhook", "dummy-theme").forEach { testImplementation(project(":kroom-plugin-$it")) }
     testRuntimeOnly(libs.slf4j.simple)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)

@@ -18,7 +18,7 @@ kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
-kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, analytics, webhook, mail, dummy-theme
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, analytics, webhook, dummy-theme
 ```
 
 ## Features
@@ -473,9 +473,9 @@ A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `
 one page —, sitemap.xml over `site.pages()`, and every page walked on a schedule, every link and picture tried,
 the broken ones listed with their page), **forms** (`$forms.contact()` in any block, a honeypot, messages as
 records for `forms.read`, daily retention), **analytics** (a cookieless counter's script, authors not counted),
-**webhook** (a signed POST on each publish), **mail** (the site's SMTP transport as `site.mailer` — the same
-`Mailer` kroom-webapp-auth sends its codes through —, a log of what was sent, a webmail framed in the bar; forms
-mails each message to its `notify` address through it).
+**webhook** (a signed POST on each publish). Mail is the site's, not a plugin's: `site.mailer` is SMTP over the
+site's *Mail* settings once a host is set (the same `Mailer` kroom-webapp-auth sends its codes through), or the
+transport the application set; forms mails each message to its `notify` address through it.
 
 What the site says of itself is not a plugin's: its card — description, Open Graph tags, canonical URL — is
 rendered by kroom in every head from the site's settings, a page's own words over them (`$page.title(…)`,
@@ -596,7 +596,7 @@ Ideal for games with chat: game state is authoritative, chat history is replayed
 ./gradlew :kroom-server:run           # SSE playground at :8080/playground
 ./gradlew :kroom-examples:chifoumi:run  # Rock-paper-scissors at :8081
 
-# the authoring demo, every example plugin installed, a Mailpit mailbox beside it — admin / admin
+# the authoring demo, every example plugin installed, a Mailpit mailbox beside it to read what the site sends — admin / admin
 KROOM_UID=$(id -u) KROOM_GID=$(id -g) docker compose -f kroom-webapp-authoring/demo/compose.yml up
 #   http://localhost:8099/login, Mailpit on :8025 (KROOM_DEMO_PORT, KROOM_MAILPIT_PORT to move them)
 ./gradlew :kroom-webapp-authoring:demo -Pport=8099   # the same without docker, and without mail

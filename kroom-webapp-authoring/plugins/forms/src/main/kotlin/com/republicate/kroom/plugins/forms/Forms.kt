@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.days
  * default), and forgotten after the retention the admin sets.
  *
  * Spam is met with a honeypot: a field people never see and robots fill, answered as a success and dropped.
- * Each message is also mailed to `notify`, when set and the site has a mailer ([Site.mailer], the mail plugin):
+ * Each message is also mailed to `notify`, when set and the site has a mailer ([Site.mailer]: its SMTP settings):
  * off the request, a failed send only logged — the message is kept either way.
  *
  * [strings] are the form's words, the application's to translate.
@@ -40,7 +40,7 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
     override val description = "A contact form blocks can call; its messages kept, listed and expired"
     override val settings = listOf(
         Setting.text("thanks", "Thank-you message", default = "Thank you, your message was sent."),
-        Setting.text("notify", "Tell", help = "An address each message is mailed to — needs a mailer (the mail plugin)"),
+        Setting.text("notify", "Tell", help = "An address each message is mailed to — needs the site's mail settings"),
         Setting.number("retentionDays", "Keep messages for (days)", default = 365)
     )
 
