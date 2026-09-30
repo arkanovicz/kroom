@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="$theme.lang"#if($theme.scheme != "auto") data-theme="$theme.scheme"#end>
+<html lang="$site.lang"#if($theme.scheme != "auto") data-theme="$theme.scheme"#end>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>#if($title)$title — #end$theme.siteName</title>
+    <title>#if($title)$title — #end$site.name</title>
     <link rel="stylesheet" href="/lib/pico/pico.min.css">
     <link rel="stylesheet" href="/css/basic/theme.css?v=$site.version">
     $site.head()

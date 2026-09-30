@@ -17,7 +17,17 @@
     // `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>`
     // — and defaults to what the plugin says. The stock words are not up for rewording.
     const STOCK = { en: {
-        pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
+        site: 'site', pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
+        // the site's own settings: their labels come from the server in English, said here in each language
+        'site.Site': 'Site', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects',
+        'site.name': 'Name', 'site.lang': 'Language', 'site.lang.help': 'The content\'s — html lang',
+        'site.baseUrl': 'Public URL', 'site.baseUrl.help': 'https://example.org — absolute URLs need it',
+        'site.description': 'Description', 'site.description.help': 'What the site is, in a sentence or two',
+        'site.image': 'Picture', 'site.image.help': 'Absolute URL of the picture a shared link shows',
+        'site.smtpHost': 'SMTP host', 'site.smtpHost.help': 'Nothing is sent while empty', 'site.smtpPort': 'SMTP port',
+        'site.smtpSecurity': 'Security', 'site.smtpUser': 'User', 'site.smtpPassword': 'Password',
+        'site.mailFrom': 'Sender', 'site.mailFrom.help': 'Site <noreply@example.org>',
+        'site.redirects': 'Rules', 'site.redirects.help': 'One per line: /from /to [301|302|307|308] — a trailing * on both sides, ?id={id}',
         activate: 'use it', active: 'in use', preview: 'preview', layouts: 'layouts: {layouts}',
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
         noPages: 'no page template', instances: '{count} pages', noInstance: 'none written yet',
@@ -26,7 +36,17 @@
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
         yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
     }, fr: {
-        pages: 'pages', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
+        site: 'site', pages: 'pages', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
+        // the site's own settings: their labels come from the server in English, said here in each language
+        'site.Site': 'Site', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections',
+        'site.name': 'Nom', 'site.lang': 'Langue', 'site.lang.help': 'Celle du contenu — html lang',
+        'site.baseUrl': 'URL publique', 'site.baseUrl.help': 'https://exemple.org — pour les URL absolues',
+        'site.description': 'Description', 'site.description.help': 'Ce qu’est le site, en une phrase ou deux',
+        'site.image': 'Image', 'site.image.help': 'URL absolue de l’image qu’un lien partagé montre',
+        'site.smtpHost': 'Hôte SMTP', 'site.smtpHost.help': 'Rien n’est envoyé tant que vide', 'site.smtpPort': 'Port SMTP',
+        'site.smtpSecurity': 'Sécurité', 'site.smtpUser': 'Utilisateur', 'site.smtpPassword': 'Mot de passe',
+        'site.mailFrom': 'Expéditeur', 'site.mailFrom.help': 'Site <noreply@exemple.org>',
+        'site.redirects': 'Règles', 'site.redirects.help': 'Une par ligne\u00a0: /de /vers [301|302|307|308] — * final des deux côtés, ?id={id}',
         activate: 'l’utiliser', active: 'utilisé', preview: 'aperçu', layouts: 'mises en page : {layouts}',
         noMedia: 'rien d’envoyé pour l’instant', remove: 'supprimer', size: '{kb} ko',
         noPages: 'aucun modèle de page', instances: '{count} pages', noInstance: 'aucune écrite pour l’instant',
@@ -51,6 +71,7 @@
         journal: 'M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v4h-4',
         media: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         plugins: 'M9 3v4M15 3v4M7 7h10v5a5 5 0 0 1-10 0zM12 17v4',
+        site: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
         themes: 'M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14.5 15 16 15h2a3 3 0 0 0 3-3 9 9 0 0 0-9-9zM7.5 12h.01M9.5 7.5h.01M14.5 7.5h.01',
         roles: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 8l2 2 4-4',
         close: 'M6 6l12 12M18 6L6 18'
@@ -212,6 +233,11 @@
             }
         },
 
+        async site(body) {
+            const settings = await api.getJson(siteApi + 'settings');
+            body.appendChild(settingsForm({ id: 'site', settings }, siteApi + 'settings'));
+        },
+
         async plugins(body) {
             const plugins = await api.getJson(siteApi + 'plugins');
             if (!plugins.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noPlugin')));
@@ -220,7 +246,7 @@
                 details.appendChild(element('summary', null, own(`${plugin.id}.name`, plugin.name)));
                 const description = own(`${plugin.id}.description`, plugin.description);
                 if (description) details.appendChild(element('p', 'kroom-admin-muted', description));
-                if (plugin.settings.length) details.appendChild(settingsForm(plugin));
+                if (plugin.settings.length) details.appendChild(settingsForm(plugin, siteApi + `plugins/${encodeURIComponent(plugin.id)}/settings`));
             }
         },
 
@@ -266,7 +292,8 @@
         }
     };
 
-    function settingsForm(plugin) {
+    /** The settings of [plugin] (or of the site, as `{id: 'site', settings}`) as a form saving to [url]. */
+    function settingsForm(plugin, url) {
         const form = element('form', 'kroom-admin-settings');
         let group = null, into = form;
         for (const declared of plugin.settings) {
@@ -325,7 +352,7 @@
                 values[setting.key] = setting.type === 'boolean' ? String(input.checked) : input.value;
             }
             try {
-                await api.putJson(siteApi + `plugins/${encodeURIComponent(plugin.id)}/settings`, values);
+                await api.putJson(url, values);
                 status.textContent = t('saved');
             } catch (err) {
                 status.textContent = said(err);

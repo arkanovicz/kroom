@@ -15,6 +15,7 @@ const check = (what, got, want) => {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const entries = JSON.stringify([
+    { id: 'site', label: 'site', builtin: true },
     { id: 'pages', label: 'pages', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
     { id: 'media', label: 'media', builtin: true },
     { id: 'themes', label: 'themes', builtin: true },
@@ -26,6 +27,9 @@ const entries = JSON.stringify([
 ]).replace(/"/g, '&quot;');
 
 const answers = {
+    '/api/site/settings': [
+        { key: 'name', label: 'Name', type: 'text', value: 'kroom', group: 'Site' },
+        { key: 'smtpPassword', label: 'Password', type: 'secret', set: false, group: 'Mail' }],
     '/api/site/pages': [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
                         { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
@@ -67,7 +71,7 @@ const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 
-check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['pages', 'journal', 'media', 'themes', 'plugins', 'roles', 'forms', 'web', 'inbox']);
+check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['site', 'pages', 'journal', 'media', 'themes', 'plugins', 'roles', 'forms', 'web', 'inbox']);
 check('builtins get a pictogram, a plugin without one the initial of its (translated) label', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'M']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
 check("kroom's entries keep kroom's words, a plugin's take the application's", [entry('pages').title, entry('forms').title], ['pages', 'Messages reçus']);
@@ -115,6 +119,16 @@ form.dispatchEvent(new window.Event('submit', { cancelable: true }));
 await sleep(20);
 check('save puts every setting, a secret left empty', calls.at(-1),
     { url: '/api/site/plugins/seo/settings', method: 'PUT', body: { title: 'Les Vagabonds', index: 'true', key: '', mode: 'tls' } });
+
+click(entry('site'));
+await sleep(20);
+const siteForm = $('.kroom-admin-settings');
+check("the site's settings, kroom's words for kroom's groups and labels", [$$('.kroom-admin-settings legend').map(l => l.textContent),
+    siteForm.elements.name.closest('label').firstChild.textContent, siteForm.elements.smtpPassword.value], [['Site', 'Mail'], 'Name', '']);
+siteForm.elements.name.value = 'Les Vagabonds';
+siteForm.dispatchEvent(new window.Event('submit', { cancelable: true }));
+await sleep(20);
+check('saved to the site, not to a plugin', calls.at(-1), { url: '/api/site/settings', method: 'PUT', body: { name: 'Les Vagabonds', smtpPassword: '' } });
 
 click(entry('roles'));
 await sleep(20);

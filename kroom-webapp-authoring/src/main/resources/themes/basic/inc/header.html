@@ -1,6 +1,6 @@
 <header class="container">
     <nav>
-        <ul><li><a href="/" class="basic-brand"><strong>$theme.siteName</strong></a></li></ul>
+        <ul><li><a href="/" class="basic-brand"><strong>$site.name</strong></a></li></ul>
         <ul>
         #foreach($item in $nav.items)
             <li><a href="$item.href"#if($nav.contains($item)) aria-current="page"#end#if($item.external) rel="external"#end>$item.label</a></li>

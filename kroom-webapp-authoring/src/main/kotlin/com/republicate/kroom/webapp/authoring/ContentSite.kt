@@ -34,6 +34,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     val site = Site(this, config.storage, config.roles, config.siteApiPrefix, config.pagePrefix, config.pageExtension)
     putSite(site)
     site.words.putAll(config.strings)
+    site.declaredSettings += config.settings
     config.plugins.forEach(site::register)
     // a page's #layout never lands on nothing: without a theme of its own, a site wears kroom's
     if (site.themes.isEmpty()) site.register(BasicTheme())
@@ -162,6 +163,9 @@ class ContentSiteConfig {
 
     var sessions: Boolean = true
     var sessionSecret: String? = null
+
+    /** The application's own site settings, after kroom's, in the *site* admin entry — see [Site.declaredSettings]. */
+    val settings = mutableListOf<Setting>()
 
     /** What the site gains beyond its pages — see [Plugin]. Installed in this order. */
     val plugins = mutableListOf<Plugin>()

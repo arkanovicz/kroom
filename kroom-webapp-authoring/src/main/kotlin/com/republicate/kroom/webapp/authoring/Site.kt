@@ -43,6 +43,17 @@ class Site internal constructor(
     /** The plugins' words in the admin bar, as the application translates them — `ContentSiteConfig.strings`. */
     internal val words = LinkedHashMap<String, String>()
 
+    /**
+     * The site's own configuration, declared like a plugin's: kroom's settings first (what the site says of
+     * itself, how it mails, what it redirects), then the application's (`ContentSiteConfig.settings`). Stored
+     * under the `site` namespace, shown by the admin bar's *site* entry, read in templates as `$site.name`,
+     * `$site.lang`, … and `$site.settings.<key>`.
+     */
+    val declaredSettings = ArrayList<Setting>(SITE_SETTINGS)
+
+    /** The site's settings, its declared defaults showing through until an admin sets them. */
+    fun settings(): Settings = DefaultedSettings(storage.settings(SITE), declaredSettings)
+
     internal val tools = LinkedHashMap<String, Any>()
     internal val requestTools = LinkedHashMap<String, (ApplicationCall) -> Any>()
     internal val blockTools = LinkedHashSet<String>()
@@ -217,6 +228,7 @@ class Site internal constructor(
         else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries).filter { can(session, it.permission) }
 
     private val builtinEntries = listOf(
+        AdminEntry("site", "site"),
         AdminEntry("pages", "pages"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
@@ -295,7 +307,36 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
 
     /** For cache-busting a theme's assets: `?v=$site.version`. */
     val version: String get() = AuthoringAssets.VERSION
+
+    // --- what the site says of itself (the *site* settings) ------------------------------------------
+
+    /** Every site setting by key, kroom's and the application's, defaults showing through. */
+    val settings: Map<String, String> get() = site.settings().all()
+
+    val name: String get() = site.settings()["name"].orEmpty()
+    val lang: String get() = site.settings()["lang"].orEmpty()
+    /** The public URL, no trailing slash; empty when unset. */
+    val baseUrl: String get() = site.settings()["baseUrl"]?.trim()?.trimEnd('/').orEmpty()
+    val description: String get() = site.settings()["description"].orEmpty()
+    val image: String get() = site.settings()["image"].orEmpty()
 }
+
+/** What every site is asked, in the groups the admin bar shows them in. */
+internal val SITE_SETTINGS = listOf(
+    Setting.text("name", "Name", default = "kroom", group = "Site"),
+    Setting.text("lang", "Language", default = "en", help = "The content's — html lang", group = "Site"),
+    Setting.text("baseUrl", "Public URL", help = "https://example.org — absolute URLs need it", group = "Site"),
+    Setting.textarea("description", "Description", help = "What the site is, in a sentence or two", group = "Site"),
+    Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Site"),
+    Setting.text("smtpHost", "SMTP host", help = "Nothing is sent while empty", group = "Mail"),
+    Setting.number("smtpPort", "SMTP port", default = 587, group = "Mail"),
+    Setting.choice("smtpSecurity", "Security", choices = listOf("starttls", "tls", "none"), group = "Mail"),
+    Setting.text("smtpUser", "User", group = "Mail"),
+    Setting.secret("smtpPassword", "Password", group = "Mail"),
+    Setting.text("mailFrom", "Sender", help = "Site <noreply@example.org>", group = "Mail"),
+    Setting.textarea("redirects", "Rules", group = "Redirects",
+        help = "One per line: /from /to [301|302|307|308] — a trailing * on both sides, ?id={id}")
+)
 
 private class DefaultedSettings(private val stored: Settings, private val declared: List<Setting>) : Settings {
     override fun get(key: String) = stored[key] ?: declared.firstOrNull { it.key == key }?.default

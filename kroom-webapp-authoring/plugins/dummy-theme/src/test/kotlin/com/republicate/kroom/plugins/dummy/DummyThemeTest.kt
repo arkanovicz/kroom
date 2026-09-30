@@ -23,7 +23,7 @@ class DummyThemeTest {
         site()
         client.get("/index").bodyAsText().let {
             assertContains(it, """data-layout="default"""")
-            assertContains(it, "<title>Home · dummy</title>")
+            assertContains(it, "<title>Home · kroom</title>")
             assertContains(it, "<p>home body</p>")
         }
         assertContains(client.get("/story").bodyAsText(), """data-layout="article"""")
@@ -40,7 +40,8 @@ class DummyThemeTest {
 
     @Test
     fun `its settings dress it, and it owes kroom its two calls`() = testApplication {
-        storage.settings("dummy").apply { set("siteName", "Les Vagabonds"); set("accent", "teal") }
+        storage.settings("site")["name"] = "Les Vagabonds"
+        storage.settings("dummy")["accent"] = "teal"
         site()
         val page = client.get("/index").bodyAsText()
         assertContains(page, "<title>Home · Les Vagabonds</title>")

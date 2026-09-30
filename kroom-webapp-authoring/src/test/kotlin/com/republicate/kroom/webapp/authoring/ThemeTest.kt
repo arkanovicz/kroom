@@ -94,9 +94,9 @@ class ThemeTest {
     }
 
     @Test
-    fun `the theme's settings dress the page`() = testApplication {
+    fun `the site's and the theme's settings dress the page`() = testApplication {
         site()
-        storage.settings("basic")["siteName"] = "Les Vagabonds"
+        storage.settings("site")["name"] = "Les Vagabonds"
         storage.settings("basic")["scheme"] = "dark"
         val page = client.get("/about").bodyAsText()
         assertContains(page, "<title>About — Les Vagabonds</title>")

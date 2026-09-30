@@ -517,13 +517,28 @@ for testing a theme's path end to end.
 
 ### The admin bar
 
-`$site.foot()` emits, for whoever holds `site.admin`, a bar on the left of the page — pages (every template
-and the pages its blocks say exist), journal, plugins with their settings forms (a secret is never read
-back), roles, then the plugins' entries. Its data comes from `/api/site/{pages, plugins, plugins/{id}/settings,
-roles}`; its markup is built by `admin.js`. It speaks the editor's language (*The editor's words*); a plugin's
+`$site.foot()` emits, for whoever holds `site.admin`, a bar on the left of the page — the site's own settings
+(below), pages (every template and the pages its blocks say exist), journal, media, plugins with their settings
+forms (a secret is never read back), themes, roles, then the plugins' entries. Its data comes from
+`/api/site/{settings, pages, plugins, plugins/{id}/settings, themes, roles}`; its markup is built by `admin.js`. It speaks the editor's language (*The editor's words*); a plugin's
 words are the application's to translate, `installContentSite { strings[…] }` keyed by the plugin's ids (`<entry id>`,
 `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`,
 `<plugin>.<group>`), defaulting to what the plugin says. Pictograms: `kroomAdmin.icons`.
+
+### The site's settings
+
+The site is configured like a plugin, from the admin bar's first entry: kroom asks what every site is asked —
+*Site* (`name`, `lang`, `baseUrl`, `description`, `image`), *Mail* (`smtpHost`, `smtpPort`, `smtpSecurity`,
+`smtpUser`, `smtpPassword`, `mailFrom`), *Redirects* (`redirects`) — and the application appends its own:
+
+```kotlin
+installContentSite { settings += Setting.text("motto", "Motto", default = "festina lente") }
+```
+
+Stored under the `site` settings namespace, defaults showing through; `GET`/`PUT /api/site/settings`. A
+layout or a block reads them as `$site.name`, `$site.lang`, `$site.baseUrl`, `$site.description`, `$site.image`,
+and `$site.settings.motto` for the application's. A theme has settings of its own (`$theme`) for what is the
+look's: colours, a footer line — not the site's name.
 
 ## Table (for seat-based games)
 

@@ -15,7 +15,7 @@ package com.republicate.kroom.webapp.authoring
  *
  * The contract, for a theme: layouts under `themes/<id>/layouts/<name>.html` — `default` required, `article`,
  * `sidebar`, `landing` when it has them (a missing one falls back to `default`) — rendering `$content`, and
- * `$aside` / `$hero` when defined (`#if($aside)` tests without rendering); `$title`; `$site.head()` at the end of
+ * `$aside` / `$hero` when defined (`#if($aside)` tests without rendering); `$title`; `$site.name`, `$site.lang`, `$site.description` for what the site says of itself; `$site.head()` at the end of
  * `<head>`, `$site.foot()` at the end of `<body>` — all kroom and its plugins ask; `$nav` for the menu; `$theme`
  * for the theme's own settings. Private partials under `themes/<id>/inc/`, assets under
  * `static/{css,js,img,fonts}/<id>/`. A theme jar keeps its templates at the classpath root; an application's
@@ -61,8 +61,6 @@ class BasicTheme : Theme {
     override val description = "pico, a menu, a footer — the look of a site without a theme of its own"
     override val layouts = setOf("default", "sidebar")
     override val settings = listOf(
-        Setting.text("siteName", "Site name", default = "kroom"),
-        Setting.text("lang", "Language", default = "en"),
         Setting.choice("scheme", "Colours", choices = listOf("auto", "light", "dark")),
         Setting.text("footer", "Footer")
     )

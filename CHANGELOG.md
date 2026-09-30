@@ -21,6 +21,10 @@ All notable changes to kroom will be documented in this file.
 ### Added
 
 #### kroom-webapp-authoring
+- The site's own settings, declared like a plugin's and shown first in the admin bar: *Site* (`name`, `lang`,
+  `baseUrl`, `description`, `image`), *Mail*, *Redirects*, plus the application's (`installContentSite {
+  settings += … }`); `GET`/`PUT /api/site/settings`; `$site.name`, `$site.lang`, … and `$site.settings.<key>` in
+  templates. `BasicTheme` loses `siteName` and `lang` to them (breaking for a layout reading `$theme.siteName`).
 - The editor has a help button: a popover cheat sheet of the markdown syntax, the `%` directives and the
   editor's own features. The editor and the admin bar now come in English and French —
   `installContentSite { language = "fr" }`, `auto` (the default) following the browser.

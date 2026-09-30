@@ -1,5 +1,5 @@
 <header class="dummy-header">
-    <a href="/" class="dummy-brand">$theme.siteName</a>
+    <a href="/" class="dummy-brand">$site.name</a>
     <nav>
     #foreach($item in $nav.items)
         <a href="$item.href"#if($nav.contains($item)) aria-current="page"#end>$item.label</a>

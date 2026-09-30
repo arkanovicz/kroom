@@ -14,6 +14,8 @@ import io.ktor.server.routing.*
  * What the admin bar reads, mounted under [Site.apiPrefix], all for [Permissions.ADMIN]:
  *
  * ```
+ * GET {prefix}/settings                the site's settings (a secret never read back)
+ * PUT {prefix}/settings                {key: value} — declared keys only; "" keeps a secret, null resets
  * GET {prefix}/pages                   every page template, its route, and the pages its blocks say exist
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
  * PUT {prefix}/plugins/{id}/settings   {key: value} — declared keys only; "" keeps a secret, null resets
@@ -40,29 +42,25 @@ fun Route.siteRoutes() {
             })
         }
 
+        get("/settings") {
+            admin(site) ?: return@get
+            respondJson(settingsJson(site.declaredSettings, site.settings()))
+        }
+
+        put("/settings") {
+            admin(site) ?: return@put
+            if (writeSettings("site", site.declaredSettings, site.settings())) respondSuccess()
+        }
+
         get("/plugins") {
             admin(site) ?: return@get
             respondJson(Json.MutableArray().apply {
                 site.plugins.forEach { plugin ->
-                    val values = site.settings(plugin)
                     push(Json.MutableObject().apply {
                         set("id", plugin.id)
                         set("name", plugin.name)
                         set("description", plugin.description)
-                        set("settings", Json.MutableArray().apply {
-                            plugin.settings.forEach { setting ->
-                                push(Json.MutableObject().apply {
-                                    set("key", setting.key)
-                                    set("label", setting.label)
-                                    set("type", setting.type)
-                                    setting.help?.let { set("help", it) }
-                                    setting.group?.let { set("group", it) }
-                                    if (setting.choices.isNotEmpty()) set("choices", Json.MutableArray().apply { setting.choices.forEach { push(it) } })
-                                    if (setting.type == "secret") set("set", !values[setting.key].isNullOrEmpty())
-                                    else set("value", values[setting.key])
-                                })
-                            }
-                        })
+                        set("settings", settingsJson(plugin.settings, site.settings(plugin)))
                     })
                 }
             })
@@ -73,21 +71,7 @@ fun Route.siteRoutes() {
             val id = call.parameters["id"]!!
             val plugin = site.plugin(id)
                 ?: return@put respondError("no plugin $id", HttpStatusCode.NotFound, "noPlugin", mapOf("id" to id))
-            val asked = receiveJsonObject()
-            val declared = plugin.settings.associateBy { it.key }
-            asked.keys.firstOrNull { it !in declared }?.let { key ->
-                return@put respondError("$id has no setting $key", code = "noSetting", args = mapOf("key" to key))
-            }
-            val settings = site.settings(plugin)
-            asked.entries.firstOrNull { (key, value) -> declared[key]!!.let { it.type == "choice" && value != null && value.toString() !in it.choices } }?.let { (key, value) ->
-                return@put respondError("$value is not a choice of $key", code = "noChoice", args = mapOf("key" to key, "value" to value))
-            }
-            for ((key, value) in asked) {
-                val text = value?.toString()
-                if (declared[key]!!.type == "secret" && text == "") continue
-                settings[key] = text
-            }
-            respondSuccess()
+            if (writeSettings(id, plugin.settings, site.settings(plugin))) respondSuccess()
         }
 
         get("/themes") {
@@ -125,6 +109,45 @@ fun Route.siteRoutes() {
             }
         }
     }
+}
+
+/** [declared] settings with their [values] — a secret only says whether it is set. */
+private fun settingsJson(declared: List<Setting>, values: Settings) = Json.MutableArray().apply {
+    declared.forEach { setting ->
+        push(Json.MutableObject().apply {
+            set("key", setting.key)
+            set("label", setting.label)
+            set("type", setting.type)
+            setting.help?.let { set("help", it) }
+            setting.group?.let { set("group", it) }
+            if (setting.choices.isNotEmpty()) set("choices", Json.MutableArray().apply { setting.choices.forEach { push(it) } })
+            if (setting.type == "secret") set("set", !values[setting.key].isNullOrEmpty())
+            else set("value", values[setting.key])
+        })
+    }
+}
+
+/**
+ * The body's `{key: value}` into [settings], [declared] keys only — "" keeps a secret, null resets. False
+ * having answered why not.
+ */
+private suspend fun RoutingContext.writeSettings(owner: String, declared: List<Setting>, settings: Settings): Boolean {
+    val asked = receiveJsonObject()
+    val known = declared.associateBy { it.key }
+    asked.keys.firstOrNull { it !in known }?.let { key ->
+        respondError("$owner has no setting $key", code = "noSetting", args = mapOf("key" to key))
+        return false
+    }
+    asked.entries.firstOrNull { (key, value) -> known[key]!!.let { it.type == "choice" && value != null && value.toString() !in it.choices } }?.let { (key, value) ->
+        respondError("$value is not a choice of $key", code = "noChoice", args = mapOf("key" to key, "value" to value))
+        return false
+    }
+    for ((key, value) in asked) {
+        val text = value?.toString()
+        if (known[key]!!.type == "secret" && text == "") continue
+        settings[key] = text
+    }
+    return true
 }
 
 /** The caller if an admin, or null having answered 401/403. */
