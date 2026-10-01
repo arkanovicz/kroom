@@ -423,7 +423,7 @@ fun interface IdentityProvider {
 }
 installContentSite {
     identity = MemoryIdentityProvider().user("admin", "admin", Roles.ADMIN)    // the demo's; or LDAP, OIDC claims…
-    roles.grant("moderator", "forms.*")                   // admin: *, editor: content.* by default
+    roles.grant("moderator", "forms.*")                   // admin: *; editor: content.*, pages.*, menu.edit; author: content.edit
     loginPage = "pages/login.html"                        // POST /login, /logout over the provider
 }
 ```

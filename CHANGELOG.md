@@ -26,6 +26,11 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
+- Roles: `editor` owns the pages and the menu (`pages.*`, `menu.edit`) beside every block; a built-in `author`
+  writes blocks (`content.edit`) and nothing else. The admin bar shows whoever has at least one entry, each
+  builtin entry carrying its permission — an editor gets *pages* and *menu*.
+- A block can be trashed: `ResourceStore.delete`, `DELETE /api/content/{path}` for its editor; a versioned
+  store keeps the deletion as an empty revision, so it can be restored.
 - The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent, or an `href` elsewhere; `label`
   and `description` by language) stored by an admin — `GET`/`PUT`/`DELETE /api/site/menu`, a *menu* panel in
   the bar editing it one language at a time — or derived from the pages as a tree, a section no page answers

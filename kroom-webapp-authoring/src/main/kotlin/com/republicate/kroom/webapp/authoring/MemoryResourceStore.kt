@@ -18,6 +18,10 @@ open class MemoryResourceStore(sigil: String = "%%@") : ResourceStore(sigil) {
 
     override fun list(prefix: String): List<String> = files.keys.filter { it.startsWith(prefix) }.sorted()
 
+    override fun delete(path: String): Boolean = (files.remove(path) != null).also { if (it) onDeleted(path) }
+
+    protected open fun onDeleted(path: String) {}
+
     /** Where a store that keeps its past records one — see [VersionedMemoryResourceStore]. */
     protected open fun onWritten(block: Block) {}
 }
@@ -33,6 +37,13 @@ class VersionedMemoryResourceStore(sigil: String = "%%@") : MemoryResourceStore(
 
     override fun onWritten(block: Block) = synchronized(revisions) {
         revisions.add(Revision(block.rev, block.path, block.author, block.updated) to block)
+        Unit
+    }
+
+    /** A deletion is a revision too: an empty block, so the history shows what went and restoring brings it back. */
+    override fun onDeleted(path: String) = synchronized(revisions) {
+        val gone = Block(path, "", mapOf("updated" to System.currentTimeMillis().toString()))
+        revisions.add(Revision(gone.rev, path, null, gone.updated, "deleted") to gone)
         Unit
     }
 

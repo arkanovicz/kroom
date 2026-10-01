@@ -317,15 +317,16 @@ class Site internal constructor(
         foots.mapNotNull { it(call)?.takeIf(String::isNotEmpty) }
     ).joinToString("\n")
 
-    /** The entries [session] may open: kroom's own, then the plugins'. */
+    /** The entries [session] may open: kroom's own, then the plugins' — the bar shows whoever has at least one. */
     internal fun adminEntries(session: UserSession?): List<AdminEntry> =
-        if (!can(session, Permissions.ADMIN)) emptyList()
+        if (session == null) emptyList()
         else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries.filter { enabled(it.owner) }.map { it.value })
             .filter { can(session, it.permission) }
 
     private val builtinEntries = listOf(
         AdminEntry("site", "site", tables = listOf(AdminTable("rules", "Redirects", "$apiPrefix/rules"), AdminTable("missing", "Not found", "$apiPrefix/missing"))),
-        AdminEntry("pages", "pages"), AdminEntry("menu", "menu"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
+        AdminEntry("pages", "pages", permission = Permissions.PAGE_EDIT), AdminEntry("menu", "menu", permission = Permissions.MENU_EDIT),
+        AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
 

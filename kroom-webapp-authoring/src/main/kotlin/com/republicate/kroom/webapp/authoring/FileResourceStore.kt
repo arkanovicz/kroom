@@ -34,6 +34,8 @@ open class FileResourceStore(private val root: Path = Path.of("data/content"), s
         return block
     }
 
+    override fun delete(path: String): Boolean = Files.deleteIfExists(resolve(path))
+
     override fun list(prefix: String): List<String> {
         if (!Files.isDirectory(root)) return emptyList()
         Files.walk(root).use { paths ->

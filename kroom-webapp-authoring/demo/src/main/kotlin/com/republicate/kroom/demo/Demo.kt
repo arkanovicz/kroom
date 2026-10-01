@@ -6,7 +6,6 @@ import com.republicate.kroom.webapp.authoring.BasicTheme
 import com.republicate.kroom.webapp.authoring.DummyTheme
 import com.republicate.kroom.webapp.authoring.MemoryIdentityProvider
 import com.republicate.kroom.webapp.authoring.MemoryStorage
-import com.republicate.kroom.webapp.authoring.Permissions
 import com.republicate.kroom.webapp.authoring.Roles
 import com.republicate.kroom.webapp.authoring.Storage
 import com.republicate.kroom.webapp.authoring.installContentSite
@@ -18,8 +17,8 @@ import io.ktor.server.netty.Netty
  * The authoring stack as a thing you can click: `./gradlew :kroom-demo:run` (`-Pport=9000` for another port),
  * or dockerized with a mailbox beside it, `docker compose -f kroom-webapp-authoring/demo/compose.yml up`.
  *
- * Four ways in. **admin / admin** sees everything and the bar on the left; **editor / editor** edits every
- * block and sees no bar; **author / author** edits the topics' blocks only; a visitor reads. Same call an
+ * Four ways in. **admin / admin** sees everything; **editor / editor** owns the pages and the menu, and every
+ * block; **author / author** writes blocks and nothing else; a visitor reads. Same call an
  * application makes ([installContentSite]), a memory store that remembers its revisions, and nothing else.
  * [DemoSiteTest] asserts the same flow without the browser.
  */
@@ -29,19 +28,6 @@ fun main() {
     embeddedServer(Netty, port = port) { demo() }.start(wait = true)
 }
 
-const val AUTHOR = "author"
-
-/** The demo's roles: kroom's two, and an author who edits under `pages/topics/` and nowhere else. */
-class DemoRoles : Roles() {
-    init {
-        grant(AUTHOR, Permissions.EDIT)
-    }
-
-    override fun can(roles: Set<String>, permission: String, target: String): Boolean =
-        super.can(roles - AUTHOR, permission, target) ||
-            AUTHOR in roles && permission == Permissions.EDIT && target.startsWith("pages/topics/")
-}
-
 fun Application.demo(storage: Storage = MemoryStorage()) {
     seed(storage)
     installContentSite {
@@ -49,8 +35,7 @@ fun Application.demo(storage: Storage = MemoryStorage()) {
         identity = MemoryIdentityProvider()
             .user("admin", "admin", Roles.ADMIN)
             .user("editor", "editor", Roles.EDITOR)
-            .user("author", "author", AUTHOR)
-        roles = DemoRoles()
+            .user("author", "author", Roles.AUTHOR)
         loginPage = "pages/login.html"
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet for **\$name**.*"
@@ -89,9 +74,9 @@ private fun seed(storage: Storage) {
         write("pages/start.md", """
             ### Try it
 
-            - **admin / admin** — everything, and the bar on the left
-            - **editor / editor** — every block, no bar
-            - **author / author** — the topics' blocks only
+            - **admin / admin** — everything, and the whole bar on the left
+            - **editor / editor** — the pages and the menu, every block
+            - **author / author** — the blocks, nothing else
 
             Topics: [authoring](/topics/authoring), [themes](/topics/themes), [plugins](/topics/plugins) — and
             a topic nobody wrote yet, [go](/topics/go), to see a page before its words.

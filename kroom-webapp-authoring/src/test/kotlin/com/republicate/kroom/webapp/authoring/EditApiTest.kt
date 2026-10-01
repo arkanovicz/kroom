@@ -187,4 +187,18 @@ class EditApiTest {
         assertEquals(HttpStatusCode.NotFound, alice.get("/api/content/journal").status)
         assertEquals(HttpStatusCode.NotFound, alice.get("/api/content/$path?rev=deadbeef").status)
     }
+
+    @Test
+    fun `trashing a block removes it, for its editor only, and a versioned store remembers`() = testApplication {
+        val store = VersionedMemoryResourceStore()
+        serve(store, identity = IdentityProvider { if (it.id == "alice") setOf(Roles.EDITOR) else emptySet() })
+        store.write(path, "## Titre", mapOf("author" to "alice"))
+        val alice = actor("alice")
+        assertEquals(HttpStatusCode.Forbidden, actor("bob").delete("/api/content/$path").status)
+        assertEquals(HttpStatusCode.OK, alice.delete("/api/content/$path").status)
+        assertEquals(null, store.read(path))
+        assertEquals(HttpStatusCode.NotFound, alice.delete("/api/content/$path").status)
+        assertEquals("deleted", store.log(path).first().message)
+        assertEquals("## Titre", store.read(path, store.log(path)[1].rev)!!.body, "what went is still there to restore")
+    }
 }

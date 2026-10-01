@@ -102,6 +102,17 @@ fun Route.authoringRoutes() {
             respondJson(payload(plugin, path, block, plugin.locks.holder(path), session))
         }
 
+        // trash: the block goes, a region it overrode falls back to the site's default; versioned stores keep it
+        delete("{path...}") {
+            val path = blockPath() ?: return@delete
+            val session = editorOf(plugin, path) ?: return@delete
+            plugin.locks.holder(path)?.takeIf { it.owner != session.id }?.let { return@delete notYourLock(path) }
+            if (!plugin.store.delete(path))
+                return@delete respondError("no block at $path", HttpStatusCode.NotFound, "noBlock", mapOf("path" to path))
+            plugin.locks.release(path, session.id)
+            respondSuccess()
+        }
+
         post("{path...}") {
             val path = blockPath() ?: return@post
             val session = editorOf(plugin, path) ?: return@post

@@ -25,6 +25,9 @@ abstract class ResourceStore(private val sigil: String = "%%@") : ResourceLoader
     /** Every path under [prefix] — what boot-time routing and the journal browse. */
     abstract fun list(prefix: String = ""): List<String>
 
+    /** Remove the block at [path]; false when there was none. A page's region falls back to the site's default. */
+    abstract fun delete(path: String): Boolean
+
     // --- the source seen by velocity: header + body, exactly as stored ---------------------------
 
     override fun load(name: String): String =

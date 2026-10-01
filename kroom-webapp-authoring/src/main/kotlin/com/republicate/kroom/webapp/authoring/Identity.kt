@@ -31,14 +31,18 @@ open class Roles {
 
     companion object {
         const val ADMIN = "admin"
+        /** Owns the pages and the menu, and every block. */
         const val EDITOR = "editor"
+        /** Writes the blocks the pages declare, and nothing else. */
+        const val AUTHOR = "author"
     }
 
     private val grants = ConcurrentHashMap<String, MutableSet<String>>()
 
     init {
         grant(ADMIN, "*")
-        grant(EDITOR, "${Permissions.CONTENT}.*")
+        grant(EDITOR, "${Permissions.CONTENT}.*", "${Permissions.PAGES}.*", Permissions.MENU_EDIT)
+        grant(AUTHOR, Permissions.EDIT)
     }
 
     fun grant(role: String, vararg permissions: String) {
@@ -69,7 +73,12 @@ object Permissions {
     const val EDIT = "content.edit"
     /** Add a file to the media. */
     const val UPLOAD = "content.upload"
-    /** The admin bar, the plugin list, every plugin's settings. */
+    /** Create, publish, change or delete an authored page — target: its path. */
+    const val PAGES = "pages"
+    const val PAGE_EDIT = "pages.edit"
+    /** Store the menu. */
+    const val MENU_EDIT = "menu.edit"
+    /** The site's settings, the plugins and theirs, the themes, the roles, the journal, the media. */
     const val ADMIN = "site.admin"
 }
 

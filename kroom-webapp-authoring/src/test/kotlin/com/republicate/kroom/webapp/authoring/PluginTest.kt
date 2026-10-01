@@ -75,7 +75,10 @@ class PluginTest {
         assertContains(anonymous, """<meta name="probe" content="hello">""")
         assertContains(anonymous, "<!-- probe foot -->")
         assertFalse(anonymous.contains("kroom-admin"))
-        assertFalse(visitor("editor").get("/club/13Ma").bodyAsText().contains("kroom-admin"))
+        val editor = visitor("editor").get("/club/13Ma").bodyAsText()
+        assertContains(editor, """<aside class="kroom-admin"""")      // the bar shows whoever has an entry
+        assertContains(editor, "&quot;id&quot;:&quot;pages&quot;")
+        assertFalse(editor.contains("&quot;id&quot;:&quot;plugins&quot;"), "the plugins are the admin's")
 
         val admin = visitor("admin").get("/club/13Ma").bodyAsText()
         assertContains(admin, """<aside class="kroom-admin"""")

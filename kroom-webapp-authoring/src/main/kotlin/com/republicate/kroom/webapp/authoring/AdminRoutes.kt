@@ -33,7 +33,7 @@ fun Route.siteRoutes() {
     route(site.apiPrefix) {
 
         get("/pages") {
-            admin(site) ?: return@get
+            allowed(site, Permissions.PAGE_EDIT) ?: return@get
             respondJson(Json.MutableArray().apply {
                 site.pages().forEach { page ->
                     push(Json.MutableObject().apply {
@@ -56,7 +56,7 @@ fun Route.siteRoutes() {
         }
 
         get("/menu") {
-            admin(site) ?: return@get
+            allowed(site, Permissions.MENU_EDIT) ?: return@get
             val served = site.urls().toSet()
             val lang = site.defaultLanguage
             fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
@@ -74,7 +74,7 @@ fun Route.siteRoutes() {
         }
 
         put("/menu") {
-            admin(site) ?: return@put
+            allowed(site, Permissions.MENU_EDIT) ?: return@put
             val items = receiveJsonObject().getArray("items")
                 ?: return@put respondError("items expected", code = "menuInvalid", args = mapOf("message" to "items expected"))
             val parsed = MenuItem.parseAll(items).getOrElse { e ->
@@ -85,7 +85,7 @@ fun Route.siteRoutes() {
         }
 
         delete("/menu") {
-            admin(site) ?: return@delete
+            allowed(site, Permissions.MENU_EDIT) ?: return@delete
             site.storeMenu(null)
             respondSuccess()
         }
@@ -203,14 +203,17 @@ private suspend fun RoutingContext.writeSettings(owner: String, declared: List<S
 }
 
 /** The caller if an admin, or null having answered 401/403. */
-internal suspend fun RoutingContext.admin(site: Site): UserSession? {
+internal suspend fun RoutingContext.admin(site: Site): UserSession? = allowed(site, Permissions.ADMIN)
+
+/** The caller if [permission] is theirs, or null having answered 401/403. */
+internal suspend fun RoutingContext.allowed(site: Site, permission: String, target: String = ""): UserSession? {
     val session = call.userSession
     if (session == null) {
         respondError("not authenticated", HttpStatusCode.Unauthorized, "notAuthenticated")
         return null
     }
-    if (!site.can(session, Permissions.ADMIN)) {
-        respondError("not an administrator", HttpStatusCode.Forbidden, "notAdmin")
+    if (!site.can(session, permission, target)) {
+        respondError("not allowed: $permission", HttpStatusCode.Forbidden, "notAllowed", mapOf("permission" to permission))
         return null
     }
     return session
