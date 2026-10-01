@@ -167,11 +167,23 @@ class Site internal constructor(
         else menu.put("tree", Json.MutableObject().apply { set("items", Json.MutableArray().apply { items.forEach { push(it.toJson()) } }) })
     }
 
-    /** The URLs the site answers, hidden pages left out. */
-    fun urls(): List<String> = pages().filter { it.template !in hiddenPages }.flatMap { it.urls }
+    /** The pages editors made, beside the developers' templates. */
+    internal val authored = AuthoredPages(this)
 
-    /** The menu as stored, or derived from the pages — as [MenuItem]s, before any language is chosen. */
-    fun menu(): List<MenuItem> = storedMenu() ?: MenuItem.derive(urls(), defaultLanguage)
+    /** The URLs the site answers a visitor: the templates' (hidden pages left out) and the published authored pages. */
+    fun urls(): List<String> = (pages().filter { it.template !in hiddenPages }.flatMap { it.urls } + authored.published()).distinct()
+
+    /** What [path] is to this request's viewer — for the menu, which drops what they may not see. */
+    fun pageState(path: String, call: ApplicationCall, served: Set<String>): PageState = when {
+        path in served -> PageState.PUBLISHED
+        else -> authored.get(path)?.let { if (authored.visible(it, call)) PageState.DRAFT else PageState.FORBIDDEN } ?: PageState.MISSING
+    }
+
+    /**
+     * The menu as stored, or derived from the pages — as [MenuItem]s, before any language or viewer is chosen:
+     * drafts are in, the view drops them for whoever may not see them.
+     */
+    fun menu(): List<MenuItem> = storedMenu() ?: MenuItem.derive((urls() + authored.all().map { it.path }).distinct(), defaultLanguage)
 
     /** `$nav` for this request: the application's menu, else the site's, in the request's language. */
     fun navigation(call: ApplicationCall): Navigation {
@@ -179,7 +191,7 @@ class Site internal constructor(
         navigation?.let { return Navigation(it(call), path) }
         val served = urls().toSet()
         val lang = language(call)
-        return Navigation(menu().map { it.view(lang, defaultLanguage, "", served::contains) }, path)
+        return Navigation(menu().mapNotNull { it.view(lang, defaultLanguage, "") { pageState(it, call, served) } }, path)
     }
 
     internal val hiddenPages = HashSet<String>()
@@ -445,6 +457,8 @@ internal val SITE_SETTINGS = listOf(
     Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Site"),
     Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), help = "What a page gets when it names none", group = "Site"),
     Setting.text("footer", "Footer", help = "A line at the foot of every page", group = "Site"),
+    Setting.boolean("menuPanels", "Menu panels", default = false, help = "The header shows a section's pages as a panel", group = "Site"),
+    Setting.choice("west", "West region", choices = listOf("section", "none"), help = "What a page shows on its left when it says nothing: the section's pages, or nothing", group = "Site"),
     Setting.text("smtpHost", "SMTP host", help = "Nothing is sent while empty", group = "Mail"),
     Setting.number("smtpPort", "SMTP port", default = 587, group = "Mail"),
     Setting.choice("smtpSecurity", "Security", choices = listOf("starttls", "tls", "none"), group = "Mail"),

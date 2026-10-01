@@ -203,8 +203,20 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
         ['$name', '${name.field}', '%if($x) … %else … %end']);
     click('.kroom-help-back');
     check('← comes back to the landing', shown(), ['landing']);
-    check('✓ sits last, ✗ before it, the status first', [...$('.kroom-editor-tools').children].map(e => e.className.split(' ')[0]),
-        ['kroom-status', 'kroom-cancel', 'kroom-submit']);
+    check('✓ sits last, ✗ before it, the trash and the status first', [...$('.kroom-editor-tools').children].map(e => e.className.split(' ')[0]),
+        ['kroom-status', 'kroom-trash', 'kroom-cancel', 'kroom-submit']);
+    window.confirm = () => true;
+    const { calls: trashed, click: clickT, window: w2 } = page(() => held);
+    w2.confirm = () => true;
+    clickT('.kroom-edit');
+    await sleep(20);
+    clickT('.kroom-trash');
+    await sleep(20);
+    check('trash deletes the block', trashed.at(-1), { url: `/api/content/${PATH}`, method: 'DELETE', body: undefined });
+    const unwritten = page(() => ({ payload: { body: '', rev: '', meta: {}, lock: { owner: 'admin' }, editable: true } }));
+    unwritten.click('.kroom-edit');
+    await sleep(20);
+    check('a block nobody wrote has nothing to trash', unwritten.$('.kroom-trash'), null);
 }
 
 // --- drafts -------------------------------------------------------------------------------------

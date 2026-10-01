@@ -239,6 +239,11 @@ textarea.kroom-source {
     margin: 0;
 }
 
+.kroom-editor-tools .kroom-trash {
+    margin-right: auto;            /* the destructive one keeps its distance, on the left with the status */
+    color: var(--kroom-cancel-color);
+}
+
 .kroom-status {
     font-size: .8rem;
     opacity: .7;

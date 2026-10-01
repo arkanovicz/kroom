@@ -289,3 +289,10 @@ body:has(> .kroom-admin) {
 .kroom-admin-unresolved > .kroom-admin-menu-row code { color: var(--kroom-cancel-color, #dc2626); }
 .kroom-admin-menu-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .kroom-admin-menu-head select { width: auto; margin: 0; padding: .2rem 1.75rem .2rem .5rem; font-size: .8rem; }
+
+/* --- the pages panel ----------------------------------------------------------------------------- */
+
+.kroom-admin-draft > a { opacity: .7; }
+.kroom-admin-new-page { margin-top: .75rem; }
+.kroom-admin-new-page h4 { margin: 0 0 .25rem; font-size: .9rem; }
+.kroom-admin-regions label { display: inline-block; margin: 0 .75rem .25rem 0; }

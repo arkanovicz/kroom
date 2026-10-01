@@ -2,6 +2,7 @@ package com.republicate.kroom.demo
 
 import com.republicate.kroom.plugins.forms.Forms
 import com.republicate.kroom.plugins.webmaster.Webmaster
+import com.republicate.kroom.webapp.authoring.AuthoredPage
 import com.republicate.kroom.webapp.authoring.BasicTheme
 import com.republicate.kroom.webapp.authoring.DummyTheme
 import com.republicate.kroom.webapp.authoring.MemoryIdentityProvider
@@ -63,7 +64,19 @@ private fun seed(storage: Storage) {
         set("description", "Pages by developers, words by authors — edited in place.")
     }
     val by = mapOf("author" to "admin")
+    // a page an editor made, not a developer: its record, then its block beside it
+    storage.records("site", "pages").put("about", AuthoredPage(
+        path = "/about", layout = "article", title = mapOf("en" to "About kroom"),
+        description = mapOf("en" to "What kroom is, in a page an editor made"),
+        status = AuthoredPage.PUBLISHED, author = "editor", published = System.currentTimeMillis()
+    ).toJson())
     storage.content.apply {
+        write("pages/about/content.md", """
+            ## About
+
+            This page has no template: an editor created it from the admin bar — a path, a title, a layout — and
+            wrote this block. Publish, unpublish or delete it there; its blocks stay in the store.
+        """.trimIndent(), by)
         write("pages/intro.md", """
             ## kroom
 

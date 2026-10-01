@@ -17,17 +17,25 @@ data class MenuItem(
 ) {
     val external: Boolean get() = slug == null
 
-    /** The entry a theme sees, in [lang] (then [fallback]), its path under [parent], [resolved] when a page answers it. */
-    fun view(lang: String, fallback: String, parent: String, resolved: (String) -> Boolean): NavItem {
+    /**
+     * The entry a theme sees, in [lang] (then [fallback]), its path under [parent], as [resolve] answers for
+     * that path: a published page, a draft the viewer may see, or nothing — a draft is kept and marked, an
+     * entry nobody may see is dropped (null).
+     */
+    fun view(lang: String, fallback: String, parent: String, resolve: (String) -> PageState): NavItem? {
         val path = if (external) href.orEmpty() else "$parent/$slug"
+        val state = if (external) PageState.PUBLISHED else resolve(path)
+        if (state == PageState.FORBIDDEN) return null
+        val children = children.mapNotNull { it.view(lang, fallback, path, resolve) }
         return NavItem(
             label = label[lang] ?: label[fallback] ?: label.values.firstOrNull() ?: slug?.replace('-', ' ')?.replaceFirstChar(Char::titlecase) ?: path,
             href = path,
             description = description[lang] ?: description[fallback],
             external = external,
-            children = children.map { it.view(lang, fallback, path, resolved) },
+            children = children,
             slug = slug,
-            resolved = external || resolved(path)
+            resolved = state != PageState.MISSING,
+            draft = state == PageState.DRAFT
         )
     }
 
@@ -78,6 +86,9 @@ data class MenuItem(
     }
 }
 
+/** What a path is to a viewer: a page out for all, a draft this viewer may see, a draft they may not, or no page. */
+enum class PageState { PUBLISHED, DRAFT, FORBIDDEN, MISSING }
+
 /** One entry of the menu as a theme sees it: words in the request's language, a path, children. */
 data class NavItem(
     val label: String,
@@ -88,7 +99,9 @@ data class NavItem(
     /** The page's segment; null for an address elsewhere. */
     val slug: String? = null,
     /** Whether a page answers [href] — a section nobody wrote renders as words, not as a dead link. */
-    val resolved: Boolean = true
+    val resolved: Boolean = true,
+    /** A page not out yet, shown because this viewer may edit it. */
+    val draft: Boolean = false
 )
 
 /** `$nav` in a layout: the menu, and where in it this request is. */

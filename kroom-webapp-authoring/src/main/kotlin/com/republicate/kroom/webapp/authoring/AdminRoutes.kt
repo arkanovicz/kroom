@@ -16,7 +16,10 @@ import io.ktor.server.routing.*
  * ```
  * GET {prefix}/settings                the site's settings (a secret never read back)
  * PUT {prefix}/settings                {key: value} — declared keys only; "" keeps a secret, null resets
- * GET {prefix}/pages                   every page template, its route, and the pages its blocks say exist
+ * GET {prefix}/pages                   the page templates (route, the pages their blocks say exist) and the authored pages
+ * POST {prefix}/pages                  {path, title, layout, regions} — a new authored page, a draft
+ * PUT {prefix}/pages/{path}            what changes: title, description, layout, regions, status (draft|published)
+ * DELETE {prefix}/pages/{path}         the record goes; its blocks stay in the store
  * GET {prefix}/menu                    the menu — stored, or derived from the pages — each entry with its path, resolved or not
  * PUT {prefix}/menu                    {items} — the tree to store; DELETE goes back to the pages
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
@@ -34,15 +37,55 @@ fun Route.siteRoutes() {
 
         get("/pages") {
             allowed(site, Permissions.PAGE_EDIT) ?: return@get
-            respondJson(Json.MutableArray().apply {
-                site.pages().forEach { page ->
-                    push(Json.MutableObject().apply {
-                        set("template", page.template)
-                        set("route", page.route)
-                        set("urls", Json.MutableArray().apply { page.urls.forEach { push(it) } })
-                    })
-                }
-            })
+            respondJson {
+                set("templates", Json.MutableArray().apply {
+                    site.pages().forEach { page ->
+                        push(Json.MutableObject().apply {
+                            set("template", page.template)
+                            set("route", page.route)
+                            set("urls", Json.MutableArray().apply { page.urls.forEach { push(it) } })
+                        })
+                    }
+                })
+                set("authored", Json.MutableArray().apply { site.authored.all().forEach { push(it.toJson()) } })
+                set("layouts", Json.MutableArray().apply { SKELETON_LAYOUTS.forEach { push(it) } })
+                set("regions", Json.MutableArray().apply { AuthoredPage.REGIONS.forEach { push(it) } })
+                set("lang", site.defaultLanguage)
+                set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
+            }
+        }
+
+        post("/pages") {
+            val asked = receiveJsonObject()
+            val path = asked.getString("path") ?: return@post respondError("path expected", code = "pageInvalid", args = mapOf("message" to "path expected"))
+            val session = allowed(site, Permissions.PAGE_EDIT, path) ?: return@post
+            if (site.authored.get(path) != null || path in site.urls())
+                return@post respondError("a page already answers $path", HttpStatusCode.Conflict, "pageExists", mapOf("path" to path))
+            val page = AuthoredPage.parse(asked).getOrElse { e ->
+                return@post respondError(e.message ?: "invalid page", code = "pageInvalid", args = mapOf("message" to (e.message ?: "")))
+            }.copy(author = session.id)
+            site.authored.put(page)
+            respondJson(page.toJson())
+        }
+
+        put("/pages/{path...}") {
+            val path = "/" + call.parameters.getAll("path").orEmpty().joinToString("/")
+            allowed(site, Permissions.PAGE_EDIT, path) ?: return@put
+            val existing = site.authored.get(path)
+                ?: return@put respondError("no authored page at $path", HttpStatusCode.NotFound, "noPage", mapOf("page" to path))
+            val page = AuthoredPage.parse(receiveJsonObject(), existing).getOrElse { e ->
+                return@put respondError(e.message ?: "invalid page", code = "pageInvalid", args = mapOf("message" to (e.message ?: "")))
+            }
+            site.authored.put(page)
+            respondJson(page.toJson())
+        }
+
+        delete("/pages/{path...}") {
+            val path = "/" + call.parameters.getAll("path").orEmpty().joinToString("/")
+            allowed(site, Permissions.PAGE_EDIT, path) ?: return@delete
+            if (!site.authored.delete(path))
+                return@delete respondError("no authored page at $path", HttpStatusCode.NotFound, "noPage", mapOf("page" to path))
+            respondSuccess()
         }
 
         get("/settings") {
@@ -59,10 +102,13 @@ fun Route.siteRoutes() {
             allowed(site, Permissions.MENU_EDIT) ?: return@get
             val served = site.urls().toSet()
             val lang = site.defaultLanguage
+            // an editor's view: a draft resolves (they may see it), what is missing does not
+            fun state(path: String) = if (path in served) PageState.PUBLISHED else site.authored.get(path)?.let { PageState.DRAFT } ?: PageState.MISSING
             fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
-                val view = item.view(lang, lang, parent, served::contains)
+                val view = item.view(lang, lang, parent, ::state)!!
                 set("path", view.href)
                 set("resolved", view.resolved)
+                if (view.draft) set("draft", true)
                 if (item.children.isNotEmpty()) set("children", Json.MutableArray().apply { item.children.forEach { push(entry(it, view.href)) } })
             }
             respondJson {

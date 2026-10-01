@@ -3,8 +3,18 @@
 .logout { margin: 0; }
 .logout button { margin: 0; padding: .25rem .75rem; }
 
-/* the header shows the menu's first level; deeper levels are the west region's */
+/* the header shows the menu's first level; deeper levels are the west region's — or a panel, when the site asks */
 header nav li ul, header nav li small { display: none; }
+header nav.panels li.section { position: relative; }
+header nav.panels li.section:hover > ul, header nav.panels li.section:focus-within > ul {
+    display: block; position: absolute; left: 0; top: 100%; z-index: 10; min-width: 14rem; padding: .5rem 1rem;
+    background: var(--pico-background-color); border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius);
+}
+header nav.panels li.section > ul li { display: block; }
+header nav.panels li.section > ul small { display: block; color: var(--pico-muted-color); font-size: .75rem; }
+/* a page not out yet, seen by its editors */
+a.draft { opacity: .6; }
+small.draft { font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; color: var(--pico-muted-color); margin-left: .25rem; }
 
 /* the regions: content alone, or beside a west and/or an east column */
 main.container { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; }

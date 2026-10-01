@@ -1,5 +1,2 @@
-## The page's own west, or the site's: the section the visitor is in, its pages listed, the current one marked.
-#if($west)<aside class="west">$west</aside>#elseif($nav.section && !$nav.section.children.isEmpty())<nav class="west" aria-label="$nav.section.label">
-<strong>$nav.section.label</strong>
-#nav($nav.section.children)
-</nav>#end
+## The page's own west, or the site's.
+#if($west)<aside class="west">$west</aside>#else#parse("kroom/regions/west-default.html")#end

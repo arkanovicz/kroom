@@ -31,8 +31,9 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
     override fun render(args: List<Any?>, bodyContent: ((Appendable) -> Unit)?, context: Context, out: Appendable, scope: Merge) {
         val argument = args.getOrNull(0) ?: throw VelocityException("#markdown(): missing or null block argument")
         // the page is the template the merge started from, not the one rendering now: a region a page
-        // #define's is rendered from inside its layout, and a partial's blocks are its page's too
-        val page = scope.templateNames.firstOrNull()?.takeUnless { it == "<undef>" }
+        // #define's is rendered from inside its layout, and a partial's blocks are its page's too — unless
+        // the context names the page (an authored page renders through one shared template)
+        val page = (context[PAGE] as? String) ?: scope.templateNames.firstOrNull()?.takeUnless { it == "<undef>" }
         val path = try {
             blockPath(argument.toString(), page) { context[it] }
         } catch (e: IllegalArgumentException) {
@@ -47,6 +48,10 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
             val problems = validate(draft, arguments.keys, path)
             if (problems.isNotEmpty()) throw BlockException(path, problems)
             renderer.renderSource(draft, block, path)
+        } else if (bodyContent != null && !renderer.exists(path)) {
+            // #@markdown(name) … #end: the body stands in for a block nobody wrote — a site default an author
+            // may override by writing the block (and trash to get the default back)
+            StringBuilder().also(bodyContent).toString()
         } else try {
             renderer.render(path, block)
         } catch (e: Exception) {
@@ -86,6 +91,9 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
     companion object {
         /** Context key an editor sets: block path → the body being written, rendered instead of the stored one. */
         const val DRAFTS = "kroomDrafts"
+
+        /** Context key naming the page a render is of (`pages/company/history.html`), when the merge's first template is not it. */
+        const val PAGE = "kroomPage"
 
         private val log = LoggerFactory.getLogger(MarkdownMacro::class.java)
 

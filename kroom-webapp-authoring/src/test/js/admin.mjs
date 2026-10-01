@@ -35,8 +35,11 @@ const answers = {
     '/api/site/menu': { stored: false, lang: 'en', languages: ['en', 'fr'], items: [
         { slug: 'about', label: { en: 'About' }, path: '/about', resolved: true },
         { slug: 'legal', label: { en: 'Legal' }, path: '/legal', resolved: false, children: [{ slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', resolved: true }] }] },
-    '/api/site/pages': [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
-                        { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
+    '/api/site/pages': { templates: [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
+                                     { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
+                         authored: [{ path: '/about', title: { en: 'About' }, layout: 'default', regions: ['content'], status: 'draft' }],
+                         layouts: ['default', 'article', 'sidebar', 'landing'], regions: ['header', 'top', 'content', 'east', 'west', 'footer'],
+                         lang: 'en', languages: ['en'] },
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
     '/api/site/plugins': [{ id: 'basic', name: 'Basic', description: 'pico', enabled: true, theme: true, settings: [] },
                           { id: 'seo', name: 'SEO', description: 'meta', enabled: true, settings: [
@@ -84,7 +87,19 @@ check("kroom's entries keep kroom's words, a plugin's take the application's", [
 
 click(entry('pages'));
 await sleep(20);
-check('pages: routes and instances, as links', $$('.kroom-admin-body a').map(a => a.getAttribute('href')), ['/login', '/club/13Ma']);
+check('pages: the editors\' first, then the templates\' routes and instances, as links', $$('.kroom-admin-body a').map(a => a.getAttribute('href')), ['/about', '/login', '/club/13Ma']);
+check('a draft says so, and offers to publish', [$('.kroom-admin-draft small').textContent, $('.kroom-admin-draft button').textContent], [' /about · draft', 'publish']);
+$('.kroom-admin-draft button').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+await sleep(20);
+check('publishing puts the status', calls.at(-2), { url: '/api/site/pages/about', method: 'PUT', body: { status: 'published' } });
+const newPage = $('.kroom-admin-new-page');
+newPage.elements.path.value = '/company/history';
+newPage.elements.title.value = 'Our history';
+[...newPage.querySelectorAll('input[name="region"]')].find(b => b.value === 'east').checked = true;
+newPage.dispatchEvent(new window.Event('submit', { cancelable: true }));
+await sleep(20);
+check('a new page posts its path, title in the default language, layout and regions', calls.find(c => c.method === 'POST' && c.url === '/api/site/pages')?.body,
+    { path: '/company/history', title: { en: 'Our history' }, layout: 'default', regions: ['content', 'east'] });
 check('the open entry is pressed', entry('pages').getAttribute('aria-pressed'), 'true');
 
 click(entry('pages'));

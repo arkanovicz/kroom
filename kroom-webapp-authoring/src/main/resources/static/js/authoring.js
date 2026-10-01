@@ -19,7 +19,8 @@
     const STOCK = { en: {
         edit: 'edit',
         markdown: 'markdown', preview: 'preview', history: 'history',
-        submit: 'submit', cancel: 'cancel',
+        submit: 'submit', cancel: 'cancel', trash: 'trash this block',
+        confirmTrash: 'Remove this block? The region falls back to what the site shows by default.',
         bold: 'bold (Ctrl+B)', italic: 'italic (Ctrl+I)', heading: 'heading', link: 'link (Ctrl+K)',
         bullets: 'bulleted list', numbers: 'numbered list', quote: 'quote', code: 'code',
         image: 'picture or PDF (or paste, or drop one)', uploading: 'uploading {name}…',
@@ -61,7 +62,8 @@
     }, fr: {
         edit: 'modifier',
         markdown: 'markdown', preview: 'aperçu', history: 'historique',
-        submit: 'soumettre', cancel: 'annuler',
+        submit: 'soumettre', cancel: 'annuler', trash: 'supprimer ce bloc',
+        confirmTrash: 'Retirer ce bloc\u00a0? La région reprend ce que le site montre par défaut.',
         bold: 'gras (Ctrl+B)', italic: 'italique (Ctrl+I)', heading: 'titre', link: 'lien (Ctrl+K)',
         bullets: 'liste à puces', numbers: 'liste numérotée', quote: 'citation', code: 'code',
         image: 'image ou PDF (ou collez-en, ou déposez-en un)', uploading: 'envoi de {name}…',
@@ -160,6 +162,7 @@
         submit: 'M4.5 12.5l4.5 4.5L19.5 6.5',
         cancel: 'M6 6l12 12M18 6L6 18',
         help: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1.2-1.5 2.5M12 17h.01',
+        trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
         close: 'M6 6l12 12M18 6L6 18',
         back: 'M19 12H5M11 6l-6 6 6 6'
     }, window.kroomAuthoring?.icons);
@@ -373,6 +376,7 @@
 
         const tools = editor.appendChild(element('nav', 'kroom-editor-tools'));
         tools.appendChild(element('span', 'kroom-status'));
+        if (held.rev) tools.appendChild(iconButton('trash', 'kroom-trash secondary outline', trash));
         tools.appendChild(iconButton('cancel', 'kroom-cancel secondary', cancel));
         tools.appendChild(iconButton('submit', 'kroom-submit', submit));
 
@@ -623,6 +627,20 @@
             dlg.close();
             fill(theirs.body);
         }));
+    }
+
+    /** The block goes — a region it overrode falls back to the site's default; a versioned store keeps it. */
+    async function trash() {
+        if (!window.confirm(t('confirmTrash'))) return;
+        const held = session;
+        try {
+            await api.deleteJson(held.root + held.path);
+            drafts.drop(held.block);
+            session = null;
+            location.reload();
+        } catch (err) {
+            status(said(err));
+        }
     }
 
     function cancel() {

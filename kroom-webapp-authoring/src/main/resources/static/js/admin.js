@@ -38,6 +38,11 @@
         activate: 'use it', active: 'in use', preview: 'preview', layouts: 'layouts: {layouts}',
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
         noPages: 'no page template', instances: '{count} pages', noInstance: 'none written yet',
+        // the pages panel
+        authoredPages: 'pages', templates: 'templates — the developers\' pages', noAuthored: 'none yet',
+        newPage: 'new page', pagePath: 'path, e.g. /company/history', pageTitle: 'title', pageRegions: 'regions besides the content',
+        create: 'create', publish: 'publish', unpublish: 'unpublish', draft: 'draft', published: 'published',
+        confirmDeletePage: 'Delete this page? Its blocks stay in the store.', menuCreate: 'create this page',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
         unknownAuthor: 'unknown', noPlugin: 'no plugin installed', enabled: 'enabled', disabled: 'disabled', save: 'save', saved: 'saved',
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
@@ -64,6 +69,11 @@
         activate: 'l’utiliser', active: 'utilisé', preview: 'aperçu', layouts: 'mises en page : {layouts}',
         noMedia: 'rien d’envoyé pour l’instant', remove: 'supprimer', size: '{kb} ko',
         noPages: 'aucun modèle de page', instances: '{count} pages', noInstance: 'aucune écrite pour l’instant',
+        // the pages panel
+        authoredPages: 'pages', templates: 'modèles — les pages des développeurs', noAuthored: 'aucune pour l’instant',
+        newPage: 'nouvelle page', pagePath: 'chemin, p. ex. /societe/histoire', pageTitle: 'titre', pageRegions: 'régions en plus du contenu',
+        create: 'créer', publish: 'publier', unpublish: 'dépublier', draft: 'brouillon', published: 'publiée',
+        confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.', menuCreate: 'créer cette page',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
         unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', enabled: 'activée', disabled: 'désactivée', save: 'enregistrer', saved: 'enregistré',
         secretSet: 'défini — laisser vide pour le garder', secretUnset: 'non défini',
@@ -181,12 +191,73 @@
     // --- kroom's own panels ------------------------------------------------------------------------
 
     const panels = {
+        // the pages: the editors' (status, publish, delete, a form for a new one), then the developers' templates
         async pages(body) {
-            const pages = await api.getJson(siteApi + 'pages');
-            if (!pages.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noPages')));
-            const list = body.appendChild(element('ul', 'kroom-admin-list'));
-            for (const page of pages) {
-                const item = list.appendChild(element('li'));
+            const answer = await api.getJson(siteApi + 'pages');
+            const lang = answer.lang;
+            const reload = () => { body.replaceChildren(); return panels.pages(body); };
+            const authored = body.appendChild(element('section', 'kroom-admin-section'));
+            authored.appendChild(element('h4', null, t('authoredPages')));
+            if (!answer.authored.length) authored.appendChild(element('p', 'kroom-admin-muted', t('noAuthored')));
+            const list = authored.appendChild(element('ul', 'kroom-admin-list'));
+            for (const page of answer.authored) {
+                const item = list.appendChild(element('li', page.status === 'draft' ? 'kroom-admin-draft' : null));
+                item.appendChild(link(page.path, page.title?.[lang] || page.path));
+                item.appendChild(element('small', 'kroom-admin-muted', ` ${page.path} · ${t(page.status)}`));
+                const actions = item.appendChild(element('div', 'kroom-admin-actions'));
+                const flip = actions.appendChild(element('button', null, t(page.status === 'draft' ? 'publish' : 'unpublish')));
+                flip.type = 'button';
+                flip.addEventListener('click', async () => {
+                    try {
+                        await api.putJson(siteApi + 'pages' + page.path, { status: page.status === 'draft' ? 'published' : 'draft' });
+                        reload();
+                    } catch (err) { actions.appendChild(element('small', 'kroom-admin-error', said(err))); }
+                });
+                const remove = actions.appendChild(element('button', 'secondary outline', t('remove')));
+                remove.type = 'button';
+                remove.addEventListener('click', async () => {
+                    if (!window.confirm(t('confirmDeletePage'))) return;
+                    try { await api.deleteJson(siteApi + 'pages' + page.path); reload(); }
+                    catch (err) { actions.appendChild(element('small', 'kroom-admin-error', said(err))); }
+                });
+            }
+            // a new page: where, what it is called, how it is laid out, which regions it fills
+            const form = authored.appendChild(element('form', 'kroom-admin-settings kroom-admin-new-page'));
+            form.appendChild(element('h4', null, t('newPage')));
+            const path = form.appendChild(element('input'));
+            path.name = 'path'; path.placeholder = t('pagePath'); path.required = true;
+            const title = form.appendChild(element('input'));
+            title.name = 'title'; title.placeholder = t('pageTitle');
+            const layout = form.appendChild(element('select'));
+            layout.name = 'layout';
+            for (const l of answer.layouts) layout.appendChild(element('option', null, l)).value = l;
+            const regions = form.appendChild(element('fieldset', 'kroom-admin-regions'));
+            regions.appendChild(element('legend', null, t('pageRegions')));
+            for (const region of answer.regions.filter(r => r !== 'content')) {
+                const label = regions.appendChild(element('label'));
+                const box = label.appendChild(element('input'));
+                box.type = 'checkbox'; box.name = 'region'; box.value = region;
+                label.appendChild(document.createTextNode(' ' + region));
+            }
+            const footer = form.appendChild(element('footer'));
+            const create = footer.appendChild(element('button', null, t('create')));
+            create.type = 'submit';
+            const status = footer.appendChild(element('small', 'kroom-admin-error'));
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const chosen = ['content', ...[...form.querySelectorAll('input[name="region"]:checked')].map(b => b.value)];
+                try {
+                    await api.postJson(siteApi + 'pages', { path: path.value.trim(), title: { [lang]: title.value.trim() }, layout: layout.value, regions: chosen });
+                    reload();
+                } catch (err) { status.textContent = said(err); }
+            });
+
+            const templates = body.appendChild(element('section', 'kroom-admin-section'));
+            templates.appendChild(element('h4', null, t('templates')));
+            if (!answer.templates.length) return templates.appendChild(element('p', 'kroom-admin-muted', t('noPages')));
+            const known = templates.appendChild(element('ul', 'kroom-admin-list'));
+            for (const page of answer.templates) {
+                const item = known.appendChild(element('li'));
                 if (page.route.includes('{')) {
                     item.appendChild(element('span', 'kroom-admin-pattern', page.route));
                     if (!page.urls.length) item.appendChild(element('small', 'kroom-admin-muted', ' ' + t('noInstance')));
@@ -274,6 +345,17 @@
                     move('menuIn', i > 0 && !list[i - 1].href && !item.href, () => { list.splice(i, 1); (list[i - 1].children ??= []).push(item); });
                     move('menuOut', !!parent, () => { list.splice(i, 1); const up = parent.list; up.splice(up.indexOf(parent.item) + 1, 0, item); });
                     move('menuRemove', true, () => list.splice(i, 1));
+                    if (item.resolved === false && !item.href) {
+                        const make = moves.appendChild(element('button', 'outline', '+'));
+                        make.type = 'button'; make.title = t('menuCreate'); make.setAttribute('aria-label', t('menuCreate'));
+                        make.addEventListener('click', async () => {
+                            try {
+                                await api.postJson(siteApi + 'pages', { path: item.path, title: item.label || {} });
+                                items = (await api.getJson(siteApi + 'menu')).items;
+                                render();
+                            } catch (err) { body.appendChild(element('p', 'kroom-admin-error', said(err))); }
+                        });
+                    }
                     const description = li.appendChild(element('input'));
                     description.value = item.description?.[lang] || '';
                     description.placeholder = t('menuDescription');

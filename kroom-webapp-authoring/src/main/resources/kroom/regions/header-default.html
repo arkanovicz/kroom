@@ -1,0 +1,8 @@
+## The site's header: the brand, the menu from its root (sections' children as panels when the site asks), the way in or out.
+<header class="container">
+<nav#if($site.settings.menuPanels == "true") class="panels"#end>
+<ul><li><a href="/" class="brand"><strong>$site.name</strong></a></li></ul>
+#nav($nav.items)
+<ul>#if($logged)<li><form method="post" action="/logout" class="logout"><button type="submit" class="secondary outline">$logged.name ⏻</button></form></li>#elseif($site.login)<li><a href="$site.login">log in</a></li>#end</ul>
+</nav>
+</header>

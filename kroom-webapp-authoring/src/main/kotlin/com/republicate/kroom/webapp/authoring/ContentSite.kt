@@ -37,9 +37,11 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     putSite(site)
     site.words.putAll(config.strings)
     site.declaredSettings += config.settings
-    // the site's own before the plugins': its card heads the head, its redirects answer first
+    // the site's own before the plugins': its card heads the head, its redirects answer first, and what no
+    // template answers may be an editor's page
     site.installCard()
     site.installRedirects(config.redirectResolvers)
+    site.notFound { call -> site.authored.serve(call) }
     config.plugins.forEach(site::register)
     // a page's #layout never lands on nothing: without a theme of its own, a site wears kroom's
     if (site.themes.isEmpty()) site.register(BasicTheme())

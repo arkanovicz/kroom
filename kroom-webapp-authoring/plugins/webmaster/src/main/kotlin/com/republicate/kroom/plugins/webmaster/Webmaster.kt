@@ -60,7 +60,7 @@ class Webmaster(internal val http: suspend (String) -> Answer = ::fetch) : Plugi
 
             get("/sitemap.xml") {
                 val excluded = settings["exclude"].orEmpty().lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-                val urls = site.pages().flatMap { it.urls }.filter { it !in excluded }.distinct().sorted()
+                val urls = site.urls().filter { it !in excluded }.distinct().sorted()
                 val xml = buildString {
                     append("""<?xml version="1.0" encoding="UTF-8"?>""").append('\n')
                     append("""<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">""").append('\n')

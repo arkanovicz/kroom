@@ -26,6 +26,13 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
+- Authored pages: a record (`path`, `layout`, `regions`, `title`/`description` by language, `draft`|`published`)
+  under `site/pages`, blocks in the content store where a template's would be, rendered through
+  `kroom/page.html` in the not-found phase (templates win); drafts for their editors only, marked in the menu.
+  `GET`/`POST /api/site/pages`, `PUT`/`DELETE /api/site/pages/{path}`; the *pages* panel creates, publishes and
+  deletes them, a red menu entry offers to create its page. A region with a site default shows it until
+  written: `#@markdown(name) … #end` (kroom-markdown) renders its body for a block nobody wrote, and the
+  `kroomPage` context key names the page blocks bind under. `menuPanels` and `west` site settings.
 - Roles: `editor` owns the pages and the menu (`pages.*`, `menu.edit`) beside every block; a built-in `author`
   writes blocks (`content.edit`) and nothing else. The admin bar shows whoever has at least one entry, each
   builtin entry carrying its permission — an editor gets *pages* and *menu*.

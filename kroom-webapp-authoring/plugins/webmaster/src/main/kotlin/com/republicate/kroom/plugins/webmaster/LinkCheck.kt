@@ -70,7 +70,7 @@ suspend fun Webmaster.checkLinks(site: Site): List<Pair<String, String>> {
     val external = site.settings(this)["external"] == "true"
     val tried = HashMap<String, Int>()
     val broken = ArrayList<Triple<String, String, Int>>()
-    val pages = site.pages().flatMap { it.urls }.distinct()
+    val pages = site.urls()
     for (page in pages) {
         val answer = http(base + page)
         if (answer.status !in 200..399) { broken += Triple(page, page, answer.status); continue }

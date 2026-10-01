@@ -1,0 +1,14 @@
+## An authored page: its record says which regions it fills, each one a block beside it in the content store
+## ($kroomPage names the page the blocks bind under), then the layout it asked for. A region the site has a
+## default for shows that default until an editor writes the block — and again once it is trashed.
+#set($title = $authored.title)
+$page.title($authored.title)
+#if($authored.description)$page.description($authored.description)#end
+#if($authored.draft)$page.noindex()#end
+#if($authored.has("header"))#define($header)#@markdown("header")#parse("kroom/regions/header-default.html")#end#end#end
+#if($authored.has("top"))#define($top)#markdown("top")#end#end
+#define($content)#markdown("content")#end
+#if($authored.has("east"))#define($east)#markdown("east")#end#end
+#if($authored.has("west"))#define($west)#@markdown("west")#parse("kroom/regions/west-default.html")#end#end#end
+#if($authored.has("footer"))#define($footer)#@markdown("footer")#parse("kroom/regions/footer-default.html")#end#end#end
+#layout($authored.layout)

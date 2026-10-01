@@ -51,6 +51,9 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
         return emit(markdown)
     }
 
+    /** Whether the loader holds a block at [path]. */
+    fun exists(path: String): Boolean = config.loader.exists(path)
+
     /** Render markdown the caller already holds — an editor preview, a draft never written to a loader. */
     fun renderSource(source: String, context: Context, name: String = "markdown"): String =
         emit(engine.evaluate(source, scoped(context), name))

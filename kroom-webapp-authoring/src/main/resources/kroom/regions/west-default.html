@@ -1,0 +1,5 @@
+## The site's west: the section the visitor is in, its pages listed, the current one marked — unless the site wants none.
+#if($site.settings.west != "none" && $nav.section && !$nav.section.children.isEmpty())<nav class="west" aria-label="$nav.section.label">
+<strong>$nav.section.label</strong>
+#nav($nav.section.children)
+</nav>#end
