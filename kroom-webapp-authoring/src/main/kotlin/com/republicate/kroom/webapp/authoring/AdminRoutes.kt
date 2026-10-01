@@ -17,6 +17,8 @@ import io.ktor.server.routing.*
  * GET {prefix}/settings                the site's settings (a secret never read back)
  * PUT {prefix}/settings                {key: value} — declared keys only; "" keeps a secret, null resets
  * GET {prefix}/pages                   every page template, its route, and the pages its blocks say exist
+ * GET {prefix}/menu                    the menu — stored, or derived from the pages — each entry with its path, resolved or not
+ * PUT {prefix}/menu                    {items} — the tree to store; DELETE goes back to the pages
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
  * PUT {prefix}/plugins/{id}/settings   {key: value} — declared keys only; "" keeps a secret, null resets
  * PUT {prefix}/plugins/{id}/enabled    {enabled} — live; enabling asks the plugin's `check`, 409 with its answer
@@ -51,6 +53,41 @@ fun Route.siteRoutes() {
         put("/settings") {
             admin(site) ?: return@put
             if (writeSettings("site", site.declaredSettings, site.settings())) respondSuccess()
+        }
+
+        get("/menu") {
+            admin(site) ?: return@get
+            val served = site.urls().toSet()
+            val lang = site.defaultLanguage
+            fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
+                val view = item.view(lang, lang, parent, served::contains)
+                set("path", view.href)
+                set("resolved", view.resolved)
+                if (item.children.isNotEmpty()) set("children", Json.MutableArray().apply { item.children.forEach { push(entry(it, view.href)) } })
+            }
+            respondJson {
+                set("stored", site.storedMenu() != null)
+                set("lang", lang)
+                set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
+                set("items", Json.MutableArray().apply { site.menu().forEach { push(entry(it, "")) } })
+            }
+        }
+
+        put("/menu") {
+            admin(site) ?: return@put
+            val items = receiveJsonObject().getArray("items")
+                ?: return@put respondError("items expected", code = "menuInvalid", args = mapOf("message" to "items expected"))
+            val parsed = MenuItem.parseAll(items).getOrElse { e ->
+                return@put respondError(e.message ?: "invalid menu", code = "menuInvalid", args = mapOf("message" to (e.message ?: "")))
+            }
+            site.storeMenu(parsed)
+            respondSuccess()
+        }
+
+        delete("/menu") {
+            admin(site) ?: return@delete
+            site.storeMenu(null)
+            respondSuccess()
         }
 
         get("/plugins") {

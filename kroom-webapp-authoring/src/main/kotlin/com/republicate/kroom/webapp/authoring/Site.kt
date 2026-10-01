@@ -141,14 +141,46 @@ class Site internal constructor(
         return if (theme != null && application.velocity.engine.resourceExists(own)) own else "kroom/regions/$name.html"
     }
 
-    internal var navigation: (ApplicationCall) -> List<NavItem> = { defaultNavigation() }
+    /** The application's own menu, when it computes one — over the stored tree and the pages. */
+    internal var navigation: ((ApplicationCall) -> List<NavItem>)? = null
 
-    /** Every page a visitor may land on, by its route — what a site without a menu of its own shows. */
-    private fun defaultNavigation(): List<NavItem> = pages()
-        .filter { it.template !in hiddenPages }
-        .flatMap { it.urls }
-        .filter { it != "/index" }
-        .map { NavItem(it.substringAfterLast('/').replace('-', ' ').replaceFirstChar(Char::titlecase), it) }
+    /** How a request's language is known (an l10n plugin's, the application's); null: the site's default. */
+    internal var requestLanguage: ((ApplicationCall) -> String?)? = null
+
+    /** The languages the site speaks — its `languages` setting, the default (`lang`) always among them. */
+    val languages: List<String> get() {
+        val listed = settings()["languages"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        return (listOf(defaultLanguage) + listed).distinct()
+    }
+
+    val defaultLanguage: String get() = settings()["lang"]?.takeIf { it.isNotBlank() } ?: "en"
+
+    /** This request's language: what [requestLanguage] says when it is one the site speaks, the default otherwise. */
+    fun language(call: ApplicationCall): String = requestLanguage?.invoke(call)?.takeIf { it in languages } ?: defaultLanguage
+
+    /** The menu as stored by an admin, or null while the site shows the one derived from its pages. */
+    fun storedMenu(): List<MenuItem>? = storage.records(SITE, "menu").get("tree")?.getArray("items")?.let { MenuItem.parseAll(it).getOrNull() }
+
+    fun storeMenu(items: List<MenuItem>?) {
+        val menu = storage.records(SITE, "menu")
+        if (items == null) menu.delete("tree")
+        else menu.put("tree", Json.MutableObject().apply { set("items", Json.MutableArray().apply { items.forEach { push(it.toJson()) } }) })
+    }
+
+    /** The URLs the site answers, hidden pages left out. */
+    fun urls(): List<String> = pages().filter { it.template !in hiddenPages }.flatMap { it.urls }
+
+    /** The menu as stored, or derived from the pages — as [MenuItem]s, before any language is chosen. */
+    fun menu(): List<MenuItem> = storedMenu() ?: MenuItem.derive(urls(), defaultLanguage)
+
+    /** `$nav` for this request: the application's menu, else the site's, in the request's language. */
+    fun navigation(call: ApplicationCall): Navigation {
+        val path = call.request.local.uri.substringBefore('?')
+        navigation?.let { return Navigation(it(call), path) }
+        val served = urls().toSet()
+        val lang = language(call)
+        return Navigation(menu().map { it.view(lang, defaultLanguage, "", served::contains) }, path)
+    }
 
     internal val hiddenPages = HashSet<String>()
 
@@ -293,7 +325,7 @@ class Site internal constructor(
 
     private val builtinEntries = listOf(
         AdminEntry("site", "site", tables = listOf(AdminTable("rules", "Redirects", "$apiPrefix/rules"), AdminTable("missing", "Not found", "$apiPrefix/missing"))),
-        AdminEntry("pages", "pages"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
+        AdminEntry("pages", "pages"), AdminEntry("menu", "menu"), AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
 
@@ -391,7 +423,9 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
     val settings: Map<String, String> get() = site.settings().all()
 
     val name: String get() = site.settings()["name"].orEmpty()
-    val lang: String get() = site.settings()["lang"].orEmpty()
+    /** This request's language — the site's default unless something (an l10n plugin) says otherwise. */
+    val lang: String get() = site.language(call)
+    val languages: List<String> get() = site.languages
     /** The public URL, no trailing slash; empty when unset. */
     val baseUrl: String get() = site.baseUrl
     val description: String get() = site.settings()["description"].orEmpty()
@@ -403,7 +437,8 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
 /** What every site is asked, in the groups the admin bar shows them in. */
 internal val SITE_SETTINGS = listOf(
     Setting.text("name", "Name", default = "kroom", group = "Site"),
-    Setting.text("lang", "Language", default = "en", help = "The content's — html lang", group = "Site"),
+    Setting.text("lang", "Language", default = "en", help = "The content's default — html lang", group = "Site"),
+    Setting.text("languages", "Languages", help = "The others the site speaks, comma-separated (fr, de)", group = "Site"),
     Setting.text("baseUrl", "Public URL", help = "https://example.org — absolute URLs need it", group = "Site"),
     Setting.textarea("description", "Description", help = "What the site is, in a sentence or two", group = "Site"),
     Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Site"),

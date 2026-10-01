@@ -73,8 +73,9 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
 
     velocity.registerRequest("site") { site.view(it) }
     velocity.registerRequest("theme") { call -> site.theme(call)?.let { ThemeView(it, site.settings(it)) } }
-    velocity.registerRequest("nav") { call -> Navigation(site.navigation(call), call.request.local.uri.substringBefore('?')) }
-    config.navigation?.let { site.navigation = it }
+    velocity.registerRequest("nav") { call -> site.navigation(call) }
+    site.navigation = config.navigation
+    site.requestLanguage = config.requestLanguage
     config.loginPage?.let { page ->
         site.hiddenPages += page
         site.loginRoute = "/" + page.removePrefix("${config.pagePrefix}/").removeSuffix(".${config.pageExtension}")
@@ -193,8 +194,11 @@ class ContentSiteConfig {
     /** What the site gains beyond its pages — see [Plugin]. Installed in this order. */
     val plugins = mutableListOf<Plugin>()
 
-    /** The menu `$nav` offers a theme, per request; null derives one from the pages the site serves. */
+    /** The menu `$nav` offers a theme, per request; null: the one an admin stored, else derived from the pages. */
     var navigation: ((ApplicationCall) -> List<NavItem>)? = null
+
+    /** How a request's language is known — `{ it.language }` with kroom-webapp-l10n installed; null: the site's default. */
+    var requestLanguage: ((ApplicationCall) -> String?)? = null
 
     /** Where the admin API mounts; under `/api/`, where api.js roots its calls. */
     var siteApiPrefix: String = "/api/site"

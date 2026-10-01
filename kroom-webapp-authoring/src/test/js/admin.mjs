@@ -16,7 +16,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const entries = JSON.stringify([
     { id: 'site', label: 'site', builtin: true, tables: [{ id: 'rules', label: 'Redirects', url: '/api/site/rules' }, { id: 'missing', label: 'Not found', url: '/api/site/missing' }] },
-    { id: 'pages', label: 'pages', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
+    { id: 'pages', label: 'pages', builtin: true }, { id: 'menu', label: 'menu', builtin: true }, { id: 'journal', label: 'journal', builtin: true },
     { id: 'media', label: 'media', builtin: true },
     { id: 'themes', label: 'themes', builtin: true },
     { id: 'plugins', label: 'plugins', builtin: true }, { id: 'roles', label: 'roles', builtin: true },
@@ -32,6 +32,9 @@ const answers = {
         { key: 'smtpPassword', label: 'Password', type: 'secret', set: false, group: 'Mail' }],
     '/api/site/rules': { columns: ['from', 'to', 'status', 'hits'], rows: [['/old', '/new', 301, 2]] },
     '/api/site/missing': { columns: ['uri', 'count', 'last'], rows: [['/gone', 3, '2026-09-30T00:00:00Z']] },
+    '/api/site/menu': { stored: false, lang: 'en', languages: ['en', 'fr'], items: [
+        { slug: 'about', label: { en: 'About' }, path: '/about', resolved: true },
+        { slug: 'legal', label: { en: 'Legal' }, path: '/legal', resolved: false, children: [{ slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', resolved: true }] }] },
     '/api/site/pages': [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
                         { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
@@ -74,7 +77,7 @@ const $$ = (s) => [...window.document.querySelectorAll(s)];
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const entry = (id) => $(`.kroom-admin nav [data-entry="${id}"]`);
 
-check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['site', 'pages', 'journal', 'media', 'themes', 'plugins', 'roles', 'forms', 'web', 'inbox']);
+check('one control per entry', $$('.kroom-admin nav > *').map(e => e.dataset.entry), ['site', 'pages', 'menu', 'journal', 'media', 'themes', 'plugins', 'roles', 'forms', 'web', 'inbox']);
 check('builtins get a pictogram, a plugin without one the initial of its (translated) label', [!!entry('pages').querySelector('svg'), entry('forms').textContent], [true, 'M']);
 check('the panel starts closed', $('.kroom-admin-panel').hidden, true);
 check("kroom's entries keep kroom's words, a plugin's take the application's", [entry('pages').title, entry('forms').title], ['pages', 'Messages reçus']);
@@ -129,6 +132,20 @@ form.dispatchEvent(new window.Event('submit', { cancelable: true }));
 await sleep(20);
 check('save puts every setting, a secret left empty', calls.at(-1),
     { url: '/api/site/plugins/seo/settings', method: 'PUT', body: { title: 'Les Vagabonds', index: 'true', key: '', mode: 'tls' } });
+
+click(entry('menu'));
+await sleep(20);
+check('the menu: a tree, labels in the chosen language, the unresolved section in red',
+    [$$('.kroom-admin-body > .kroom-admin-menu > li > .kroom-admin-menu-row input').map(i => i.value), $$('.kroom-admin-unresolved > .kroom-admin-menu-row code').map(c => c.textContent)],
+    [['About', 'Legal'], ['/legal']]);
+$('.kroom-admin-menu-head select').value = 'fr';
+$('.kroom-admin-menu-head select').dispatchEvent(new window.Event('change'));
+check('switching the language shows its words, blank where it has none', $$('.kroom-admin-menu input[placeholder="label"]').map(i => i.value), ['', '', 'Mentions']);
+$$('.kroom-admin-menu-moves button')[1].dispatchEvent(new window.MouseEvent('click', { bubbles: true }));   // About ↓
+await sleep(20);
+check('a move puts the whole tree, stripped of what the server computes', calls.find(c => c.method === 'PUT' && c.url === '/api/site/menu')?.body,
+    { items: [{ slug: 'legal', label: { en: 'Legal' }, description: {}, children: [{ slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, description: {}, children: [] }] },
+              { slug: 'about', label: { en: 'About' }, description: {}, children: [] }] });
 
 click(entry('site'));
 await sleep(20);

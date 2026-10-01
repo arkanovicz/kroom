@@ -523,13 +523,27 @@ from the admin bar, live; an admin previews another with `?theme=<id>`):
   without rendering), `$title`, `$site.name`, `$site.head()` at the end of `<head>` and `$site.foot()` at the
   end of `<body>` — all kroom and its plugins ask.
 
-Both get `$nav` (the application's `navigation`, or derived from the pages; `#nav($nav.items)` renders the
-tree with `aria-current`, `$nav.section` is the top-level entry the visitor is under) and `$theme` (the
+Both get `$nav` (the menu, see below; `#nav($nav.items)` renders the tree with `aria-current`, a section no
+page answers as words rather than a dead link, each entry's description in a `<small>` for a theme that shows
+panels; `$nav.section` is the top-level entry the visitor is under) and `$theme` (the
 theme: `id`, `name`, `stylesheets`, `scripts`, `settings`, and any setting by key — `$theme.scheme`). A theme
 adds to `<head>` like any plugin, `site.head { }` in its `install`, emitted while it is the active one. Assets
 live under `static/{css,js,img,fonts}/<id>/`, private partials under `themes/<id>/inc/`. The authoring tests
 hold a `DummyTheme` — every layout of the vocabulary, plainly and unmistakably — for testing a theme's path
 end to end; the demo installs it beside the basic one.
+
+### The menu
+
+The menu is a tree of pages: an entry is a page's segment under its parent, so the tree of entries *is* the
+tree of URLs (`company` at the root is `/company`, `history` under it `/company/history`; `company.html` and
+`company/index.html` are one page), or an address elsewhere (`href`). Labels and descriptions are by language:
+the site's `lang` is the default, `languages` the others it speaks, and a request's language is what
+`installContentSite { requestLanguage = { it.language } }` answers (kroom-webapp-l10n's, or the application's),
+the default filling what a language lacks. Until an admin stores one, the menu is derived from the pages, a
+deeper URL nesting under its first segment — a section no page answers renders as words. The bar's *menu*
+entry edits the tree one language at a time (reorder, nest, rename, describe, add a page before it exists —
+shown in red until it does —, add a link, back to the pages); `GET`/`PUT`/`DELETE /api/site/menu`. An
+application computing its own menu sets `navigation = { call -> List<NavItem> }` over all this.
 
 ### The admin bar
 

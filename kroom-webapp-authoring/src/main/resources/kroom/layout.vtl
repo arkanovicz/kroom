@@ -8,5 +8,6 @@
 ## (themes/<id>/regions/<name>.html), kroom's otherwise (kroom/regions/<name>.html).
 #macro(region $name)#parse($site.region($name))#end
 ##
-## #nav($nav.items) — a menu tree as nested lists, the current page and its trail marked.
-#macro(nav $items)<ul>#foreach($item in $items)<li><a href="$item.href"#if($nav.here == $item) aria-current="page"#elseif($nav.contains($item)) aria-current="true"#end#if($item.external) rel="external"#end>$item.label</a>#if(!$item.children.isEmpty())#nav($item.children)#end</li>#end</ul>#end
+## #nav($nav.items) — a menu tree as nested lists, the current page and its trail marked, a section nobody
+## wrote as words rather than a dead link, each entry's description beside it for a theme that shows panels.
+#macro(nav $items)<ul>#foreach($item in $items)<li#if(!$item.children.isEmpty()) class="section"#end>#if($item.resolved)<a href="$item.href"#if($nav.here == $item) aria-current="page"#elseif($nav.contains($item)) aria-current="true"#end#if($item.external) rel="external"#end>$item.label</a>#else<span#if($nav.contains($item)) aria-current="true"#end>$item.label</span>#end#if($item.description)<small>$item.description</small>#end#if(!$item.children.isEmpty())#nav($item.children)#end</li>#end</ul>#end

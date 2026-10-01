@@ -17,7 +17,13 @@
     // `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>`
     // — and defaults to what the plugin says. The stock words are not up for rewording.
     const STOCK = { en: {
-        site: 'site', pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
+        site: 'site', pages: 'pages', menu: 'menu', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
+        // the menu editor
+        menuDerived: 'derived from the pages — save to keep a menu of your own', menuStored: 'the menu as you saved it',
+        menuLabel: 'label', menuDescription: 'description', menuUnresolved: 'no page here yet',
+        menuUp: 'up', menuDown: 'down', menuOut: 'out of its section', menuIn: 'under the entry above', menuRemove: 'remove',
+        menuAddPage: 'add a page', menuAddLink: 'add a link', menuSlug: 'page segment, e.g. company', menuUrl: 'address, https://…',
+        menuReset: 'back to the pages',
         // the site's own settings: their labels come from the server in English, said here in each language
         'site.Site': 'Site', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects', 'site.rules': 'Redirects', 'site.missing': 'Not found',
         'site.name': 'Name', 'site.lang': 'Language', 'site.lang.help': 'The content\'s — html lang',
@@ -37,7 +43,13 @@
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
         yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
     }, fr: {
-        site: 'site', pages: 'pages', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
+        site: 'site', pages: 'pages', menu: 'menu', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
+        // the menu editor
+        menuDerived: 'déduit des pages — enregistrez pour garder un menu à vous', menuStored: 'le menu tel que vous l’avez enregistré',
+        menuLabel: 'libellé', menuDescription: 'description', menuUnresolved: 'pas encore de page ici',
+        menuUp: 'monter', menuDown: 'descendre', menuOut: 'sortir de sa rubrique', menuIn: 'sous l’entrée au-dessus', menuRemove: 'retirer',
+        menuAddPage: 'ajouter une page', menuAddLink: 'ajouter un lien', menuSlug: 'segment de la page, p. ex. societe', menuUrl: 'adresse, https://…',
+        menuReset: 'revenir aux pages',
         // the site's own settings: their labels come from the server in English, said here in each language
         'site.Site': 'Site', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections', 'site.rules': 'Redirections', 'site.missing': 'Introuvables',
         'site.name': 'Nom', 'site.lang': 'Langue', 'site.lang.help': 'Celle du contenu — html lang',
@@ -70,6 +82,7 @@
     // one stroked path each, on the editor's 24px grid
     const icons = Object.assign({
         pages: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+        menu: 'M4 7h16M4 12h10M4 17h16M18 11l3 3-3 3',
         journal: 'M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v4h-4',
         media: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         plugins: 'M9 3v4M15 3v4M7 7h10v5a5 5 0 0 1-10 0zM12 17v4',
@@ -184,6 +197,92 @@
                 }
                 item.title = page.template;
             }
+        },
+
+        // the menu: the stored tree, or the one derived from the pages, edited in one language at a time
+        async menu(body) {
+            const answer = await api.getJson(siteApi + 'menu');
+            let items = answer.items, lang = answer.lang;
+            const strip = (list) => list.map(i => ({ slug: i.slug, href: i.href, label: i.label || {}, description: i.description || {},
+                                                     children: strip(i.children || []) }));
+            const put = async () => {
+                try {
+                    await api.putJson(siteApi + 'menu', { items: strip(items) });
+                    const fresh = await api.getJson(siteApi + 'menu');
+                    items = fresh.items;
+                    render();
+                } catch (err) { body.appendChild(element('p', 'kroom-admin-error', said(err))); }
+            };
+            const render = () => {
+                body.replaceChildren();
+                const head = body.appendChild(element('div', 'kroom-admin-menu-head'));
+                head.appendChild(element('p', 'kroom-admin-muted', t(answer.stored ? 'menuStored' : 'menuDerived')));
+                if (answer.languages.length > 1) {
+                    const pick = head.appendChild(element('select'));
+                    for (const l of answer.languages) {
+                        const option = pick.appendChild(element('option', null, l));
+                        option.value = l;
+                        option.selected = l === lang;
+                    }
+                    pick.addEventListener('change', () => { lang = pick.value; render(); });
+                }
+                body.appendChild(tree(items, null));
+                const actions = body.appendChild(element('div', 'kroom-admin-actions'));
+                const addPage = actions.appendChild(element('button', null, t('menuAddPage')));
+                addPage.type = 'button';
+                addPage.addEventListener('click', () => {
+                    const slug = window.prompt(t('menuSlug'));
+                    if (slug) { items.push({ slug, label: {}, description: {}, children: [] }); put(); }
+                });
+                const addLink = actions.appendChild(element('button', null, t('menuAddLink')));
+                addLink.type = 'button';
+                addLink.addEventListener('click', () => {
+                    const href = window.prompt(t('menuUrl'));
+                    if (href) { items.push({ href, label: { [lang]: href }, description: {}, children: [] }); put(); }
+                });
+                if (answer.stored) {
+                    const reset = actions.appendChild(element('button', 'secondary', t('menuReset')));
+                    reset.type = 'button';
+                    reset.addEventListener('click', async () => {
+                        await api.deleteJson(siteApi + 'menu');
+                        Object.assign(answer, await api.getJson(siteApi + 'menu'));
+                        items = answer.items;
+                        render();
+                    });
+                }
+            };
+            // one list per level: words in the chosen language, the path, and the moves
+            const tree = (list, parent) => {
+                const ul = element('ul', 'kroom-admin-menu');
+                list.forEach((item, i) => {
+                    const li = ul.appendChild(element('li', item.resolved === false ? 'kroom-admin-unresolved' : null));
+                    const row = li.appendChild(element('div', 'kroom-admin-menu-row'));
+                    const label = row.appendChild(element('input'));
+                    label.value = item.label?.[lang] || '';
+                    label.placeholder = t('menuLabel');
+                    label.addEventListener('change', () => { (item.label ??= {})[lang] = label.value; answer.stored = true; put(); });
+                    const path = row.appendChild(element('code', null, item.href || item.path));
+                    if (item.resolved === false) path.title = t('menuUnresolved');
+                    const moves = row.appendChild(element('span', 'kroom-admin-menu-moves'));
+                    const move = (name, enabled, act) => {
+                        const b = moves.appendChild(element('button', 'outline secondary', { menuUp: '↑', menuDown: '↓', menuOut: '←', menuIn: '→', menuRemove: '✕' }[name]));
+                        b.type = 'button'; b.title = t(name); b.setAttribute('aria-label', t(name)); b.disabled = !enabled;
+                        b.addEventListener('click', () => { act(); answer.stored = true; put(); });
+                    };
+                    move('menuUp', i > 0, () => { list.splice(i, 1); list.splice(i - 1, 0, item); });
+                    move('menuDown', i < list.length - 1, () => { list.splice(i, 1); list.splice(i + 1, 0, item); });
+                    move('menuIn', i > 0 && !list[i - 1].href && !item.href, () => { list.splice(i, 1); (list[i - 1].children ??= []).push(item); });
+                    move('menuOut', !!parent, () => { list.splice(i, 1); const up = parent.list; up.splice(up.indexOf(parent.item) + 1, 0, item); });
+                    move('menuRemove', true, () => list.splice(i, 1));
+                    const description = li.appendChild(element('input'));
+                    description.value = item.description?.[lang] || '';
+                    description.placeholder = t('menuDescription');
+                    description.addEventListener('change', () => { (item.description ??= {})[lang] = description.value; answer.stored = true; put(); });
+                    if (item.children?.length) li.appendChild(tree(item.children, { item, list }));
+                });
+                return ul;
+            };
+            render();
         },
 
         async journal(body) {

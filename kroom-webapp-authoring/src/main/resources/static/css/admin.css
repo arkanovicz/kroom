@@ -274,3 +274,18 @@ body:has(> .kroom-admin) {
         width: auto;
     }
 }
+
+/* --- the menu editor ----------------------------------------------------------------------------- */
+
+.kroom-admin-menu { list-style: none; padding-left: 0; margin: 0; }
+.kroom-admin-menu .kroom-admin-menu { padding-left: 1.25rem; border-left: 2px solid var(--pico-muted-border-color, #ddd); }
+.kroom-admin-menu li { margin: .25rem 0; }
+.kroom-admin-menu-row { display: flex; align-items: center; gap: .5rem; }
+.kroom-admin-menu-row input, .kroom-admin-menu li > input { margin: 0 0 .25rem; font-size: .875rem; }
+.kroom-admin-menu-row input { flex: 1; }
+.kroom-admin-menu-row code { font-size: .75rem; white-space: nowrap; }
+.kroom-admin-menu-moves { display: flex; gap: .125rem; }
+.kroom-admin-menu-moves button { width: auto; margin: 0; padding: 0 .4rem; font-size: .75rem; line-height: 1.6; }
+.kroom-admin-unresolved > .kroom-admin-menu-row code { color: var(--kroom-cancel-color, #dc2626); }
+.kroom-admin-menu-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.kroom-admin-menu-head select { width: auto; margin: 0; padding: .2rem 1.75rem .2rem .5rem; font-size: .8rem; }

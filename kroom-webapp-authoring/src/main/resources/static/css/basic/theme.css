@@ -4,7 +4,7 @@
 .logout button { margin: 0; padding: .25rem .75rem; }
 
 /* the header shows the menu's first level; deeper levels are the west region's */
-header nav li ul { display: none; }
+header nav li ul, header nav li small { display: none; }
 
 /* the regions: content alone, or beside a west and/or an east column */
 main.container { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; }

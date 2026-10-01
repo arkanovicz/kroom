@@ -26,6 +26,12 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
+- The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent, or an `href` elsewhere; `label`
+  and `description` by language) stored by an admin — `GET`/`PUT`/`DELETE /api/site/menu`, a *menu* panel in
+  the bar editing it one language at a time — or derived from the pages as a tree, a section no page answers
+  rendered as words. `languages` joins the site settings beside `lang`; `requestLanguage` on
+  `installContentSite` tells the site a request's language (`$site.lang`, `<html lang>`, the menu's words).
+  `NavItem` gains `slug` and `resolved`; `#nav` renders descriptions.
 - Themes, take two (breaking). The regions are `$header`, `$top` (was `$hero`), `$content`, `$east` (was
   `$aside`), `$west`, `$footer`; `$header`, `$west`, `$footer` have site-wide defaults (the menu; the section's
   pages; the `footer` site setting). A `Skin` is a theme of stylesheets only, over kroom's skeleton

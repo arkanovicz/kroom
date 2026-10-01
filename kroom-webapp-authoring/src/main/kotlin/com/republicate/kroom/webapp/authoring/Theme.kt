@@ -63,32 +63,6 @@ class ThemeView internal constructor(private val theme: Theme, private val value
     fun get(key: String): String? = values[key]
 }
 
-/** One entry of the menu: a page, a section with its pages, or an address elsewhere. */
-data class NavItem(
-    val label: String,
-    val href: String,
-    val description: String? = null,
-    val external: Boolean = false,
-    val children: List<NavItem> = emptyList()
-)
-
-/** `$nav` in a layout: the menu, and where this request stands in it. */
-class Navigation(val items: List<NavItem>, path: String) {
-    /** From the top item down to the one this request is at; empty when it is at none. */
-    val trail: List<NavItem> = items.firstNotNullOfOrNull { trail(it, path) }.orEmpty()
-
-    /** The top-level entry the visitor is under — whose pages the west region lists. */
-    val section: NavItem? get() = trail.firstOrNull()
-
-    val here: NavItem? get() = trail.lastOrNull()
-
-    fun contains(item: NavItem): Boolean = item in trail
-
-    private fun trail(item: NavItem, path: String): List<NavItem>? =
-        if (item.href == path) listOf(item)
-        else item.children.firstNotNullOfOrNull { trail(it, path) }?.let { listOf(item) + it }
-}
-
 /** kroom's own look: pico over the skeleton — what a site wears until it has a theme of its own. */
 class BasicTheme : Skin {
     override val id = "basic"
