@@ -1,4 +1,4 @@
-description = "Kroom demo - the authoring stack as a thing you can click"
+description = "Kroom webapp authoring demo - the authoring stack as a thing you can click"
 
 plugins {
     alias(libs.plugins.jvm)
@@ -12,7 +12,7 @@ java {
 }
 
 application {
-    mainClass.set("com.republicate.kroom.demo.DemoKt")
+    mainClass.set("com.republicate.kroom.webapp.authoring.demo.DemoKt")
 }
 
 dependencies {

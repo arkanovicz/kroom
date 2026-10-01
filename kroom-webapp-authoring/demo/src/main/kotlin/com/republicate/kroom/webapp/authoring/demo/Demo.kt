@@ -1,4 +1,4 @@
-package com.republicate.kroom.demo
+package com.republicate.kroom.webapp.authoring.demo
 
 import com.republicate.kroom.plugins.forms.Forms
 import com.republicate.kroom.plugins.webmaster.Webmaster
@@ -15,7 +15,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 
 /**
- * The authoring stack as a thing you can click: `./gradlew :kroom-demo:run` (`-Pport=9000` for another port),
+ * The authoring stack as a thing you can click: `./gradlew :kroom-webapp-authoring-demo:run` (`-Pport=9000` for another port),
  * or dockerized with a mailbox beside it, `docker compose -f kroom-webapp-authoring/demo/compose.yml up`.
  *
  * Four ways in. **admin / admin** sees everything; **editor / editor** owns the pages and the menu, and every

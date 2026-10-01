@@ -1,4 +1,4 @@
-package com.republicate.kroom.demo
+package com.republicate.kroom.webapp.authoring.demo
 
 import com.republicate.kroom.webapp.authoring.MemoryStorage
 import com.republicate.kroom.webapp.authoring.VersionedMemoryResourceStore

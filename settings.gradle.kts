@@ -32,8 +32,8 @@ for (plugin in listOf("webmaster", "forms")) {
 }
 
 // The authoring demo, a thing you can click
-include("kroom-demo")
-project(":kroom-demo").projectDir = file("kroom-webapp-authoring/demo")
+include("kroom-webapp-authoring-demo")
+project(":kroom-webapp-authoring-demo").projectDir = file("kroom-webapp-authoring/demo")
 // Examples
 include("kroom-examples:chifoumi")
 project(":kroom-examples:chifoumi").projectDir = file("kroom-examples/chifoumi")

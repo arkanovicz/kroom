@@ -104,8 +104,8 @@ All notable changes to kroom will be documented in this file.
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
 
-#### kroom-demo
-- The demo is a module of its own (`kroom-webapp-authoring/demo/`, `./gradlew :kroom-demo:run`), no longer the
+#### kroom-webapp-authoring-demo
+- The demo is a module of its own (`kroom-webapp-authoring/demo/`, `./gradlew :kroom-webapp-authoring-demo:run`), no longer the
   authoring tests': its own pages (home, contact, a topic per placeholder, login) and four ways in — admin,
   editor, an author who edits the topics only (a `Roles` subclass scoping `content.edit`), a visitor. The
   `DummyTheme` moves to kroom-webapp-authoring's test fixtures, for its tests and the demo.
