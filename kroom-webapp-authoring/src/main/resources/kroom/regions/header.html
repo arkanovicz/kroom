@@ -1,0 +1,8 @@
+## The page's own header, or the site's: the brand, the menu from its root, the way in or out.
+#if($header)$header#else<header class="container">
+<nav>
+<ul><li><a href="/" class="brand"><strong>$site.name</strong></a></li></ul>
+#nav($nav.items)
+<ul>#if($logged)<li><form method="post" action="/logout" class="logout"><button type="submit" class="secondary outline">$logged.name ⏻</button></form></li>#elseif($site.login)<li><a href="$site.login">log in</a></li>#end</ul>
+</nav>
+</header>#end

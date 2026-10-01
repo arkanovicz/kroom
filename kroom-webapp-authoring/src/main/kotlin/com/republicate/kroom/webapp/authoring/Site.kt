@@ -3,6 +3,7 @@ package com.republicate.kroom.webapp.authoring
 import com.republicate.kroom.PathTemplate
 import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.core.Mailer
+import com.republicate.kroom.webapp.velocity.velocity
 import com.republicate.kroom.webapp.session.UserSession
 import com.republicate.kroom.webapp.session.userSession
 import com.republicate.kroom.webapp.velocity.pageCatalog
@@ -121,11 +122,23 @@ class Site internal constructor(
     /** Make [theme] the one visitors get. */
     fun activate(theme: Theme) { storage.settings(SITE)["theme"] = theme.id }
 
-    /** The template of layout [name] in the request's theme — its `default` when it has no such layout. */
-    fun layout(call: ApplicationCall, name: String?): String {
+    /** The layout a page gets for asking [name] — the site's `layout` setting when it asks none, `default` when the theme lacks it. */
+    fun layoutName(call: ApplicationCall, name: String?): String {
         val theme = theme(call) ?: error("#layout: no theme installed")
-        val layout = name?.takeIf { it in theme.layouts } ?: "default"
-        return "themes/${theme.id}/layouts/$layout.html"
+        return (name ?: settings()["layout"])?.takeIf { it in theme.layouts } ?: "default"
+    }
+
+    /** The template rendering [layout] in the request's theme: kroom's skeleton for a [Skin], the theme's own otherwise. */
+    fun layout(call: ApplicationCall, layout: String): String {
+        val theme = theme(call) ?: error("#layout: no theme installed")
+        return if (theme is Skin) "kroom/skeleton.html" else "themes/${theme.id}/layouts/$layout.html"
+    }
+
+    /** The partial rendering region [name]: the request's theme's when it has one, kroom's otherwise. */
+    fun region(call: ApplicationCall, name: String): String {
+        val theme = theme(call)
+        val own = "themes/${theme?.id}/regions/$name.html"
+        return if (theme != null && application.velocity.engine.resourceExists(own)) own else "kroom/regions/$name.html"
     }
 
     internal var navigation: (ApplicationCall) -> List<NavItem> = { defaultNavigation() }
@@ -186,10 +199,10 @@ class Site internal constructor(
 
     // --- registration, while plugins install ---------------------------------------------------------
 
-    /** [fragment], silent while the plugin recording it is off. */
+    /** [fragment], silent while the plugin recording it is off — or, for a theme, while another one is active. */
     private fun owned(fragment: (ApplicationCall) -> String?): (ApplicationCall) -> String? {
         val owner = installing
-        return { call -> if (enabled(owner)) fragment(call) else null }
+        return { call -> if (enabled(owner) && (owner !is Theme || theme(call) === owner)) fragment(call) else null }
     }
 
     /** [handler], skipped while the plugin recording it is off. */
@@ -353,8 +366,18 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
     fun foot(): String = site.foot(call)
     fun can(permission: String, target: String = ""): Boolean = site.can(call.userSession, permission, target)
 
+    /** The layout this page got — `#layout(name)` resolved it, the skeleton reads it. */
+    var layoutName: String = "default"
+        private set
+
     /** What `#layout(name)` parses. */
-    fun layout(name: String?): String = site.layout(call, name)
+    fun layout(name: String?): String {
+        layoutName = site.layoutName(call, name)
+        return site.layout(call, layoutName)
+    }
+
+    /** What `#region(name)` parses. */
+    fun region(name: String): String = site.region(call, name)
 
     /** Where one logs in — null when the application handles it elsewhere. */
     val login: String? get() = site.loginRoute
@@ -373,6 +396,8 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
     val baseUrl: String get() = site.baseUrl
     val description: String get() = site.settings()["description"].orEmpty()
     val image: String get() = site.settings()["image"].orEmpty()
+    /** The site's footer line, shown where a page defines no `$footer`. */
+    val footer: String get() = site.settings()["footer"].orEmpty()
 }
 
 /** What every site is asked, in the groups the admin bar shows them in. */
@@ -382,6 +407,8 @@ internal val SITE_SETTINGS = listOf(
     Setting.text("baseUrl", "Public URL", help = "https://example.org — absolute URLs need it", group = "Site"),
     Setting.textarea("description", "Description", help = "What the site is, in a sentence or two", group = "Site"),
     Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Site"),
+    Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), help = "What a page gets when it names none", group = "Site"),
+    Setting.text("footer", "Footer", help = "A line at the foot of every page", group = "Site"),
     Setting.text("smtpHost", "SMTP host", help = "Nothing is sent while empty", group = "Mail"),
     Setting.number("smtpPort", "SMTP port", default = 587, group = "Mail"),
     Setting.choice("smtpSecurity", "Security", choices = listOf("starttls", "tls", "none"), group = "Mail"),

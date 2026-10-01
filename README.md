@@ -498,7 +498,7 @@ layout places them, straight to the response, nothing buffered — then names it
 ```velocity
 #set($title = "Les Vagabonds")
 $page.description("Un club de go à Marseille")
-#define($aside) <article>…</article> #end
+#define($east) <article>…</article> #end
 #define($content)
   <h1>Les Vagabonds</h1>
   #markdown("description", {"club": $club})
@@ -506,26 +506,30 @@ $page.description("Un club de go à Marseille")
 #layout("sidebar")
 ```
 
-The page's top level only sets things (they are known before the layout writes `<head>`); its regions render
-inside the layout. A page without `#layout` is a full document, as before.
+The regions are `$header`, `$top`, `$content`, `$east`, `$west`, `$footer`; the layouts `default`, `article`,
+`sidebar`, `landing`. `#layout()` takes the site's `layout` setting. `$header`, `$west` and `$footer` have a
+site-wide default a page overrides by defining them: the brand, the menu and the way in; the section the
+visitor is in, its pages listed; the site's `footer` line.
 
-A theme is a plugin (`Theme`) naming the layouts it provides. The contract:
+Two kinds of theme, both `Theme : Plugin`, several installed, one active (the `theme` site setting, switched
+from the admin bar, live; an admin previews another with `?theme=<id>`):
 
-- layouts at `themes/<id>/layouts/<name>.html`: `default` required; `article`, `sidebar`, `landing` when it
-  has them (a missing one falls back to `default`); private partials under `themes/<id>/inc/`, assets under
-  `static/{css,js,img,fonts}/<id>/`; a theme jar keeps them at the classpath root, an application's own theme
-  in its templates directory;
-- a layout renders `$content`, and `$aside` / `$hero` when defined (`#if($aside)` tests without rendering);
-  `$title`; `$site.head()` at the end of `<head>` — the house scripts, the editor's for a logged-in author,
-  every plugin's fragments — and `$site.foot()` at the end of `<body>`;
-- `$nav`: the menu (`items` of `NavItem(label, href, description, external, children)`), where the request
-  stands (`here`, `trail`, `contains(item)`) — the application's (`installContentSite { navigation = … }`),
-  or one derived from the pages the site serves; `$theme`: the theme's own settings; `$site.login`.
+- a **skin** (`Skin`) names its `stylesheets` (and `scripts`) and renders kroom's own skeleton,
+  `kroom/skeleton.html` — every layout in one file, `data-layout` and `layout-<name>` for the CSS, each
+  region through a partial the skin may rewrite: `themes/<id>/regions/<region>.html` over
+  `kroom/regions/<region>.html`. kroom's `BasicTheme` is one: pico and a few lines of CSS.
+- a **markup-owning** theme provides its `layouts` under `themes/<id>/layouts/<name>.html` (`default`
+  required, a missing one falls back to it), rendering `$content` and the regions it shows (`#if($east)` tests
+  without rendering), `$title`, `$site.name`, `$site.head()` at the end of `<head>` and `$site.foot()` at the
+  end of `<body>` — all kroom and its plugins ask.
 
-Several themes may be installed, one active — the admin bar's *themes* panel switches it, live — and an admin
-previews another on any page with `?theme=<id>`. A site without a theme wears kroom's `BasicTheme` (pico, the
-menu, a footer). The authoring tests hold a `DummyTheme` — every layout of the vocabulary, plainly and
-unmistakably — for testing a theme's path end to end; the demo installs it beside the basic one.
+Both get `$nav` (the application's `navigation`, or derived from the pages; `#nav($nav.items)` renders the
+tree with `aria-current`, `$nav.section` is the top-level entry the visitor is under) and `$theme` (the
+theme: `id`, `name`, `stylesheets`, `scripts`, `settings`, and any setting by key — `$theme.scheme`). A theme
+adds to `<head>` like any plugin, `site.head { }` in its `install`, emitted while it is the active one. Assets
+live under `static/{css,js,img,fonts}/<id>/`, private partials under `themes/<id>/inc/`. The authoring tests
+hold a `DummyTheme` — every layout of the vocabulary, plainly and unmistakably — for testing a theme's path
+end to end; the demo installs it beside the basic one.
 
 ### The admin bar
 

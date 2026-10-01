@@ -1,3 +1,12 @@
+## The macros a page and the skeleton speak.
+##
 ## #layout("sidebar") — the page's last word: the active theme's layout, rendered in the page's own context,
-## where it writes the regions the page #define'd straight to the response. #layout() is the default one.
+## where it writes the regions the page #define'd straight to the response. #layout() is the site's default.
 #macro(layout $name)#parse($site.layout($name))#end
+##
+## #region("content") — one region of the skeleton, through the theme's partial when it has one
+## (themes/<id>/regions/<name>.html), kroom's otherwise (kroom/regions/<name>.html).
+#macro(region $name)#parse($site.region($name))#end
+##
+## #nav($nav.items) — a menu tree as nested lists, the current page and its trail marked.
+#macro(nav $items)<ul>#foreach($item in $items)<li><a href="$item.href"#if($nav.here == $item) aria-current="page"#elseif($nav.contains($item)) aria-current="true"#end#if($item.external) rel="external"#end>$item.label</a>#if(!$item.children.isEmpty())#nav($item.children)#end</li>#end</ul>#end

@@ -26,6 +26,13 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
+- Themes, take two (breaking). The regions are `$header`, `$top` (was `$hero`), `$content`, `$east` (was
+  `$aside`), `$west`, `$footer`; `$header`, `$west`, `$footer` have site-wide defaults (the menu; the section's
+  pages; the `footer` site setting). A `Skin` is a theme of stylesheets only, over kroom's skeleton
+  (`kroom/skeleton.html`), each region a partial it may rewrite (`themes/<id>/regions/`); `BasicTheme` is one.
+  `#layout()` takes the `layout` site setting. `$theme` is the theme (`id`, `stylesheets`, `settings`, a setting
+  by key), no longer its settings; a theme's head fragments are emitted while it is active. `#nav($items)`
+  renders the menu tree, `$nav.section` names the visitor's top-level entry.
 - A plugin is switched on and off live from the plugins panel (`PUT /api/site/plugins/{id}/enabled`, the
   `plugins.disabled` site setting): everything it recorded is tagged with it and falls silent while it is off,
   its routes answering 404. `Plugin.check(settings)` says what keeps a plugin from working; enabling asks it

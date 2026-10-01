@@ -20,6 +20,13 @@ import kotlin.test.assertTrue
  * A page hands its parts down as `#define`s and names its layout; the active theme lays them out, straight to
  * the response. Which theme is active is the site's setting — an admin previews another without changing it.
  */
+/** A skin of one stylesheet, with a region partial of its own (test resources) and a head fragment. */
+class Skinny : Skin {
+    override val id = "skinny"
+    override val stylesheets = listOf("/css/skinny.css")
+    override fun install(site: Site) { site.head { """<meta name="skinny" content="on">""" } }
+}
+
 class ThemeTest {
 
     private object Plain : Theme {
@@ -36,6 +43,7 @@ class ThemeTest {
             identity = IdentityProvider { if (it.id == "admin") setOf(Roles.ADMIN) else emptySet() }
             plugins += BasicTheme()
             plugins += Plain
+            plugins += Skinny()
         }
         routing { get("/as/{who}") { call.sessions.set(UserSession(call.parameters["who"]!!, "x", null, "t")); call.respondText("ok") } }
     }
@@ -49,9 +57,10 @@ class ThemeTest {
         val page = client.get("/about").bodyAsText()
         assertTrue(page.startsWith("<!doctype html>"), "the page writes nothing of its own: ${page.take(80)}")
         assertContains(page, "<title>About — kroom</title>")
-        assertContains(page, """<main class="container basic-sidebar">""")
-        assertContains(page, "<h1>About us</h1>")
-        assertContains(page, "<aside>in the margin</aside>")
+        assertContains(page, """<main class="container layout-sidebar">""")
+        assertContains(page, """<div class="content"><h1>About us</h1></div>""")
+        assertContains(page, """<aside class="east">in the margin</aside>""")
+        assertContains(page, """data-layout="sidebar"""")
     }
 
     @Test
@@ -101,5 +110,35 @@ class ThemeTest {
         val page = client.get("/about").bodyAsText()
         assertContains(page, "<title>About — Les Vagabonds</title>")
         assertContains(page, """data-theme="dark"""")
+    }
+
+    @Test
+    fun `a skin is stylesheets over the skeleton, which renders every layout and its regions in order`() = testApplication {
+        site()
+        storage.settings("site")["footer"] = "© Les Vagabonds"
+        val about = client.get("/about").bodyAsText()
+        assertContains(about, """<link rel="stylesheet" href="/lib/pico/pico.min.css?v=""")
+        assertContains(about, """<link rel="stylesheet" href="/css/basic/theme.css?v=""")
+        assertContains(about, """<header class="container">""")
+        assertContains(about, "© Les Vagabonds · <a href=")
+        assertTrue(about.indexOf("<header") < about.indexOf("<main") && about.indexOf("<main") < about.indexOf("<footer"), "header, main, footer")
+        assertContains(client.get("/welcome").bodyAsText(), """<section class="container top"><h1>Big hello</h1></section>""")
+        assertContains(client.get("/story").bodyAsText(), """<main class="container layout-article">""")
+        storage.settings("site")["layout"] = "article"
+        assertContains(client.get("/index").bodyAsText(), """data-layout="article"""", message = "#layout() takes the site's default")
+    }
+
+    @Test
+    fun `a theme rewrites a region through its partial, and adds to the head only while active`() = testApplication {
+        site()
+        storage.settings("site")["theme"] = "skinny"
+        val page = client.get("/about").bodyAsText()
+        assertContains(page, """<div class="content skinny"><h1>About us</h1></div>""")
+        assertContains(page, """<meta name="skinny" content="on">""")
+        assertContains(page, """<link rel="stylesheet" href="/css/skinny.css?v=""")
+        storage.settings("site")["theme"] = "basic"
+        val basic = client.get("/about").bodyAsText()
+        assertFalse(basic.contains("skinny"), "another theme's head fragment and partial stay out")
+        assertContains(basic, """<div class="content"><h1>About us</h1></div>""")
     }
 }

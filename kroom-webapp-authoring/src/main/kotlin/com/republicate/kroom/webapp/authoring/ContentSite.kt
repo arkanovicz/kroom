@@ -72,7 +72,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     }
 
     velocity.registerRequest("site") { site.view(it) }
-    velocity.registerRequest("theme") { call -> site.theme(call)?.let { site.settings(it) } }
+    velocity.registerRequest("theme") { call -> site.theme(call)?.let { ThemeView(it, site.settings(it)) } }
     velocity.registerRequest("nav") { call -> Navigation(site.navigation(call), call.request.local.uri.substringBefore('?')) }
     config.navigation?.let { site.navigation = it }
     config.loginPage?.let { page ->

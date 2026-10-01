@@ -1,0 +1,29 @@
+## kroom's own skeleton: what a skin-only theme renders, every layout of the contract in one file. The
+## theme's stylesheets and scripts dress it, its region partials may rewrite any region, CSS tells the
+## layouts apart (data-layout, layout-<name>).
+<!doctype html>
+<html lang="$site.lang" data-layout="$site.layoutName"#if($theme.scheme && $theme.scheme != "auto") data-theme="$theme.scheme"#end>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>#if($title)$title — #end$site.name</title>
+#foreach($css in $theme.stylesheets)
+<link rel="stylesheet" href="$css#if(!$css.contains('?'))?v=$site.version#end">
+#end
+#foreach($js in $theme.scripts)
+<script src="$js#if(!$js.contains('?'))?v=$site.version#end"></script>
+#end
+$site.head()
+</head>
+<body>
+#region("header")
+#region("top")
+<main class="container layout-$site.layoutName">
+#region("west")
+#region("content")
+#region("east")
+</main>
+#region("footer")
+$site.foot()
+</body>
+</html>
