@@ -1,0 +1,11 @@
+#set($title = "Log in")
+#define($content)
+<h1>Log in</h1>
+#if($failed)<p><mark>admin / admin, editor / editor or author / author, in this demo.</mark></p>#end
+<form method="post" action="/login">
+    <input name="user" placeholder="user" autofocus>
+    <input name="password" type="password" placeholder="password">
+    <button type="submit">log in</button>
+</form>
+#end
+#layout()

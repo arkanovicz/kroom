@@ -21,7 +21,7 @@ services:
       - ../..:/kroom
       - ${HOME}/.m2/repository:/m2:ro
       - ${HOME}/.gradle/caches:/gradle-ro:ro
-    command: ./gradlew --no-daemon --console=plain -Dmaven.repo.local=/m2 :kroom-webapp-authoring:demo -Pport=8080
+    command: ./gradlew --no-daemon --console=plain -Dmaven.repo.local=/m2 :kroom-demo:run -Pport=8080
     ports:
       - "${KROOM_DEMO_PORT:-8099}:8080"
     depends_on:

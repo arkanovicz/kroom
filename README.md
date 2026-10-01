@@ -19,6 +19,7 @@ kroom-webapp-push     Web Push notifications
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
 kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms
+kroom-demo            the authoring stack as a thing you can click (kroom-webapp-authoring/demo/)
 ```
 
 ## Features
@@ -598,7 +599,7 @@ Ideal for games with chat: game state is authoritative, chat history is replayed
 # the authoring demo, every example plugin installed, a Mailpit mailbox beside it to read what the site sends — admin / admin
 KROOM_UID=$(id -u) KROOM_GID=$(id -g) docker compose -f kroom-webapp-authoring/demo/compose.yml up
 #   http://localhost:8099/login, Mailpit on :8025 (KROOM_DEMO_PORT, KROOM_MAILPIT_PORT to move them)
-./gradlew :kroom-webapp-authoring:demo -Pport=8099   # the same without docker, and without mail
+./gradlew :kroom-demo:run -Pport=8099                # the same without docker, and without mail
 ```
 
 ## License

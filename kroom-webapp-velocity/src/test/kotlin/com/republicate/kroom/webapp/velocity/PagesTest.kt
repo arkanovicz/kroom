@@ -31,6 +31,15 @@ class PagesTest {
     }
 
     @Test
+    fun `the root is the index, and so is a folder with one`() = testApplication {
+        app()
+        assertEquals("home:alice", client.get("/").bodyAsText())
+        assertEquals("home:alice", client.get("/index").bodyAsText())
+        assertEquals("docs:alice", client.get("/docs").bodyAsText())
+        assertEquals(HttpStatusCode.NotFound, client.get("/docs/index/index").status)
+    }
+
+    @Test
     fun `a path with no backing template is 404, not 500`() = testApplication {
         app()
         assertEquals(HttpStatusCode.NotFound, client.get("/about").status)

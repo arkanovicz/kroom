@@ -1,0 +1,6 @@
+#set($title = $topic)
+#define($content)
+<h1>$topic</h1>
+#markdown("body", {"topic": $topic})
+#end
+#layout("article")

@@ -298,11 +298,12 @@ private val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
 
 /** Whether a page path made of [segments] may be served: every segment clean, none private (`inc/`). */
 internal fun VelocityPlugin.routable(segments: List<String>): Boolean =
-    segments.isNotEmpty() && segments.all { SAFE_SEGMENT.matches(it) && it !in privateSegments }
+    segments.all { SAFE_SEGMENT.matches(it) && it !in privateSegments }
 
 /**
- * Resolve [path] (one or more `/`-separated clean segments, e.g. `source` or `legal/terms`) to a
- * template `"$prefix/$path.$extension"` and, if it exists, render it via [VelocityPlugin.pageRenderer]
+ * Resolve [path] (`/`-separated clean segments, e.g. `source` or `legal/terms`) to a template
+ * `"$prefix/$path.$extension"` — or, failing that, to the folder's `index` (`/` → `pages/index.html`,
+ * `/docs` → `pages/docs/index.html`) — and, if it exists, render it via [VelocityPlugin.pageRenderer]
  * — so the per-request base context (`$user` …) applies and, when l10n is installed, the page is
  * translated. Returns `true` if a page was served, `false` if the path is unsafe or no template
  * backs it, leaving the response untouched so the caller can fall through (404, next route, …).
@@ -320,15 +321,19 @@ suspend fun ApplicationCall.servePage(
 ): Boolean {
     val segments = path.split('/').filter { it.isNotEmpty() }
     if (!velocity.routable(segments)) return false
-    val template = "${prefix.trimEnd('/')}/${segments.joinToString("/")}.${extension.trimStart('.')}"
-    if (!velocity.engine.resourceExists(template)) return false
+    val root = prefix.trimEnd('/')
+    val suffix = ".${extension.trimStart('.')}"
+    val template = listOfNotNull(
+        segments.takeIf { it.isNotEmpty() }?.let { "$root/${it.joinToString("/")}$suffix" },
+        "$root/${(segments + "index").joinToString("/")}$suffix"
+    ).firstOrNull { velocity.engine.resourceExists(it) } ?: return false
     velocity.pageRenderer(this, template)
     return true
 }
 
 /**
  * Mount a convention that renders a clean URI as a template: `/source` → `pages/source.html`,
- * `/legal/terms` → `pages/legal/terms.html`. A content page becomes *just a template* — no route,
+ * `/legal/terms` → `pages/legal/terms.html`, `/` → `pages/index.html` (and a folder's `index` likewise). A content page becomes *just a template* — no route,
  * no model.
  *
  * Mount it **last**, after all specific and param routes: it serves any otherwise-unmatched GET a template

@@ -68,9 +68,18 @@ All notable changes to kroom will be documented in this file.
 - The demo runs dockerized (`kroom-webapp-authoring/demo/compose.yml`): the repository's wrapper in a JDK
   container, Mailpit beside it.
 
+#### kroom-webapp-velocity
+- `pages()` serves `/` as `pages/index.html`, and a folder's `index` likewise (`/docs` → `pages/docs/index.html`).
+
 #### kroom-webapp-core
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send
   through the application's transport.
+
+#### kroom-demo
+- The demo is a module of its own (`kroom-webapp-authoring/demo/`, `./gradlew :kroom-demo:run`), no longer the
+  authoring tests': its own pages (home, contact, a topic per placeholder, login) and four ways in — admin,
+  editor, an author who edits the topics only (a `Roles` subclass scoping `content.edit`), a visitor. The
+  `DummyTheme` moves to kroom-webapp-authoring's test fixtures, for its tests and the demo.
 
 #### kroom-plugin-webmaster, -forms
 - Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. A `DummyTheme` —

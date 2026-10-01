@@ -2,6 +2,7 @@ description = "Kroom webapp authoring - block-based content editing (locks, cont
 
 plugins {
     alias(libs.plugins.jvm)
+    `java-test-fixtures`          // the dummy theme: every layout of the contract, for this module's tests and the demo
     `maven-publish`
 }
 
@@ -22,10 +23,7 @@ dependencies {
     api(libs.velocity.engine.core)
     implementation(libs.angus.mail)                      // the site's SMTP transport
     testImplementation(libs.greenmail)                   // …tested against an in-process server
-    testImplementation(project(":kroom-markdown"))       // the demo renders real `%` blocks
-    testImplementation(libs.ktor.server.netty)           // …and the demo app serves them
-    // …with the example plugins installed (they depend on this module's main, not its tests: no cycle)
-    listOf("webmaster", "forms").forEach { testImplementation(project(":kroom-plugin-$it")) }
+    testImplementation(project(":kroom-markdown"))       // the tests render real `%` blocks
     testRuntimeOnly(libs.slf4j.simple)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
@@ -39,14 +37,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// the demo lives with the tests: it is the same flow, with a browser instead of assertions
-tasks.register<JavaExec>("demo") {
-    group = "application"
-    description = "Run the authoring demo on http://localhost:8080"
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("com.republicate.kroom.webapp.authoring.DemoAppKt")
-    systemProperty("port", project.findProperty("port") ?: "8088")
-}
+// the fixtures are for the tests and the demo, not for the artifact
+val javaComponent = components["java"] as AdhocComponentWithVariants
+javaComponent.withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
+javaComponent.withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
 
 publishing {
     publications {

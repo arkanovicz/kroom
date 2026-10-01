@@ -1,4 +1,7 @@
-package com.republicate.kroom.webapp.authoring
+package com.republicate.kroom.demo
+
+import com.republicate.kroom.webapp.authoring.MemoryStorage
+import com.republicate.kroom.webapp.authoring.VersionedMemoryResourceStore
 
 import com.republicate.kroom.webapp.session.UserSession
 import io.ktor.client.*
@@ -24,12 +27,7 @@ class DemoSiteTest {
     private val store = VersionedMemoryResourceStore()
 
     private fun ApplicationTestBuilder.site() = application {
-        installContentSite {
-            storage = MemoryStorage(this@DemoSiteTest.store)
-            sessionSecret = "demo-secret"
-            placeholder = "*Pas encore de contenu pour **\$name**.*"
-            identity = IdentityProvider { if (it.id == "admin") setOf(Roles.ADMIN) else emptySet() }
-        }
+        demo(MemoryStorage(this@DemoSiteTest.store))
         routing {
             get("/login/{who}") {
                 val who = call.parameters["who"]!!
@@ -45,15 +43,15 @@ class DemoSiteTest {
     @Test
     fun `an unwritten block renders its placeholder, and the author is offered the way in`() = testApplication {
         site()
-        val page = visitor("admin").get("/club/13Ma").bodyAsText()
-        assertContains(page, "Pas encore de contenu pour <strong>description</strong>")
-        assertContains(page, """data-content="pages/club/13Ma/description.md"""")
+        val page = visitor("admin").get("/topics/go").bodyAsText()
+        assertContains(page, "Nothing here yet for <strong>body</strong>")
+        assertContains(page, """data-content="pages/topics/go/body.md"""")
         assertContains(page, "kroom-edit")   // the handle, because this session may edit
         // `$authoring.assets.tags()` relies on velocity honouring a kotlin default argument
         assertContains(page, "/js/authoring.js?v=")
 
-        val anonymous = visitor().get("/club/13Ma").bodyAsText()
-        assertContains(anonymous, "Pas encore de contenu")
+        val anonymous = visitor().get("/topics/go").bodyAsText()
+        assertContains(anonymous, "Nothing here yet")
         assert(!anonymous.contains("kroom-edit")) { "a visitor who cannot edit is shown no handle" }
     }
 
@@ -61,7 +59,7 @@ class DemoSiteTest {
     fun `what an author submits is what the next visitor reads`() = testApplication {
         site()
         val author = visitor("admin")
-        val path = "pages/club/13Ma/description.md"
+        val path = "pages/topics/go/body.md"
 
         val held = author.post("/api/content/lock/$path")
         assertEquals(HttpStatusCode.OK, held.status)
@@ -69,17 +67,17 @@ class DemoSiteTest {
         val rev = Regex(""""rev"\s*:\s*"([^"]*)"""").find(held.bodyAsText())!!.groupValues[1]
         val submitted = author.post("/api/content/$path") {
             contentType(ContentType.Application.Json)
-            setBody("""{"page":"/club/13Ma","rev":"$rev","body":"## Les Vagabonds\n\nOn joue le mardi, salle **Jean Moulin**."}""")
+            setBody("""{"page":"/topics/go","rev":"$rev","body":"## Go\n\nA game of **stones**, on a board of lines."}""")
         }
         assertEquals(HttpStatusCode.OK, submitted.status)
 
-        val page = visitor().get("/club/13Ma").bodyAsText()
-        assertContains(page, "<h2>Les Vagabonds</h2>")
-        assertContains(page, "salle <strong>Jean Moulin</strong>")
+        val page = visitor().get("/topics/go").bodyAsText()
+        assertContains(page, "<h2>Go</h2>")
+        assertContains(page, "A game of <strong>stones</strong>")
 
         // and the store kept who wrote it, and when — the journal a site-wide log reads
         assertEquals("admin", store.read(path)!!.author)
-        assertEquals(listOf(path), store.log().map { it.path })
+        assertContains(store.log().map { it.path }, path)
     }
 
     /** The preview is the page itself: same layout, same context, the unsaved text standing in. */
@@ -87,17 +85,17 @@ class DemoSiteTest {
     fun `a preview renders the page with the draft in place, and writes nothing`() = testApplication {
         site()
         val author = visitor("admin")
-        val path = "pages/club/13Ma/description.md"
+        val path = "pages/topics/go/body.md"
         author.post("/api/content/lock/$path")
 
         val preview = author.post("/api/content/preview/$path") {
             contentType(ContentType.Application.Json)
-            setBody("""{"page":"/club/13Ma","body":"## Titre\n\nbrouillon *en cours*"}""")
+            setBody("""{"page":"/topics/go","body":"## Titre\n\nbrouillon *en cours*"}""")
         }
         assertEquals(HttpStatusCode.OK, preview.status)
         val html = preview.bodyAsText()
         assertContains(html, "brouillon <em>en cours</em>")
-        assertContains(html, "<h1>13Ma</h1>")          // the page, not a fragment
+        assertContains(html, "<h1>go</h1>")            // the page, not a fragment
         assertEquals(null, store.read(path))           // and nothing was written
     }
 
@@ -109,9 +107,9 @@ class DemoSiteTest {
     fun `a body that would break the page is refused, positioned, and nothing is written`() = testApplication {
         site()
         val author = visitor("admin")
-        val path = "pages/club/13Ma/description.md"
+        val path = "pages/topics/go/body.md"
         author.post("/api/content/lock/$path")
-        val broken = """{"page":"/club/13Ma","rev":"","body":"## ${'$'}club\n\n%if(false)${'$'}secret%end"}"""
+        val broken = """{"page":"/topics/go","rev":"","body":"## ${'$'}topic\n\n%if(false)${'$'}secret%end"}"""
 
         for (route in listOf("preview/$path", path)) {
             val answer = author.post("/api/content/$route") {
@@ -125,11 +123,20 @@ class DemoSiteTest {
     }
 
     @Test
+    fun `the root is the home page, its blocks seeded, its menu derived from the pages`() = testApplication {
+        site()
+        val home = visitor().get("/").bodyAsText()
+        assertContains(home, "<h2>kroom</h2>")
+        assertContains(home, """<a href="/contact">Contact</a>""")
+        assertContains(visitor().get("/contact").bodyAsText(), """<form class="kroom-form"""")   // the forms plugin, from a block
+    }
+
+    @Test
     fun `the page is routed by its placeholder, and its blocks follow the same value`() = testApplication {
         site()
-        store.write("pages/club/22Ly/description.md", "Le club de Lyon.", mapOf("author" to "admin"))
-        val page = visitor().get("/club/22Ly").bodyAsText()
+        store.write("pages/topics/lyon/body.md", "Le club de Lyon.", mapOf("author" to "admin"))
+        val page = visitor().get("/topics/lyon").bodyAsText()
         assertContains(page, "Le club de Lyon.")
-        assertContains(page, "<h1>22Ly</h1>")   // the route's own binding, in the page's context
+        assertContains(page, "<h1>lyon</h1>")   // the route's own binding, in the page's context
     }
 }
