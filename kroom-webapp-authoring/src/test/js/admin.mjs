@@ -35,7 +35,8 @@ const answers = {
     '/api/site/pages': [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
                         { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
-    '/api/site/plugins': [{ id: 'seo', name: 'SEO', description: 'meta', settings: [
+    '/api/site/plugins': [{ id: 'basic', name: 'Basic', description: 'pico', enabled: true, theme: true, settings: [] },
+                          { id: 'seo', name: 'SEO', description: 'meta', enabled: true, settings: [
         { key: 'title', label: 'Title', type: 'text', value: 'Club', group: 'Search engines' },
         { key: 'index', label: 'Indexed', type: 'boolean', value: 'true', group: 'Search engines' },
         { key: 'key', label: 'Key', type: 'secret', set: true },
@@ -109,6 +110,13 @@ check('using one puts it', [calls.at(-1).method, calls.at(-1).url, calls.at(-1).
 
 click(entry('plugins'));
 await sleep(20);
+check('a plugin has its switch in the summary, a theme none', $$('.kroom-admin-plugin summary').map(s => !!s.querySelector('input[role="switch"]')), [false, true]);
+const toggle = $('.kroom-admin-plugin:nth-child(2) summary input');
+toggle.checked = false;
+toggle.dispatchEvent(new window.Event('change'));
+await sleep(20);
+check('flipping it puts the state, and says it quietly', [calls.at(-1), $('.kroom-admin-plugin:nth-child(2)').classList.contains('kroom-admin-off')],
+    [{ url: '/api/site/plugins/seo/enabled', method: 'PUT', body: { enabled: false } }, true]);
 const form = $('.kroom-admin-settings');
 check('a secret is never filled in', form.elements.key.value, '');
 check("a plugin's setting in the application's words", form.elements.title.closest('label').firstChild.textContent, 'Titre');

@@ -32,7 +32,7 @@
         noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
         noPages: 'no page template', instances: '{count} pages', noInstance: 'none written yet',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
-        unknownAuthor: 'unknown', noPlugin: 'no plugin installed', save: 'save', saved: 'saved',
+        unknownAuthor: 'unknown', noPlugin: 'no plugin installed', enabled: 'enabled', disabled: 'disabled', save: 'save', saved: 'saved',
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
         yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
     }, fr: {
@@ -51,7 +51,7 @@
         noMedia: 'rien d’envoyé pour l’instant', remove: 'supprimer', size: '{kb} ko',
         noPages: 'aucun modèle de page', instances: '{count} pages', noInstance: 'aucune écrite pour l’instant',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
-        unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', save: 'enregistrer', saved: 'enregistré',
+        unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', enabled: 'activée', disabled: 'désactivée', save: 'enregistrer', saved: 'enregistré',
         secretSet: 'défini — laisser vide pour le garder', secretUnset: 'non défini',
         yourRoles: 'vos rôles : {roles}', empty: 'rien pour l’instant', error: 'Erreur : {message}'
     } };
@@ -244,7 +244,29 @@
             if (!plugins.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noPlugin')));
             for (const plugin of plugins) {
                 const details = body.appendChild(element('details', 'kroom-admin-plugin'));
-                details.appendChild(element('summary', null, own(`${plugin.id}.name`, plugin.name)));
+                details.classList.toggle('kroom-admin-off', !plugin.enabled);
+                const summary = details.appendChild(element('summary'));
+                // a theme is switched on the themes panel; any other plugin here, live — clicking the switch
+                // activates the switch, not the summary
+                if (!plugin.theme) {
+                    const toggle = summary.appendChild(element('input'));
+                    toggle.type = 'checkbox';
+                    toggle.setAttribute('role', 'switch');
+                    toggle.checked = plugin.enabled;
+                    toggle.title = t(plugin.enabled ? 'enabled' : 'disabled');
+                    toggle.setAttribute('aria-label', toggle.title);
+                    toggle.addEventListener('change', async () => {
+                        try {
+                            await api.putJson(siteApi + `plugins/${encodeURIComponent(plugin.id)}/enabled`, { enabled: toggle.checked });
+                            details.classList.toggle('kroom-admin-off', !toggle.checked);
+                            toggle.title = t(toggle.checked ? 'enabled' : 'disabled');
+                        } catch (err) {
+                            toggle.checked = !toggle.checked;
+                            details.appendChild(element('small', 'kroom-admin-error', said(err)));
+                        }
+                    });
+                }
+                summary.appendChild(document.createTextNode(own(`${plugin.id}.name`, plugin.name)));
                 const description = own(`${plugin.id}.description`, plugin.description);
                 if (description) details.appendChild(element('p', 'kroom-admin-muted', description));
                 if (plugin.settings.length) details.appendChild(settingsForm(plugin, siteApi + `plugins/${encodeURIComponent(plugin.id)}/settings`));

@@ -468,6 +468,12 @@ optional `group`, under which the admin form gathers it.
 | `every(period) { }` | scheduled jobs, from start to stop | WP-Cron |
 | `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
 
+A plugin installed is switched on and off live, from the plugins panel (`PUT /api/site/plugins/{id}/enabled`):
+off, everything it recorded falls silent — fragments, routes (404), interceptors, listeners, jobs, its admin
+entry, and its tools, so a block calling one fails and renders `broken`. Enabling asks the plugin's
+`check(settings)` first: a plugin paired with a service (an SMTP relay, a search server) answers what is
+missing and stays off until it is there. Themes are switched on the themes panel instead.
+
 A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `$site.foot()` at the end of
 `<body>` (see *Themes*). The examples, one artifact each under `kroom-webapp-authoring/plugins/`: **webmaster**
 (the site as seen from outside: whether it wants indexing — robots.txt, a robots meta, `$page.noindex()` for

@@ -25,6 +25,13 @@ interface Plugin {
     val settings: List<Setting> get() = emptyList()
 
     fun install(site: Site)
+
+    /**
+     * What keeps this plugin from working with these [settings] — a service address missing, a server not
+     * answering — or null when nothing does. Asked when an admin enables it: a plugin paired with a service
+     * stays off until the service is there.
+     */
+    fun check(settings: Settings): String? = null
 }
 
 /**

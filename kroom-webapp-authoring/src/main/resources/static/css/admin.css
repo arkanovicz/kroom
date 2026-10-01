@@ -151,6 +151,16 @@ body:has(> .kroom-admin) {
     margin-bottom: .5rem;
 }
 
+.kroom-admin-plugin summary input[role="switch"] {
+    margin: 0 .5rem 0 0;
+    vertical-align: middle;
+}
+
+/* off: still there to configure, said quietly */
+.kroom-admin-off > summary {
+    opacity: .6;
+}
+
 .kroom-admin-settings label {
     display: block;
     margin-bottom: .5rem;

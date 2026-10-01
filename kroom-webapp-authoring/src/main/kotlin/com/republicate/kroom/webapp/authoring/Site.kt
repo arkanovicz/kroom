@@ -57,25 +57,50 @@ class Site internal constructor(
     /** The site's public URL, no trailing slash; empty when unset. */
     val baseUrl: String get() = settings()["baseUrl"]?.trim()?.trimEnd('/').orEmpty()
 
-    internal val tools = LinkedHashMap<String, Any>()
-    internal val requestTools = LinkedHashMap<String, (ApplicationCall) -> Any>()
+    // what the plugins recorded, each piece tagged with its owner, so a disabled plugin falls silent everywhere
+    internal val tools = LinkedHashMap<String, Owned<Any>>()
+    internal val requestTools = LinkedHashMap<String, Owned<(ApplicationCall) -> Any>>()
     internal val blockTools = LinkedHashSet<String>()
-    internal val routes = ArrayList<Route.() -> Unit>()
+    internal val routes = ArrayList<Owned<Route.() -> Unit>>()
     internal val interceptors = ArrayList<suspend (ApplicationCall) -> Unit>()
     internal val notFoundHandlers = ArrayList<suspend (ApplicationCall) -> Unit>()
     internal val publishListeners = ArrayList<suspend (Block, UserSession) -> Unit>()
     internal val jobs = ArrayList<Pair<Duration, suspend () -> Unit>>()
     private val heads = ArrayList<(ApplicationCall) -> String?>()
     private val foots = ArrayList<(ApplicationCall) -> String?>()
-    private val entries = ArrayList<AdminEntry>()
+    private val entries = ArrayList<Owned<AdminEntry>>()
+
+    /** The plugin whose [Plugin.install] is running — what it records is its; null for the site's own. */
+    private var installing: Plugin? = null
 
     internal fun register(plugin: Plugin) {
         segment(plugin.id)
         require(plugin.id != SITE) { "'$SITE' is the site's own namespace" }
         require(plugin.id !in registered) { "plugin '${plugin.id}' registered twice" }
         registered[plugin.id] = plugin
-        plugin.install(this)
-        logger.info("plugin {} installed", plugin.id)
+        installing = plugin
+        try { plugin.install(this) } finally { installing = null }
+        logger.info("plugin {} installed{}", plugin.id, if (enabled(plugin)) "" else ", disabled")
+    }
+
+    // --- enabled or not: a plugin installed stays installed, an admin switches it live --------------------
+
+    @Volatile private var disabled: Set<String> = storage.settings(SITE)["plugins.disabled"].orEmpty()
+        .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    /** Whether [plugin]'s registrations answer — the site's own (null) always do, a theme always does. */
+    fun enabled(plugin: Plugin?): Boolean = plugin == null || plugin is Theme || plugin.id !in disabled
+
+    /**
+     * Switch [plugin] [on] or off, live. Enabling asks the plugin's [Plugin.check] first: what it answers is
+     * answered here, and the plugin stays off. Null: done.
+     */
+    fun enable(plugin: Plugin, on: Boolean): String? {
+        if (plugin is Theme) return null
+        if (on) plugin.check(settings(plugin))?.let { return it }
+        disabled = if (on) disabled - plugin.id else disabled + plugin.id
+        storage.settings(SITE)["plugins.disabled"] = disabled.sorted().joinToString(",").ifEmpty { null }
+        return null
     }
 
     fun plugin(id: String): Plugin? = registered[id]
@@ -161,9 +186,21 @@ class Site internal constructor(
 
     // --- registration, while plugins install ---------------------------------------------------------
 
+    /** [fragment], silent while the plugin recording it is off. */
+    private fun owned(fragment: (ApplicationCall) -> String?): (ApplicationCall) -> String? {
+        val owner = installing
+        return { call -> if (enabled(owner)) fragment(call) else null }
+    }
+
+    /** [handler], skipped while the plugin recording it is off. */
+    private fun owned(handler: suspend (ApplicationCall) -> Unit): suspend (ApplicationCall) -> Unit {
+        val owner = installing
+        return { call -> if (enabled(owner)) handler(call) }
+    }
+
     /** `$name` in every page; with [blocks], in every `%` block too — what a WordPress shortcode is. */
     fun tool(name: String, value: Any, blocks: Boolean = false) {
-        tools[name] = value
+        tools[name] = Owned(installing, value)
         if (blocks) blockTools += name
     }
 
@@ -173,13 +210,13 @@ class Site internal constructor(
      * `$site.head()`). With [blocks], blocks see it too.
      */
     fun requestTool(name: String, blocks: Boolean = false, provider: (ApplicationCall) -> Any) {
-        requestTools[name] = provider
+        requestTools[name] = Owned(installing, provider)
         if (blocks) blockTools += name
     }
 
-    /** The value [requestTool] gave [name] for this [call], made now if it was not yet. */
+    /** The value [requestTool] gave [name] for this [call], made now if it was not yet — null while its plugin is off. */
     fun requestValue(name: String, call: ApplicationCall): Any? {
-        val provider = requestTools[name] ?: return null
+        val provider = requestTools[name]?.takeIf { enabled(it.owner) }?.value ?: return null
         @Suppress("UNCHECKED_CAST")
         val key = requestKeys.computeIfAbsent(name) { AttributeKey<Any>("kroom.tool.$it") } as AttributeKey<Any>
         return call.attributes.computeIfAbsent(key) { provider(call) }
@@ -188,31 +225,37 @@ class Site internal constructor(
     private val requestKeys = java.util.concurrent.ConcurrentHashMap<String, AttributeKey<*>>()
 
     /** Routes of the plugin's own: public endpoints (a form's submit, a webhook) or guarded ones ([can]). */
-    fun routes(block: Route.() -> Unit) { routes += block }
+    fun routes(block: Route.() -> Unit) { routes += Owned(installing, block) }
 
     /** Runs before routing, for every request; answering the call ends it there (redirects, firewall, cache). */
-    fun intercept(handler: suspend (ApplicationCall) -> Unit) { interceptors += handler }
+    fun intercept(handler: suspend (ApplicationCall) -> Unit) { interceptors += owned(handler) }
 
     /**
      * Runs for a request nothing answered — no route, no page — before it becomes a 404: log it, or answer it
      * (a redirect learned too late for [intercept]). The first handler to answer ends it.
      */
-    fun notFound(handler: suspend (ApplicationCall) -> Unit) { notFoundHandlers += handler }
+    fun notFound(handler: suspend (ApplicationCall) -> Unit) { notFoundHandlers += owned(handler) }
 
     /** A fragment for `<head>` (meta, links, scripts); null or empty adds nothing. */
-    fun head(fragment: (ApplicationCall) -> String?) { heads += fragment }
+    fun head(fragment: (ApplicationCall) -> String?) { heads += owned(fragment) }
 
     /** A fragment for the end of `<body>`. */
-    fun foot(fragment: (ApplicationCall) -> String?) { foots += fragment }
+    fun foot(fragment: (ApplicationCall) -> String?) { foots += owned(fragment) }
 
     /** An entry of the admin bar, shown to whoever holds its permission. */
-    fun admin(entry: AdminEntry) { entries += entry }
+    fun admin(entry: AdminEntry) { entries += Owned(installing, entry) }
 
     /** Called after each block an author submits — off the request: a slow listener delays nobody. */
-    fun onPublish(listener: suspend (Block, UserSession) -> Unit) { publishListeners += listener }
+    fun onPublish(listener: suspend (Block, UserSession) -> Unit) {
+        val owner = installing
+        publishListeners += { block, author -> if (enabled(owner)) listener(block, author) }
+    }
 
     /** Every [period], from the site's start until it stops; a failing run is logged, the next one still comes. */
-    fun every(period: Duration, job: suspend () -> Unit) { jobs += period to job }
+    fun every(period: Duration, job: suspend () -> Unit) {
+        val owner = installing
+        jobs += period to { if (enabled(owner)) job() }
+    }
 
     fun grant(role: String, vararg permissions: String) = roles.grant(role, *permissions)
 
@@ -232,7 +275,8 @@ class Site internal constructor(
     /** The entries [session] may open: kroom's own, then the plugins'. */
     internal fun adminEntries(session: UserSession?): List<AdminEntry> =
         if (!can(session, Permissions.ADMIN)) emptyList()
-        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries).filter { can(session, it.permission) }
+        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries.filter { enabled(it.owner) }.map { it.value })
+            .filter { can(session, it.permission) }
 
     private val builtinEntries = listOf(
         AdminEntry("site", "site", tables = listOf(AdminTable("rules", "Redirects", "$apiPrefix/rules"), AdminTable("missing", "Not found", "$apiPrefix/missing"))),
@@ -290,6 +334,9 @@ class Site internal constructor(
 }
 
 data class Page(val template: String, val route: String, val urls: List<String>)
+
+/** Something a plugin recorded on the site — [owner] null for the site's own. */
+class Owned<T>(val owner: Plugin?, val value: T)
 
 /** `$site` in a page: the slots a layout calls, the layout a page asks for, and the one question a template may ask. */
 class SiteView internal constructor(private val site: Site, private val call: ApplicationCall) {

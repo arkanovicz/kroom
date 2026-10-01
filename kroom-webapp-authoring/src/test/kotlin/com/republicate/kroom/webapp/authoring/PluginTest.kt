@@ -40,6 +40,14 @@ class PluginTest {
         }
     }
 
+    /** Paired with a service: nothing to enable until its address is set. */
+    private val needy = object : Plugin {
+        override val id = "needy"
+        override val settings = listOf(Setting.text("url", "Service"))
+        override fun install(site: Site) {}
+        override fun check(settings: Settings) = if (settings["url"].isNullOrBlank()) "no service address" else null
+    }
+
     class Greeter(private val site: Site, private val plugin: Plugin) {
         fun greet(name: String) = "${site.settings(plugin)["greeting"]}, $name"
     }
@@ -49,6 +57,7 @@ class PluginTest {
             sessionSecret = "test-secret"
             identity = IdentityProvider { mapOf("admin" to setOf(Roles.ADMIN), "editor" to setOf(Roles.EDITOR))[it.id].orEmpty() }
             plugins += probe
+            plugins += needy
             strings["probe.name"] = "Sonde"
         }
         routing {
@@ -140,5 +149,49 @@ class PluginTest {
         assertContains(pages, """"route":"/club/{club}"""")
         assertContains(pages, """"urls":["/club/22Ly"]""")
         assertContains(pages, """"route":"/login"""")
+    }
+
+    @Test
+    fun `a disabled plugin falls silent everywhere, and comes back when enabled`() = testApplication {
+        site()
+        val admin = visitor("admin")
+        val off = admin.put("/api/site/plugins/probe/enabled") { contentType(ContentType.Application.Json); setBody("""{"enabled":false}""") }
+        assertEquals(HttpStatusCode.OK, off.status, off.bodyAsText())
+        assertContains(admin.get("/api/site/plugins").bodyAsText(), """"id":"probe","name":"probe","description":"","enabled":false""")
+
+        val page = admin.get("/club/13Ma").bodyAsText()
+        assertFalse(page.contains("<meta name=\"probe\""), "its head fragment")
+        assertFalse(page.contains("probe foot"), "its foot fragment")
+        assertFalse(page.contains("&quot;id&quot;:&quot;probe&quot;"), "its admin entry")
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/probe/rows").status, "its routes")
+        assertEquals(HttpStatusCode.NotFound, visitor().get("/old").status, "its interceptor")
+        visitor().get("/late").let { assertEquals(HttpStatusCode.NotFound, it.status, "its notFound handler") }
+        assertEquals(emptyList(), missed, "its other notFound handler")
+        admin.post("/api/content/lock/pages/club/13Ma/agenda.md")
+        val preview = admin.post("/api/content/preview/pages/club/13Ma/agenda.md") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"page":"/club/13Ma","body":"${'$'}probe.greet('Alice')"}""")
+        }
+        assertEquals(HttpStatusCode.UnprocessableEntity, preview.status, "its block tool: a block calling it is refused")
+
+        admin.put("/api/site/plugins/probe/enabled") { contentType(ContentType.Application.Json); setBody("""{"enabled":true}""") }
+            .let { assertEquals(HttpStatusCode.OK, it.status) }
+        assertContains(admin.get("/club/13Ma").bodyAsText(), """<meta name="probe" content="hello">""")
+        assertEquals(HttpStatusCode.OK, client.get("/api/probe/rows").status)
+    }
+
+    @Test
+    fun `a plugin paired with a service stays off until the service is there`() = testApplication {
+        site()
+        val admin = visitor("admin")
+        admin.put("/api/site/plugins/needy/enabled") { contentType(ContentType.Application.Json); setBody("""{"enabled":false}""") }
+        val refused = admin.put("/api/site/plugins/needy/enabled") { contentType(ContentType.Application.Json); setBody("""{"enabled":true}""") }
+        assertEquals(HttpStatusCode.Conflict, refused.status)
+        assertContains(refused.bodyAsText(), """"code":"pluginCheck"""")
+        assertContains(refused.bodyAsText(), "no service address")
+        assertContains(admin.get("/api/site/plugins").bodyAsText(), """"id":"needy","name":"needy","description":"","enabled":false""")
+        admin.put("/api/site/plugins/needy/settings") { contentType(ContentType.Application.Json); setBody("""{"url":"http://solr:8983"}""") }
+        admin.put("/api/site/plugins/needy/enabled") { contentType(ContentType.Application.Json); setBody("""{"enabled":true}""") }
+            .let { assertEquals(HttpStatusCode.OK, it.status) }
     }
 }

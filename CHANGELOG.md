@@ -26,6 +26,10 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
+- A plugin is switched on and off live from the plugins panel (`PUT /api/site/plugins/{id}/enabled`, the
+  `plugins.disabled` site setting): everything it recorded is tagged with it and falls silent while it is off,
+  its routes answering 404. `Plugin.check(settings)` says what keeps a plugin from working; enabling asks it
+  and answers 409 with its words.
 - The site's card (description, Open Graph, canonical; a page's own through `$page.title(…)`, `.description(…)`,
   `.image(…)`) and its redirects (`redirects` setting, `{name}` captures, `@resolver` through
   `installContentSite { redirectResolvers }`, the 404s counted — two tables under the *site* entry) move from

@@ -19,6 +19,7 @@ import io.ktor.server.routing.*
  * GET {prefix}/pages                   every page template, its route, and the pages its blocks say exist
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
  * PUT {prefix}/plugins/{id}/settings   {key: value} — declared keys only; "" keeps a secret, null resets
+ * PUT {prefix}/plugins/{id}/enabled    {enabled} — live; enabling asks the plugin's `check`, 409 with its answer
  * GET {prefix}/roles                   what each role may do, and the caller's roles
  * GET {prefix}/themes                  the installed themes, their layouts, which one is active
  * PUT {prefix}/theme                   {id} — what visitors get from now on
@@ -60,6 +61,8 @@ fun Route.siteRoutes() {
                         set("id", plugin.id)
                         set("name", plugin.name)
                         set("description", plugin.description)
+                        set("enabled", site.enabled(plugin))
+                        if (plugin is Theme) set("theme", true)       // switched on the themes panel, not here
                         set("settings", settingsJson(plugin.settings, site.settings(plugin)))
                     })
                 }
@@ -72,6 +75,18 @@ fun Route.siteRoutes() {
             val plugin = site.plugin(id)
                 ?: return@put respondError("no plugin $id", HttpStatusCode.NotFound, "noPlugin", mapOf("id" to id))
             if (writeSettings(id, plugin.settings, site.settings(plugin))) respondSuccess()
+        }
+
+        put("/plugins/{id}/enabled") {
+            admin(site) ?: return@put
+            val id = call.parameters["id"]!!
+            val plugin = site.plugin(id)
+                ?: return@put respondError("no plugin $id", HttpStatusCode.NotFound, "noPlugin", mapOf("id" to id))
+            val on = receiveJsonObject().getBoolean("enabled") ?: true
+            site.enable(plugin, on)?.let { problem ->
+                return@put respondError(problem, HttpStatusCode.Conflict, "pluginCheck", mapOf("id" to id, "message" to problem))
+            }
+            respondSuccess()
         }
 
         get("/themes") {

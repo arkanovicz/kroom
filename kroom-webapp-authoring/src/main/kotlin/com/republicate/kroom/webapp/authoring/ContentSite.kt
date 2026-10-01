@@ -9,7 +9,9 @@ import com.republicate.kroom.webapp.velocity.placeholderPages
 import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.PipelinePhase
-import io.ktor.server.routing.routing
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.respond
+import io.ktor.server.routing.*
 import java.io.File
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -77,7 +79,8 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         site.hiddenPages += page
         site.loginRoute = "/" + page.removePrefix("${config.pagePrefix}/").removeSuffix(".${config.pageExtension}")
     }
-    site.tools.forEach { (name, value) -> velocity.registerApplication(name) { value } }
+    // a tool of a plugin that is off resolves to nothing: a block calling it fails, and renders `broken`
+    site.tools.forEach { (name, owned) -> velocity.registerApplication(name) { owned.value.takeIf { site.enabled(owned.owner) } } }
     site.requestTools.keys.forEach { name -> velocity.registerRequest(name) { call -> site.requestValue(name, call) } }
     if (site.interceptors.isNotEmpty()) intercept(ApplicationCallPipeline.Plugins) {
         for (interceptor in site.interceptors) {
@@ -102,10 +105,24 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         kroomAssets()                 // /js/kroom/*: the house stack authoring.js builds on
         config.loginPage?.let { loginRoutes(it) }
         siteRoutes()
-        site.routes.forEach { it() }
+        // a plugin's routes mount under a pass-through child whose interceptor answers 404 while the plugin is off
+        site.routes.forEach { owned ->
+            val owner = owned.owner ?: return@forEach owned.value(this)
+            createChild(Transparent).apply {
+                intercept(ApplicationCallPipeline.Plugins) {
+                    if (!site.enabled(owner)) { call.respond(HttpStatusCode.NotFound); finish() }
+                }
+                owned.value(this)
+            }
+        }
         placeholderPages(config.pagePrefix, config.pageExtension)
         pages(config.pagePrefix, config.pageExtension)
     }
+}
+
+/** A route selector matching nothing of the path: a place to hang an interceptor over a plugin's routes. */
+private object Transparent : RouteSelector() {
+    override suspend fun evaluate(context: RoutingResolveContext, segmentIndex: Int) = RouteSelectorEvaluation.Transparent
 }
 
 class ContentSiteConfig {
