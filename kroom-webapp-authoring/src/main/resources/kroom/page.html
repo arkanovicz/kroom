@@ -1,14 +1,15 @@
-## An authored page: its record says which regions it fills, each one a block beside it in the content store
-## ($kroomPage names the page the blocks bind under), then the layout it asked for. A region the site has a
-## default for shows that default until an editor writes the block — and again once it is trashed.
+## An authored page: each region a block beside it in the content store ($kroomPage names the page the blocks
+## bind under), then the layout it asked for. A region is what its block makes it. Written: everyone sees it.
+## Not written: a visitor sees nothing there (or the site's default, for header, west and footer), and whoever
+## may write it finds a sliver with the edit handle — the default itself, where there is one.
 #set($title = $authored.title)
 $page.title($authored.title)
 #if($authored.description)$page.description($authored.description)#end
 #if($authored.draft)$page.noindex()#end
-#if($authored.has("header"))#define($header)#@markdown("header")#parse("kroom/regions/header-default.html")#end#end#end
-#if($authored.has("top"))#define($top)#markdown("top")#end#end
+#if($authored.written("header") || $authored.editable)#define($header)<div class="kroom-region-default">#@markdown("header")#parse("kroom/regions/header-default.html")#end</div>#end#end
+#if($authored.written("top"))#define($top)#markdown("top")#end#elseif($authored.editable)#define($top)<div class="kroom-region-empty">#@markdown("top")<small>page top</small>#end</div>#end#end
 #define($content)#markdown("content")#end
-#if($authored.has("east"))#define($east)#markdown("east")#end#end
-#if($authored.has("west"))#define($west)#@markdown("west")#parse("kroom/regions/west-default.html")#end#end#end
-#if($authored.has("footer"))#define($footer)#@markdown("footer")#parse("kroom/regions/footer-default.html")#end#end#end
+#if($authored.written("east"))#define($east)#markdown("east")#end#elseif($authored.editable)#define($east)<div class="kroom-region-empty">#@markdown("east")<small>right sidebar</small>#end</div>#end#end
+#if($authored.written("west") || $authored.editable)#define($west)<div class="kroom-region-default">#@markdown("west")#parse("kroom/regions/west-default.html")#end</div>#end#end
+#if($authored.written("footer") || $authored.editable)#define($footer)<div class="kroom-region-default">#@markdown("footer")#parse("kroom/regions/footer-default.html")#end</div>#end#end
 #layout($authored.layout)

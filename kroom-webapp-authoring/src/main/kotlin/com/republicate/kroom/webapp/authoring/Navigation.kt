@@ -35,7 +35,8 @@ data class MenuItem(
             children = children,
             slug = slug,
             resolved = state != PageState.MISSING,
-            draft = state == PageState.DRAFT
+            draft = state == PageState.DRAFT,
+            link = if (state != PageState.MISSING) path else children.firstNotNullOfOrNull { it.link }
         )
     }
 
@@ -98,10 +99,12 @@ data class NavItem(
     val children: List<NavItem> = emptyList(),
     /** The page's segment; null for an address elsewhere. */
     val slug: String? = null,
-    /** Whether a page answers [href] — a section nobody wrote renders as words, not as a dead link. */
+    /** Whether a page answers [href] — a section nobody wrote leads to its first page ([link]), or is only words. */
     val resolved: Boolean = true,
     /** A page not out yet, shown because this viewer may edit it. */
-    val draft: Boolean = false
+    val draft: Boolean = false,
+    /** Where a click leads: the page itself, or — for a section nobody wrote — its first page; null when neither. */
+    val link: String? = href
 )
 
 /** `$nav` in a layout: the menu, and where in it this request is. */

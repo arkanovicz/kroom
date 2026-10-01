@@ -161,7 +161,7 @@ private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String)
         respondError("a block is rendered within the page it is in: page missing", code = "pageMissing")
         return null
     }
-    val (template, bound) = call.application.resolvePage(page) ?: run {
+    val (template, bound) = call.application.authoring.pageResolver?.invoke(call, page) ?: call.application.resolvePage(page) ?: run {
         respondError("no page at $page", HttpStatusCode.NotFound, "noPage", mapOf("page" to page))
         return null
     }

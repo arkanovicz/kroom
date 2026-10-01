@@ -35,11 +35,11 @@ class NavigationTest {
     private suspend fun ApplicationTestBuilder.admin(): HttpClient = createClient { install(HttpCookies) }.also { it.get("/as/admin") }
 
     @Test
-    fun `derived from the pages, a deeper URL nests under its segment, a section nobody wrote is words`() = testApplication {
+    fun `derived from the pages, a deeper URL nests under its segment, a section nobody wrote leads to its first page`() = testApplication {
         site()
         val page = client.get("/legal/terms").bodyAsText()
         // the header: the tree from its root, the section marked as the trail, the page as current
-        assertContains(page, """<li class="section"><span aria-current="true">Legal</span><ul><li><a href="/legal/terms" aria-current="page">Terms</a></li></ul></li>""")
+        assertContains(page, """<li class="section"><a href="/legal/terms" aria-current="true">Legal</a><ul><li><a href="/legal/terms" aria-current="page">Terms</a></li></ul></li>""")
         assertContains(page, """<a href="/about">About</a>""")
         assertFalse(page.contains(">Login</a>"), "the login page is hidden from the menu")
         // the west region: the section's pages
@@ -62,7 +62,7 @@ class NavigationTest {
         val fr = client.get("/about?lang=fr").bodyAsText()
         assertContains(fr, """<html lang="fr"""")
         assertContains(fr, """>La Société</a><small>Who we are</small>""")
-        assertContains(fr, """<span>Legal</span>""", message = "a section without a page, in the default language")
+        assertContains(fr, """<a href="/legal/terms">Legal</a>""", message = "a section without a page, in the default language, leading to its first one")
         assertContains(fr, """>Mentions</a>""")
         assertContains(client.get("/about?lang=de").bodyAsText(), """<html lang="en"""", message = "a language the site does not speak is the default")
     }

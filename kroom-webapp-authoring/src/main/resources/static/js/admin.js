@@ -40,7 +40,7 @@
         noPages: 'no page template', instances: '{count} pages', noInstance: 'none written yet',
         // the pages panel
         authoredPages: 'pages', templates: 'templates — the developers\' pages', noAuthored: 'none yet',
-        newPage: 'new page', pagePath: 'path, e.g. /company/history', pageTitle: 'title', pageRegions: 'regions besides the content',
+        newPage: 'new page', pagePath: 'path, e.g. /company/history', pageTitle: 'title',
         create: 'create', publish: 'publish', unpublish: 'unpublish', draft: 'draft', published: 'published',
         confirmDeletePage: 'Delete this page? Its blocks stay in the store.', menuCreate: 'create this page',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
@@ -71,7 +71,7 @@
         noPages: 'aucun modèle de page', instances: '{count} pages', noInstance: 'aucune écrite pour l’instant',
         // the pages panel
         authoredPages: 'pages', templates: 'modèles — les pages des développeurs', noAuthored: 'aucune pour l’instant',
-        newPage: 'nouvelle page', pagePath: 'chemin, p. ex. /societe/histoire', pageTitle: 'titre', pageRegions: 'régions en plus du contenu',
+        newPage: 'nouvelle page', pagePath: 'chemin, p. ex. /societe/histoire', pageTitle: 'titre',
         create: 'créer', publish: 'publier', unpublish: 'dépublier', draft: 'brouillon', published: 'publiée',
         confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.', menuCreate: 'créer cette page',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
@@ -221,7 +221,7 @@
                     catch (err) { actions.appendChild(element('small', 'kroom-admin-error', said(err))); }
                 });
             }
-            // a new page: where, what it is called, how it is laid out, which regions it fills
+            // a new page: where, what it is called, how it is laid out — its regions are there to write once it exists
             const form = authored.appendChild(element('form', 'kroom-admin-settings kroom-admin-new-page'));
             form.appendChild(element('h4', null, t('newPage')));
             const path = form.appendChild(element('input'));
@@ -231,23 +231,14 @@
             const layout = form.appendChild(element('select'));
             layout.name = 'layout';
             for (const l of answer.layouts) layout.appendChild(element('option', null, l)).value = l;
-            const regions = form.appendChild(element('fieldset', 'kroom-admin-regions'));
-            regions.appendChild(element('legend', null, t('pageRegions')));
-            for (const region of answer.regions.filter(r => r !== 'content')) {
-                const label = regions.appendChild(element('label'));
-                const box = label.appendChild(element('input'));
-                box.type = 'checkbox'; box.name = 'region'; box.value = region;
-                label.appendChild(document.createTextNode(' ' + region));
-            }
             const footer = form.appendChild(element('footer'));
             const create = footer.appendChild(element('button', null, t('create')));
             create.type = 'submit';
             const status = footer.appendChild(element('small', 'kroom-admin-error'));
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const chosen = ['content', ...[...form.querySelectorAll('input[name="region"]:checked')].map(b => b.value)];
                 try {
-                    await api.postJson(siteApi + 'pages', { path: path.value.trim(), title: { [lang]: title.value.trim() }, layout: layout.value, regions: chosen });
+                    await api.postJson(siteApi + 'pages', { path: path.value.trim(), title: { [lang]: title.value.trim() }, layout: layout.value });
                     reload();
                 } catch (err) { status.textContent = said(err); }
             });

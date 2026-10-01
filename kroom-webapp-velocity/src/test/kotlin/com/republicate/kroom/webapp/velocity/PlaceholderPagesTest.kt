@@ -50,6 +50,9 @@ class PlaceholderPagesTest {
             assertEquals("pages/shop/_id_/index.html" to mapOf("id" to "7"), resolvePage("/shop/7"))
             assertEquals("pages/city/lyon.html" to emptyMap(), resolvePage("/city/lyon"))
             assertEquals(null, resolvePage("/city/paris/extra"))
+            // as served: the root is the index, a folder its own
+            assertEquals("pages/index.html" to emptyMap(), resolvePage("/"))
+            assertEquals("pages/docs/index.html" to emptyMap(), resolvePage("/docs"))
         }
         client.get("/city/paris")   // the application is only built on first call
     }

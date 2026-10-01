@@ -526,7 +526,7 @@ from the admin bar, live; an admin previews another with `?theme=<id>`):
   end of `<body>` — all kroom and its plugins ask.
 
 Both get `$nav` (the menu, see below; `#nav($nav.items)` renders the tree with `aria-current`, a section no
-page answers as words rather than a dead link, each entry's description in a `<small>` for a theme that shows
+page answers leading to its first page (`$item.link`), each entry's description in a `<small>` for a theme that shows
 panels; `$nav.section` is the top-level entry the visitor is under) and `$theme` (the
 theme: `id`, `name`, `stylesheets`, `scripts`, `settings`, and any setting by key — `$theme.scheme`). A theme
 adds to `<head>` like any plugin, `site.head { }` in its `install`, emitted while it is the active one. Assets
@@ -537,11 +537,16 @@ end to end; the demo installs it beside the basic one.
 ### Authored pages
 
 A page need not be a template: an editor creates one from the bar's *pages* entry — a path (`/company/history`,
-the slug tree the menu speaks), a title and description per language, a layout, the regions it fills — and
-kroom renders it through one template, `kroom/page.html`, each region a block in the content store right
-where a template's would be (`pages/company/history/content.md`), edited in place like any other. A region
-the site has a default for (`$header`, `$west`, `$footer`) shows that default with its edit handle until the
-editor writes the block, and again once the block is trashed (the editor's trash, `DELETE /api/content/{path}`).
+the slug tree the menu speaks), a title and description per language, a layout — and kroom renders it through
+one template, `kroom/page.html`, each region a block in the content store right where a template's would be
+(`pages/company/history/content.md`), edited in place like any other, previewed within its page.
+
+A region is what its block makes it. Written, everyone sees it. Not written, a visitor sees nothing there —
+or the site's default, for `$header`, `$west` and `$footer` — and whoever may write it finds a sliver in its
+place, unseen until hovered, that says what it is (*right sidebar*) and offers the edit handle; the default
+itself carries the handle where there is one, and writing it overrides the default for that page. Trashing
+the block (the editor's trash, `DELETE /api/content/{path}`) brings the default, or the emptiness, back.
+
 A page is a `draft` until published: its editors see it (and the menu marks it *draft* for them), visitors
 and the sitemap do not. Authored pages answer after the templates, in the not-found phase: a developer's page
 wins, an editor cannot take `/login`. `GET`/`POST /api/site/pages`, `PUT`/`DELETE /api/site/pages/{path}`,
@@ -556,8 +561,8 @@ tree of URLs (`company` at the root is `/company`, `history` under it `/company/
 the site's `lang` is the default, `languages` the others it speaks, and a request's language is what
 `installContentSite { requestLanguage = { it.language } }` answers (kroom-webapp-l10n's, or the application's),
 the default filling what a language lacks. Until an admin stores one, the menu is derived from the pages, a
-deeper URL nesting under its first segment — a section no page answers renders as words; a draft page shows to
-its editors only, marked. Two site settings shape the rendering: `menuPanels` (the header shows a section's
+deeper URL nesting under its first segment — a section no page answers leads to its first page; a draft page
+shows to its editors only, marked. Two site settings shape the rendering: `menuPanels` (the header shows a section's
 pages as a hover panel) and `west` (the section's pages on the left by default, or nothing). The bar's *menu*
 entry edits the tree one language at a time (reorder, nest, rename, describe, add a page before it exists —
 shown in red until it does —, add a link, back to the pages); `GET`/`PUT`/`DELETE /api/site/menu`. An

@@ -295,4 +295,3 @@ body:has(> .kroom-admin) {
 .kroom-admin-draft > a { opacity: .7; }
 .kroom-admin-new-page { margin-top: .75rem; }
 .kroom-admin-new-page h4 { margin: 0 0 .25rem; font-size: .9rem; }
-.kroom-admin-regions label { display: inline-block; margin: 0 .75rem .25rem 0; }

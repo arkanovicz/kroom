@@ -45,10 +45,16 @@ fun Application.resolvePage(
     prefix: String = "pages",
     extension: String = "html"
 ): Pair<String, Map<String, String>>? {
-    val path = url.trim('/').substringBefore('?')
-    if (!velocity.routable(path.split('/'))) return null
-    val concrete = "${prefix.trimEnd('/')}/$path.${extension.trimStart('.')}"
-    if (velocity.engine.resourceExists(concrete)) return concrete to emptyMap()
+    val path = url.substringBefore('?').trim('/')
+    val segments = path.split('/').filter { it.isNotEmpty() }
+    if (!velocity.routable(segments)) return null
+    val root = prefix.trimEnd('/')
+    val suffix = ".${extension.trimStart('.')}"
+    // as servePage serves: the page itself, else its folder's index — `/` being the root's
+    val concrete = "$root/$path$suffix"
+    listOfNotNull(concrete.takeIf { segments.isNotEmpty() }, "$root/${(segments + "index").joinToString("/")}$suffix")
+        .firstOrNull { velocity.engine.resourceExists(it) }?.let { return it to emptyMap() }
+    if (segments.isEmpty()) return null
     for (template in catalog(velocity, prefix, extension)) {
         val values = PathTemplate(template).match(concrete)
             ?: PathTemplate(template).match("${prefix.trimEnd('/')}/$path/index.${extension.trimStart('.')}")

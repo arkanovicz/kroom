@@ -17,8 +17,8 @@ import io.ktor.server.routing.*
  * GET {prefix}/settings                the site's settings (a secret never read back)
  * PUT {prefix}/settings                {key: value} — declared keys only; "" keeps a secret, null resets
  * GET {prefix}/pages                   the page templates (route, the pages their blocks say exist) and the authored pages
- * POST {prefix}/pages                  {path, title, layout, regions} — a new authored page, a draft
- * PUT {prefix}/pages/{path}            what changes: title, description, layout, regions, status (draft|published)
+ * POST {prefix}/pages                  {path, title, layout} — a new authored page, a draft
+ * PUT {prefix}/pages/{path}            what changes: title, description, layout, status (draft|published)
  * DELETE {prefix}/pages/{path}         the record goes; its blocks stay in the store
  * GET {prefix}/menu                    the menu — stored, or derived from the pages — each entry with its path, resolved or not
  * PUT {prefix}/menu                    {items} — the tree to store; DELETE goes back to the pages
@@ -49,7 +49,6 @@ fun Route.siteRoutes() {
                 })
                 set("authored", Json.MutableArray().apply { site.authored.all().forEach { push(it.toJson()) } })
                 set("layouts", Json.MutableArray().apply { SKELETON_LAYOUTS.forEach { push(it) } })
-                set("regions", Json.MutableArray().apply { AuthoredPage.REGIONS.forEach { push(it) } })
                 set("lang", site.defaultLanguage)
                 set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
             }

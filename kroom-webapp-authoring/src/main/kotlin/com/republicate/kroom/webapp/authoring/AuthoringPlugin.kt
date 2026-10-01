@@ -49,6 +49,13 @@ class AuthoringConfig {
     var placeholder: String? = null
 
     /**
+     * The page a URL is, for the editor's preview and submit, which render the block within it: the template
+     * and what it is rendered with. Null: the page templates (`resolvePage`); a site with pages of another
+     * kind — authored ones — answers for them too.
+     */
+    var pageResolver: ((ApplicationCall, String) -> Pair<String, Map<String, Any?>>?)? = null
+
+    /**
      * The language the editor (and the admin bar) speaks: one kroom stocks (`en`, `fr`), or `auto` — the
      * browser's first stocked one, English otherwise.
      */
@@ -67,6 +74,7 @@ class AuthoringPlugin(private val config: AuthoringConfig) {
     internal val mediaMaxSize: Long get() = config.mediaMaxSize
     internal val published get() = config.published
     val placeholder: String? get() = config.placeholder
+    internal val pageResolver get() = config.pageResolver
 
     /** The editor's script, stylesheet and language, for a layout to emit — `$authoring.assets.tags()`. */
     val assets = AuthoringAssets(config.language)

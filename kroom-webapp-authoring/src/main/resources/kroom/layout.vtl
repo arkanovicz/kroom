@@ -9,6 +9,6 @@
 #macro(region $name)#parse($site.region($name))#end
 ##
 ## #nav($nav.items) — a menu tree as nested lists, the current page and its trail marked, a section nobody
-## wrote as words rather than a dead link, a draft page (shown to its editors only) marked, each entry's
+## wrote leading to its first page (words only when it has none), a draft page (shown to its editors only) marked, each entry's
 ## description beside it for a theme that shows panels.
-#macro(nav $items)<ul>#foreach($item in $items)<li#if(!$item.children.isEmpty()) class="section"#end>#if($item.resolved)<a href="$item.href"#if($item.draft) class="draft"#end#if($nav.here == $item) aria-current="page"#elseif($nav.contains($item)) aria-current="true"#end#if($item.external) rel="external"#end>$item.label</a>#if($item.draft)<small class="draft">draft</small>#end#else<span#if($nav.contains($item)) aria-current="true"#end>$item.label</span>#end#if($item.description)<small>$item.description</small>#end#if(!$item.children.isEmpty())#nav($item.children)#end</li>#end</ul>#end
+#macro(nav $items)<ul>#foreach($item in $items)<li#if(!$item.children.isEmpty()) class="section"#end>#if($item.link)<a href="$item.link"#if($item.draft) class="draft"#end#if($nav.here == $item) aria-current="page"#elseif($nav.contains($item)) aria-current="true"#end#if($item.external) rel="external"#end>$item.label</a>#if($item.draft)<small class="draft">draft</small>#end#else<span#if($nav.contains($item)) aria-current="true"#end>$item.label</span>#end#if($item.description)<small>$item.description</small>#end#if(!$item.children.isEmpty())#nav($item.children)#end</li>#end</ul>#end

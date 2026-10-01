@@ -16,12 +16,12 @@ header nav.panels li.section > ul small { display: block; color: var(--pico-mute
 a.draft { opacity: .6; }
 small.draft { font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; color: var(--pico-muted-color); margin-left: .25rem; }
 
-/* the regions: content alone, or beside a west and/or an east column */
-main.container { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; }
-main:has(> .east) { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); }
-main:has(> .west) { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); }
-main:has(> .west):has(> .east) { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr); }
-@media (max-width: 48rem) { main.container { grid-template-columns: minmax(0, 1fr) !important; } }
+/* the regions: content alone, or beside a west and/or an east column — an unwritten one a sliver for its editor */
+main.container { display: flex; gap: 2rem; align-items: flex-start; }
+main > .content { flex: 3 1 0; min-width: 0; }
+main > .east, main > .west { flex: 1 1 0; min-width: 0; }
+main > aside:has(> .kroom-region-empty) { flex: 0 0 1.5rem; }
+@media (max-width: 48rem) { main.container { flex-direction: column; } main > aside { flex-basis: auto !important; } }
 .west ul { list-style: none; padding: 0; }
 .west li { margin: .25rem 0; }
 

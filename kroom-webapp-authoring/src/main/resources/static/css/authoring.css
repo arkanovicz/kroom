@@ -391,3 +391,28 @@ ul.kroom-revisions button {
     font-size: .75rem;
     white-space: pre;
 }
+
+/* --- a page's regions, to who may write them --------------------------------------------------------- */
+
+/* a region nobody wrote: a sliver, unseen until hovered, that says what it is and offers the handle */
+.kroom-region-empty {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    opacity: 0;
+    transition: opacity .15s ease-in-out;
+}
+
+.kroom-region-empty:hover,
+.kroom-region-empty:focus-within {
+    opacity: 1;
+}
+
+.kroom-region-empty small {
+    color: var(--pico-muted-color, #888);
+    white-space: nowrap;
+}
+
+/* a region showing the site's default: always something to hover, even when the default says nothing */
+.kroom-region-default > .kroom-block {
+    min-height: 1.5rem;
+}

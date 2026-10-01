@@ -26,12 +26,13 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
-- Authored pages: a record (`path`, `layout`, `regions`, `title`/`description` by language, `draft`|`published`)
+- Authored pages: a record (`path`, `layout`, `title`/`description` by language, `draft`|`published`)
   under `site/pages`, blocks in the content store where a template's would be, rendered through
   `kroom/page.html` in the not-found phase (templates win); drafts for their editors only, marked in the menu.
   `GET`/`POST /api/site/pages`, `PUT`/`DELETE /api/site/pages/{path}`; the *pages* panel creates, publishes and
-  deletes them, a red menu entry offers to create its page. A region with a site default shows it until
-  written: `#@markdown(name) … #end` (kroom-markdown) renders its body for a block nobody wrote, and the
+  deletes them, a red menu entry offers to create its page. Every region is there to write: unwritten, a
+  sliver with the edit handle for who may write it, nothing for a visitor — the site's default where there is
+  one, shown until written: `#@markdown(name) … #end` (kroom-markdown) renders its body for a block nobody wrote, and the
   `kroomPage` context key names the page blocks bind under. `menuPanels` and `west` site settings.
 - Roles: `editor` owns the pages and the menu (`pages.*`, `menu.edit`) beside every block; a built-in `author`
   writes blocks (`content.edit`) and nothing else. The admin bar shows whoever has at least one entry, each
@@ -41,7 +42,7 @@ All notable changes to kroom will be documented in this file.
 - The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent, or an `href` elsewhere; `label`
   and `description` by language) stored by an admin — `GET`/`PUT`/`DELETE /api/site/menu`, a *menu* panel in
   the bar editing it one language at a time — or derived from the pages as a tree, a section no page answers
-  rendered as words. `languages` joins the site settings beside `lang`; `requestLanguage` on
+  leading to its first page. `languages` joins the site settings beside `lang`; `requestLanguage` on
   `installContentSite` tells the site a request's language (`$site.lang`, `<html lang>`, the menu's words).
   `NavItem` gains `slug` and `resolved`; `#nav` renders descriptions.
 - Themes, take two (breaking). The regions are `$header`, `$top` (was `$hero`), `$content`, `$east` (was
@@ -99,6 +100,8 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-webapp-velocity
 - `pages()` serves `/` as `pages/index.html`, and a folder's `index` likewise (`/docs` → `pages/docs/index.html`).
+  `resolvePage` resolves the same, so a block of the home page is previewed within `/`; the authoring plugin's
+  `pageResolver` lets a site answer for pages that are not templates (the authored ones).
 
 #### kroom-webapp-core
 - `Mailer` moves here from kroom-webapp-auth (which keeps the name as an alias), so any module can send

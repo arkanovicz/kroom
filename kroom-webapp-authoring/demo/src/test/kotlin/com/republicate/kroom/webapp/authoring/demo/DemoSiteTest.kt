@@ -129,6 +129,17 @@ class DemoSiteTest {
         assertContains(home, "<h2>kroom</h2>")
         assertContains(home, """<a href="/contact">Contact</a>""")
         assertContains(visitor().get("/contact").bodyAsText(), """<form class="kroom-form"""")   // the forms plugin, from a block
+        // the home page's blocks are edited within `/`, an authored page's within its path
+        val admin = visitor("admin")
+        for ((block, page) in listOf("pages/intro.md" to "/", "pages/about/content.md" to "/about")) {
+            admin.post("/api/content/lock/$block")
+            val preview = admin.post("/api/content/preview/$block") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"page":"$page","body":"en *cours*"}""")
+            }
+            assertEquals(HttpStatusCode.OK, preview.status, "$block within $page: ${preview.bodyAsText().take(200)}")
+            assertContains(preview.bodyAsText(), "en <em>cours</em>")
+        }
     }
 
     @Test

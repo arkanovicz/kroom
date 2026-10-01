@@ -6,6 +6,7 @@ import com.republicate.kroom.webapp.session.installSessions
 import com.republicate.kroom.webapp.velocity.installVelocity
 import com.republicate.kroom.webapp.velocity.pages
 import com.republicate.kroom.webapp.velocity.placeholderPages
+import com.republicate.kroom.webapp.velocity.resolvePage
 import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.PipelinePhase
@@ -71,6 +72,8 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         placeholder = config.placeholder
         language = config.language
         published = site::published
+        // a block is previewed within its page: a template's, or an editor's
+        pageResolver = { call, url -> this@installContentSite.resolvePage(url, config.pagePrefix, config.pageExtension) ?: site.authored.resolve(call, url) }
     }
 
     velocity.registerRequest("site") { site.view(it) }

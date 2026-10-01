@@ -12,13 +12,13 @@ import io.ktor.server.response.respondText
  * A page an editor made, not a developer: a record — where it is, how it is laid out, what it says of itself,
  * whether it is out — and blocks, one per region, in the content store where a template's would be
  * (`pages/company/history/content.md`), edited in place like any other. A single template renders them all.
+ * A region is what its block makes it: written, everyone sees it; not written, whoever may write it finds a
+ * sliver there with the edit handle (the site's default, for the regions that have one), and a visitor nothing.
  */
 data class AuthoredPage(
     /** `/company/history`: the slug tree, as in the menu. */
     val path: String,
     val layout: String = "default",
-    /** The regions it fills, `content` always among them. */
-    val regions: Set<String> = setOf("content"),
     val title: Map<String, String> = emptyMap(),
     val description: Map<String, String> = emptyMap(),
     val status: String = DRAFT,
@@ -37,7 +37,6 @@ data class AuthoredPage(
     fun toJson(): Json.MutableObject = Json.MutableObject().apply {
         set("path", path)
         set("layout", layout)
-        set("regions", Json.MutableArray().apply { regions.forEach { push(it) } })
         set("title", Json.MutableObject().apply { title.forEach { (k, v) -> set(k, v) } })
         set("description", Json.MutableObject().apply { description.forEach { (k, v) -> set(k, v) } })
         set("status", status)
@@ -49,7 +48,6 @@ data class AuthoredPage(
     companion object {
         const val DRAFT = "draft"
         const val PUBLISHED = "published"
-        val REGIONS = setOf("header", "top", "content", "east", "west", "footer")
         private val PATH = Regex("(/[A-Za-z0-9_-]+)+")
 
         fun validPath(path: String) = PATH.matches(path)
@@ -61,13 +59,11 @@ data class AuthoredPage(
             require(validPath(path)) { "not a page path: $path" }
             val layout = json.getString("layout") ?: existing?.layout ?: "default"
             require(layout in SKELETON_LAYOUTS) { "not a layout: $layout" }
-            val regions = json.getArray("regions")?.map { it.toString() }?.toSet() ?: existing?.regions ?: setOf("content")
-            require(REGIONS.containsAll(regions)) { "not a region: ${(regions - REGIONS).first()}" }
             val status = json.getString("status") ?: existing?.status ?: DRAFT
             require(status == DRAFT || status == PUBLISHED) { "not a status: $status" }
             fun words(key: String) = json.getObject(key)?.entries?.associate { (k, v) -> k to v.toString() }
             AuthoredPage(
-                path = path, layout = layout, regions = regions + "content",
+                path = path, layout = layout,
                 title = words("title") ?: existing?.title.orEmpty(),
                 description = words("description") ?: existing?.description.orEmpty(),
                 status = status, author = existing?.author, created = existing?.created ?: System.currentTimeMillis(),
@@ -107,25 +103,35 @@ internal class AuthoredPages(private val site: Site) {
      * site's `notFound` handler, so a developer's page always wins.
      */
     suspend fun serve(call: ApplicationCall): Boolean {
-        val path = call.request.path().trimEnd('/').ifEmpty { "/" }
-        val page = get(path) ?: return false
-        if (!visible(page, call)) return false
-        val lang = site.language(call)
-        val html = site.application.velocity.renderForCall(call, "kroom/page.html", mapOf(
-            MARKDOWN_PAGE to page.template,
-            "authored" to AuthoredPageView(page, lang, site.defaultLanguage)
-        ))
-        call.respondText(html, ContentType.Text.Html)
+        val (template, model) = resolve(call, call.request.path()) ?: return false
+        call.respondText(site.application.velocity.renderForCall(call, template, model), ContentType.Text.Html)
         return true
+    }
+
+    /** The authored page at [url] this caller may see, as the template rendering it and what it is rendered with. */
+    fun resolve(call: ApplicationCall, url: String): Pair<String, Map<String, Any?>>? {
+        val path = url.substringBefore('?').trimEnd('/').ifEmpty { "/" }
+        val page = get(path)?.takeIf { visible(it, call) } ?: return null
+        return "kroom/page.html" to mapOf(
+            MARKDOWN_PAGE to page.template,
+            "authored" to AuthoredPageView(page, site, call)
+        )
     }
 }
 
-/** `$authored` in `kroom/page.html`: the record, in the request's language. */
-class AuthoredPageView internal constructor(private val page: AuthoredPage, lang: String, fallback: String) {
+/** `$authored` in `kroom/page.html`: the record in the request's language, and what each region is to this viewer. */
+class AuthoredPageView internal constructor(private val page: AuthoredPage, private val site: Site, private val call: ApplicationCall) {
     val path: String get() = page.path
     val layout: String get() = page.layout
-    val title: String = page.title(lang, fallback)
-    val description: String? = page.description(lang, fallback)
+    val title: String = page.title(site.language(call), site.defaultLanguage)
+    val description: String? = page.description(site.language(call), site.defaultLanguage)
     val draft: Boolean get() = !page.isPublished
-    fun has(region: String) = region in page.regions
+
+    private fun block(region: String) = "pages${page.path}/$region.md"
+
+    /** Whether someone wrote this region's block. */
+    fun written(region: String): Boolean = site.storage.content.read(block(region)) != null
+
+    /** Whether this viewer may write this page's blocks — and so sees its unwritten regions as slivers to hover. */
+    val editable: Boolean get() = site.can(call.userSession, Permissions.EDIT, block("content"))
 }

@@ -37,8 +37,8 @@ const answers = {
         { slug: 'legal', label: { en: 'Legal' }, path: '/legal', resolved: false, children: [{ slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', resolved: true }] }] },
     '/api/site/pages': { templates: [{ template: 'pages/login.html', route: '/login', urls: ['/login'] },
                                      { template: 'pages/club/_club_.html', route: '/club/{club}', urls: ['/club/13Ma'] }],
-                         authored: [{ path: '/about', title: { en: 'About' }, layout: 'default', regions: ['content'], status: 'draft' }],
-                         layouts: ['default', 'article', 'sidebar', 'landing'], regions: ['header', 'top', 'content', 'east', 'west', 'footer'],
+                         authored: [{ path: '/about', title: { en: 'About' }, layout: 'default', status: 'draft' }],
+                         layouts: ['default', 'article', 'sidebar', 'landing'],
                          lang: 'en', languages: ['en'] },
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
     '/api/site/plugins': [{ id: 'basic', name: 'Basic', description: 'pico', enabled: true, theme: true, settings: [] },
@@ -95,11 +95,10 @@ check('publishing puts the status', calls.at(-2), { url: '/api/site/pages/about'
 const newPage = $('.kroom-admin-new-page');
 newPage.elements.path.value = '/company/history';
 newPage.elements.title.value = 'Our history';
-[...newPage.querySelectorAll('input[name="region"]')].find(b => b.value === 'east').checked = true;
 newPage.dispatchEvent(new window.Event('submit', { cancelable: true }));
 await sleep(20);
-check('a new page posts its path, title in the default language, layout and regions', calls.find(c => c.method === 'POST' && c.url === '/api/site/pages')?.body,
-    { path: '/company/history', title: { en: 'Our history' }, layout: 'default', regions: ['content', 'east'] });
+check('a new page posts its path, its title in the default language and its layout', calls.find(c => c.method === 'POST' && c.url === '/api/site/pages')?.body,
+    { path: '/company/history', title: { en: 'Our history' }, layout: 'default' });
 check('the open entry is pressed', entry('pages').getAttribute('aria-pressed'), 'true');
 
 click(entry('pages'));
