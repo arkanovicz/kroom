@@ -39,9 +39,9 @@ All notable changes to kroom will be documented in this file.
   builtin entry carrying its permission — an editor gets *pages* and *menu*.
 - A block can be trashed: `ResourceStore.delete`, `DELETE /api/content/{path}` for its editor; a versioned
   store keeps the deletion as an empty revision, so it can be restored.
-- The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent, or an `href` elsewhere; `label`
-  and `description` by language) stored by an admin — `GET`/`PUT`/`DELETE /api/site/menu`, a *menu* panel in
-  the bar editing it one language at a time — or derived from the pages as a tree, a section no page answers
+- The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent; `label` and `description` by
+  language) stored by an editor — `GET`/`PUT`/`DELETE /api/site/menu`, a *menu* panel in the bar: a compact
+  tree dragged with SortableJS (vendored, `static/lib/sortablejs`), each entry an accordion — or derived from the pages as a tree, a section no page answers
   leading to its first page. `languages` joins the site settings beside `lang`; `requestLanguage` on
   `installContentSite` tells the site a request's language (`$site.lang`, `<html lang>`, the menu's words).
   `NavItem` gains `slug` and `resolved`; `#nav` renders descriptions.

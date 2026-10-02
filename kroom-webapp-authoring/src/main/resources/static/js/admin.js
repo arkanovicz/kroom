@@ -19,11 +19,9 @@
     const STOCK = { en: {
         site: 'site', pages: 'pages', menu: 'menu', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
         // the menu editor
-        menuDerived: 'derived from the pages — save to keep a menu of your own', menuStored: 'the menu as you saved it',
-        menuLabel: 'label', menuDescription: 'description', menuUnresolved: 'no page here yet',
-        menuUp: 'up', menuDown: 'down', menuOut: 'out of its section', menuIn: 'under the entry above', menuRemove: 'remove',
-        menuAddPage: 'add a page', menuAddLink: 'add a link', menuSlug: 'page segment, e.g. company', menuUrl: 'address, https://…',
-        menuReset: 'back to the pages',
+        menuDerived: 'derived from the pages', menuStored: 'as you arranged it',
+        menuDrag: 'drag to move', menuLabel: 'label', menuDescription: 'description', menuUnresolved: 'no page here yet',
+        menuRemove: 'remove from the menu', menuNew: 'new entry: a page segment, then Enter', menuReset: 'back to the pages',
         // the site's own settings: their labels come from the server in English, said here in each language
         'site.Site': 'Site', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects', 'site.rules': 'Redirects', 'site.missing': 'Not found',
         'site.name': 'Name', 'site.lang': 'Language', 'site.lang.help': 'The content\'s — html lang',
@@ -50,11 +48,9 @@
     }, fr: {
         site: 'site', pages: 'pages', menu: 'menu', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
         // the menu editor
-        menuDerived: 'déduit des pages — enregistrez pour garder un menu à vous', menuStored: 'le menu tel que vous l’avez enregistré',
-        menuLabel: 'libellé', menuDescription: 'description', menuUnresolved: 'pas encore de page ici',
-        menuUp: 'monter', menuDown: 'descendre', menuOut: 'sortir de sa rubrique', menuIn: 'sous l’entrée au-dessus', menuRemove: 'retirer',
-        menuAddPage: 'ajouter une page', menuAddLink: 'ajouter un lien', menuSlug: 'segment de la page, p. ex. societe', menuUrl: 'adresse, https://…',
-        menuReset: 'revenir aux pages',
+        menuDerived: 'déduit des pages', menuStored: 'tel que vous l’avez arrangé',
+        menuDrag: 'glisser pour déplacer', menuLabel: 'libellé', menuDescription: 'description', menuUnresolved: 'pas encore de page ici',
+        menuRemove: 'retirer du menu', menuNew: 'nouvelle entrée\u00a0: un segment de page, puis Entrée', menuReset: 'revenir aux pages',
         // the site's own settings: their labels come from the server in English, said here in each language
         'site.Site': 'Site', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections', 'site.rules': 'Redirections', 'site.missing': 'Introuvables',
         'site.name': 'Nom', 'site.lang': 'Langue', 'site.lang.help': 'Celle du contenu — html lang',
@@ -261,24 +257,85 @@
             }
         },
 
-        // the menu: the stored tree, or the one derived from the pages, edited in one language at a time
+        // the menu: a compact tree, one line per entry — a handle to drag it by (Sortable; the ghost is the
+        // phantom row showing where it lands) and its label, which opens what there is to say of it. Every
+        // gesture stores the whole tree.
         async menu(body) {
-            const answer = await api.getJson(siteApi + 'menu');
-            let items = answer.items, lang = answer.lang;
-            const strip = (list) => list.map(i => ({ slug: i.slug, href: i.href, label: i.label || {}, description: i.description || {},
-                                                     children: strip(i.children || []) }));
-            const put = async () => {
+            let answer = await api.getJson(siteApi + 'menu');
+            let lang = answer.lang;
+            const open = new Set();                     // the accordions left open, by path, across re-renders
+            const strip = (list) => list.map(i => ({ slug: i.slug, label: i.label || {}, description: i.description || {}, children: strip(i.children || []) }));
+            const fail = (err) => body.appendChild(element('p', 'kroom-admin-error', said(err)));
+            const store = async (items) => {
                 try {
                     await api.putJson(siteApi + 'menu', { items: strip(items) });
-                    const fresh = await api.getJson(siteApi + 'menu');
-                    items = fresh.items;
+                    answer = await api.getJson(siteApi + 'menu');
                     render();
-                } catch (err) { body.appendChild(element('p', 'kroom-admin-error', said(err))); }
+                } catch (err) { fail(err); }
             };
+            // the tree as the DOM now has it: what a drop made of it
+            const read = (ul) => [...ul.children].filter(li => li._item).map(li => Object.assign({}, li._item, { children: read(li.querySelector(':scope > ul')) }));
+
+            const field = (into, name, item, key) => {
+                const label = into.appendChild(element('label', null, t(name)));
+                const input = label.appendChild(element('input'));
+                input.value = item[key]?.[lang] || '';
+                input.addEventListener('change', () => { (item[key] ??= {})[lang] = input.value.trim(); store(answer.items); });
+                return input;
+            };
+
+            const entry = (item, list) => {
+                const li = element('li', 'kroom-admin-menu-entry' + (item.resolved === false ? ' kroom-admin-unresolved' : ''));
+                li._item = item;
+                li.appendChild(element('span', 'kroom-admin-handle', '\u283f')).title = t('menuDrag');
+                const details = li.appendChild(element('details'));
+                details.open = open.has(item.path);
+                details.addEventListener('toggle', () => { if (details.open) open.add(item.path); else open.delete(item.path); });
+                const summary = details.appendChild(element('summary', null, item.label?.[lang] || item.label?.[answer.lang] || item.slug));
+                if (item.draft) summary.appendChild(element('small', 'kroom-admin-muted', ' ' + t('draft')));
+                const fields = details.appendChild(element('div', 'kroom-admin-menu-fields'));
+                field(fields, 'menuLabel', item, 'label');
+                field(fields, 'menuDescription', item, 'description');
+                const page = fields.appendChild(element('p', 'kroom-admin-menu-page'));
+                if (item.resolved === false) {
+                    page.appendChild(element('span', null, `${item.path} \u2014 ${t('menuUnresolved')} `));
+                    const make = page.appendChild(element('button', 'outline', t('menuCreate')));
+                    make.type = 'button';
+                    make.addEventListener('click', async () => {
+                        try {
+                            await api.postJson(siteApi + 'pages', { path: item.path, title: item.label || {} });
+                            answer = await api.getJson(siteApi + 'menu');
+                            render();
+                        } catch (err) { fail(err); }
+                    });
+                } else {
+                    page.appendChild(link(item.path, item.path + ' \u2197'));
+                }
+                const remove = fields.appendChild(element('button', 'secondary outline', t('menuRemove')));
+                remove.type = 'button';
+                remove.addEventListener('click', () => { list.splice(list.indexOf(item), 1); store(answer.items); });
+                li.appendChild(tree(item.children ??= []));
+                return li;
+            };
+
+            // one list per level, each a place to drop into — an entry's own, empty, is how it gets its first child
+            const tree = (list) => {
+                const ul = element('ul', 'kroom-admin-menu');
+                list.forEach(item => ul.appendChild(entry(item, list)));
+                if (window.Sortable) new window.Sortable(ul, {
+                    group: 'kroom-menu', handle: '.kroom-admin-handle', draggable: '> .kroom-admin-menu-entry',
+                    animation: 150, fallbackOnBody: true, swapThreshold: 0.65, emptyInsertThreshold: 8,
+                    ghostClass: 'kroom-admin-ghost',
+                    onEnd: (ev) => { if (ev.from !== ev.to || ev.oldIndex !== ev.newIndex) store(read(root)); }
+                });
+                return ul;
+            };
+
+            let root;
             const render = () => {
                 body.replaceChildren();
                 const head = body.appendChild(element('div', 'kroom-admin-menu-head'));
-                head.appendChild(element('p', 'kroom-admin-muted', t(answer.stored ? 'menuStored' : 'menuDerived')));
+                head.appendChild(element('small', 'kroom-admin-muted', t(answer.stored ? 'menuStored' : 'menuDerived')));
                 if (answer.languages.length > 1) {
                     const pick = head.appendChild(element('select'));
                     for (const l of answer.languages) {
@@ -288,72 +345,28 @@
                     }
                     pick.addEventListener('change', () => { lang = pick.value; render(); });
                 }
-                body.appendChild(tree(items, null));
-                const actions = body.appendChild(element('div', 'kroom-admin-actions'));
-                const addPage = actions.appendChild(element('button', null, t('menuAddPage')));
-                addPage.type = 'button';
-                addPage.addEventListener('click', () => {
-                    const slug = window.prompt(t('menuSlug'));
-                    if (slug) { items.push({ slug, label: {}, description: {}, children: [] }); put(); }
-                });
-                const addLink = actions.appendChild(element('button', null, t('menuAddLink')));
-                addLink.type = 'button';
-                addLink.addEventListener('click', () => {
-                    const href = window.prompt(t('menuUrl'));
-                    if (href) { items.push({ href, label: { [lang]: href }, description: {}, children: [] }); put(); }
+                root = body.appendChild(tree(answer.items));
+                root.classList.add('kroom-admin-menu-root');
+                // a new entry: a page's segment, typed and entered — it may not exist yet, the tree says so in red
+                const add = body.appendChild(element('input', 'kroom-admin-menu-new'));
+                add.placeholder = t('menuNew');
+                add.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter' || !add.value.trim()) return;
+                    e.preventDefault();
+                    answer.items.push({ slug: add.value.trim(), label: {}, description: {}, children: [] });
+                    store(answer.items);
                 });
                 if (answer.stored) {
-                    const reset = actions.appendChild(element('button', 'secondary', t('menuReset')));
+                    const reset = body.appendChild(element('button', 'kroom-admin-menu-reset', t('menuReset')));
                     reset.type = 'button';
                     reset.addEventListener('click', async () => {
-                        await api.deleteJson(siteApi + 'menu');
-                        Object.assign(answer, await api.getJson(siteApi + 'menu'));
-                        items = answer.items;
-                        render();
+                        try {
+                            await api.deleteJson(siteApi + 'menu');
+                            answer = await api.getJson(siteApi + 'menu');
+                            render();
+                        } catch (err) { fail(err); }
                     });
                 }
-            };
-            // one list per level: words in the chosen language, the path, and the moves
-            const tree = (list, parent) => {
-                const ul = element('ul', 'kroom-admin-menu');
-                list.forEach((item, i) => {
-                    const li = ul.appendChild(element('li', item.resolved === false ? 'kroom-admin-unresolved' : null));
-                    const row = li.appendChild(element('div', 'kroom-admin-menu-row'));
-                    const label = row.appendChild(element('input'));
-                    label.value = item.label?.[lang] || '';
-                    label.placeholder = t('menuLabel');
-                    label.addEventListener('change', () => { (item.label ??= {})[lang] = label.value; answer.stored = true; put(); });
-                    const path = row.appendChild(element('code', null, item.href || item.path));
-                    if (item.resolved === false) path.title = t('menuUnresolved');
-                    const moves = row.appendChild(element('span', 'kroom-admin-menu-moves'));
-                    const move = (name, enabled, act) => {
-                        const b = moves.appendChild(element('button', 'outline secondary', { menuUp: '↑', menuDown: '↓', menuOut: '←', menuIn: '→', menuRemove: '✕' }[name]));
-                        b.type = 'button'; b.title = t(name); b.setAttribute('aria-label', t(name)); b.disabled = !enabled;
-                        b.addEventListener('click', () => { act(); answer.stored = true; put(); });
-                    };
-                    move('menuUp', i > 0, () => { list.splice(i, 1); list.splice(i - 1, 0, item); });
-                    move('menuDown', i < list.length - 1, () => { list.splice(i, 1); list.splice(i + 1, 0, item); });
-                    move('menuIn', i > 0 && !list[i - 1].href && !item.href, () => { list.splice(i, 1); (list[i - 1].children ??= []).push(item); });
-                    move('menuOut', !!parent, () => { list.splice(i, 1); const up = parent.list; up.splice(up.indexOf(parent.item) + 1, 0, item); });
-                    move('menuRemove', true, () => list.splice(i, 1));
-                    if (item.resolved === false && !item.href) {
-                        const make = moves.appendChild(element('button', 'outline', '+'));
-                        make.type = 'button'; make.title = t('menuCreate'); make.setAttribute('aria-label', t('menuCreate'));
-                        make.addEventListener('click', async () => {
-                            try {
-                                await api.postJson(siteApi + 'pages', { path: item.path, title: item.label || {} });
-                                items = (await api.getJson(siteApi + 'menu')).items;
-                                render();
-                            } catch (err) { body.appendChild(element('p', 'kroom-admin-error', said(err))); }
-                        });
-                    }
-                    const description = li.appendChild(element('input'));
-                    description.value = item.description?.[lang] || '';
-                    description.placeholder = t('menuDescription');
-                    description.addEventListener('change', () => { (item.description ??= {})[lang] = description.value; answer.stored = true; put(); });
-                    if (item.children?.length) li.appendChild(tree(item.children, { item, list }));
-                });
-                return ul;
             };
             render();
         },

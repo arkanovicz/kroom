@@ -368,6 +368,7 @@ class Site internal constructor(
         val words = authoring?.assets?.stringTags("kroomAdmin", this.words).orEmpty()
         return """<link rel="stylesheet" href="/css/admin.css?v=$v">$words
 <aside class="kroom-admin" data-api="${htmlEscape(apiPrefix)}" data-content-api="${htmlEscape(content)}" data-entries="${htmlEscape(json)}"></aside>
+<script src="/lib/sortablejs/Sortable.js?v=$v"></script>
 <script src="/js/admin.js?v=$v"></script>"""
     }
 

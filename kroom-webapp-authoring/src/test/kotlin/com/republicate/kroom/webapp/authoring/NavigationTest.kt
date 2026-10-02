@@ -53,12 +53,10 @@ class NavigationTest {
         storage.settings("site")["languages"] = "fr"
         storage.records("site", "menu").put("tree", com.republicate.kson.Json.parse("""{"items":[
             {"slug":"about","label":{"en":"The Company","fr":"La Société"},"description":{"en":"Who we are"}},
-            {"slug":"legal","label":{"en":"Legal"},"children":[{"slug":"terms","label":{"en":"Terms","fr":"Mentions"}}]},
-            {"href":"https://example.org","label":{"en":"Elsewhere"}}
+            {"slug":"legal","label":{"en":"Legal"},"children":[{"slug":"terms","label":{"en":"Terms","fr":"Mentions"}}]}
         ]}""") as com.republicate.kson.Json.Object)
         val en = client.get("/about").bodyAsText()
         assertContains(en, """<a href="/about" aria-current="page">The Company</a><small>Who we are</small>""")
-        assertContains(en, """<a href="https://example.org" rel="external">Elsewhere</a>""")
         val fr = client.get("/about?lang=fr").bodyAsText()
         assertContains(fr, """<html lang="fr"""")
         assertContains(fr, """>La Société</a><small>Who we are</small>""")
@@ -90,6 +88,10 @@ class NavigationTest {
             .let { assertEquals(HttpStatusCode.BadRequest, it.status) }
         admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"slug":"x","href":"https://y","label":{}}]}""") }
             .let { assertEquals(HttpStatusCode.BadRequest, it.status) }
+        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"href":"https://y","label":{}}]}""") }
+            .let { assertEquals(HttpStatusCode.BadRequest, it.status, "an entry is a page: no address elsewhere") }
+        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"slug":"a","label":{}},{"slug":"a","label":{}}]}""") }
+            .let { assertEquals(HttpStatusCode.BadRequest, it.status, "two entries cannot be one page") }
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/site/menu").status)
 
         assertEquals(HttpStatusCode.OK, admin.delete("/api/site/menu").status)

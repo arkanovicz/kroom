@@ -68,6 +68,9 @@ function bar(preset) {
         calls.push({ url, method: options.method || 'GET', body: options.body && JSON.parse(options.body) });
         return new Response(JSON.stringify(answers[url] ?? {}), { status: 200, headers: { 'content-type': 'application/json' } });
     };
+    // jsdom drags nothing: a stand-in for Sortable records each list made draggable, for a test to play a drop
+    window.sortables = [];
+    window.Sortable = function (el, options) { window.sortables.push({ el, options }); };
     window.eval(['domhelper.js', 'api.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
         .concat(preset, readFileSync(`${OWN}/js/admin.js`, 'utf8')).join('\n;\n'));
     return window;
@@ -149,17 +152,45 @@ check('save puts every setting, a secret left empty', calls.at(-1),
 
 click(entry('menu'));
 await sleep(20);
-check('the menu: a tree, labels in the chosen language, the unresolved section in red',
-    [$$('.kroom-admin-body > .kroom-admin-menu > li > .kroom-admin-menu-row input').map(i => i.value), $$('.kroom-admin-unresolved > .kroom-admin-menu-row code').map(c => c.textContent)],
-    [['About', 'Legal'], ['/legal']]);
+const rows = () => $$('.kroom-admin-menu-entry').map(li => li.querySelector(':scope > details > summary').firstChild.textContent);
+check('the menu: one line per entry, its label as plain text, children included', rows(), ['About', 'Legal', 'Terms']);
+check('nothing but a handle and a label on the line', $$('.kroom-admin-menu-entry').every(li =>
+    li.querySelector(':scope > .kroom-admin-handle') && !li.querySelector(':scope > details > summary input, :scope > details > summary button')), true);
+check('an entry without a page is red, and offers to create it — a written one links to its page',
+    [$$('.kroom-admin-unresolved').map(li => li._item.slug), $('.kroom-admin-unresolved .kroom-admin-menu-page button').textContent,
+     $('.kroom-admin-menu-entry .kroom-admin-menu-page a').getAttribute('href')], [['legal'], 'create this page', '/about']);
+check('every level is a place to drag into, an entry\'s empty list included', [window.sortables.length, window.sortables.every(s => s.options.handle === '.kroom-admin-handle' && s.options.group === 'kroom-menu')], [4, true]);
+
+// a drop: Sortable has moved the node, the panel reads the tree back from the DOM and stores it
+const rootList = $('.kroom-admin-menu-root');
+const [about, legal] = [...rootList.children];
+legal.querySelector(':scope > ul').appendChild(about);
+window.sortables.find(s => s.el === rootList).options.onEnd({ from: rootList, to: legal.querySelector(':scope > ul'), oldIndex: 0, newIndex: 1 });
+await sleep(20);
+check('a drop puts the whole tree as it now stands, stripped of what the server computes', calls.findLast(c => c.method === 'PUT' && c.url === '/api/site/menu')?.body,
+    { items: [{ slug: 'legal', label: { en: 'Legal' }, description: {}, children: [
+        { slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, description: {}, children: [] },
+        { slug: 'about', label: { en: 'About' }, description: {}, children: [] }] }] });
+
+// the accordion: label and description, in the chosen language
 $('.kroom-admin-menu-head select').value = 'fr';
 $('.kroom-admin-menu-head select').dispatchEvent(new window.Event('change'));
-check('switching the language shows its words, blank where it has none', $$('.kroom-admin-menu input[placeholder="label"]').map(i => i.value), ['', '', 'Mentions']);
-$$('.kroom-admin-menu-moves button')[1].dispatchEvent(new window.MouseEvent('click', { bubbles: true }));   // About ↓
+check('switching the language shows its labels, the default where it has none', rows(), ['About', 'Legal', 'Mentions']);
+const terms = $$('.kroom-admin-menu-entry').find(li => li._item.slug === 'terms');
+const [labelField, descriptionField] = terms.querySelectorAll(':scope > details .kroom-admin-menu-fields input');
+check('its fields hold that language\'s words', [labelField.value, descriptionField.value], ['Mentions', '']);
+descriptionField.value = 'Qui publie ce site';
+descriptionField.dispatchEvent(new window.Event('change'));
 await sleep(20);
-check('a move puts the whole tree, stripped of what the server computes', calls.find(c => c.method === 'PUT' && c.url === '/api/site/menu')?.body,
-    { items: [{ slug: 'legal', label: { en: 'Legal' }, description: {}, children: [{ slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, description: {}, children: [] }] },
-              { slug: 'about', label: { en: 'About' }, description: {}, children: [] }] });
+check('a word changed is stored with the tree', calls.findLast(c => c.method === 'PUT' && c.url === '/api/site/menu')?.body.items[1].children[0].description, { fr: 'Qui publie ce site' });
+
+const add = $('.kroom-admin-menu-new');
+add.value = 'company';
+add.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+await sleep(20);
+check('a new entry is a page segment, typed and entered', calls.findLast(c => c.method === 'PUT' && c.url === '/api/site/menu')?.body.items.at(-1),
+    { slug: 'company', label: {}, description: {}, children: [] });
+check('no way to add an address elsewhere', $$('.kroom-admin-body button').map(b => b.textContent).filter(w => /link|lien/.test(w)), []);
 
 click(entry('site'));
 await sleep(20);

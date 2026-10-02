@@ -5,33 +5,29 @@ import com.republicate.kson.Json
 /**
  * One entry of the menu as stored: a page, named by its [slug] — the segment under its parent, so the tree of
  * slugs IS the tree of URLs (`company` under the root is `/company`, `history` under it `/company/history`;
- * `company.html` and `company/index.html` are one page) — or an address elsewhere ([href]). [label] and
- * [description] by language, the site's default filling what a language lacks.
+ * `company.html` and `company/index.html` are one page). [label] and [description] by language, the site's
+ * default filling what a language lacks.
  */
 data class MenuItem(
-    val slug: String? = null,
-    val href: String? = null,
+    val slug: String,
     val label: Map<String, String> = emptyMap(),
     val description: Map<String, String> = emptyMap(),
     val children: List<MenuItem> = emptyList()
 ) {
-    val external: Boolean get() = slug == null
-
     /**
      * The entry a theme sees, in [lang] (then [fallback]), its path under [parent], as [resolve] answers for
      * that path: a published page, a draft the viewer may see, or nothing — a draft is kept and marked, an
      * entry nobody may see is dropped (null).
      */
     fun view(lang: String, fallback: String, parent: String, resolve: (String) -> PageState): NavItem? {
-        val path = if (external) href.orEmpty() else "$parent/$slug"
-        val state = if (external) PageState.PUBLISHED else resolve(path)
+        val path = "$parent/$slug"
+        val state = resolve(path)
         if (state == PageState.FORBIDDEN) return null
         val children = children.mapNotNull { it.view(lang, fallback, path, resolve) }
         return NavItem(
-            label = label[lang] ?: label[fallback] ?: label.values.firstOrNull() ?: slug?.replace('-', ' ')?.replaceFirstChar(Char::titlecase) ?: path,
+            label = label[lang] ?: label[fallback] ?: label.values.firstOrNull() ?: slug.replace('-', ' ').replaceFirstChar(Char::titlecase),
             href = path,
             description = description[lang] ?: description[fallback],
-            external = external,
             children = children,
             slug = slug,
             resolved = state != PageState.MISSING,
@@ -41,8 +37,7 @@ data class MenuItem(
     }
 
     fun toJson(): Json.MutableObject = Json.MutableObject().apply {
-        slug?.let { set("slug", it) }
-        href?.let { set("href", it) }
+        set("slug", slug)
         set("label", Json.MutableObject().apply { label.forEach { (k, v) -> set(k, v) } })
         if (description.isNotEmpty()) set("description", Json.MutableObject().apply { description.forEach { (k, v) -> set(k, v) } })
         if (children.isNotEmpty()) set("children", Json.MutableArray().apply { children.forEach { push(it.toJson()) } })
@@ -53,18 +48,20 @@ data class MenuItem(
 
         /** An entry from its JSON, or the reason it is not one. */
         fun parse(json: Json.Object): Result<MenuItem> = runCatching {
-            val slug = json.getString("slug")?.takeIf { it.isNotEmpty() }
-            val href = json.getString("href")?.takeIf { it.isNotEmpty() }
-            require((slug == null) != (href == null)) { "an entry is a page (slug) or a link (href), not both nor neither" }
-            require(slug == null || SLUG.matches(slug)) { "not a page segment: $slug" }
-            require(href == null || href.startsWith("https://") || href.startsWith("http://")) { "not an address: $href" }
-            fun words(key: String) = json.getObject(key)?.entries?.associate { (k, v) -> k to v.toString() }.orEmpty()
+            val slug = json.getString("slug")?.takeIf { it.isNotEmpty() } ?: throw IllegalArgumentException("an entry is a page: its segment is expected")
+            require(SLUG.matches(slug)) { "not a page segment: $slug" }
+            require(json.getString("href") == null) { "an entry is a page, not an address elsewhere" }
+            fun words(key: String) = json.getObject(key)?.entries?.associate { (k, v) -> k to v.toString() }?.filterValues { it.isNotEmpty() }.orEmpty()
             val children = json.getArray("children")?.map { parse(it as Json.Object).getOrThrow() }.orEmpty()
-            require(href == null || children.isEmpty()) { "a link has no children" }
-            MenuItem(slug, href, words("label"), words("description"), children)
+            require(children.map { it.slug }.distinct().size == children.size) { "two entries share a segment under $slug" }
+            MenuItem(slug, words("label"), words("description"), children)
         }
 
-        fun parseAll(json: Json.Array): Result<List<MenuItem>> = runCatching { json.map { parse(it as Json.Object).getOrThrow() } }
+        fun parseAll(json: Json.Array): Result<List<MenuItem>> = runCatching {
+            json.map { parse(it as Json.Object).getOrThrow() }.also { items ->
+                require(items.map { it.slug }.distinct().size == items.size) { "two entries share a segment at the root" }
+            }
+        }
 
         /**
          * A menu from the pages a site serves: one entry per URL, nested by segment, a section made for a
@@ -97,7 +94,7 @@ data class NavItem(
     val description: String? = null,
     val external: Boolean = false,
     val children: List<NavItem> = emptyList(),
-    /** The page's segment; null for an address elsewhere. */
+    /** The page's segment; null for an entry of an application's own menu that is no page. */
     val slug: String? = null,
     /** Whether a page answers [href] — a section nobody wrote leads to its first page ([link]), or is only words. */
     val resolved: Boolean = true,

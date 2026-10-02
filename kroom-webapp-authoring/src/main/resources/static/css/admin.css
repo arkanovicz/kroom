@@ -275,20 +275,32 @@ body:has(> .kroom-admin) {
     }
 }
 
-/* --- the menu editor ----------------------------------------------------------------------------- */
+/* --- the menu editor: a compact tree, a handle and a label per line ------------------------------- */
 
-.kroom-admin-menu { list-style: none; padding-left: 0; margin: 0; }
-.kroom-admin-menu .kroom-admin-menu { padding-left: 1.25rem; border-left: 2px solid var(--pico-muted-border-color, #ddd); }
-.kroom-admin-menu li { margin: .25rem 0; }
-.kroom-admin-menu-row { display: flex; align-items: center; gap: .5rem; }
-.kroom-admin-menu-row input, .kroom-admin-menu li > input { margin: 0 0 .25rem; font-size: .875rem; }
-.kroom-admin-menu-row input { flex: 1; }
-.kroom-admin-menu-row code { font-size: .75rem; white-space: nowrap; }
-.kroom-admin-menu-moves { display: flex; gap: .125rem; }
-.kroom-admin-menu-moves button { width: auto; margin: 0; padding: 0 .4rem; font-size: .75rem; line-height: 1.6; }
-.kroom-admin-unresolved > .kroom-admin-menu-row code { color: var(--kroom-cancel-color, #dc2626); }
-.kroom-admin-menu-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.kroom-admin-menu-head select { width: auto; margin: 0; padding: .2rem 1.75rem .2rem .5rem; font-size: .8rem; }
+.kroom-admin-menu { list-style: none; margin: 0; padding: 0; }
+.kroom-admin-menu .kroom-admin-menu { grid-column: 2; min-height: .375rem; }      /* empty: still a place to drop */
+.kroom-admin-menu-entry { display: grid; grid-template-columns: 1.125rem minmax(0, 1fr); margin: 0; padding: 0; list-style: none; }
+.kroom-admin-handle { cursor: grab; line-height: 1.6; opacity: .45; user-select: none; }
+.kroom-admin-handle:hover { opacity: 1; }
+.kroom-admin-menu-entry > details { margin: 0; padding: 0; border: none; }
+.kroom-admin-menu-entry > details > summary { margin: 0; padding: 0; line-height: 1.6; font-size: .875rem; cursor: pointer; }
+.kroom-admin-menu-entry > details > summary::after { float: none; display: inline-block; margin-left: .35rem; opacity: .4; }
+.kroom-admin-unresolved > details > summary { color: var(--kroom-cancel-color, #dc2626); }
+
+/* what there is to say of an entry, once opened */
+.kroom-admin-menu-fields { margin: .125rem 0 .5rem; padding: .375rem .5rem; border-left: 2px solid var(--pico-muted-border-color, #ddd); font-size: .8rem; }
+.kroom-admin-menu-fields label { display: block; margin: 0 0 .25rem; }
+.kroom-admin-menu-fields input { display: block; width: 100%; margin: .1rem 0 0; padding: .2rem .4rem; height: auto; font-size: .8rem; }
+.kroom-admin-menu-fields p { margin: .25rem 0; }
+.kroom-admin-menu-fields button { width: auto; margin: 0; padding: .1rem .5rem; font-size: .75rem; }
+
+/* the phantom row: where the dragged entry will land */
+.kroom-admin-ghost { opacity: .5; outline: 1px dashed var(--kroom-edit-color, #2563eb); outline-offset: -1px; background: color-mix(in srgb, var(--kroom-edit-color, #2563eb) 8%, transparent); }
+
+.kroom-admin-menu-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .375rem; }
+.kroom-admin-menu-head select { width: auto; margin: 0; padding: .1rem 1.75rem .1rem .4rem; height: auto; font-size: .75rem; }
+input.kroom-admin-menu-new { margin: .5rem 0 0; padding: .2rem .4rem; height: auto; font-size: .8rem; border-style: dashed; }
+button.kroom-admin-menu-reset { width: auto; margin: .5rem 0 0; padding: 0; background: none; border: none; box-shadow: none; color: var(--pico-muted-color, #888); font-size: .75rem; text-decoration: underline; }
 
 /* --- the pages panel ----------------------------------------------------------------------------- */
 

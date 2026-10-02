@@ -557,15 +557,17 @@ blocks in the store.
 
 The menu is a tree of pages: an entry is a page's segment under its parent, so the tree of entries *is* the
 tree of URLs (`company` at the root is `/company`, `history` under it `/company/history`; `company.html` and
-`company/index.html` are one page), or an address elsewhere (`href`). Labels and descriptions are by language:
+`company/index.html` are one page). Labels and descriptions are by language:
 the site's `lang` is the default, `languages` the others it speaks, and a request's language is what
 `installContentSite { requestLanguage = { it.language } }` answers (kroom-webapp-l10n's, or the application's),
 the default filling what a language lacks. Until an admin stores one, the menu is derived from the pages, a
 deeper URL nesting under its first segment — a section no page answers leads to its first page; a draft page
 shows to its editors only, marked. Two site settings shape the rendering: `menuPanels` (the header shows a section's
 pages as a hover panel) and `west` (the section's pages on the left by default, or nothing). The bar's *menu*
-entry edits the tree one language at a time (reorder, nest, rename, describe, add a page before it exists —
-shown in red until it does —, add a link, back to the pages); `GET`/`PUT`/`DELETE /api/site/menu`. An
+entry is a compact tree, one line per entry — a handle to drag it by (SortableJS; a phantom row shows where
+it lands, an entry's own list is how it gets a child) and its label, which opens what there is to say of it:
+the label and description in the chosen language, the page it leads to, *remove*. An entry may name a page
+that does not exist yet: it shows in red and offers to create it. Every gesture stores the tree; `GET`/`PUT`/`DELETE /api/site/menu`. An
 application computing its own menu sets `navigation = { call -> List<NavItem> }` over all this.
 
 ### The admin bar
