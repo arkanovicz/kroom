@@ -36,6 +36,14 @@ open class FileResourceStore(private val root: Path = Path.of("data/content"), s
 
     override fun delete(path: String): Boolean = Files.deleteIfExists(resolve(path))
 
+    override fun move(from: String, to: String): Boolean {
+        val source = resolve(from).takeIf { it.isRegularFile() } ?: return false
+        val target = resolve(to)
+        require(!Files.exists(target)) { "a block is already at $to" }
+        Files.move(source, target.createParentDirectories())
+        return true
+    }
+
     override fun list(prefix: String): List<String> {
         if (!Files.isDirectory(root)) return emptyList()
         Files.walk(root).use { paths ->

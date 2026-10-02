@@ -37,6 +37,8 @@ All notable changes to kroom will be documented in this file.
 - Roles: `editor` owns the pages and the menu (`pages.*`, `menu.edit`) beside every block; a built-in `author`
   writes blocks (`content.edit`) and nothing else. The admin bar shows whoever has at least one entry, each
   builtin entry carrying its permission — an editor gets *pages* and *menu*.
+- `ResourceStore.move(from, to)` and `moveAll(from, to)`: a block, or every block under a folder, changes
+  place with its past — a versioned store answers the old revisions under the new path and records the move.
 - A block can be trashed: `ResourceStore.delete`, `DELETE /api/content/{path}` for its editor; a versioned
   store keeps the deletion as an empty revision, so it can be restored.
 - The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent; `label` and `description` by

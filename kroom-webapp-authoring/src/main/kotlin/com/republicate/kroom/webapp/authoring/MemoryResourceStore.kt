@@ -22,6 +22,16 @@ open class MemoryResourceStore(sigil: String = "%%@") : ResourceStore(sigil) {
 
     protected open fun onDeleted(path: String) {}
 
+    override fun move(from: String, to: String): Boolean {
+        require(!files.containsKey(to)) { "a block is already at $to" }
+        val source = files.remove(from) ?: return false
+        files[to] = source
+        onMoved(from, to)
+        return true
+    }
+
+    protected open fun onMoved(from: String, to: String) {}
+
     /** Where a store that keeps its past records one — see [VersionedMemoryResourceStore]. */
     protected open fun onWritten(block: Block) {}
 }
@@ -37,6 +47,15 @@ class VersionedMemoryResourceStore(sigil: String = "%%@") : MemoryResourceStore(
 
     override fun onWritten(block: Block) = synchronized(revisions) {
         revisions.add(Revision(block.rev, block.path, block.author, block.updated) to block)
+        Unit
+    }
+
+    /** The past follows the block: its revisions answer under the new path, and the move is one more of them. */
+    override fun onMoved(from: String, to: String) = synchronized(revisions) {
+        revisions.replaceAll { (revision, block) -> if (revision.path == from) revision.copy(path = to) to block.copy(path = to) else revision to block }
+        revisions.lastOrNull { it.first.path == to }?.let { (last, block) ->
+            revisions.add(last.copy(time = System.currentTimeMillis(), message = "moved from $from") to block)
+        }
         Unit
     }
 

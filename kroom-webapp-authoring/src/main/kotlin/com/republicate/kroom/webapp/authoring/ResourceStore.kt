@@ -28,6 +28,23 @@ abstract class ResourceStore(private val sigil: String = "%%@") : ResourceLoader
     /** Remove the block at [path]; false when there was none. A page's region falls back to the site's default. */
     abstract fun delete(path: String): Boolean
 
+    /**
+     * The block at [from] becomes the block at [to], its past with it where the store keeps one — a page that
+     * moves keeps its history. False when there is none at [from]; an [IllegalArgumentException] when [to] is taken.
+     */
+    abstract fun move(from: String, to: String): Boolean
+
+    /** Every block under [from] moved under [to] (`pages/a/` → `pages/b/c/`), each as [move] does; how many went. */
+    fun moveAll(from: String, to: String): Int {
+        val source = from.trimEnd('/') + "/"
+        val target = to.trimEnd('/') + "/"
+        val blocks = list(source)
+        blocks.firstOrNull { read(target + it.removePrefix(source)) != null }?.let {
+            throw IllegalArgumentException("a block is already at ${target + it.removePrefix(source)}")
+        }
+        return blocks.count { move(it, target + it.removePrefix(source)) }
+    }
+
     // --- the source seen by velocity: header + body, exactly as stored ---------------------------
 
     override fun load(name: String): String =

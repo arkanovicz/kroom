@@ -78,4 +78,50 @@ class ResourceStoreTest {
         assertEquals(listOf("pages/club/13Ma/description.md"), file.list())
         assertFailsWith<IllegalArgumentException> { file.read("../../etc/passwd") }
     }
+
+    @Test
+    fun `a block moves, a tree of them too, and a taken place is refused`() {
+        store.write("pages/a/content.md", "un", mapOf("author" to "admin"))
+        store.write("pages/a/east.md", "deux", emptyMap())
+        store.write("pages/b/content.md", "trois", emptyMap())
+        assertEquals(false, store.move("pages/nowhere.md", "pages/x.md"))
+        assertEquals(2, store.moveAll("pages/a", "pages/c/a"))
+        assertNull(store.read("pages/a/content.md"))
+        assertEquals("un", store.read("pages/c/a/content.md")!!.body)
+        assertEquals("admin", store.read("pages/c/a/content.md")!!.author)
+        assertEquals("pages/c/a/content.md", store.read("pages/c/a/content.md")!!.path)
+        kotlin.test.assertFailsWith<IllegalArgumentException> { store.move("pages/c/a/content.md", "pages/b/content.md") }
+        kotlin.test.assertFailsWith<IllegalArgumentException> { store.moveAll("pages/c/a", "pages/b") }
+        assertEquals("trois", store.read("pages/b/content.md")!!.body, "a refused move changes nothing")
+        assertEquals("un", store.read("pages/c/a/content.md")!!.body)
+    }
+
+    @Test
+    fun `a moved block keeps its past, and the move is in its history`() {
+        val versioned = VersionedMemoryResourceStore()
+        versioned.write("pages/a/content.md", "un", mapOf("author" to "admin"))
+        val first = versioned.log("pages/a/content.md").single().rev
+        versioned.write("pages/a/content.md", "deux", mapOf("author" to "admin"))
+        versioned.move("pages/a/content.md", "pages/b/content.md")
+        assertEquals(emptyList(), versioned.log("pages/a/content.md"), "nothing is left behind")
+        val log = versioned.log("pages/b/content.md")
+        assertEquals(3, log.size)
+        assertEquals("moved from pages/a/content.md", log.first().message)
+        assertEquals("un", versioned.read("pages/b/content.md", first)!!.body, "an old revision answers under the new path")
+    }
+
+    @Test
+    fun `a file store moves the file`() {
+        val root = java.nio.file.Files.createTempDirectory("kroom-store")
+        try {
+            val files = FileResourceStore(root)
+            files.write("pages/a/content.md", "un", mapOf("author" to "admin"))
+            assertEquals(true, files.move("pages/a/content.md", "pages/b/deep/content.md"))
+            assertNull(files.read("pages/a/content.md"))
+            assertEquals("un", files.read("pages/b/deep/content.md")!!.body)
+            assertEquals(listOf("pages/b/deep/content.md"), files.list("pages/"))
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
 }
