@@ -25,6 +25,10 @@ main > aside:has(> .kroom-region-empty) { flex: 0 0 1.5rem; }
 .west ul { list-style: none; padding: 0; }
 .west li { margin: .25rem 0; }
 
+/* the breadcrumb: small, under the header */
+nav.breadcrumb { font-size: .8rem; margin-bottom: 1rem; }
+nav.breadcrumb ul { margin: 0; padding: 0; }
+
 /* an article reads at a measure; a landing opens on its top region */
 .layout-article .content { max-width: 70ch; margin: 0 auto; }
 .top { padding: 3rem 0; text-align: center; }

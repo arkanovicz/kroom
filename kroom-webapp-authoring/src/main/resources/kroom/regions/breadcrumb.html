@@ -1,0 +1,4 @@
+## Where the visitor is, from the site down to the page — shown inside a section, not on a top-level page.
+#if($nav.trail.size() > 1)<nav aria-label="breadcrumb" class="container breadcrumb">
+<ul><li><a href="/">$site.name</a></li>#foreach($item in $nav.trail)<li>#if($foreach.hasNext && $item.link)<a href="$item.link">$item.label</a>#elseif($foreach.hasNext)$item.label#else<span aria-current="page">$item.label</span>#end</li>#end</ul>
+</nav>#end
