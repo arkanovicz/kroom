@@ -16,20 +16,21 @@ class StarterTest {
     fun `a site with a contact — the forms plugin on, the versions this build's, the wrapper ours, no hole left`() {
         val into = Files.createTempDirectory("kroom-starter")
         try {
-            val answers = Answers(name = "Les Vagabonds !", lang = "fr", languages = listOf("en"), contact = "club@example.org", port = 9000)
+            val answers = Answers(name = "Les Vagabonds !", lang = "fr", languages = listOf("en"), contact = "club@example.org", port = 9000, uid = 1234, gid = 5678)
             assertEquals("les-vagabonds", answers.folder)
             assertEquals("com.example.les_vagabonds", answers.packageName)
             val written = Starter(answers).write(into)
             val root = into.resolve("les-vagabonds")
             val paths = written.map { it.relativeTo(root).toString() }.toSet()
             for (expected in listOf("build.gradle.kts", "settings.gradle.kts", "gradle/libs.versions.toml", "gradlew", "gradle/wrapper/gradle-wrapper.jar",
-                                    "compose.yml", "Dockerfile", ".env", ".gitignore", "README.md",
+                                    "compose.yml", "run.sh", "gradle.properties", ".env", ".gitignore", "README.md",
                                     "src/main/kotlin/com/example/les_vagabonds/Main.kt", "src/main/resources/templates/pages/index.html",
                                     "src/main/resources/templates/pages/login.html")) {
                 assertTrue(expected in paths, "$expected missing from $paths")
             }
             written.filter { !it.toString().endsWith(".jar") }.forEach { assertFalse(it.readText().contains("{{"), "a hole left in $it") }
-            assertTrue(root.resolve("gradlew").toFile().canExecute())
+            assertTrue(root.resolve("gradlew").toFile().canExecute() && root.resolve("run.sh").toFile().canExecute())
+            assertFalse("Dockerfile" in paths, "nothing to customize in the container: no image of our own")
 
             val main = root.resolve("src/main/kotlin/com/example/les_vagabonds/Main.kt").readText()
             assertContains(main, "package com.example.les_vagabonds")
@@ -45,8 +46,14 @@ class StarterTest {
             assertContains(toml, "kroom = \"${versions.getProperty("kroom")}\"")
             assertContains(toml, "velocity = \"${versions.getProperty("velocity")}\"")
             assertFalse(versions.getProperty("kroom").contains("$"), "the build filled the versions in")
-            assertContains(root.resolve("compose.yml").readText(), "\"9000:8080\"")
+            val compose = root.resolve("compose.yml").readText()
+            assertContains(compose, "\"9000:8080\"")
+            assertContains(compose, "image: eclipse-temurin:21-jdk")
+            assertContains(compose, "user: \"\${UID}:\${GID}\"")
+            assertContains(compose, "- .:\${PWD}")
+            assertContains(compose, "./gradlew --no-daemon --console=plain installDist && exec build/install/les-vagabonds/bin/les-vagabonds")
             val env = root.resolve(".env").readText()
+            assertContains(env, "UID=1234\nGID=5678\n")
             assertTrue(Regex("ADMIN_PASSWORD=[A-Za-z0-9]{20}").containsMatchIn(env) && Regex("SITE_SECRET=[A-Za-z0-9]{20}").containsMatchIn(env), env)
             assertContains(root.resolve("gradle/wrapper/gradle-wrapper.properties").readText(), "gradle-8.")
         } finally {

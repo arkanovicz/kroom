@@ -1,17 +1,22 @@
-# docker compose up — builds the site, runs it on :{{port}}, keeps its data under ./data
-# docker compose --profile dev up — with Mailpit beside it, catching whatever the site mails
+# ./run.sh, or docker compose up — builds the site with its own wrapper, then runs it on :{{port}}; everything it
+# keeps lands under ./data. ./run.sh dev (docker compose --profile dev up) adds Mailpit, catching what it mails.
+# Nothing to customize in the container: the JDK image, this folder at the same path, you as the user.
 services:
   {{site}}:
     container_name: {{site}}
-    build: .
-    ports:
-      - "{{port}}:8080"
+    image: eclipse-temurin:21-jdk
+    user: "${UID}:${GID}"
+    working_dir: ${PWD}
     volumes:
-      - ./data:/app/data
+      - .:${PWD}
     environment:
+      HOME: ${PWD}/.gradle/home
+      GRADLE_USER_HOME: ${PWD}/.gradle/home
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SITE_SECRET: ${SITE_SECRET}
-    user: "${UID:-1000}:${GID:-1000}"
+    command: sh -c "./gradlew --no-daemon --console=plain installDist && exec build/install/{{site}}/bin/{{site}}"
+    ports:
+      - "{{port}}:8080"
 
   mailpit:
     image: axllent/mailpit

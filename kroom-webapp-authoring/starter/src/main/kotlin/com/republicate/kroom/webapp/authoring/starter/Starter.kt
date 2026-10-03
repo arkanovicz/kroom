@@ -27,9 +27,16 @@ data class Answers(
     /** Set, the contact form is on and its messages are mailed there. */
     val contact: String? = null,
     val port: Int = 8080,
+    /** Who the site's container runs as: the one who asked for it, so what it writes under `data/` is theirs. */
+    val uid: Int = hostId("HOST_UID") { it.uid },
+    val gid: Int = hostId("HOST_GID") { it.gid },
     val packageName: String = "com.example." + folder.replace('-', '_').let { if (it.first().isDigit()) "_$it" else it }
 ) {
     companion object {
+        /** create.sh hands the host's ids in; run bare, the JVM's own user stands for them. */
+        private fun hostId(variable: String, own: (com.sun.security.auth.module.UnixSystem) -> Long): Int =
+            System.getenv(variable)?.toIntOrNull() ?: runCatching { own(com.sun.security.auth.module.UnixSystem()).toInt() }.getOrDefault(1000)
+
         /** `Notre Société !` → `notre-societe`. */
         fun slug(text: String): String = Normalizer.normalize(text, Normalizer.Form.NFD)
             .replace(Regex("\\p{M}"), "").lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { "site" }
@@ -56,6 +63,8 @@ class Starter(private val answers: Answers) {
         "languages" to answers.languages.joinToString(", "),
         "contact" to answers.contact.orEmpty(),
         "port" to answers.port.toString(),
+        "uid" to answers.uid.toString(),
+        "gid" to answers.gid.toString(),
         "adminPassword" to random(),
         "siteSecret" to random(),
         "kroomVersion" to versions.getProperty("kroom"),
@@ -80,6 +89,7 @@ class Starter(private val answers: Answers) {
             val target = root.resolve(relative.replace("__package__", values["packagePath"]!!).replace("_gitignore", ".gitignore"))
             target.parent.createDirectories()
             if (relative.endsWith(".jar")) target.writeBytes(bytes) else target.writeText(fill(String(bytes, Charsets.UTF_8)))
+            if (relative.endsWith(".sh")) target.toFile().setExecutable(true)
             written.add(target)
         }
         for ((relative, bytes) in resources("starter/wrapper")) {

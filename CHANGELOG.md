@@ -22,7 +22,8 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-webapp-authoring-starter
 - A site starter: a jar asking a few questions and writing a site pinned to the build it came from (its build,
-  `Main.kt`, two pages, `Dockerfile`, `compose.yml`, `.env`, this repository's wrapper);
+  `Main.kt`, two pages, `compose.yml` on the plain JDK image run as the creator, `run.sh`, `.env`, this
+  repository's wrapper);
   `republicate.com/kroom/create.sh` fetches the latest and runs it in a JRE container. `publish-snapshot.sh`
   now pushes kroom to `republicate.com/maven2` too (`~/bin/m2-push`), where a site resolves it.
 

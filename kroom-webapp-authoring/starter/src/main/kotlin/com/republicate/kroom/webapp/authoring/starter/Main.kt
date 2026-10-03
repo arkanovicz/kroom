@@ -20,7 +20,7 @@ fun main(args: Array<String>) {
     println("\n  ${written.size} files written under ${into.resolve(folder)}\n")
     println("""
       cd $folder
-      docker compose up                 # builds, then http://localhost:$port/ — log in as admin, password in .env
+      ./run.sh                          # builds, then http://localhost:$port/ — log in as admin, password in .env
       ./gradlew run                     # or, with a JDK 21: set -a; . ./.env; ./gradlew run
     """.trimIndent().prependIndent("  "))
     println()

@@ -14,5 +14,6 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 echo "kroom starter $version"
 curl -fsSL -o "$tmp/starter.jar" "$REPO/$version/kroom-webapp-authoring-starter-$version-all.jar"
-docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work -v "$tmp/starter.jar":/starter.jar:ro -w /work \
+docker run --rm -it -u "$(id -u):$(id -g)" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+    -v "$PWD":/work -v "$tmp/starter.jar":/starter.jar:ro -w /work \
     eclipse-temurin:21-jre java -jar /starter.jar /work
