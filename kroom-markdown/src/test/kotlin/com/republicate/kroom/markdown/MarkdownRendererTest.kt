@@ -327,8 +327,10 @@ class MarkdownRendererTest {
      */
     @Test
     fun `blocks are sandboxed by default`() {
-        val statics = "\${\"\" + java.lang.Runtime.getRuntime()}\n"
-        val conjured = "\${\"\" + java.io.File(\"/etc/hostname\").exists()}\n"
+        // default-import names: since velocity 3.0.0-BETA-20261003-01 no template navigates packages, sandbox or not,
+        // so `java.lang.Runtime` would be refused before the sandbox is asked — and prove nothing about it
+        val statics = "\${\"\" + Runtime.getRuntime()}\n"
+        val conjured = "\${\"\" + ProcessBuilder(\"hostname\").command()}\n"
         for (island in listOf(statics, conjured)) {
             val failure = assertFails { renderer.renderSource(island, ctx()) }
             assertTrue(
@@ -339,7 +341,7 @@ class MarkdownRendererTest {
         // the pin has teeth: the same islands run once the application opts out of the sandbox
         val open = MarkdownRenderer(config("sandbox" to "false"))
         assertContains(open.renderSource(statics, ctx()), "java.lang.Runtime@")
-        assertContains(open.renderSource(conjured, ctx()), "true")
+        assertContains(open.renderSource(conjured, ctx()), "[hostname]")
     }
 
     /**
