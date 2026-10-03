@@ -33,6 +33,9 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
+- Authored pages are keyed by an id every store accepts (`/company/history` → `company_-history`; `_` escapes
+  itself and the slash): on a `FileStorage`, a nested page failed, and so did any miss that was no page path
+  (`/favicon.ico` answered 500 instead of 404).
 - Authored pages: a record (`path`, `layout`, `draft`|`published`) under `site/pages`, its title and
   description its menu entry's label and description; blocks in the content store where a template's would
   be, rendered through `kroom/page.html` in the not-found phase (templates win); drafts for their editors only,

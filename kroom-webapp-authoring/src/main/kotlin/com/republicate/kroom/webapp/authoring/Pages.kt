@@ -73,9 +73,15 @@ internal class AuthoredPages(private val site: Site) {
 
     private val records get() = site.storage.records(SITE, "pages")
 
-    private fun id(path: String) = path.trim('/').replace('/', '~')
+    /**
+     * A page path as a record id every store accepts (letters, digits, `-`, `_`): `_` escapes itself (`__`) and
+     * the slash (`_-`), so `/company/history` is `company_-history` and no two paths meet.
+     */
+    private fun id(path: String) = path.trim('/').replace("_", "__").replace("/", "_-")
 
-    fun get(path: String): AuthoredPage? = records.get(id(path))?.let { AuthoredPage.parse(it).getOrNull() }
+    /** The page at [path] — none for whatever is no page path (`/favicon.ico` asked in the not-found phase). */
+    fun get(path: String): AuthoredPage? =
+        if (!AuthoredPage.validPath(path)) null else records.get(id(path))?.let { AuthoredPage.parse(it).getOrNull() }
 
     fun all(): List<AuthoredPage> = records.list(Int.MAX_VALUE).values.mapNotNull { AuthoredPage.parse(it).getOrNull() }.sortedBy { it.path }
 

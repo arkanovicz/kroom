@@ -167,4 +167,34 @@ class PagesTest {
         refused("/a/b", "/b", "pages/a/b/content.md is being written by someone else")()
         assertEquals("being written", storage.content.read("pages/a/b/content.md")!!.body, "a refused move moves nothing")
     }
+
+    @Test
+    fun `on files - a miss that is no page path is a plain 404, and nested pages are stored, served and moved`() = testApplication {
+        val root = java.nio.file.Files.createTempDirectory("kroom-pages")
+        try {
+            application {
+                installContentSite {
+                    storage = FileStorage(root)
+                    sessionSecret = "test-secret"
+                    identity = IdentityProvider { if (it.id == "ed") setOf(Roles.EDITOR) else emptySet() }
+                }
+                routing { get("/as/{who}") { call.sessions.set(UserSession(call.parameters["who"]!!, "x", null, "t")); call.respondText("ok") } }
+            }
+            for (miss in listOf("/favicon.ico", "/apple-touch-icon.png", "/.env", "/a_b/c.d")) {
+                assertEquals(HttpStatusCode.NotFound, client.get(miss).status, miss)
+            }
+            val editor = visitor("ed")
+            editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history_1","label":{"en":"History"},"status":"published"}""")
+                .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+            editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company_-history_1"}""")
+                .let { assertEquals(HttpStatusCode.OK, it.status, "a segment spelled like the escape is another page") }
+            assertContains(visitor().get("/company/history_1").bodyAsText(), "<title>History — kroom</title>")
+            editor.json(HttpMethod.Post, "/api/site/pages/move", """{"from":"/company/history_1","to":"/history"}""")
+                .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+            assertEquals(HttpStatusCode.OK, visitor().get("/history").status)
+            assertEquals(HttpStatusCode.NotFound, visitor().get("/company/history_1").status)
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
 }
