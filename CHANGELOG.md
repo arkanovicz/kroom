@@ -26,25 +26,32 @@ All notable changes to kroom will be documented in this file.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is
   set, or the transport the application set, or null. The mail plugin is gone with its log and webmail: what a
   site sends is the recipient's business; Mailpit stays beside the demo as a debugging mailbox, on its own port.
-- Authored pages: a record (`path`, `layout`, `title`/`description` by language, `draft`|`published`)
-  under `site/pages`, blocks in the content store where a template's would be, rendered through
-  `kroom/page.html` in the not-found phase (templates win); drafts for their editors only, marked in the menu.
-  `GET`/`POST /api/site/pages`, `PUT`/`DELETE /api/site/pages/{path}`; the *pages* panel creates, publishes and
-  deletes them, a red menu entry offers to create its page. Every region is there to write: unwritten, a
+- Authored pages: a record (`path`, `layout`, `draft`|`published`) under `site/pages`, its title and
+  description its menu entry's label and description; blocks in the content store where a template's would
+  be, rendered through `kroom/page.html` in the not-found phase (templates win); drafts for their editors only,
+  marked in the menu, hidden from the sitemap. `POST /api/site/pages`, `PUT`/`DELETE /api/site/pages/{path}`,
+  `POST /api/site/pages/move` (a page with none under it, its blocks and their past with it — refused onto a
+  taken path or while someone else writes one of its blocks; no redirect left behind); a section of the
+  *pages* panel offers to create its page. Every region is there to write: unwritten, a
   sliver with the edit handle for who may write it, nothing for a visitor — the site's default where there is
   one, shown until written: `#@markdown(name) … #end` (kroom-markdown) renders its body for a block nobody wrote, and the
-  `kroomPage` context key names the page blocks bind under. `menuPanels` and `west` site settings.
-- Roles: `editor` owns the pages and the menu (`pages.*`, `menu.edit`) beside every block; a built-in `author`
-  writes blocks (`content.edit`) and nothing else. The admin bar shows whoever has at least one entry, each
-  builtin entry carrying its permission — an editor gets *pages* and *menu*.
+  `kroomPage` context key names the page blocks bind under. `menuDepth`, `menuPanels` and `west` site settings.
+- Roles: `editor` owns the pages, which are the menu (`pages.*`; `pages.edit` guards every page and menu
+  route), beside every block; a built-in `author` writes blocks (`content.edit`) and nothing else. The admin bar
+  shows whoever has at least one entry, each builtin entry carrying its permission — an editor gets *pages*.
+- A breadcrumb in the skeleton, under the header, on any page inside a section: the site, the section, the
+  page (`kroom/regions/breadcrumb.html`, a region partial a theme may rewrite).
 - `ResourceStore.move(from, to)` and `moveAll(from, to)`: a block, or every block under a folder, changes
   place with its past — a versioned store answers the old revisions under the new path and records the move.
 - A block can be trashed: `ResourceStore.delete`, `DELETE /api/content/{path}` for its editor; a versioned
   store keeps the deletion as an empty revision, so it can be restored.
-- The menu is state: a tree of `MenuItem`s (a page's `slug` under its parent; `label` and `description` by
-  language) stored by an editor — `GET`/`PUT`/`DELETE /api/site/menu`, a *menu* panel in the bar: a compact
-  tree dragged with SortableJS (vendored, `static/lib/sortablejs`), each entry an accordion — or derived from the pages as a tree, a section no page answers
-  leading to its first page. `languages` joins the site settings beside `lang`; `requestLanguage` on
+- The pages are a tree, and the tree is the menu: what exists (templates, placeholder instances, authored
+  pages) derived by segment, arranged and worded by an editor's stored tree of `MenuItem`s (a page's `slug`
+  under its parent; `label` and `description` by language) — which never makes a page exist: a page made since
+  comes after the arranged ones, an entry no page answers is dropped. `GET`/`PUT`/`DELETE /api/site/menu`; the
+  bar's *pages* panel is that tree, compact, dragged with SortableJS (vendored, `static/lib/sortablejs`), each
+  page an accordion (label, description, the page; layout, publish, delete for an editor's), a new page typed
+  by its name. A section no page answers leads to its first page. `languages` joins the site settings beside `lang`; `requestLanguage` on
   `installContentSite` tells the site a request's language (`$site.lang`, `<html lang>`, the menu's words).
   `NavItem` gains `slug` and `resolved`; `#nav` renders descriptions.
 - Themes, take two (breaking). The regions are `$header`, `$top` (was `$hero`), `$content`, `$east` (was

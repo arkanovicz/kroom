@@ -11,17 +11,17 @@ import io.ktor.http.*
 import io.ktor.server.routing.*
 
 /**
- * What the admin bar reads, mounted under [Site.apiPrefix], all for [Permissions.ADMIN]:
+ * What the admin bar reads, mounted under [Site.apiPrefix] — for [Permissions.ADMIN], the pages for [Permissions.PAGE_EDIT]:
  *
  * ```
  * GET {prefix}/settings                the site's settings (a secret never read back)
  * PUT {prefix}/settings                {key: value} — declared keys only; "" keeps a secret, null resets
- * GET {prefix}/pages                   the page templates (route, the pages their blocks say exist) and the authored pages
- * POST {prefix}/pages                  {path, title, layout} — a new authored page, a draft
- * PUT {prefix}/pages/{path}            what changes: title, description, layout, status (draft|published)
+ * GET {prefix}/menu                    the pages as a tree — the menu: each entry's path, kind, status, whether it may move
+ * PUT {prefix}/menu                    {items} — their order and words; DELETE forgets the arrangement
+ * POST {prefix}/pages                  {path, label, layout} — a new authored page, a draft
+ * POST {prefix}/pages/move             {from, to} — an authored page without pages under it changes place, blocks and past with it
+ * PUT {prefix}/pages/{path}            what changes: layout, status (draft|published)
  * DELETE {prefix}/pages/{path}         the record goes; its blocks stay in the store
- * GET {prefix}/menu                    the menu — stored, or derived from the pages — each entry with its path, resolved or not
- * PUT {prefix}/menu                    {items} — the tree to store; DELETE goes back to the pages
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
  * PUT {prefix}/plugins/{id}/settings   {key: value} — declared keys only; "" keeps a secret, null resets
  * PUT {prefix}/plugins/{id}/enabled    {enabled} — live; enabling asks the plugin's `check`, 409 with its answer
@@ -35,36 +35,90 @@ fun Route.siteRoutes() {
 
     route(site.apiPrefix) {
 
-        get("/pages") {
+        get("/settings") {
+            admin(site) ?: return@get
+            respondJson(settingsJson(site.declaredSettings, site.settings()))
+        }
+
+        put("/settings") {
+            admin(site) ?: return@put
+            if (writeSettings("site", site.declaredSettings, site.settings())) respondSuccess()
+        }
+
+        // the pages as a tree, which is the menu: what exists, arranged and worded as stored
+        get("/menu") {
             allowed(site, Permissions.PAGE_EDIT) ?: return@get
-            respondJson {
-                set("templates", Json.MutableArray().apply {
-                    site.pages().forEach { page ->
-                        push(Json.MutableObject().apply {
-                            set("template", page.template)
-                            set("route", page.route)
-                            set("urls", Json.MutableArray().apply { page.urls.forEach { push(it) } })
-                        })
-                    }
-                })
-                set("authored", Json.MutableArray().apply { site.authored.all().forEach { push(it.toJson()) } })
-                set("layouts", Json.MutableArray().apply { SKELETON_LAYOUTS.forEach { push(it) } })
-                set("lang", site.defaultLanguage)
-                set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
+            val served = site.urls().toSet()
+            val lang = site.defaultLanguage
+            val kind = site.kinds()
+            // an editor's view: a draft resolves (they may see it), what is missing does not
+            fun state(path: String) = if (path in served) PageState.PUBLISHED else site.authored.get(path)?.let { PageState.DRAFT } ?: PageState.MISSING
+            fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
+                val path = "$parent/${item.slug}"
+                set("path", path)
+                set("kind", kind(path))
+                site.authored.get(path)?.let { page ->
+                    set("status", page.status)
+                    set("layout", page.layout)
+                    // v1 moves leaves only
+                    set("movable", item.children.isEmpty())
+                }
+                set("resolved", state(path) != PageState.MISSING)
+                set("children", Json.MutableArray().apply { item.children.forEach { push(entry(it, path)) } })
             }
+            respondJson {
+                set("stored", site.storedMenu() != null)
+                set("lang", lang)
+                set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
+                set("layouts", Json.MutableArray().apply { SKELETON_LAYOUTS.forEach { push(it) } })
+                set("items", Json.MutableArray().apply { site.menu().forEach { push(entry(it, "")) } })
+            }
+        }
+
+        put("/menu") {
+            allowed(site, Permissions.PAGE_EDIT) ?: return@put
+            val items = receiveJsonObject().getArray("items")
+                ?: return@put respondError("items expected", code = "menuInvalid", args = mapOf("message" to "items expected"))
+            val parsed = MenuItem.parseAll(items).getOrElse { e ->
+                return@put respondError(e.message ?: "invalid menu", code = "menuInvalid", args = mapOf("message" to (e.message ?: "")))
+            }
+            site.storeMenu(parsed)
+            respondSuccess()
+        }
+
+        delete("/menu") {
+            allowed(site, Permissions.PAGE_EDIT) ?: return@delete
+            site.storeMenu(null)
+            respondSuccess()
         }
 
         post("/pages") {
             val asked = receiveJsonObject()
             val path = asked.getString("path") ?: return@post respondError("path expected", code = "pageInvalid", args = mapOf("message" to "path expected"))
             val session = allowed(site, Permissions.PAGE_EDIT, path) ?: return@post
-            if (site.authored.get(path) != null || path in site.urls())
-                return@post respondError("a page already answers $path", HttpStatusCode.Conflict, "pageExists", mapOf("path" to path))
             val page = AuthoredPage.parse(asked).getOrElse { e ->
                 return@post respondError(e.message ?: "invalid page", code = "pageInvalid", args = mapOf("message" to (e.message ?: "")))
             }.copy(author = session.id)
+            if (site.authored.taken(path))
+                return@post respondError("a page already answers $path", HttpStatusCode.Conflict, "pageExists", mapOf("path" to path))
             site.authored.put(page)
+            // its words are its menu entry's: the label it was given is stored there
+            asked.getObject("label")?.entries?.associate { (k, v) -> k to v.toString() }?.filterValues { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
+                ?.let { label -> site.rewrite(path) { it.copy(label = label) } }
             respondJson(page.toJson())
+        }
+
+        post("/pages/move") {
+            val asked = receiveJsonObject()
+            val from = asked.getString("from").orEmpty()
+            val to = asked.getString("to").orEmpty()
+            val session = allowed(site, Permissions.PAGE_EDIT, from) ?: return@post
+            if (!site.can(session, Permissions.PAGE_EDIT, to))
+                return@post respondError("not allowed: ${Permissions.PAGE_EDIT}", HttpStatusCode.Forbidden, "notAllowed", mapOf("permission" to Permissions.PAGE_EDIT))
+            site.authored.move(from, to, session.id)?.let { problem ->
+                return@post respondError(problem, HttpStatusCode.Conflict, "pageMove", mapOf("message" to problem))
+            }
+            respondSuccess()
         }
 
         put("/pages/{path...}") {
@@ -84,54 +138,6 @@ fun Route.siteRoutes() {
             allowed(site, Permissions.PAGE_EDIT, path) ?: return@delete
             if (!site.authored.delete(path))
                 return@delete respondError("no authored page at $path", HttpStatusCode.NotFound, "noPage", mapOf("page" to path))
-            respondSuccess()
-        }
-
-        get("/settings") {
-            admin(site) ?: return@get
-            respondJson(settingsJson(site.declaredSettings, site.settings()))
-        }
-
-        put("/settings") {
-            admin(site) ?: return@put
-            if (writeSettings("site", site.declaredSettings, site.settings())) respondSuccess()
-        }
-
-        get("/menu") {
-            allowed(site, Permissions.MENU_EDIT) ?: return@get
-            val served = site.urls().toSet()
-            val lang = site.defaultLanguage
-            // an editor's view: a draft resolves (they may see it), what is missing does not
-            fun state(path: String) = if (path in served) PageState.PUBLISHED else site.authored.get(path)?.let { PageState.DRAFT } ?: PageState.MISSING
-            fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
-                val view = item.view(lang, lang, parent, ::state)!!
-                set("path", view.href)
-                set("resolved", view.resolved)
-                if (view.draft) set("draft", true)
-                if (item.children.isNotEmpty()) set("children", Json.MutableArray().apply { item.children.forEach { push(entry(it, view.href)) } })
-            }
-            respondJson {
-                set("stored", site.storedMenu() != null)
-                set("lang", lang)
-                set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
-                set("items", Json.MutableArray().apply { site.menu().forEach { push(entry(it, "")) } })
-            }
-        }
-
-        put("/menu") {
-            allowed(site, Permissions.MENU_EDIT) ?: return@put
-            val items = receiveJsonObject().getArray("items")
-                ?: return@put respondError("items expected", code = "menuInvalid", args = mapOf("message" to "items expected"))
-            val parsed = MenuItem.parseAll(items).getOrElse { e ->
-                return@put respondError(e.message ?: "invalid menu", code = "menuInvalid", args = mapOf("message" to (e.message ?: "")))
-            }
-            site.storeMenu(parsed)
-            respondSuccess()
-        }
-
-        delete("/menu") {
-            allowed(site, Permissions.MENU_EDIT) ?: return@delete
-            site.storeMenu(null)
             respondSuccess()
         }
 

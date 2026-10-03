@@ -24,7 +24,7 @@ class PagesTest {
         installContentSite {
             storage = this@PagesTest.storage
             sessionSecret = "test-secret"
-            identity = IdentityProvider { mapOf("admin" to setOf(Roles.ADMIN), "ed" to setOf(Roles.EDITOR), "au" to setOf(Roles.AUTHOR))[it.id].orEmpty() }
+            identity = IdentityProvider { mapOf("admin" to setOf(Roles.ADMIN), "ed" to setOf(Roles.EDITOR), "ed2" to setOf(Roles.EDITOR), "au" to setOf(Roles.AUTHOR))[it.id].orEmpty() }
             loginPage = "pages/login.html"
         }
         routing { get("/as/{who}") { call.sessions.set(UserSession(call.parameters["who"]!!, "x", null, "t")); call.respondText("ok") } }
@@ -42,7 +42,7 @@ class PagesTest {
         site()
         val editor = visitor("ed")
         assertEquals(HttpStatusCode.Forbidden, visitor("au").json(HttpMethod.Post, "/api/site/pages", """{"path":"/company"}""").status, "an author writes blocks, not pages")
-        val created = editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history","title":{"en":"Our history"},"layout":"article"}""")
+        val created = editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history","label":{"en":"Our history"},"layout":"article"}""")
         assertEquals(HttpStatusCode.OK, created.status, created.bodyAsText())
         assertContains(created.bodyAsText(), """"status":"draft"""")
 
@@ -52,7 +52,7 @@ class PagesTest {
         assertContains(draft, """data-layout="article"""")
         assertContains(draft, """data-content="pages/company/history/content.md"""", message = "the block where a template's would be, with its handle")
         assertFalse(visitor().get("/about").bodyAsText().contains("history"), "a visitor's menu does not know it")
-        assertContains(editor.get("/about").bodyAsText(), """<a href="/company/history" class="draft">History</a><small class="draft">draft</small>""")
+        assertContains(editor.get("/about").bodyAsText(), """<a href="/company/history" class="draft">Our history</a><small class="draft">draft</small>""")
 
         storage.content.write("pages/company/history/content.md", "## Since 1998\n\nA long **story**.", mapOf("author" to "ed"))
         editor.json(HttpMethod.Put, "/api/site/pages/company/history", """{"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
@@ -60,12 +60,15 @@ class PagesTest {
         assertContains(page, "<h2>Since 1998</h2>")
         assertContains(page, "A long <strong>story</strong>")
         assertContains(page, """<meta property="og:title" content="Our history">""")
-        assertContains(visitor().get("/about").bodyAsText(), """<a href="/company/history">History</a>""", message = "published, it is in the menu, under its section")
+        assertContains(visitor().get("/about").bodyAsText(), """<a href="/company/history">Our history</a>""", message = "published, it is in the menu under its section, by the name it was given: its label is its title")
         assertContains(visitor().get("/about").bodyAsText(), """<li class="section"><a href="/company/history">Company</a>""", message = "a section nobody wrote leads to its first page")
-        assertContains(visitor("admin").get("/api/site/pages").bodyAsText(), """"path":"/company/history","layout":"article"""")
+        assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/company/history","kind":"authored","status":"published","layout":"article","movable":true""")
+        editor.json(HttpMethod.Put, "/api/site/pages/company/history", """{"layout":"sidebar"}""").let { assertEquals(HttpStatusCode.OK, it.status) }
+        assertContains(visitor().get("/company/history").bodyAsText(), """data-layout="sidebar"""")
 
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history"}""").let { assertEquals(HttpStatusCode.Conflict, it.status) }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/about"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "a template's page is not for the taking") }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club/anything"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "nor a place a placeholder template would answer") }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"bad path"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status) }
         assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/company/history").status)
         assertEquals(HttpStatusCode.NotFound, visitor().get("/company/history").status)
@@ -76,7 +79,7 @@ class PagesTest {
     fun `a region is what its block makes it - a sliver for who may write it, nothing for a visitor, itself once written`() = testApplication {
         site()
         val editor = visitor("ed")
-        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/legal/notes","title":{"en":"Notes"},"status":"published"}""")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/legal/notes","label":{"en":"Notes"},"status":"published"}""")
         val asEditor = editor.get("/legal/notes").bodyAsText()
         assertContains(asEditor, """<aside class="east"><div class="kroom-region-empty">""", message = "an unwritten region: a sliver")
         assertContains(asEditor, """data-content="pages/legal/notes/east.md"""", message = "with its handle")
@@ -107,7 +110,7 @@ class PagesTest {
     fun `a block of an authored page goes through the editor like any other - lock, preview within its page, submit`() = testApplication {
         site()
         val editor = visitor("ed")
-        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company","title":{"en":"Company"}}""")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company","label":{"en":"Company"}}""")
         val path = "pages/company/content.md"
         val held = editor.post("/api/content/lock/$path")
         assertEquals(HttpStatusCode.OK, held.status, held.bodyAsText())
@@ -118,5 +121,50 @@ class PagesTest {
         val submitted = editor.json(HttpMethod.Post, "/api/content/$path", """{"page":"/company","rev":"","body":"## Written"}""")
         assertEquals(HttpStatusCode.OK, submitted.status, submitted.bodyAsText())
         assertEquals("## Written", storage.content.read(path)!!.body)
+    }
+
+    @Test
+    fun `an authored page moves with its blocks, their past and its words - unless something stands in the way`() = testApplication {
+        site()
+        val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/notes","label":{"en":"Field notes"},"status":"published"}""")
+        storage.content.write("pages/notes/content.md", "First.", mapOf("author" to "ed"))
+        storage.content.write("pages/notes/content.md", "Second.", mapOf("author" to "ed"))
+
+        assertEquals(HttpStatusCode.Forbidden, visitor("au").json(HttpMethod.Post, "/api/site/pages/move", """{"from":"/notes","to":"/legal/notes"}""").status)
+        val moved = editor.json(HttpMethod.Post, "/api/site/pages/move", """{"from":"/notes","to":"/legal/notes"}""")
+        assertEquals(HttpStatusCode.OK, moved.status, moved.bodyAsText())
+        assertEquals(HttpStatusCode.NotFound, visitor().get("/notes").status, "the old address answers nothing: no redirect is written")
+        val page = visitor().get("/legal/notes").bodyAsText()
+        assertContains(page, "Second.")
+        assertContains(page, "<title>Field notes — kroom</title>", message = "its words followed")
+        assertEquals(null, storage.content.read("pages/notes/content.md"))
+        val history = (storage.content as Versioned).log("pages/legal/notes/content.md")
+        assertEquals(listOf("moved from pages/notes/content.md", null, null), history.map { it.message }, "its past followed, and the move is in it")
+        assertContains(visitor().get("/about").bodyAsText(), """<a href="/legal/notes">Field notes</a>""")
+
+        // its words follow even under a parent the stored arrangement never heard of
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/fresh","status":"published"}""")
+        storage.records("site", "menu").put("tree", com.republicate.kson.Json.parse("""{"items":[{"slug":"legal","label":{"en":"Legal"},"children":[{"slug":"notes","label":{"en":"Field notes"}}]}]}""") as com.republicate.kson.Json.Object)
+        editor.json(HttpMethod.Post, "/api/site/pages/move", """{"from":"/legal/notes","to":"/fresh/notes"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertContains(visitor().get("/fresh/notes").bodyAsText(), "<title>Field notes — kroom</title>")
+        editor.json(HttpMethod.Post, "/api/site/pages/move", """{"from":"/fresh/notes","to":"/legal/notes"}""")
+
+        fun refused(from: String, to: String, why: String) = suspend {
+            val answer = editor.json(HttpMethod.Post, "/api/site/pages/move", """{"from":"$from","to":"$to"}""")
+            assertEquals(HttpStatusCode.Conflict, answer.status, why)
+            assertContains(answer.bodyAsText(), why)
+        }
+        refused("/legal/notes", "/about", "a page already answers /about")()
+        refused("/legal/notes", "/club/notes", "a page already answers /club/notes")()
+        refused("/about", "/legal/about", "no authored page at /about")()
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/a"}""")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/a/b"}""")
+        refused("/a", "/legal/a", "/a has pages under it")()
+        assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/a","kind":"authored","status":"draft","layout":"default","movable":false""")
+        visitor("ed2").post("/api/content/lock/pages/a/b/content.md").let { assertEquals(HttpStatusCode.OK, it.status) }
+        storage.content.write("pages/a/b/content.md", "being written", mapOf("author" to "ed2"))
+        refused("/a/b", "/b", "pages/a/b/content.md is being written by someone else")()
+        assertEquals("being written", storage.content.read("pages/a/b/content.md")!!.body, "a refused move moves nothing")
     }
 }

@@ -425,13 +425,14 @@ fun interface IdentityProvider {
 }
 installContentSite {
     identity = MemoryIdentityProvider().user("admin", "admin", Roles.ADMIN)    // the demo's; or LDAP, OIDC claims…
-    roles.grant("moderator", "forms.*")                   // admin: *; editor: content.*, pages.*, menu.edit; author: content.edit
+    roles.grant("moderator", "forms.*")                   // admin: *; editor: content.*, pages.*; author: content.edit
     loginPage = "pages/login.html"                        // POST /login, /logout over the provider
 }
 ```
 
 `Roles.can(roles, permission, target)` is open, for rights a flat table cannot say (an editor of one club's
-pages only). kroom asks `content.edit` (target: the block path) and `site.admin`.
+pages only). kroom asks `content.edit` (target: the block path),
+`pages.edit` (target: the page path) and `site.admin`.
 
 ### Plugins
 
@@ -511,7 +512,8 @@ $page.description("Un club de go à Marseille")
 The regions are `$header`, `$top`, `$content`, `$east`, `$west`, `$footer`; the layouts `default`, `article`,
 `sidebar`, `landing`. `#layout()` takes the site's `layout` setting. `$header`, `$west` and `$footer` have a
 site-wide default a page overrides by defining them: the brand, the menu and the way in; the section the
-visitor is in, its pages listed; the site's `footer` line.
+visitor is in, its pages listed; the site's `footer` line. Under the header, a breadcrumb (`$nav.trail`: the
+site, the section, the page) shows on any page inside a section — a region partial like the others.
 
 Two kinds of theme, both `Theme : Plugin`, several installed, one active (the `theme` site setting, switched
 from the admin bar, live; an admin previews another with `?theme=<id>`):
@@ -534,12 +536,26 @@ live under `static/{css,js,img,fonts}/<id>/`, private partials under `themes/<id
 hold a `DummyTheme` — every layout of the vocabulary, plainly and unmistakably — for testing a theme's path
 end to end; the demo installs it beside the basic one.
 
-### Authored pages
+### Pages and the menu
 
-A page need not be a template: an editor creates one from the bar's *pages* entry — a path (`/company/history`,
-the slug tree the menu speaks), a title and description per language, a layout — and kroom renders it through
-one template, `kroom/page.html`, each region a block in the content store right where a template's would be
-(`pages/company/history/content.md`), edited in place like any other, previewed within its page.
+The pages are a tree, and the tree is the menu: an entry is a page's segment under its parent, so the tree of
+entries *is* the tree of URLs (`company` at the root is `/company`, `history` under it `/company/history`;
+`company.html` and `company/index.html` are one page). What exists is the developers' templates — and the
+instances of their placeholder pages — plus the pages editors made. An editor's stored arrangement only orders
+and words them (`MenuItem`: `slug`, `label` and `description` by language, `children`); it never makes a page
+exist: a page made since appears after the arranged ones, an entry no page answers any more is dropped. Until
+one is stored, the tree is derived from the pages, a deeper URL nesting under its first segment.
+
+A page's label is its title, its description the page's — one field each, by language, so the menu and the page
+cannot disagree: the site's `lang` is the default, `languages` the others it speaks, and a request's language
+is what `installContentSite { requestLanguage = { it.language } }` answers (kroom-webapp-l10n's, or the
+application's), the default filling what a language lacks.
+
+**Authored pages.** A page need not be a template: an editor makes one, a record (`path`, `layout`,
+`draft`|`published`), and kroom renders it through one template, `kroom/page.html`, each region a block in the
+content store right where a template's would be (`pages/company/history/content.md`), edited in place like any
+other, previewed within its page. Authored pages answer after the templates, in the not-found phase: a
+developer's page wins, an editor cannot take `/login`. Deleting the record leaves its blocks in the store.
 
 A region is what its block makes it. Written, everyone sees it. Not written, a visitor sees nothing there —
 or the site's default, for `$header`, `$west` and `$footer` — and whoever may write it finds a sliver in its
@@ -547,35 +563,39 @@ place, unseen until hovered, that says what it is (*right sidebar*) and offers t
 itself carries the handle where there is one, and writing it overrides the default for that page. Trashing
 the block (the editor's trash, `DELETE /api/content/{path}`) brings the default, or the emptiness, back.
 
-A page is a `draft` until published: its editors see it (and the menu marks it *draft* for them), visitors
-and the sitemap do not. Authored pages answer after the templates, in the not-found phase: a developer's page
-wins, an editor cannot take `/login`. `GET`/`POST /api/site/pages`, `PUT`/`DELETE /api/site/pages/{path}`,
-for `pages.edit` — the editor's; an `author` writes blocks and nothing else. Deleting the record leaves its
-blocks in the store.
+A page is a `draft` until published: its editors see it, marked *draft* in the menu; visitors and the sitemap
+do not.
 
-### The menu
+**Moving.** An authored page with no page under it moves by being dragged under another parent — its record,
+its blocks with their history (`ResourceStore.moveAll`), its words. The move is refused when a page (or a
+placeholder template) already answers the destination, when the page has pages under it, or when someone else
+is writing one of its blocks. A developer's page is reordered among its siblings, not moved: its address is
+its template's. No redirect is written from the old address; the not-found table of the *site* entry shows
+who still asks for it.
 
-The menu is a tree of pages: an entry is a page's segment under its parent, so the tree of entries *is* the
-tree of URLs (`company` at the root is `/company`, `history` under it `/company/history`; `company.html` and
-`company/index.html` are one page). Labels and descriptions are by language:
-the site's `lang` is the default, `languages` the others it speaks, and a request's language is what
-`installContentSite { requestLanguage = { it.language } }` answers (kroom-webapp-l10n's, or the application's),
-the default filling what a language lacks. Until an admin stores one, the menu is derived from the pages, a
-deeper URL nesting under its first segment — a section no page answers leads to its first page; a draft page
-shows to its editors only, marked. Two site settings shape the rendering: `menuPanels` (the header shows a section's
-pages as a hover panel) and `west` (the section's pages on the left by default, or nothing). The bar's *menu*
-entry is a compact tree, one line per entry — a handle to drag it by (SortableJS; a phantom row shows where
-it lands, an entry's own list is how it gets a child) and its label, which opens what there is to say of it:
-the label and description in the chosen language, the page it leads to, *remove*. An entry may name a page
-that does not exist yet: it shows in red and offers to create it. Every gesture stores the tree; `GET`/`PUT`/`DELETE /api/site/menu`. An
-application computing its own menu sets `navigation = { call -> List<NavItem> }` over all this.
+**Rendering.** Three site settings shape the menu a visitor gets: `menuDepth` (how deep the header's menu goes,
+2 by default), `menuPanels` (the header shows a section's pages as a hover panel) and `west` (the section's
+pages on the left by default, or nothing). A section no page answers leads to its first page.
+
+**The *pages* entry** of the admin bar is that tree, compact, one line per page — a handle to drag it by
+(SortableJS; a phantom row shows where it lands, a page's own list, empty, is how it gets a first child;
+a developer's handle is greyed) and its label, which opens an accordion: the label and description in the
+chosen language, the page itself (a section offers to create it), and for an editor's page its layout,
+publish/unpublish, delete. A new page is typed by its name, the segment derived from it (`Notre Société` →
+`notre-societe`) until typed over. Every gesture stores the tree.
+
+`GET`/`PUT`/`DELETE /api/site/menu` (the tree; its arrangement; forgetting it), `POST /api/site/pages`
+(`{path, label, layout}`, a draft), `POST /api/site/pages/move` (`{from, to}`),
+`PUT`/`DELETE /api/site/pages/{path}` (layout, status), all for `pages.edit` — the editor's; an `author` writes
+blocks and nothing else. An application computing its own menu sets `navigation = { call -> List<NavItem> }` over all this.
 
 ### The admin bar
 
-`$site.foot()` emits, for whoever holds `site.admin`, a bar on the left of the page — the site's own settings
-(below), pages (every template and the pages its blocks say exist), journal, media, plugins with their settings
-forms (a secret is never read back), themes, roles, then the plugins' entries. Its data comes from
-`/api/site/{settings, pages, plugins, plugins/{id}/settings, themes, roles}`; its markup is built by `admin.js`. It speaks the editor's language (*The editor's words*); a plugin's
+`$site.foot()` emits, for whoever may open at least one of its entries (*pages* asks `pages.edit`, the others
+`site.admin`), a bar on the left of the page — the site's own settings (below), pages (the tree, see *Pages and
+the menu*), journal, media, plugins with their settings forms (a secret is never read back), themes (when more
+than one is installed), roles, then the plugins' entries. Its data comes from
+`/api/site/{settings, menu, pages, plugins, plugins/{id}/settings, themes, roles}`; its markup is built by `admin.js`. It speaks the editor's language (*The editor's words*); a plugin's
 words are the application's to translate, `installContentSite { strings[…] }` keyed by the plugin's ids (`<entry id>`,
 `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`,
 `<plugin>.<group>`), defaulting to what the plugin says. Pictograms: `kroomAdmin.icons`.
@@ -583,8 +603,9 @@ words are the application's to translate, `installContentSite { strings[…] }` 
 ### The site's settings
 
 The site is configured like a plugin, from the admin bar's first entry: kroom asks what every site is asked —
-*Site* (`name`, `lang`, `baseUrl`, `description`, `image`), *Mail* (`smtpHost`, `smtpPort`, `smtpSecurity`,
-`smtpUser`, `smtpPassword`, `mailFrom`), *Redirects* (`redirects`) — and the application appends its own:
+*Site* (`name`, `lang` and the other `languages`, `baseUrl`, `description`, `image`, the default `layout`, a
+`footer` line, `menuDepth`, `menuPanels`, `west`), *Mail* (`smtpHost`, `smtpPort`, `smtpSecurity`, `smtpUser`,
+`smtpPassword`, `mailFrom`), *Redirects* (`redirects`) — and the application appends its own:
 
 ```kotlin
 installContentSite { settings += Setting.text("motto", "Motto", default = "festina lente") }

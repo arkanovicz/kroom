@@ -31,7 +31,7 @@ open class Roles {
 
     companion object {
         const val ADMIN = "admin"
-        /** Owns the pages and the menu, and every block. */
+        /** Owns the pages — which is the menu — and every block. */
         const val EDITOR = "editor"
         /** Writes the blocks the pages declare, and nothing else. */
         const val AUTHOR = "author"
@@ -41,7 +41,7 @@ open class Roles {
 
     init {
         grant(ADMIN, "*")
-        grant(EDITOR, "${Permissions.CONTENT}.*", "${Permissions.PAGES}.*", Permissions.MENU_EDIT)
+        grant(EDITOR, "${Permissions.CONTENT}.*", "${Permissions.PAGES}.*")
         grant(AUTHOR, Permissions.EDIT)
     }
 
@@ -73,11 +73,9 @@ object Permissions {
     const val EDIT = "content.edit"
     /** Add a file to the media. */
     const val UPLOAD = "content.upload"
-    /** Create, publish, change or delete an authored page — target: its path. */
+    /** Create, publish, move or delete an authored page (target: its path), and arrange the pages — the menu. */
     const val PAGES = "pages"
     const val PAGE_EDIT = "pages.edit"
-    /** Store the menu. */
-    const val MENU_EDIT = "menu.edit"
     /** The site's settings, the plugins and theirs, the themes, the roles, the journal, the media. */
     const val ADMIN = "site.admin"
 }

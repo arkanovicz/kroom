@@ -180,10 +180,27 @@ class Site internal constructor(
     }
 
     /**
-     * The menu as stored, or derived from the pages — as [MenuItem]s, before any language or viewer is chosen:
-     * drafts are in, the view drops them for whoever may not see them.
+     * The pages as a tree — which is the menu — before any language or viewer is chosen: what exists (the
+     * visitors' URLs and the drafts, which the view drops for whoever may not see them), arranged and worded
+     * as an editor stored it. The stored tree orders and names; it never makes a page exist.
      */
-    fun menu(): List<MenuItem> = storedMenu() ?: MenuItem.derive((urls() + authored.all().map { it.path }).distinct(), defaultLanguage)
+    fun menu(): List<MenuItem> {
+        val derived = MenuItem.derive((urls() + authored.all().map { it.path }).distinct(), defaultLanguage)
+        return storedMenu()?.let { MenuItem.arrange(derived, it) } ?: derived
+    }
+
+    /** The entry of the page at [path] — where its words are. */
+    fun entry(path: String): MenuItem? = MenuItem.find(menu(), path.trim('/').split('/'))
+
+    /** Store [change] of the entry at [path] (its words), the tree as it stands being stored with it. */
+    fun rewrite(path: String, change: (MenuItem) -> MenuItem?) = storeMenu(MenuItem.update(menu(), path.trim('/').split('/'), change))
+
+    /** What the page at [path] is: a developer's `template`, an `instance` of a placeholder one, an `authored` page, or a `section` nobody wrote. */
+    fun kinds(): (String) -> String {
+        val sourced = pages().flatMap { page -> page.urls.map { it to if ('{' in page.route) "instance" else "template" } }.toMap()
+        val made = authored.all().associateBy { it.path }
+        return { path -> sourced[path] ?: if (path in made) "authored" else "section" }
+    }
 
     /** `$nav` for this request: the application's menu, else the site's, in the request's language. */
     fun navigation(call: ApplicationCall): Navigation {
@@ -337,14 +354,14 @@ class Site internal constructor(
 
     private val builtinEntries = listOf(
         AdminEntry("site", "site", tables = listOf(AdminTable("rules", "Redirects", "$apiPrefix/rules"), AdminTable("missing", "Not found", "$apiPrefix/missing"))),
-        AdminEntry("pages", "pages", permission = Permissions.PAGE_EDIT), AdminEntry("menu", "menu", permission = Permissions.MENU_EDIT),
+        AdminEntry("pages", "pages", permission = Permissions.PAGE_EDIT),
         AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
 
     /**
      * The admin bar's anchor: its entries as data, the markup built by admin.js — a visitor downloads none of
-     * it, as with the editor. Only for whoever holds [Permissions.ADMIN].
+     * it, as with the editor. For whoever may open at least one entry: an editor gets the pages, an admin the rest.
      */
     private fun adminBar(call: ApplicationCall): String? {
         val shown = adminEntries(call.userSession).takeIf { it.isNotEmpty() } ?: return null
@@ -446,6 +463,8 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
     val image: String get() = site.settings()["image"].orEmpty()
     /** The site's footer line, shown where a page defines no `$footer`. */
     val footer: String get() = site.settings()["footer"].orEmpty()
+    /** How many levels the header's menu shows. */
+    val menuDepth: Int get() = site.settings()["menuDepth"]?.toIntOrNull()?.coerceAtLeast(1) ?: 2
 }
 
 /** What every site is asked, in the groups the admin bar shows them in. */
@@ -458,6 +477,7 @@ internal val SITE_SETTINGS = listOf(
     Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Site"),
     Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), help = "What a page gets when it names none", group = "Site"),
     Setting.text("footer", "Footer", help = "A line at the foot of every page", group = "Site"),
+    Setting.number("menuDepth", "Menu depth", default = 2, help = "How many levels of pages the header's menu shows", group = "Site"),
     Setting.boolean("menuPanels", "Menu panels", default = false, help = "The header shows a section's pages as a panel", group = "Site"),
     Setting.choice("west", "West region", choices = listOf("section", "none"), help = "What a page shows on its left when it says nothing: the section's pages, or nothing", group = "Site"),
     Setting.text("smtpHost", "SMTP host", help = "Nothing is sent while empty", group = "Mail"),

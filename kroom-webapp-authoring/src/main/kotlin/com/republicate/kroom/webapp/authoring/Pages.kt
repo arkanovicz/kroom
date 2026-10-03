@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kroom.webapp.session.userSession
+import com.republicate.kroom.webapp.velocity.resolvePage
 import com.republicate.kroom.webapp.velocity.velocity
 import com.republicate.kson.Json
 import io.ktor.http.*
@@ -9,8 +10,9 @@ import io.ktor.server.request.path
 import io.ktor.server.response.respondText
 
 /**
- * A page an editor made, not a developer: a record — where it is, how it is laid out, what it says of itself,
- * whether it is out — and blocks, one per region, in the content store where a template's would be
+ * A page an editor made, not a developer: a record — where it is, how it is laid out, whether it is out —
+ * its words in the menu (an entry's label is the page's title, its description the page's), and blocks, one
+ * per region, in the content store where a template's would be
  * (`pages/company/history/content.md`), edited in place like any other. A single template renders them all.
  * A region is what its block makes it: written, everyone sees it; not written, whoever may write it finds a
  * sliver there with the edit handle (the site's default, for the regions that have one), and a visitor nothing.
@@ -19,8 +21,6 @@ data class AuthoredPage(
     /** `/company/history`: the slug tree, as in the menu. */
     val path: String,
     val layout: String = "default",
-    val title: Map<String, String> = emptyMap(),
-    val description: Map<String, String> = emptyMap(),
     val status: String = DRAFT,
     val author: String? = null,
     val created: Long = System.currentTimeMillis(),
@@ -31,14 +31,9 @@ data class AuthoredPage(
     /** The template path a block binds under: what `pages/company/history.html` would have been. */
     val template: String get() = "pages$path.html"
 
-    fun title(lang: String, fallback: String) = title[lang] ?: title[fallback] ?: title.values.firstOrNull() ?: path.substringAfterLast('/')
-    fun description(lang: String, fallback: String) = description[lang] ?: description[fallback]
-
     fun toJson(): Json.MutableObject = Json.MutableObject().apply {
         set("path", path)
         set("layout", layout)
-        set("title", Json.MutableObject().apply { title.forEach { (k, v) -> set(k, v) } })
-        set("description", Json.MutableObject().apply { description.forEach { (k, v) -> set(k, v) } })
         set("status", status)
         author?.let { set("author", it) }
         set("created", created)
@@ -54,18 +49,15 @@ data class AuthoredPage(
 
         /** The record from its JSON, [existing] supplying what the JSON leaves out; or why it is not one. */
         fun parse(json: Json.Object, existing: AuthoredPage? = null): Result<AuthoredPage> = runCatching {
-            // a page does not move: what exists keeps its path, whatever the JSON says
+            // what exists keeps its path, whatever the JSON says: a page moves through [AuthoredPages.move]
             val path = existing?.path ?: json.getString("path") ?: throw IllegalArgumentException("path expected")
             require(validPath(path)) { "not a page path: $path" }
             val layout = json.getString("layout") ?: existing?.layout ?: "default"
             require(layout in SKELETON_LAYOUTS) { "not a layout: $layout" }
             val status = json.getString("status") ?: existing?.status ?: DRAFT
             require(status == DRAFT || status == PUBLISHED) { "not a status: $status" }
-            fun words(key: String) = json.getObject(key)?.entries?.associate { (k, v) -> k to v.toString() }
             AuthoredPage(
                 path = path, layout = layout,
-                title = words("title") ?: existing?.title.orEmpty(),
-                description = words("description") ?: existing?.description.orEmpty(),
                 status = status, author = existing?.author, created = existing?.created ?: System.currentTimeMillis(),
                 published = if (status == PUBLISHED) existing?.published ?: System.currentTimeMillis() else null
             )
@@ -98,6 +90,33 @@ internal class AuthoredPages(private val site: Site) {
     fun visible(page: AuthoredPage, call: ApplicationCall): Boolean =
         page.isPublished || site.can(call.userSession, Permissions.PAGE_EDIT, page.path)
 
+    /** Whether something already answers [path]: an authored page, a template, or a placeholder that would take it. */
+    fun taken(path: String): Boolean =
+        get(path) != null || path in site.urls() || site.application.resolvePage(path, site.pagePrefix, site.pageExtension) != null
+
+    /**
+     * The page at [from] goes to [to]: its record, and its blocks with their past ([ResourceStore.moveAll]),
+     * and its words in the menu. Null when done; what stands in the way otherwise — a page under it (v1 moves
+     * leaves only), a place already taken, a block someone else is writing.
+     */
+    fun move(from: String, to: String, mover: String): String? {
+        val page = get(from) ?: return "no authored page at $from"
+        if (from == to) return null
+        if (!AuthoredPage.validPath(to)) return "not a page path: $to"
+        if (taken(to)) return "a page already answers $to"
+        if (all().any { it.path.startsWith("$from/") } || site.urls().any { it.startsWith("$from/") }) return "$from has pages under it"
+        val locks = site.application.authoringOrNull?.locks
+        site.storage.content.list("pages$from/").firstOrNull { block -> locks?.holder(block)?.let { it.owner != mover } == true }
+            ?.let { return "$it is being written by someone else" }
+        // its words, read while it is still there: they are stored again at its new place once it has moved
+        val words = site.storedMenu()?.let { site.entry(from) }
+        site.storage.content.moveAll("pages$from", "pages$to")
+        records.delete(id(from))
+        put(page.copy(path = to))
+        words?.let { was -> site.rewrite(to) { it.copy(label = was.label, description = was.description) } }
+        return null
+    }
+
     /**
      * Answer the request with the authored page at its path, if there is one the caller may see — the
      * site's `notFound` handler, so a developer's page always wins.
@@ -119,12 +138,17 @@ internal class AuthoredPages(private val site: Site) {
     }
 }
 
-/** `$authored` in `kroom/page.html`: the record in the request's language, and what each region is to this viewer. */
+/** `$authored` in `kroom/page.html`: the record, its words in the request's language, and what each region is to this viewer. */
 class AuthoredPageView internal constructor(private val page: AuthoredPage, private val site: Site, private val call: ApplicationCall) {
+    // a page's words are its menu entry's: one label, one description, said once
+    private val entry = site.entry(page.path)
+    private val lang = site.language(call)
+
     val path: String get() = page.path
     val layout: String get() = page.layout
-    val title: String = page.title(site.language(call), site.defaultLanguage)
-    val description: String? = page.description(site.language(call), site.defaultLanguage)
+    val title: String = entry?.label?.let { it[lang] ?: it[site.defaultLanguage] ?: it.values.firstOrNull() }
+        ?: page.path.substringAfterLast('/').replace('-', ' ').replaceFirstChar(Char::titlecase)
+    val description: String? = entry?.description?.let { it[lang] ?: it[site.defaultLanguage] }
     val draft: Boolean get() = !page.isPublished
 
     private fun block(region: String) = "pages${page.path}/$region.md"

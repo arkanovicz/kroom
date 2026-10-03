@@ -24,7 +24,7 @@ class IdentityTest {
         assertTrue(roles.can(setOf(Roles.ADMIN), "anything.at-all", ""))
         assertTrue(roles.can(setOf(Roles.EDITOR), Permissions.EDIT, "pages/x.md"))
         assertFalse(roles.can(setOf(Roles.EDITOR), Permissions.ADMIN, ""))
-        assertTrue(roles.can(setOf(Roles.EDITOR), Permissions.PAGE_EDIT, "/x") && roles.can(setOf(Roles.EDITOR), Permissions.MENU_EDIT, ""))
+        assertTrue(roles.can(setOf(Roles.EDITOR), Permissions.PAGE_EDIT, "/x"))
         assertTrue(roles.can(setOf(Roles.AUTHOR), Permissions.EDIT, "pages/x.md"))
         assertFalse(roles.can(setOf(Roles.AUTHOR), Permissions.PAGE_EDIT, "/x") || roles.can(setOf(Roles.AUTHOR), Permissions.UPLOAD, ""))
         assertTrue(roles.can(setOf("moderator"), "comments.delete", ""))

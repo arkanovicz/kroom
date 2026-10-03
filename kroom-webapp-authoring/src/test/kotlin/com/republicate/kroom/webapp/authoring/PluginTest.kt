@@ -140,7 +140,7 @@ class PluginTest {
     }
 
     @Test
-    fun `the pages panel lists routes, and the pages their blocks say exist`() = testApplication {
+    fun `the pages tree lists the pages a placeholder's blocks say exist`() = testApplication {
         site()
         val admin = visitor("admin")
         admin.post("/api/content/lock/pages/club/22Ly/agenda.md")
@@ -148,10 +148,9 @@ class PluginTest {
             contentType(ContentType.Application.Json)
             setBody("""{"page":"/club/22Ly","rev":"","body":"Jeudi."}""")
         }
-        val pages = admin.get("/api/site/pages").bodyAsText()
-        assertContains(pages, """"route":"/club/{club}"""")
-        assertContains(pages, """"urls":["/club/22Ly"]""")
-        assertContains(pages, """"route":"/login"""")
+        val pages = admin.get("/api/site/menu").bodyAsText()
+        assertContains(pages, """"path":"/club/22Ly","kind":"instance"""")
+        assertContains(pages, """"path":"/club","kind":"section"""")
     }
 
     @Test

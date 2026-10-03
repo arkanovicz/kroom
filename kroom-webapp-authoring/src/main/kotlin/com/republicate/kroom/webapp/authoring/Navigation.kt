@@ -64,6 +64,36 @@ data class MenuItem(
         }
 
         /**
+         * What exists ([derived]) arranged and worded as [stored] says: the stored entries first, in their
+         * order and with their words, then what the stored tree does not know yet (a page made since); a
+         * stored entry no page answers any more is left out. The stored tree never makes a page exist.
+         */
+        fun arrange(derived: List<MenuItem>, stored: List<MenuItem>): List<MenuItem> {
+            val existing = derived.associateBy { it.slug }
+            val known = stored.mapNotNull { s ->
+                existing[s.slug]?.let { d -> MenuItem(s.slug, s.label.ifEmpty { d.label }, s.description, arrange(d.children, s.children)) }
+            }
+            val seen = stored.map { it.slug }.toSet()
+            return known + derived.filter { it.slug !in seen }
+        }
+
+        /** The entry at [segments] in [items], or null. */
+        fun find(items: List<MenuItem>, segments: List<String>): MenuItem? {
+            val first = items.firstOrNull { it.slug == segments.firstOrNull() } ?: return null
+            return if (segments.size == 1) first else find(first.children, segments.drop(1))
+        }
+
+        /** [items] with the entry at [segments] changed by [change] — or taken out, when it answers null. */
+        fun update(items: List<MenuItem>, segments: List<String>, change: (MenuItem) -> MenuItem?): List<MenuItem> =
+            items.mapNotNull { item ->
+                when {
+                    item.slug != segments.firstOrNull() -> item
+                    segments.size == 1 -> change(item)
+                    else -> item.copy(children = update(item.children, segments.drop(1), change))
+                }
+            }
+
+        /**
          * A menu from the pages a site serves: one entry per URL, nested by segment, a section made for a
          * segment no page answers (and marked unresolved) — what a site without a menu of its own shows.
          */

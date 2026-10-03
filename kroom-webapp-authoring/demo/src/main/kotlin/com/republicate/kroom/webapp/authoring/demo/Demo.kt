@@ -66,8 +66,7 @@ private fun seed(storage: Storage) {
     val by = mapOf("author" to "admin")
     // a page an editor made, not a developer: its record, then its block beside it
     storage.records("site", "pages").put("about", AuthoredPage(
-        path = "/about", layout = "article", title = mapOf("en" to "About kroom"),
-        description = mapOf("en" to "What kroom is, in a page an editor made"),
+        path = "/about", layout = "article",
         status = AuthoredPage.PUBLISHED, author = "editor", published = System.currentTimeMillis()
     ).toJson())
     storage.content.apply {
