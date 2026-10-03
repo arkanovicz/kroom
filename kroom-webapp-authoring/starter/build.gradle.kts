@@ -18,12 +18,17 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+// the versions a generated site pins are this build's
+val pinned = mapOf(
+    "kroom" to project.version.toString(), "velocity" to libs.versions.velocity.get(), "ktor" to libs.versions.ktor.get(),
+    "kotlin" to libs.versions.kotlin.asProvider().get(), "slf4j" to libs.versions.slf4j.get()
+)
+
 tasks.processResources {
-    // the versions a generated site pins are this build's, and its wrapper is this repository's
-    filesMatching("starter/versions.properties") {
-        expand("kroom" to project.version, "velocity" to libs.versions.velocity.get(), "ktor" to libs.versions.ktor.get(),
-               "kotlin" to libs.versions.kotlin.asProvider().get(), "slf4j" to libs.versions.slf4j.get())
-    }
+    // expand's values are no task input: undeclared, a new version finds the task up to date (or restored from the
+    // build cache) and the jar ships the previous snapshot's versions — publish-snapshot.sh did exactly that
+    inputs.properties(pinned)
+    filesMatching("starter/versions.properties") { expand(pinned) }
     from(rootDir) {
         include("gradlew", "gradle/wrapper/**")
         into("starter/wrapper")
