@@ -22,8 +22,10 @@ main > .content { flex: 3 1 0; min-width: 0; }
 main > .east, main > .west { flex: 1 1 0; min-width: 0; }
 main > aside:has(> .kroom-region-empty) { flex: 0 0 1.5rem; }
 @media (max-width: 48rem) { main.container { flex-direction: column; } main > aside { flex-basis: auto !important; } }
-.west ul { list-style: none; padding: 0; }
-.west li { margin: .25rem 0; }
+/* the west is a nav too: pico lays a nav's lists out in a row, this one reads down */
+nav.west ul { display: block; list-style: none; margin: 0; padding: 0; }
+nav.west li { display: block; margin: 0; padding: .25rem 0; }
+nav.west li ul { padding-left: 1rem; }
 
 /* the breadcrumb: small, under the header */
 nav.breadcrumb { font-size: .8rem; margin-bottom: 1rem; }
