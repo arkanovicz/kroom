@@ -1,0 +1,20 @@
+# docker compose up — builds the site, runs it on :{{port}}, keeps its data under ./data
+# docker compose --profile dev up — with Mailpit beside it, catching whatever the site mails
+services:
+  {{site}}:
+    container_name: {{site}}
+    build: .
+    ports:
+      - "{{port}}:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SITE_SECRET: ${SITE_SECRET}
+    user: "${UID:-1000}:${GID:-1000}"
+
+  mailpit:
+    image: axllent/mailpit
+    profiles: ["dev"]
+    ports:
+      - "8025:8025"

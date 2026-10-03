@@ -660,6 +660,23 @@ class MyChatRoom(id: String) : Room<MyState>(id) {
 
 Ideal for games with chat: game state is authoritative, chat history is replayed on reconnect.
 
+## Starting a site
+
+From a machine with Docker and nothing else:
+
+```
+sh -c "$(curl -fsSL https://republicate.com/kroom/create.sh)"
+```
+
+The starter asks for a name, a folder, the languages, a contact email (given, the contact form is on and its
+messages go there) and a port, then writes the site: a Kotlin build pinned to the kroom it came from (and to
+its velocity engine, both published on `republicate.com/maven2`), one `Main.kt` around `installContentSite` —
+a `FileStorage` under `data/`, the basic theme, the webmaster plugin, an admin whose password is in `.env` —,
+two pages, a `Dockerfile` and a `compose.yml` running the installed distribution with `./data` bound, and a
+README. `docker compose up` builds and serves it. The starter is `kroom-webapp-authoring-starter`, a jar of
+the standard library and the templatized files under `starter/`; `create.sh` fetches the latest and runs it in
+a bare JRE container, as you, in the current directory. `publish-snapshot.sh` publishes both.
+
 ## Run Examples
 
 ```bash

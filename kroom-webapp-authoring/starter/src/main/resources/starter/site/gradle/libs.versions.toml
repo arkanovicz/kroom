@@ -1,0 +1,18 @@
+[versions]
+kroom = "{{kroomVersion}}"
+velocity = "{{velocityVersion}}"
+ktor = "{{ktorVersion}}"
+kotlin = "{{kotlinVersion}}"
+slf4j = "{{slf4jVersion}}"
+
+[libraries]
+kroom-webapp-authoring = { module = "com.republicate.kroom:kroom-webapp-authoring", version.ref = "kroom" }
+kroom-markdown = { module = "com.republicate.kroom:kroom-markdown", version.ref = "kroom" }
+kroom-plugin-webmaster = { module = "com.republicate.kroom:kroom-plugin-webmaster", version.ref = "kroom" }
+kroom-plugin-forms = { module = "com.republicate.kroom:kroom-plugin-forms", version.ref = "kroom" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+velocity-engine-scripting = { module = "org.apache.velocity:velocity-engine-scripting", version.ref = "velocity" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+
+[plugins]
+jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

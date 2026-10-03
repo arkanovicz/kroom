@@ -34,6 +34,9 @@ for (plugin in listOf("webmaster", "forms")) {
 // The authoring demo, a thing you can click
 include("kroom-webapp-authoring-demo")
 project(":kroom-webapp-authoring-demo").projectDir = file("kroom-webapp-authoring/demo")
+// The site starter: a jar that asks a few questions and writes a site (republicate.com/kroom/create.sh runs it)
+include("kroom-webapp-authoring-starter")
+project(":kroom-webapp-authoring-starter").projectDir = file("kroom-webapp-authoring/starter")
 // Examples
 include("kroom-examples:chifoumi")
 project(":kroom-examples:chifoumi").projectDir = file("kroom-examples/chifoumi")
