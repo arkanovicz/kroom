@@ -600,6 +600,13 @@ words are the application's to translate, `installContentSite { strings[…] }` 
 `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`,
 `<plugin>.<group>`), defaulting to what the plugin says. Pictograms: `kroomAdmin.icons`.
 
+### Warm-up
+
+Interpreted templates cost their compile the first time — the runtime compiler's start, then each template's —,
+several seconds on a fresh JVM. Once the server listens, a content site asks itself for `/` in the background,
+the whole way through (layout, regions, blocks), and logs how long it took; the first visitor finds the home
+page warm. `installContentSite { warmUp = false }` turns it off; other pages still pay their own first compile.
+
 ### The site's settings
 
 The site is configured like a plugin, from the admin bar's first entry: kroom asks what every site is asked —

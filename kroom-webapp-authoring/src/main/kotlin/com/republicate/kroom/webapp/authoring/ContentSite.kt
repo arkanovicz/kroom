@@ -106,6 +106,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         }
     }
     site.startJobs()
+    if (config.warmUp) warmUp()
 
     routing {
         kroomAssets()                 // /js/kroom/*: the house stack authoring.js builds on
@@ -204,6 +205,9 @@ class ContentSiteConfig {
 
     /** How a request's language is known — `{ it.language }` with kroom-webapp-l10n installed; null: the site's default. */
     var requestLanguage: ((ApplicationCall) -> String?)? = null
+
+    /** Whether the site asks itself for `/` once it listens, so its first visitor does not wait for the compilers. */
+    var warmUp: Boolean = true
 
     /** Where the admin API mounts; under `/api/`, where api.js roots its calls. */
     var siteApiPrefix: String = "/api/site"

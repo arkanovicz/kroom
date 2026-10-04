@@ -7,6 +7,8 @@ All notable changes to kroom will be documented in this file.
 ### Changed (breaking)
 
 #### kroom-webapp-authoring
+- (added) Warm-up: once the server listens, a content site requests `/` from itself in the background, so the
+  first visitor does not pay the compilers' start (`warmUp`, on by default).
 - kroom's own templates name with `_`, never `-`, so a build can compile them (a compiled template's path
   segments are identifiers): `kroom/block_wrapper.html` (the default `markdown.block.wrapper`, was
   `block-wrapper.html`), `kroom/regions/{header,west,footer}_default.html`.
