@@ -164,7 +164,7 @@ class ContentSiteConfig {
     var pageExtension: String = "html"
 
     /** The template decorating each block; kroom's own ships in this module. */
-    var wrapper: String = "kroom/block-wrapper.html"
+    var wrapper: String = "kroom/block_wrapper.html"
 
     /**
      * Page-context tools every block may use, by name. A block sees nothing else of the page but what the

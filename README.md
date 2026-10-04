@@ -281,7 +281,7 @@ installSessions { … }
 installVelocity {
     // the engine is built at install, before authoring exists: the page side is wired here
     properties["markdown.loader"] = store                 // blocks read from the tree the editor writes
-    properties["markdown.block.wrapper"] = "kroom/block-wrapper.html"
+    properties["markdown.block.wrapper"] = "kroom/block_wrapper.html"
 }
 installAuthoring {
     this.store = store
@@ -325,7 +325,7 @@ new revision through the ordinary submit, which keeps the journal honest.
 
 `markdown.block.wrapper` names a template the `#markdown` macro renders in place of the bare html, with
 `$path`, `$name` and `$html` added to the page context. This module ships the default one at the classpath
-root as `kroom/block-wrapper.html` — root, so it resolves under every engine shape (dev's `classpath` loader,
+root as `kroom/block_wrapper.html` — root, so it resolves under every engine shape (dev's `classpath` loader,
 production's `root` loader) — and it emits the block plus, for an author `$authoring.canEdit` accepts, one
 edit button. The editor markup itself is built by `authoring.js` when editing starts: a visitor downloads none
 of it.

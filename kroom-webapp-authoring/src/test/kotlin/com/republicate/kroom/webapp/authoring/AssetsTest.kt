@@ -60,8 +60,8 @@ class AssetsTest {
 
     @Test
     fun `the default wrapper sits where every engine shape looks for it`() {
-        val wrapper = Thread.currentThread().contextClassLoader.getResourceAsStream("kroom/block-wrapper.html")
-        assertNotNull(wrapper, "kroom/block-wrapper.html must sit at the classpath root")
+        val wrapper = Thread.currentThread().contextClassLoader.getResourceAsStream("kroom/block_wrapper.html")
+        assertNotNull(wrapper, "kroom/block_wrapper.html must sit at the classpath root")
         val source = wrapper.reader().readText()
         assertTrue(source.contains("\$authoring.canEdit(\$logged, \$path)"))
         assertTrue(source.contains("data-content=\"\$path\""))

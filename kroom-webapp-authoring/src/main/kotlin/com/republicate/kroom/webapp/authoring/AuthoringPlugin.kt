@@ -104,11 +104,11 @@ val Application.authoringOrNull: AuthoringPlugin?
 /**
  * Install the edit API and mount it under [AuthoringConfig.apiPrefix].
  *
- * The default block wrapper ships here as `kroom/block-wrapper.html` — at the classpath root, so every
+ * The default block wrapper ships here as `kroom/block_wrapper.html` — at the classpath root, so every
  * engine shape resolves it — but authoring cannot select it: velocity is installed first and its engine
  * is already built, so the application names it itself, in `installVelocity`:
  *
- *     properties["markdown.block.wrapper"] = "kroom/block-wrapper.html"
+ *     properties["markdown.block.wrapper"] = "kroom/block_wrapper.html"
  */
 fun Application.installAuthoring(block: AuthoringConfig.() -> Unit = {}) {
     val plugin = AuthoringPlugin(AuthoringConfig().apply(block))

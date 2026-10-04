@@ -7,6 +7,9 @@ All notable changes to kroom will be documented in this file.
 ### Changed (breaking)
 
 #### kroom-webapp-authoring
+- kroom's own templates name with `_`, never `-`, so a build can compile them (a compiled template's path
+  segments are identifiers): `kroom/block_wrapper.html` (the default `markdown.block.wrapper`, was
+  `block-wrapper.html`), `kroom/regions/{header,west,footer}_default.html`.
 - `strings` no longer rewords the editor or the admin bar: kroom ships their words (en, fr, `language`).
   `installContentSite { strings[…] }` remains for what the bar says of a plugin, keyed by the plugin's ids;
   `installAuthoring { strings }` and `kroomAuthoring.strings` are gone.
