@@ -10,6 +10,7 @@ import com.republicate.kroom.webapp.authoring.MemoryStorage
 import com.republicate.kroom.webapp.authoring.Roles
 import com.republicate.kroom.webapp.authoring.Storage
 import com.republicate.kroom.webapp.authoring.installContentSite
+import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -42,7 +43,9 @@ fun Application.demo(storage: Storage = MemoryStorage()) {
         placeholder = "*Nothing here yet for **\$name**.*"
         // the dummy theme beside the basic one: the themes panel has something to switch
         plugins += listOf(Webmaster(), Forms(), BasicTheme(), DummyTheme())
+        blockTools += "stack"
     }
+    velocity.registerApplication("stack") { STACK }
 
     // dockerized (demo/compose.yml): mail goes to Mailpit, a debugging mailbox on its own port, and each form
     // message to the admin
@@ -93,6 +96,16 @@ private fun seed(storage: Storage) {
             Topics: [authoring](/topics/authoring), [themes](/topics/themes), [plugins](/topics/plugins) — and
             a topic nobody wrote yet, [go](/topics/go), to see a page before its words.
         """.trimIndent(), by)
+        write("pages/stack.md", """
+            ### The stack
+
+            %foreach(${'$'}p in ${'$'}stack.projects)
+            - [${'$'}p.name](${'$'}p.url) — ${'$'}p.summary
+            %end
+
+            This list is a block reading `${'$'}stack`, a tool the site hands every block: edit it and type `${'$'}`,
+            then a dot — the editor offers what each level holds.
+        """.trimIndent(), by)
         write("pages/contact/contact.md", """
             Say hello. The form is the forms plugin's, dropped into this block with one call:
 
@@ -103,8 +116,10 @@ private fun seed(storage: Storage) {
         """.trimIndent(), by)
         write("pages/topics/authoring/body.md", """
             One tree, read by the renderer and written by the editor: a block is a markdown file beside the
-            page that shows it, and *${'$'}topic* is the folder this one sits in. Locks, history, drafts and a
+            page that shows it, and *${'$'}topic.name* is the folder this one sits in. Locks, history, drafts and a
             preview that is the page itself come with the editor.
+
+            Built on %foreach(${'$'}p in ${'$'}topic.projects)[${'$'}p.name](${'$'}p.url)%if(${'$'}foreach.hasNext) and %end%end.
         """.trimIndent(), by)
         write("pages/topics/themes/body.md", """
             A page defines its regions and names its layout; the active theme lays them out. Two are installed

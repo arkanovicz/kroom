@@ -1,6 +1,8 @@
-#set($title = $topic)
+##@ topic: String
+##@ subject: com.republicate.kroom.webapp.authoring.demo.Topic = $stack.topic($topic)
+#set($title = $subject.title)
 #define($content)
-<h1>$topic</h1>
-#markdown("body", {"topic": $topic})
+<h1>$subject.title</h1>
+#markdown("body", {"topic": $subject})
 #end
 #layout("article")

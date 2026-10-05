@@ -151,6 +151,9 @@ All notable changes to kroom will be documented in this file.
   authoring tests': its own pages (home, contact, a topic per placeholder, login) and four ways in — admin,
   editor, an author who edits the topics only (a `Roles` subclass scoping `content.edit`), a visitor. The
   `DummyTheme` moves to kroom-webapp-authoring's test fixtures, for its tests and the demo.
+- `$stack`, a block tool: the libraries the site stands on (`$stack.projects`, `$stack.byName`), listed by a
+  home-page block — typed data for the editor's completion to unfold. A topic page turns its path segment into a
+  `Topic` in its header (`##@ subject: …Topic = $stack.topic($topic)`), the pattern a real site uses.
 
 #### kroom-plugin-webmaster, -forms
 - Example plugins under `kroom-webapp-authoring/plugins/`, one artifact each, all in the demo. A `DummyTheme` —

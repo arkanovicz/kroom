@@ -95,7 +95,7 @@ class DemoSiteTest {
         assertEquals(HttpStatusCode.OK, preview.status)
         val html = preview.bodyAsText()
         assertContains(html, "brouillon <em>en cours</em>")
-        assertContains(html, "<h1>go</h1>")            // the page, not a fragment
+        assertContains(html, "<h1>Go</h1>")            // the page, not a fragment
         assertEquals(null, store.read(path))           // and nothing was written
     }
 
@@ -148,6 +148,30 @@ class DemoSiteTest {
         store.write("pages/topics/lyon/body.md", "Le club de Lyon.", mapOf("author" to "admin"))
         val page = visitor().get("/topics/lyon").bodyAsText()
         assertContains(page, "Le club de Lyon.")
-        assertContains(page, "<h1>lyon</h1>")   // the route's own binding, in the page's context
+        assertContains(page, "<h1>Lyon</h1>")   // the route's own binding, made a topic by the page's header
+    }
+
+    /** `$stack` is the blocks' to read: the home page lists it, a topic page hands its topic down typed. */
+    @Test
+    fun `blocks read the stack, and completion unfolds it`() = testApplication {
+        site()
+        val home = visitor().get("/index").bodyAsText()
+        assertContains(home, """<a href="https://github.com/arkanovicz/skorm">skorm</a>""")
+        val topic = visitor().get("/topics/authoring").bodyAsText()
+        assertContains(topic, """Built on <a href="/index">kroom</a> and <a href="https://velocity.apache.org">velocity</a>.""")
+
+        val author = visitor("admin")
+        val path = "pages/topics/authoring/body.md"
+        author.post("/api/content/lock/$path")
+        val first = author.post("/api/content/shape/$path") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"page":"/topics/authoring"}""")
+        }.bodyAsText()
+        assertContains(first, """"topic":{}""")
+        assertContains(first, """"stack":{}""")
+        val project = author.get("/api/content/shape/$path?at=topic.projects[]").bodyAsText()
+        listOf(""""name":"String"""", """"summary":"String"""", """"url":"String"""", """"dependsOn":[{}]""")
+            .forEach { assertContains(project, it) }
+        assertContains(author.get("/api/content/shape/$path?at=stack.byName").bodyAsText(), """"*":{}""")
     }
 }
