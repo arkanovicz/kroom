@@ -416,3 +416,45 @@ ul.kroom-revisions button {
 .kroom-region-default > .kroom-block {
     min-height: 1.5rem;
 }
+
+/* completion: what may follow the reference at the caret, under it */
+.kroom-pane[data-pane="source"] {
+    position: relative;
+}
+
+.kroom-complete {
+    position: absolute;
+    z-index: 10;
+    min-width: 12rem;
+    max-height: 12rem;
+    overflow: auto;
+    margin: 0;
+    padding: .25rem 0;
+    list-style: none;
+    border: 1px solid var(--pico-muted-border-color, #ddd);
+    border-radius: var(--pico-border-radius, .25rem);
+    background: var(--pico-background-color, #fff);
+    color: var(--pico-color, inherit);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .2);
+    font-family: var(--pico-font-family-monospace, ui-monospace, monospace);
+    font-size: .8rem;
+}
+
+.kroom-complete li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0;
+    padding: .125rem .5rem;
+    list-style: none;
+    cursor: pointer;
+}
+
+.kroom-complete li[aria-selected="true"] {
+    background: var(--pico-primary-background, #2563eb);
+    color: var(--pico-primary-inverse, #fff);
+}
+
+.kroom-complete small {
+    opacity: .7;
+}

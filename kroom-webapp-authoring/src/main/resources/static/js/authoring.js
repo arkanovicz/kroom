@@ -176,7 +176,7 @@
         ? t(err.data.code, err.data.args) : err.message;
     const said = (err) => t('error', { message: reason(err) });
 
-    // one block at a time: { block, root, path, rev, textarea, editor, body, timer, previewed }
+    // one block at a time: { block, root, path, rev, textarea, editor, body, timer, previewed, levels, completion, … }
     let session = null;
 
     // --- plumbing --------------------------------------------------------------------------------
@@ -382,12 +382,17 @@
 
         session = {
             block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: held.body,
-            stored: held.body, startRev: held.rev, draft: drafts.read(block), kept: true
+            stored: held.body, startRev: held.rev, draft: drafts.read(block), kept: true,
+            levels: new Map(), completion: null, accepting: false
         };
         block.addClass('kroom-editing');
         document.documentElement.addClass('kroom-busy');
         textarea.on('input', typed);
+        textarea.on('input', complete);
+        textarea.on('keydown', choose);
         textarea.on('keydown', shortcut);
+        textarea.on('click', closeCompletion);
+        textarea.on('blur', closeCompletion);
         textarea.on('paste', pasted);
         textarea.on('drop', dropped);
         textarea.on('dragover', e => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
@@ -657,6 +662,177 @@
         session.block.removeClass('kroom-editing');
         document.documentElement.removeClass('kroom-busy');
         session = null;
+    }
+
+    // --- completion ------------------------------------------------------------------------------
+
+    // What a block sees, asked the first time `$` is typed — its page renders once — then one level per `.`
+    // (GET shape?at=club.membres()[]). A level maps a key to a type name (a leaf), {} (it unfolds) or [x] (it
+    // iterates over x); `*` is any key of a map, and a call's key spells its required parameters.
+
+    const MEMBER = String.raw`[A-Za-z_]\w*(?:\([^()]*\))?`;
+    // the reference ending at the caret, on its line: `$club.membres().no` → path `club.membres().`, word `no`
+    const TYPING = new RegExp(String.raw`(?:^|[^\\])\$!?\{?((?:${MEMBER}\.)*)([A-Za-z_]\w*)?$`);
+    // what opens and closes a block of VTL, a %foreach saying what its variable iterates over
+    const NESTING = new RegExp(String.raw`%\{?(foreach|if|macro|define|@\w+|end)\b\}?(?:\(\s*\$(\w+)\s+in\s+\$!?\{?((?:${MEMBER}\.)*${MEMBER}))?`, 'g');
+
+    /** After each keystroke: what may follow the reference at the caret, if the caret ends one. */
+    async function complete() {
+        const held = session, textarea = held.textarea;
+        if (held.accepting) return;
+        const caret = textarea.selectionStart;
+        const before = textarea.value.slice(0, caret);
+        const typing = caret === textarea.selectionEnd && TYPING.exec(before.slice(before.lastIndexOf('\n') + 1));
+        if (!typing) return closeCompletion();
+        const segments = typing[1].split('.').slice(0, -1), word = typing[2] || '';
+        const open = loops(before);
+        const steps = await stepsOf(segments, open);
+        const level = steps && await levelAt(steps);
+        // the author moved on while the server answered
+        if (session !== held || textarea.selectionStart !== caret || textarea.value.slice(0, caret) !== before) return;
+        if (!level) return closeCompletion();
+        const offered = Object.entries(level).filter(([key]) => key !== '*');
+        if (!segments.length) open.forEach(loop => offered.push([loop.name, `∈ $${loop.path}`]));
+        const shown = offered
+            .filter(([key]) => key !== word && key.toLowerCase().startsWith(word.toLowerCase()))
+            .sort(([a], [b]) => a.localeCompare(b));
+        if (shown.length) showCompletion(shown, caret - word.length);
+        else closeCompletion();
+    }
+
+    /** The %foreach loops still open before the caret, innermost last. */
+    function loops(before) {
+        const open = [];
+        for (const m of before.matchAll(NESTING)) {
+            if (m[1] === 'end') open.pop();
+            else open.push(m[1] === 'foreach' && m[2] ? { name: m[2], path: m[3] } : null);
+        }
+        return open.filter(Boolean);
+    }
+
+    /** The server's steps for what was typed — a loop variable stands for an element of what it iterates over. */
+    async function stepsOf(segments, open) {
+        let steps = [], rest = segments;
+        const index = segments.length ? open.map(l => l.name).lastIndexOf(segments[0]) : -1;
+        if (index >= 0) {
+            steps = await stepsOf(open[index].path.split('.'), open.slice(0, index));
+            if (!steps) return null;
+            steps.push('[]');
+            rest = segments.slice(1);
+        }
+        for (const segment of rest) {
+            const level = await levelAt(steps);
+            const key = level && keyOf(level, segment);
+            if (!key) return null;
+            steps = steps.concat(key);
+        }
+        return steps;
+    }
+
+    /** The level's key for a typed member: `greet('Ada')` is `greet(name)`, any name is a map's. */
+    function keyOf(level, segment) {
+        const call = segment.indexOf('(');
+        if (call >= 0) return Object.keys(level).find(key => key.startsWith(segment.slice(0, call + 1))) || null;
+        return segment in level || '*' in level ? segment : null;
+    }
+
+    /** A level, asked once per editing session; null when the server knows nothing there. */
+    function levelAt(steps) {
+        const held = session;
+        const at = steps.map(step => step === '[]' ? step : '.' + step).join('').slice(1);
+        if (!held.levels.has(at)) held.levels.set(at, (steps.length
+            ? api.getJson(`${held.root}shape/${held.path}?at=${encodeURIComponent(at)}`)
+            : api.postJson(`${held.root}shape/${held.path}`, { page: window.location.pathname })
+        ).catch(() => null));
+        return held.levels.get(at);
+    }
+
+    function showCompletion(entries, from) {
+        const textarea = session.textarea;
+        let list = session.completion?.list;
+        if (!list) {
+            list = textarea.parentNode.appendChild(element('ul', 'kroom-complete'));
+            list.attr('role', 'listbox');
+            // a click must not blur the textarea first, which would close the list under the pointer
+            list.on('mousedown', event => {
+                event.preventDefault();
+                const item = event.target.closest('li');
+                if (item) acceptCompletion(Number(item.data('index')));
+            });
+        }
+        list.clear();
+        entries.forEach(([key, value], index) => {
+            const item = list.appendChild(element('li'));
+            item.attr('role', 'option').data('index', String(index));
+            item.appendChild(element('span', null, key));
+            item.appendChild(element('small', null, typeof value === 'string' ? value : Array.isArray(value) ? '[…]' : '{…}'));
+        });
+        session.completion = { list, entries, from, index: 0 };
+        const at = caretAt(textarea, from);
+        list.style.top = `${textarea.offsetTop + at.top + at.height}px`;
+        list.style.left = `${Math.max(0, Math.min(textarea.offsetLeft + at.left, textarea.parentNode.clientWidth - list.offsetWidth))}px`;
+        selectCompletion(0);
+    }
+
+    function selectCompletion(index) {
+        const completion = session.completion;
+        completion.index = (index + completion.entries.length) % completion.entries.length;
+        [...completion.list.children].forEach((item, i) => item.attr('aria-selected', String(i === completion.index)));
+        completion.list.children[completion.index].scrollIntoView?.({ block: 'nearest' });
+    }
+
+    /** The key replaces the word typed so far; a call's parameters come selected, to type over. */
+    function acceptCompletion(index) {
+        const { entries, from } = session.completion;
+        const key = entries[index][0];
+        const textarea = session.textarea, end = textarea.selectionStart;
+        const call = key.indexOf('(');
+        closeCompletion();
+        session.accepting = true;
+        try {
+            if (call < 0 || key.endsWith('()')) replace(textarea, from, end, key);
+            else replace(textarea, from, end, key, call + 1, key.length - 1);
+        } finally {
+            session.accepting = false;
+        }
+    }
+
+    function closeCompletion() {
+        session?.completion?.list.remove();
+        if (session) session.completion = null;
+    }
+
+    /** While the list is open: the arrows walk it, Enter or Tab take a key, Escape closes it. */
+    function choose(event) {
+        const completion = session.completion;
+        if (!completion) return;
+        const moves = { ArrowDown: 1, ArrowUp: -1 };
+        if (event.key in moves) selectCompletion(completion.index + moves[event.key]);
+        else if (event.key === 'Enter' || event.key === 'Tab') acceptCompletion(completion.index);
+        else if (event.key === 'Escape') closeCompletion();
+        else {
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') closeCompletion();
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+
+    /** Where the character at [index] sits in the textarea: a hidden copy laid out alike, up to there. */
+    function caretAt(textarea, index) {
+        const style = getComputedStyle(textarea);
+        const mirror = document.body.appendChild(element('div'));
+        ['boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth',
+            'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderStyle', 'fontFamily', 'fontSize',
+            'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'textTransform', 'wordSpacing', 'tabSize',
+            'textIndent'].forEach(property => { mirror.style[property] = style[property]; });
+        Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', top: '0', left: '-9999px',
+            whiteSpace: 'pre-wrap', overflowWrap: 'break-word' });
+        mirror.textContent = textarea.value.slice(0, index);
+        const mark = mirror.appendChild(element('span', null, '\u200b'));
+        const at = { top: mark.offsetTop - textarea.scrollTop, left: mark.offsetLeft - textarea.scrollLeft, height: mark.offsetHeight };
+        mirror.remove();
+        return at;
     }
 
     // --- history ---------------------------------------------------------------------------------

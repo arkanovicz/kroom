@@ -42,6 +42,10 @@ All notable changes to kroom will be documented in this file.
   as the block sandbox lists them (velocity `-20261005-01`'s `Navigation`). Types are kept, never values.
 
 #### kroom-webapp-authoring
+- The editor completes `$` and each `.`: what the block sees, then the members its sandbox lets through, a
+  `%foreach` variable unfolding as an element of what it iterates over. The page renders on the first `$` of
+  an editing session, never on opening; arrows walk the list, Enter or Tab take a key (a call's parameters come
+  selected), Escape closes it.
 - `POST`/`GET {prefix}/shape/{path...}`: what a block sees, for the editor's completion. The page renders once
   (the lock keeps the walk), then each `.` unfolds a level without rendering again.
 - The analytics and webhook plugins are gone: a counter's snippet is a line in a layout, and `onPublish` stays

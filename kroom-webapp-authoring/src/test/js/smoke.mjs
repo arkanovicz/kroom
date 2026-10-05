@@ -334,5 +334,79 @@ const seeded = (draft) => `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.s
     check('and comes back as markdown at the caret', textarea.value, '## Titre![Club photo](/media/x-club.png)');
 }
 
+// --- completion: what may follow `$` and each `.`, asked of the server one level at a time ------------
+{
+    const levels = {
+        '': { club: {}, titre: 'String' },
+        club: { nom: 'String', 'membres()': [{}], 'greet(name)': 'String' },
+        'club.membres()[]': { prenom: 'String' }
+    };
+    const { calls, click, $, window } = page((url, method) => {
+        if (url.includes('/lock/')) return held;
+        if (url.includes('/shape/')) {
+            const at = method === 'POST' ? '' : decodeURIComponent(url.split('?at=')[1]);
+            return at in levels ? { payload: levels[at] } : { status: 404, payload: { message: 'nothing', code: 'noSuchMember' } };
+        }
+        return {};
+    });
+    click('.kroom-edit');
+    await sleep(20);
+    const textarea = $('.kroom-block textarea');
+    const type = async (text) => {
+        textarea.value = text;
+        textarea.setSelectionRange(text.length, text.length);
+        textarea.dispatchEvent(new window.Event('input', { bubbles: true }));
+        await sleep(20);
+    };
+    const key = async (name) => {
+        textarea.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
+        await sleep(20);
+    };
+    const offered = () => [...window.document.querySelectorAll('.kroom-complete li span')].map(s => s.textContent);
+    const selected = () => window.document.querySelector('.kroom-complete li[aria-selected="true"] span')?.textContent;
+
+    check('opening a block asks nothing of its shape', calls.some(c => c.url.includes('/shape/')), false);
+    await type('$');
+    check('the first $ learns the shape from the page', calls.find(c => c.url.includes('/shape/')),
+        { url: `/api/content/shape/${PATH}`, method: 'POST', body: { page: '/club/13Ma' } });
+    check('and offers what the block sees', offered(), ['club', 'titre']);
+    await type('$cl');
+    check('narrowed by what is typed', offered(), ['club']);
+    await key('Enter');
+    check('Enter writes the key', textarea.value, '$club');
+    check('and closes the list', $('.kroom-complete'), null);
+
+    await type('$club.');
+    check('a dot unfolds the next level', offered(), ['greet(name)', 'membres()', 'nom']);
+    check('asking the server for it', calls[calls.length - 1].url, `/api/content/shape/${PATH}?at=club`);
+    await key('ArrowDown');
+    check('the arrows walk the list', selected(), 'membres()');
+    await key('Enter');
+    check('a call without parameters leaves the caret after it', [textarea.value, textarea.selectionStart], ['$club.membres()', 15]);
+
+    await type('Bonjour $club.');
+    await key('Enter');
+    check('a call\'s parameters come selected, to type over',
+        [textarea.value, textarea.value.slice(textarea.selectionStart, textarea.selectionEnd)], ['Bonjour $club.greet(name)', 'name']);
+
+    await type('%foreach($m in $club.membres())\n- $m.');
+    check('a loop variable unfolds as an element of what it iterates over', offered(), ['prenom']);
+    check('asked as such', calls[calls.length - 1].url, `/api/content/shape/${PATH}?at=${encodeURIComponent('club.membres()[]')}`);
+    await type('%foreach($m in $club.membres())\n- $');
+    check('and is offered beside what the block sees', offered(), ['club', 'm', 'titre']);
+    await type('%foreach($m in $club.membres())\n%end\n$m.');
+    check('until its %end', $('.kroom-complete'), null);
+
+    await type('prix \\$');
+    check('an escaped $ offers nothing', $('.kroom-complete'), null);
+    await type('$club.nope.');
+    check('a member the level lacks offers nothing', $('.kroom-complete'), null);
+    await type('$club.');
+    await key('Escape');
+    check('Escape closes the list', $('.kroom-complete'), null);
+    check('the page rendered once, each level was asked once',
+        calls.filter(c => c.url.includes('/shape/')).map(c => c.url.split('?at=')[1] ?? c.method), ['POST', 'club', encodeURIComponent('club.membres()[]')]);
+}
+
 console.log(failures ? `\n${failures} failure(s)` : '\nall good');
 process.exit(failures ? 1 : 0);
