@@ -23,6 +23,10 @@ All notable changes to kroom will be documented in this file.
   `installAuthoring` takes `identity`/`roles` likewise. The default provider knows nobody: nothing is editable
   until one is given (it used to be any session).
 
+#### kroom-markdown
+- The default ACL also refuses `$x.class` (`- java.lang.Object#getClass`): velocity leaves it to the ACL as
+  2.x-legitimate, but a block has no business with reflection.
+
 ### Added
 
 #### kroom-webapp-authoring-starter

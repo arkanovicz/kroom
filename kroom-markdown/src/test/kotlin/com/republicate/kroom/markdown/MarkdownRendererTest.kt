@@ -344,6 +344,17 @@ class MarkdownRendererTest {
         assertContains(open.renderSource(conjured, ctx()), "[hostname]")
     }
 
+    /** No reflection either: `$x.class` is 2.x-legitimate, so velocity leaves it to the ACL, and kroom's says no. */
+    @Test
+    fun `a block cannot reach a value's class by default`() {
+        val club = ctx("club" to Club("Les Vagabonds"))
+        // a refused member reads null, which strict mode refuses in turn
+        assertContains(assertFails { renderer.renderSource("\$club.class\n", club) }.message.orEmpty(), "\$club.class evaluated to null")
+        // the pin has teeth: velocity's own ACL lets it through
+        assertContains(MarkdownRenderer(config("acl" to org.apache.velocity.engine.runtime.introspection.Sandbox.DEFAULT_ACL))
+            .renderSource("\$club.class\n", club), "Club")
+    }
+
     /**
      * The other side of that rule: what an author legitimately writes still works — literals the engine
      * owns, a loop over one, and members of the values the page handed the block.

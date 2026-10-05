@@ -16,8 +16,9 @@ data class MarkdownConfig(
     /** Where blocks are read from — typically the same store the editor writes through. */
     val loader: ResourceLoader = ResourceLoader { throw ResourceNotFoundException("no markdown loader configured for \"$it\"") },
 
-    /** The sandbox's rules, in velocity's ACL syntax; null runs blocks unsandboxed. */
-    val acl: String? = Sandbox.DEFAULT_ACL + "\n- write *",
+    /** The sandbox's rules, in velocity's ACL syntax; null runs blocks unsandboxed. No `$x.class` either: a
+     *  block has no business with reflection, and the editor's completion lists what the sandbox lets through. */
+    val acl: String? = Sandbox.DEFAULT_ACL + "\n- write *\n- java.lang.Object#getClass",
 
     /** Page-context tools every block may use, by name; a block sees nothing else but its arguments. */
     val tools: List<String> = emptyList(),
