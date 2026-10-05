@@ -179,6 +179,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-authoring
+- An authored page's editable default for its header, west and footer was kroom's generic region by literal
+  path, so a Skin's rewritten `*_default` never reached the block; the defaults now resolve through the theme
+  (`$site.region("header_default")`), in `kroom/page.html` and kroom's own regions alike (reported from site2026).
+
 #### kroom-webapp-core
 - `installCore`'s 404 handler replaced every 404 body with plain `Not Found` — an API's JSON error included,
   so the editor never received `noPage`, `noHistory` or `noSuchRevision` (reported from site2026). Only a 404

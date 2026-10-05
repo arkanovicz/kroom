@@ -1,2 +1,2 @@
 ## The page's own footer, or the site's line.
-<footer class="container">#if($footer)$footer#else#parse("kroom/regions/footer_default.html")#end</footer>
+<footer class="container">#if($footer)$footer#else#parse($site.region("footer_default"))#end</footer>

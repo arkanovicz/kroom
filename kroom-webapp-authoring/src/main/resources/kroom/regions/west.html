@@ -1,2 +1,2 @@
 ## The page's own west, or the site's.
-#if($west)<aside class="west">$west</aside>#else#parse("kroom/regions/west_default.html")#end
+#if($west)<aside class="west">$west</aside>#else#parse($site.region("west_default"))#end

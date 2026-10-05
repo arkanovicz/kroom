@@ -51,6 +51,21 @@ class NavigationTest {
         assertFalse(client.get("/about").bodyAsText().contains("breadcrumb"), "a top-level page has none")
     }
 
+    /** A stored tree orders and words what exists; an instance written under a stored section is still there. */
+    @Test
+    fun `an instance of a placeholder page stays under its stored section`() = testApplication {
+        site()
+        storage.content.write("pages/club/13Ma/description.md", "Le club", mapOf("author" to "admin"))
+        val admin = admin()
+        assertContains(admin.get("/api/site/menu").bodyAsText(), """"path":"/club/13Ma"""", message = "derived: the instance under its section")
+        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"slug":"club","label":{"en":"Clubs"}},{"slug":"about","label":{}}]}""") }
+            .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertContains(admin.get("/api/site/menu").bodyAsText(), """"path":"/club/13Ma"""", message = "stored: still there")
+        val page = client.get("/club/13Ma").bodyAsText()
+        assertContains(page, """<li><a href="/">kroom</a></li><li><a href="/club/13Ma">Clubs</a></li><li><span aria-current="page">13Ma</span></li>""")
+        assertContains(page, """<nav class="west" aria-label="Clubs">""")
+    }
+
     @Test
     fun `a stored menu speaks the request's language, the default filling the gaps`() = testApplication {
         site(lang = { it.request.queryParameters["lang"] })
