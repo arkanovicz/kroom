@@ -203,8 +203,9 @@ const previewOf = (body) => ({ payload: { page: `<html><body><div class="kroom-b
         ['$name', '${name.field}', '%if($x) … %else … %end']);
     click('.kroom-help-back');
     check('← comes back to the landing', shown(), ['landing']);
-    check('✓ sits last, ✗ before it, the trash and the status first', [...$('.kroom-editor-tools').children].map(e => e.className.split(' ')[0]),
-        ['kroom-status', 'kroom-trash', 'kroom-cancel', 'kroom-submit']);
+    check('the trash on the left, the status in the middle, the buttons grouped on the right',
+        [...$('.kroom-editor-tools').children].map(e => e.className.split(' ')[0]), ['kroom-trash', 'kroom-status', 'kroom-editor-buttons']);
+    check('✓ sits last, ✗ before it', [...$('.kroom-editor-buttons').children].map(e => e.className.split(' ')[0]), ['kroom-cancel', 'kroom-submit']);
     window.confirm = () => true;
     const { calls: trashed, click: clickT, window: w2 } = page(() => held);
     w2.confirm = () => true;

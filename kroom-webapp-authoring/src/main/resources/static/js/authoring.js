@@ -375,10 +375,11 @@
         past.attr('role', 'tabpanel').data('pane', 'history');
 
         const tools = editor.appendChild(element('nav', 'kroom-editor-tools'));
+        if (held.rev) tools.appendChild(iconButton('trash', 'kroom-trash', trash));
         tools.appendChild(element('span', 'kroom-status'));
-        if (held.rev) tools.appendChild(iconButton('trash', 'kroom-trash secondary outline', trash));
-        tools.appendChild(iconButton('cancel', 'kroom-cancel secondary', cancel));
-        tools.appendChild(iconButton('submit', 'kroom-submit', submit));
+        const buttons = tools.appendChild(element('div', 'kroom-editor-buttons'));
+        buttons.appendChild(iconButton('cancel', 'kroom-cancel secondary', cancel));
+        buttons.appendChild(iconButton('submit', 'kroom-submit', submit));
 
         session = {
             block, root, path, rev: held.rev, textarea, editor, body, timer: null, previewed: held.body,

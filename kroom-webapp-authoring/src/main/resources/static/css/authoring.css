@@ -54,7 +54,8 @@
 
 .kroom-block-tools .kroom-edit,
 .kroom-editor-tools .kroom-submit,
-.kroom-editor-tools .kroom-cancel {
+.kroom-editor-tools .kroom-cancel,
+.kroom-editor-tools .kroom-trash {
     color: #fff;
     border: 1px solid rgba(0, 0, 0, .15);
     border-radius: .375rem;
@@ -64,17 +65,20 @@
 
 .kroom-block-tools .kroom-edit { background-color: var(--kroom-edit-color); }
 .kroom-editor-tools .kroom-submit { background-color: var(--kroom-submit-color); }
-.kroom-editor-tools .kroom-cancel { background-color: var(--kroom-cancel-color); }
+.kroom-editor-tools .kroom-cancel,
+.kroom-editor-tools .kroom-trash { background-color: var(--kroom-cancel-color); }
 
 .kroom-block-tools .kroom-edit:hover,
 .kroom-editor-tools .kroom-submit:hover,
-.kroom-editor-tools .kroom-cancel:hover {
+.kroom-editor-tools .kroom-cancel:hover,
+.kroom-editor-tools .kroom-trash:hover {
     filter: brightness(1.1);
 }
 
 .kroom-block-tools .kroom-edit:active,
 .kroom-editor-tools .kroom-submit:active,
-.kroom-editor-tools .kroom-cancel:active {
+.kroom-editor-tools .kroom-cancel:active,
+.kroom-editor-tools .kroom-trash:active {
     transform: translateY(1px);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, .4);
     filter: brightness(.95);
@@ -83,7 +87,8 @@
 /* the shadow above replaces pico's focus ring: keep one for the keyboard */
 .kroom-block-tools .kroom-edit:focus-visible,
 .kroom-editor-tools .kroom-submit:focus-visible,
-.kroom-editor-tools .kroom-cancel:focus-visible {
+.kroom-editor-tools .kroom-cancel:focus-visible,
+.kroom-editor-tools .kroom-trash:focus-visible {
     outline: 2px solid var(--pico-primary-focus, rgba(37, 99, 235, .5));
     outline-offset: 2px;
 }
@@ -221,27 +226,36 @@ textarea.kroom-source {
     tab-size: 4;
 }
 
-/* the status reads on the left, the buttons gather on the right, ✓ last */
+/* the trash on the left, the status centred on the line, the buttons grouped on the right, ✓ last: the side
+   columns share what is left equally, so the middle stays centred whatever sits on either side */
 .kroom-editor-tools {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
     align-items: center;
-    justify-content: flex-end;
     gap: .5rem;
 }
 
+.kroom-editor-tools .kroom-trash {
+    grid-column: 1;
+    justify-self: start;
+}
+
 .kroom-status {
-    margin-right: auto;
+    grid-column: 2;
+    text-align: center;
+}
+
+.kroom-editor-buttons {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    gap: .5rem;
 }
 
 .kroom-editor-tools button {
     width: auto;
     padding: .25rem .6rem;
     margin: 0;
-}
-
-.kroom-editor-tools .kroom-trash {
-    margin-right: auto;            /* the destructive one keeps its distance, on the left with the status */
-    color: var(--kroom-cancel-color);
 }
 
 .kroom-status {
