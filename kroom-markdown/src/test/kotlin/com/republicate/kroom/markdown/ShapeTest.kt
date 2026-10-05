@@ -52,6 +52,14 @@ class ShapeTest {
         assertFalse(membre.keys.any { it.startsWith("get") || it.startsWith("toString") || it == "class" }, membre.keys.toString())
     }
 
+    /** A declared `List` is read-only to Kotlin, and so to completion (velocity `-20261005-02`) — though a render reaches more. */
+    @Test
+    fun `a read-only collection offers no mutators`() {
+        val list = shape("club" to club).unfold(listOf("club", "membres()"))!!.keys
+        assertTrue("size" in list, list.toString())
+        assertFalse(list.any { it.startsWith("add(") || it.startsWith("remove") || it.startsWith("set(") }, list.toString())
+    }
+
     @Test
     fun `a map navigates by key, and its keys come from a value or from nowhere`() {
         val shape = shape("club" to club, "options" to mapOf("couleur" to "vert", "lieu" to Lieu("Paris")))
