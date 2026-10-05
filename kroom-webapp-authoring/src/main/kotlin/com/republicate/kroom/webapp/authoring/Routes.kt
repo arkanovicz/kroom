@@ -24,6 +24,8 @@ import io.ktor.server.routing.*
  * DELETE /lock/{path...}    give it back, unwritten
  * POST   {path...}          submit {page, rev, body} (409 on a stale rev, with theirs; 422 if it breaks the page)
  * POST   /preview/{path...} render {page, body} — the page itself, this body standing in (422 if it breaks)
+ * POST   /shape/{path...}   render {page} to learn what the block sees: its first level, for completion
+ * GET    /shape/{path...}?at=club.membres()[]   the level that path leads to
  * GET    /history/{path...} revisions of one block   ] 404 unless the store is Versioned
  * GET    /journal           the site-wide log        ]
  * ```
@@ -39,6 +41,9 @@ import io.ktor.server.routing.*
  */
 /** The context key `#markdown` reads a draft from (kroom-markdown's `MarkdownMacro.DRAFTS`). */
 private const val DRAFTS = "kroomDrafts"
+
+/** The context key `#markdown` answers what a block sees in (kroom-markdown's `MarkdownMacro.SHAPES`). */
+private const val SHAPES = "kroomShapes"
 
 fun Route.authoringRoutes() {
     val plugin = application.authoring
@@ -69,6 +74,39 @@ fun Route.authoringRoutes() {
             val asked = receiveJsonObject()
             val html = renderDraft(asked, path) ?: return@post
             respondJson { set("page", html) }
+        }
+
+        // Completion: what a block sees only exists in its page's render, so the page renders once, then each
+        // `.` walks the types its lock remembers — no second render, and no value kept past the request.
+        route("/shape/{path...}") {
+            post {
+                val path = blockPath() ?: return@post
+                val session = editorOf(plugin, path) ?: return@post
+                if (!plugin.locks.touch(path, session.id))
+                    return@post notYourLock(path)
+
+                val asked = mutableMapOf<String, Any?>(path to null)
+                renderPage(receiveJsonObject().getString("page"), mapOf(SHAPES to asked)) ?: return@post
+                @Suppress("UNCHECKED_CAST")
+                val shape = asked[path] as? Shape
+                    ?: return@post respondError("$path is not on this page", HttpStatusCode.NotFound, "notOnPage", mapOf("path" to path))
+                if (!plugin.locks.attach(path, session.id, shape))
+                    return@post notYourLock(path)
+                respondJson(Json.toJson(shape(emptyList()))!!)
+            }
+
+            get {
+                val path = blockPath() ?: return@get
+                val session = editorOf(plugin, path) ?: return@get
+                if (!plugin.locks.touch(path, session.id))
+                    return@get notYourLock(path)
+                val shape = plugin.locks.holder(path)?.shape
+                    ?: return@get respondError("no shape for $path yet", HttpStatusCode.NotFound, "noShape", mapOf("path" to path))
+                val at = call.request.queryParameters["at"].orEmpty()
+                val level = shape(steps(at))
+                    ?: return@get respondError("nothing at $at", HttpStatusCode.NotFound, "noSuchMember", mapOf("at" to at))
+                respondJson(Json.toJson(level)!!)
+            }
         }
 
         route("/lock/{path...}") {
@@ -155,8 +193,14 @@ fun Route.authoringRoutes() {
  * The page at `page`, rendered with `body` standing in for the block at [path] — or null having answered:
  * 400/404 for a missing or unknown page, 422 with the author's problem when the body breaks the render.
  */
-private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String): String? {
-    val page = asked.getString("page")
+private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String): String? =
+    renderPage(asked.getString("page"), mapOf(DRAFTS to mapOf(path to (asked.getString("body") ?: ""))))
+
+/**
+ * The page at [page], rendered for this call with [extra] in its context — or null having answered: 400/404
+ * for a missing or unknown page, 422 with the author's problem when the render breaks.
+ */
+private suspend fun RoutingContext.renderPage(page: String?, extra: Map<String, Any?>): String? {
     if (page == null) {
         respondError("a block is rendered within the page it is in: page missing", code = "pageMissing")
         return null
@@ -166,15 +210,19 @@ private suspend fun RoutingContext.renderDraft(asked: Json.Object, path: String)
         return null
     }
     return try {
-        call.application.velocity.renderForCall(
-            call, template, bound + mapOf(DRAFTS to mapOf(path to (asked.getString("body") ?: "")))
-        )
+        call.application.velocity.renderForCall(call, template, bound + extra)
     } catch (e: Exception) {
         // the engine's wrappers say where it surfaced; the innermost cause says what the author wrote wrong
         val cause = generateSequence<Throwable>(e) { it.cause }.last { it.message != null }
         respondError(cause.message!!, HttpStatusCode.UnprocessableEntity, "broken", mapOf("message" to cause.message))
         null
     }
+}
+
+/** `club.membres()[]` → `club`, `membres()`, `[]`: a member's key holds no dot, an iteration is a trailing `[]`. */
+private fun steps(at: String): List<String> = at.split('.').filter { it.isNotEmpty() }.flatMap { segment ->
+    val name = segment.trimEnd('[', ']')
+    listOfNotNull(name.ifEmpty { null }) + List((segment.length - name.length) / 2) { "[]" }
 }
 
 /** The block path, or null having answered 400 — an empty or traversing path never reaches a store. */

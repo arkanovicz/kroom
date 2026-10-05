@@ -306,6 +306,8 @@ DELETE {prefix}/lock/{path...}     give it back, unwritten
 POST   {prefix}/{path...}          submit {page, rev, body} — 409 answers {message, theirs} on a stale rev,
                                    422 when the body breaks its page
 POST   {prefix}/preview/{path...}  render {page, body}: the page itself, this body standing in
+POST   {prefix}/shape/{path...}    render {page} to learn what the block sees — its first level
+GET    {prefix}/shape/{path...}?at=club.membres()[]   the level that path leads to
 GET    {prefix}/history/{path...}  revisions of one block   ] 404 unless the store is Versioned
 GET    {prefix}/journal            the site-wide log        ]
 ```
@@ -314,6 +316,12 @@ GET    {prefix}/journal            the site-wide log        ]
 because a ktor tailcard takes every remaining segment. A submit carries the rev it started from, so an edit
 made meanwhile — a concurrent author, a `git pull` — is answered with *theirs* instead of being overwritten:
 the lock is the polite path, the rev check is the safe one.
+
+The shape routes feed the editor's completion, and need the lock. What a block sees only exists in its page's
+render, so `POST` renders the page once and the lock keeps the walk; each `.` then unfolds one level of
+declared types under the block sandbox (velocity's `Navigation`) — what is offered is what a block may write.
+A level maps each key to a leaf's type name, `{}` (unfolds) or `[x]` (iterates over x); `*` is any key of a
+map, and a call's key spells its required parameters (`greet(name)`).
 
 An error answers `{message, code, args}`: `message` in English, `code` (`lockHeld`, `stale`, `forbidden`,
 `broken`, …) and `args` for a client that says it its own way — see *The editor's words* below.

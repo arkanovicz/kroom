@@ -36,7 +36,14 @@ All notable changes to kroom will be documented in this file.
   `republicate.com/kroom/create.sh` fetches the latest and runs it in a JRE container. `publish-snapshot.sh`
   now pushes kroom to `republicate.com/maven2` too (`~/bin/m2-push`), where a site resolves it.
 
+#### kroom-markdown
+- `MarkdownMacro.SHAPES` (`kroomShapes`): an editor names a block path in a render's context, and the render
+  answers a walk of what that block sees — its arguments and tools, then one level of declared types per `.`,
+  as the block sandbox lists them (velocity `-20261005-01`'s `Navigation`). Types are kept, never values.
+
 #### kroom-webapp-authoring
+- `POST`/`GET {prefix}/shape/{path...}`: what a block sees, for the editor's completion. The page renders once
+  (the lock keeps the walk), then each `.` unfolds a level without rendering again.
 - The analytics and webhook plugins are gone: a counter's snippet is a line in a layout, and `onPublish` stays
   on `Site` for whoever wants to be told.
 - Mail is the site's: `site.mailer` is SMTP (angus-mail) over the site's *Mail* settings once `smtpHost` is

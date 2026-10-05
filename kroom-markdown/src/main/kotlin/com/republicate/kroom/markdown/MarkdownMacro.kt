@@ -40,6 +40,7 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
             throw VelocityException("#markdown(): ${e.message} in ${page ?: "an unnamed template"}", e)
         }
         val arguments = blockArguments(context, args.getOrNull(1) as? Map<*, *>)
+        probe(context, path, arguments)
         val block = VelocityContext(arguments)
         // a draft in the context stands in for what the store holds: the editor's preview IS the page render
         val draft = (context[DRAFTS] as? Map<*, *>)?.get(path)?.toString()
@@ -77,6 +78,13 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
         return scope
     }
 
+    /** An editor asking what this block sees ([SHAPES]) gets its completion walk: plain types across the boundary. */
+    @Suppress("UNCHECKED_CAST")
+    private fun probe(context: Context, path: String, arguments: Map<String, Any?>) {
+        val asked = context[SHAPES] as? MutableMap<String, Any?> ?: return
+        if (asked.containsKey(path)) asked[path] = Shape(renderer.navigation, arguments)::unfold
+    }
+
     /**
      * The wrapper renders in the PAGE's engine and context (so `$logged`, `$authoring` and the rest are in
      * reach) with the block's `$path`, `$name` and `$html` added: which blocks may be edited is the
@@ -91,6 +99,12 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
     companion object {
         /** Context key an editor sets: block path → the body being written, rendered instead of the stored one. */
         const val DRAFTS = "kroomDrafts"
+
+        /**
+         * Context key an editor sets to learn what a block sees: block path → null, which the render replaces with
+         * a `(steps: List<String>) -> Map<String, Any>?` walking the block's arguments one `.` at a time ([Shape]).
+         */
+        const val SHAPES = "kroomShapes"
 
         /** Context key naming the page a render is of (`pages/company/history.html`), when the merge's first template is not it. */
         const val PAGE = "kroomPage"

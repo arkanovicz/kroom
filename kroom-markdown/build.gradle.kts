@@ -23,6 +23,7 @@ dependencies {
     api(project(":kroom-common"))              // PathTemplate: page routing and block inclusion share it
     api(libs.velocity.engine.common)                    // LexerSource, Config, parse — this module's public surface
     implementation(libs.velocity.engine.scripting)      // the runtime compiler (and its sandbox): blocks are authored, hence interpreted
+    implementation(libs.kotlin.reflect)                 // the editor's completion walks block types (Shape)
     implementation(libs.slf4j.api)                      // a failing stored block is logged, not thrown at the visitor
     implementation(libs.antlr.kotlin)
     // md→html, JVM-only by design; nothing of it crosses this module's API

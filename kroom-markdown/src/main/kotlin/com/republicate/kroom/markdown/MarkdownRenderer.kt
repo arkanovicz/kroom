@@ -25,7 +25,11 @@ import org.apache.velocity.engine.runtime.introspection.Sandbox
  */
 class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
 
-    private val engine = markdownEngine(config)
+    private val compiler = markdownCompiler(config)
+    private val engine = markdownEngine(config, compiler)
+
+    /** What blocks may navigate on a type, as this renderer's sandbox decides — for an editor's completion. */
+    internal val navigation get() = compiler.navigation
 
     // flexmark's parser and renderer are immutable and thread-safe once built — built once, here.
     private val options = MutableDataSet().set(
@@ -76,13 +80,12 @@ private fun scoped(context: Context): VelocityContext = VelocityContext(parent =
  * application's (so ktor's dev reload still sees fresh classes). The lexer is forced last: a markdown
  * block is `%`-VTL by definition, and no configuration may say otherwise.
  */
-private fun markdownEngine(config: MarkdownConfig): VelocityEngine {
-    val sandbox = config.acl?.let {
-        Sandbox(Acl.parse(it), Thread.currentThread().contextClassLoader ?: MarkdownRenderer::class.java.classLoader)
-    }
-    return VelocityEngine(
-        compiler = ScriptingCompiler(sandbox = sandbox),
-        loader = config.loader,
-        config = config.engine.copy(lexerSource = MarkdownVtl),
-    )
-}
+private fun markdownCompiler(config: MarkdownConfig) = ScriptingCompiler(sandbox = config.acl?.let {
+    Sandbox(Acl.parse(it), Thread.currentThread().contextClassLoader ?: MarkdownRenderer::class.java.classLoader)
+})
+
+private fun markdownEngine(config: MarkdownConfig, compiler: ScriptingCompiler) = VelocityEngine(
+    compiler = compiler,
+    loader = config.loader,
+    config = config.engine.copy(lexerSource = MarkdownVtl),
+)

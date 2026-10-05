@@ -102,6 +102,36 @@ class PluginTest {
         assertContains(preview, "salut, Alice")
     }
 
+    /** Completion: the page tells once what a block sees, then each `.` walks types — for the lock's holder only. */
+    @Test
+    fun `a block's shape is learned from its page, then unfolded one level at a time`() = testApplication {
+        site()
+        val admin = visitor("admin")
+        val agenda = "pages/club/13Ma/agenda.md"
+        assertEquals(HttpStatusCode.Conflict, admin.shape(agenda).status, "no lock, no shape")
+        admin.post("/api/content/lock/$agenda")
+        assertEquals(HttpStatusCode.NotFound, admin.get("/api/content/shape/$agenda?at=probe").status, "not learned yet")
+
+        val first = admin.shape(agenda)
+        assertEquals(HttpStatusCode.OK, first.status, first.bodyAsText())
+        assertContains(first.bodyAsText(), """"probe":{}""")
+        assertEquals("""{"greet(name)":"String"}""", admin.get("/api/content/shape/$agenda?at=probe").bodyAsText())
+        assertEquals(HttpStatusCode.NotFound, admin.get("/api/content/shape/$agenda?at=probe.nope").status)
+        assertEquals(HttpStatusCode.Conflict, visitor("editor").get("/api/content/shape/$agenda?at=probe").status, "someone else's lock")
+
+        val description = "pages/club/13Ma/description.md"
+        admin.post("/api/content/lock/$description")
+        assertContains(admin.shape(description).bodyAsText(), """"club":"String"""")
+        val elsewhere = "pages/club/13Ma/nowhere.md"
+        admin.post("/api/content/lock/$elsewhere")
+        assertEquals(HttpStatusCode.NotFound, admin.shape(elsewhere).status, "a block its page does not render")
+    }
+
+    private suspend fun HttpClient.shape(path: String) = post("/api/content/shape/$path") {
+        contentType(ContentType.Application.Json)
+        setBody("""{"page":"/club/13Ma"}""")
+    }
+
     @Test
     fun `settings are an admin's, and a secret is never read back`() = testApplication {
         site()

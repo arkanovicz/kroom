@@ -3,6 +3,9 @@ package com.republicate.kroom.webapp.authoring
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
 
+/** kroom-markdown's completion walk (`MarkdownMacro.SHAPES`): path steps → the level they lead to, or null. */
+typealias Shape = (List<String>) -> Map<String, Any>?
+
 /**
  * Who is editing what, in memory: one lock per block path, held by a session id and kept alive by use.
  *
@@ -15,7 +18,8 @@ import kotlin.time.Duration
  */
 class Locks(private val timeout: Duration) {
 
-    data class Lock(val path: String, val owner: String, val since: Long, val touched: Long)
+    /** [shape]: what the block sees, for the editor's completion, once the page told ([attach]); gone with the lock. */
+    data class Lock(val path: String, val owner: String, val since: Long, val touched: Long, val shape: Shape? = null)
 
     private val locks = ConcurrentHashMap<String, Lock>()
 
@@ -40,6 +44,15 @@ class Locks(private val timeout: Duration) {
             if (held != null && held.owner == owner && !stale(held, now)) held.copy(touched = now) else held
         }
         return lock != null && lock.owner == owner && !stale(lock, now)
+    }
+
+    /** Remember what [owner]'s block sees, keeping the lock alive; false when the lock is not [owner]'s. */
+    fun attach(path: String, owner: String, shape: Shape): Boolean {
+        val now = System.currentTimeMillis()
+        val lock = locks.compute(path) { _, held ->
+            if (held != null && held.owner == owner && !stale(held, now)) held.copy(touched = now, shape = shape) else held
+        }
+        return lock?.shape === shape
     }
 
     /** Give the block back; false when [owner] was not holding it. */
