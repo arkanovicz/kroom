@@ -43,7 +43,8 @@ const answers = {
         { slug: 'legal', label: { en: 'Legal' }, path: '/legal', kind: 'section', resolved: false, children: [
             { slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', kind: 'template', resolved: true, children: [] }] },
         { slug: 'company', label: { en: 'Company' }, path: '/company', kind: 'authored', status: 'draft', layout: 'default', movable: false, resolved: true, children: [
-            { slug: 'history', label: { en: 'History' }, path: '/company/history', kind: 'authored', status: 'draft', layout: 'default', movable: true, resolved: true, children: [] }] }] },
+            { slug: 'history', label: { en: 'History' }, path: '/company/history', kind: 'authored', status: 'draft', layout: 'default', movable: true, resolved: true, children: [] }] },
+        { href: 'https://y.example/doc', label: { en: 'Docs' }, kind: 'link', movable: true, children: [] }] },
     '/api/content/journal?limit=100': [{ rev: 'a', path: 'pages/club/13Ma/description.md', author: 'admin', time: 0 }],
     '/api/site/plugins': [{ id: 'basic', name: 'Basic', description: 'pico', enabled: true, theme: true, settings: [] },
                           { id: 'seo', name: 'SEO', description: 'meta', enabled: true, settings: [
@@ -102,11 +103,11 @@ const list = (slug) => slug ? line(slug).querySelector(':scope > ul') : $('.kroo
 const sortable = (ul) => window.sortables.find(s => s.el === ul).options;
 const rows = () => lines().map(li => li.querySelector(':scope > details > summary').firstChild.textContent);
 /** What a stored tree says, slugs only: `legal(terms)`. */
-const outline = (items) => items.map(i => i.children.length ? `${i.slug}(${outline(i.children).join(' ')})` : i.slug);
+const outline = (items) => items.map(i => i.children.length ? `${i.slug}(${outline(i.children).join(' ')})` : i.slug ?? i.href);
 const lastMenu = () => calls.findLast(c => c.method === 'PUT' && c.url === '/api/site/menu')?.body;
 
 check('pages: one line per page, its label as plain text, the pages under it included', rows(),
-    ['About', 'Contact', 'Clubs', 'Les Vagabonds', 'Legal', 'Terms', 'Company', 'History']);
+    ['About', 'Contact', 'Clubs', 'Les Vagabonds', 'Legal', 'Terms', 'Company', 'History', 'Docs']);
 check('nothing but a handle and a label on the line', lines().every(li => [...li.children].map(c => c.tagName).join() === 'SPAN,DETAILS,UL'
     && li.querySelector(':scope > .kroom-admin-handle') && !li.querySelector(':scope > details > summary :is(input, select, button, a)')), true);
 check('a draft says so', lines().filter(li => li.querySelector(':scope > details > summary small')).map(li => [li._item.slug,
@@ -115,11 +116,12 @@ check('a line says its kind; only an editor\'s page with nothing under it is fre
     [li._item.slug, [...li.classList].filter(c => c !== 'kroom-admin-menu-entry').join(' ')]), [
     ['about', 'kroom-admin-kind-authored'], ['contact', 'kroom-admin-kind-template kroom-admin-fixed'], ['club', 'kroom-admin-kind-template kroom-admin-fixed'],
     ['13Ma', 'kroom-admin-kind-instance kroom-admin-fixed'], ['legal', 'kroom-admin-kind-section kroom-admin-fixed'],
-    ['terms', 'kroom-admin-kind-template kroom-admin-fixed'], ['company', 'kroom-admin-kind-authored kroom-admin-fixed'], ['history', 'kroom-admin-kind-authored']]);
+    ['terms', 'kroom-admin-kind-template kroom-admin-fixed'], ['company', 'kroom-admin-kind-authored kroom-admin-fixed'], ['history', 'kroom-admin-kind-authored'],
+    [undefined, 'kroom-admin-kind-link']]);
 check('the arrangement is said to be the editors\', and can be forgotten', [$('.kroom-admin-menu-head small').textContent,
     $('.kroom-admin-menu-reset')?.textContent], ['as you arranged them', 'forget this arrangement']);
 check('every level is a place to drag into, a page\'s empty list included', [window.sortables.length,
-    window.sortables.every(s => s.options.handle === '.kroom-admin-handle' && s.options.group === 'kroom-menu')], [9, true]);
+    window.sortables.every(s => s.options.handle === '.kroom-admin-handle' && s.options.group === 'kroom-menu')], [10, true]);
 
 // where a page may go: Sortable asks onMove at each list it hovers
 {
@@ -145,7 +147,7 @@ check('every level is a place to drag into, a page\'s empty list included', [win
     sortable(list()).onEnd({ from: list(), to: list(), item: line('contact'), oldIndex: 1, newIndex: 0 });
     await sleep(20);
     check('a reorder puts the whole tree as it now stands, and nothing moves', [calls.slice(before).filter(c => c.method !== 'GET').map(c => `${c.method} ${c.url}`),
-        outline(lastMenu().items)], [['PUT /api/site/menu'], ['contact', 'about', 'club(13Ma)', 'legal(terms)', 'company(history)']]);
+        outline(lastMenu().items)], [['PUT /api/site/menu'], ['contact', 'about', 'club(13Ma)', 'legal(terms)', 'company(history)', 'https://y.example/doc']]);
     check('the tree put is stripped of what the server computes', lastMenu().items.slice(0, 2), [
         { slug: 'contact', label: { en: 'Contact' }, description: {}, children: [] },
         { slug: 'about', label: { en: 'About', fr: 'À propos' }, description: { en: 'Who we are' }, children: [] }]);
@@ -159,17 +161,28 @@ check('every level is a place to drag into, a page\'s empty list included', [win
     const moved = calls.slice(before).filter(c => c.method !== 'GET');
     check('a drop under another page moves it there first, then puts the tree', [moved.map(c => `${c.method} ${c.url}`), moved[0]?.body, outline(moved[1]?.body.items ?? [])],
         [['POST /api/site/pages/move', 'PUT /api/site/menu'], { from: '/company/history', to: '/about/history' },
-         ['about(history)', 'contact', 'club(13Ma)', 'legal(terms)', 'company']]);
+         ['about(history)', 'contact', 'club(13Ma)', 'legal(terms)', 'company', 'https://y.example/doc']]);
+
+    // a link has nothing to move: a drop under another page just puts the tree
+    before = calls.length;
+    const docs = lines().find(li => li._item.href);
+    list('about').appendChild(docs);
+    sortable(list()).onEnd({ from: list(), to: list('about'), item: docs, oldIndex: 5, newIndex: 1 });
+    await sleep(20);
+    check('a link dropped elsewhere moves nothing, the tree is put with it there', calls.slice(before).filter(c => c.method !== 'GET').map(c => `${c.method} ${c.url}`),
+        ['PUT /api/site/menu']);
+    check('and it is put as a link', lastMenu().items[0].children.find(i => i.href), { href: 'https://y.example/doc', label: { en: 'Docs' }, description: {}, children: [] });
 }
 
 // the accordion: label and description in the language chosen, what the page is, and an editor's page's own
 $('.kroom-admin-menu-head select').value = 'fr';
 $('.kroom-admin-menu-head select').dispatchEvent(new window.Event('change'));
 check('switching the language shows its labels, the default\'s where it has none', rows(),
-    ['À propos', 'Contact', 'Clubs', 'Les Vagabonds', 'Legal', 'Mentions', 'Company', 'History']);
+    ['À propos', 'Contact', 'Clubs', 'Les Vagabonds', 'Legal', 'Mentions', 'Company', 'History', 'Docs']);
 {
     const fields = (slug) => [...line(slug).querySelectorAll(':scope > details > .kroom-admin-menu-fields input')];
     check('the fields hold that language\'s words', [fields('about').map(i => i.value), fields('contact').map(i => i.value)], [['À propos', ''], ['', '']]);
+    check('and say what they take by a placeholder, no label', [fields('about').map(i => i.placeholder), line('about').querySelector(':scope > details label')], [['label', 'description'], null]);
     const [label] = fields('contact');
     label.value = ' Nous écrire ';
     label.dispatchEvent(new window.Event('change'));
@@ -215,6 +228,15 @@ check('publishing puts the status', sent(), { url: '/api/site/pages/company', me
     await sleep(20);
     check('a delete confirmed deletes the page', sent(), { url: '/api/site/pages/company/history', method: 'DELETE', body: undefined });
 }
+check('the layout reads on one line with its choice', line('about').querySelector(':scope > details .kroom-admin-menu-layout')?.firstChild.textContent, 'layout ');
+check('one accordion opens at a time', lines().every(li => li.querySelector(':scope > details').name === 'kroom-admin-menu'), true);
+{
+    const docs = lines().find(li => li._item.href);
+    check('a link offers to be removed, and nothing else', [...docs.querySelectorAll(':scope > details button')].map(b => b.textContent), ['remove this link']);
+    click(docs.querySelector(':scope > details button'));
+    await sleep(20);
+    check('removing it puts the tree without it', [sent().url, sent().method, sent().body.items.some(i => i.href)], ['/api/site/menu', 'PUT', false]);
+}
 
 // a new page: its name, the segment following it until typed over
 {
@@ -229,6 +251,13 @@ check('publishing puts the status', sent(), { url: '/api/site/pages/company', me
     await sleep(20);
     check('a new page posts its path and its name in the language chosen', sent(),
         { url: '/api/site/pages', method: 'POST', body: { path: '/societe', label: { fr: 'Notre Société' } } });
+    check('the one input says what it takes', form.elements.slug.placeholder, 'segment / URL');
+    type(form.elements.label, 'Docs');
+    type(form.elements.slug, 'https://docs.example');
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    await sleep(20);
+    check('an address makes a link, stored at the end of the tree', [sent().url, sent().method, sent().body.items.at(-1)],
+        ['/api/site/menu', 'PUT', { href: 'https://docs.example', label: { fr: 'Docs' }, description: {}, children: [] }]);
 }
 click($('.kroom-admin-menu-reset'));
 await sleep(20);

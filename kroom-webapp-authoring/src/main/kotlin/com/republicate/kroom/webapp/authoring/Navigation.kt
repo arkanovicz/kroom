@@ -5,27 +5,40 @@ import com.republicate.kson.Json
 /**
  * One entry of the menu as stored: a page, named by its [slug] — the segment under its parent, so the tree of
  * slugs IS the tree of URLs (`company` under the root is `/company`, `history` under it `/company/history`;
- * `company.html` and `company/index.html` are one page). [label] and [description] by language, the site's
- * default filling what a language lacks.
+ * `company.html` and `company/index.html` are one page) — or a link, an address elsewhere ([href], no page,
+ * no children). [label] and [description] by language, the site's default filling what a language lacks.
  */
 data class MenuItem(
-    val slug: String,
+    val slug: String?,
     val label: Map<String, String> = emptyMap(),
     val description: Map<String, String> = emptyMap(),
-    val children: List<MenuItem> = emptyList()
+    val children: List<MenuItem> = emptyList(),
+    val href: String? = null
 ) {
+    val external: Boolean get() = slug == null
+
+    /** What tells this entry from its siblings: its segment, or its address. */
+    val key: String get() = slug ?: href.orEmpty()
+
     /**
      * The entry a theme sees, in [lang] (then [fallback]), its path under [parent], as [resolve] answers for
      * that path: a published page, a draft the viewer may see, or nothing — a draft is kept and marked, an
-     * entry nobody may see is dropped (null).
+     * entry nobody may see is dropped (null). A link is never here, never a draft: it resolves by being stored.
      */
     fun view(lang: String, fallback: String, parent: String, resolve: (String) -> PageState): NavItem? {
+        val words = label[lang] ?: label[fallback] ?: label.values.firstOrNull()
+        if (slug == null) return NavItem(
+            label = words ?: href!!.substringAfter("://").substringBefore('/').ifEmpty { href },
+            href = href!!,
+            description = description[lang] ?: description[fallback],
+            external = true
+        )
         val path = "$parent/$slug"
         val state = resolve(path)
         if (state == PageState.FORBIDDEN) return null
         val children = children.mapNotNull { it.view(lang, fallback, path, resolve) }
         return NavItem(
-            label = label[lang] ?: label[fallback] ?: label.values.firstOrNull() ?: slug.replace('-', ' ').replaceFirstChar(Char::titlecase),
+            label = words ?: slug.replace('-', ' ').replaceFirstChar(Char::titlecase),
             href = path,
             description = description[lang] ?: description[fallback],
             children = children,
@@ -37,7 +50,8 @@ data class MenuItem(
     }
 
     fun toJson(): Json.MutableObject = Json.MutableObject().apply {
-        set("slug", slug)
+        slug?.let { set("slug", it) }
+        href?.let { set("href", it) }
         set("label", Json.MutableObject().apply { label.forEach { (k, v) -> set(k, v) } })
         if (description.isNotEmpty()) set("description", Json.MutableObject().apply { description.forEach { (k, v) -> set(k, v) } })
         if (children.isNotEmpty()) set("children", Json.MutableArray().apply { children.forEach { push(it.toJson()) } })
@@ -46,32 +60,42 @@ data class MenuItem(
     companion object {
         private val SLUG = Regex("[A-Za-z0-9_-]+")
 
+        /** An address elsewhere: anything with a scheme (`https://…`, `mailto:…`) — what a segment can never be. */
+        val LINK = Regex("[a-z][a-z0-9+.-]*:.+", RegexOption.IGNORE_CASE)
+
         /** An entry from its JSON, or the reason it is not one. */
         fun parse(json: Json.Object): Result<MenuItem> = runCatching {
-            val slug = json.getString("slug")?.takeIf { it.isNotEmpty() } ?: throw IllegalArgumentException("an entry is a page: its segment is expected")
-            require(SLUG.matches(slug)) { "not a page segment: $slug" }
-            require(json.getString("href") == null) { "an entry is a page, not an address elsewhere" }
+            val slug = json.getString("slug")?.takeIf { it.isNotEmpty() }
+            val href = json.getString("href")?.takeIf { it.isNotEmpty() }
+            require((slug == null) != (href == null)) { "an entry is a page (its segment) or a link (its address), not both nor neither" }
+            require(slug == null || SLUG.matches(slug)) { "not a page segment: $slug" }
+            require(href == null || LINK.matches(href)) { "not an address: $href" }
             fun words(key: String) = json.getObject(key)?.entries?.associate { (k, v) -> k to v.toString() }?.filterValues { it.isNotEmpty() }.orEmpty()
             val children = json.getArray("children")?.map { parse(it as Json.Object).getOrThrow() }.orEmpty()
-            require(children.map { it.slug }.distinct().size == children.size) { "two entries share a segment under $slug" }
-            MenuItem(slug, words("label"), words("description"), children)
+            require(href == null || children.isEmpty()) { "a link has no pages under it: $href" }
+            distinct(children, "under $slug")
+            MenuItem(slug, words("label"), words("description"), children, href)
         }
 
         fun parseAll(json: Json.Array): Result<List<MenuItem>> = runCatching {
-            json.map { parse(it as Json.Object).getOrThrow() }.also { items ->
-                require(items.map { it.slug }.distinct().size == items.size) { "two entries share a segment at the root" }
-            }
+            json.map { parse(it as Json.Object).getOrThrow() }.also { distinct(it, "at the root") }
+        }
+
+        private fun distinct(items: List<MenuItem>, where: String) {
+            require(items.map { it.key }.distinct().size == items.size) { "two entries share a segment or an address $where" }
         }
 
         /**
          * What exists ([derived]) arranged and worded as [stored] says: the stored entries first, in their
          * order and with their words, then what the stored tree does not know yet (a page made since); a
-         * stored entry no page answers any more is left out. The stored tree never makes a page exist.
+         * stored entry no page answers any more is left out. The stored tree never makes a page exist — a
+         * link, which is no page, exists by being stored.
          */
         fun arrange(derived: List<MenuItem>, stored: List<MenuItem>): List<MenuItem> {
             val existing = derived.associateBy { it.slug }
             val known = stored.mapNotNull { s ->
-                existing[s.slug]?.let { d -> MenuItem(s.slug, s.label.ifEmpty { d.label }, s.description, arrange(d.children, s.children)) }
+                if (s.external) s
+                else existing[s.slug]?.let { d -> MenuItem(s.slug, s.label.ifEmpty { d.label }, s.description, arrange(d.children, s.children)) }
             }
             val seen = stored.map { it.slug }.toSet()
             return known + derived.filter { it.slug !in seen }

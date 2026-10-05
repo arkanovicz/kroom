@@ -42,6 +42,9 @@ All notable changes to kroom will be documented in this file.
   as the block sandbox lists them (velocity `-20261005-01`'s `Navigation`). Types are kept, never values.
 
 #### kroom-webapp-authoring
+- A menu entry may be a link again (`MenuItem.href`, any address with a scheme): stored in the tree with its
+  words, never a page under it, never the current page, `external` for the theme. The panel's new-entry form
+  takes a segment or an address in the one input.
 - The editor completes `$` and each `.`: what the block sees, then the members its sandbox lets through, a
   `%foreach` variable unfolding as an element of what it iterates over. The page renders on the first `$` of
   an editing session, never on opening; arrows walk the list, Enter or Tab take a key (a call's parameters come

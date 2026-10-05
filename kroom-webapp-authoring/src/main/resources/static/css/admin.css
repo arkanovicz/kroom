@@ -288,8 +288,7 @@ body:has(> .kroom-admin) {
 
 /* what there is to say of an entry, once opened */
 .kroom-admin-menu-fields { margin: .125rem 0 .5rem; padding: .375rem .5rem; border-left: 2px solid var(--pico-muted-border-color, #ddd); font-size: .8rem; }
-.kroom-admin-menu-fields label { display: block; margin: 0 0 .25rem; }
-.kroom-admin-menu-fields input { display: block; width: 100%; margin: .1rem 0 0; padding: .2rem .4rem; height: auto; font-size: .8rem; }
+.kroom-admin-menu-fields input { display: block; width: 100%; margin: 0 0 .25rem; padding: .2rem .4rem; height: auto; font-size: .8rem; }
 .kroom-admin-menu-fields p { margin: .25rem 0; }
 .kroom-admin-menu-fields button { width: auto; margin: 0; padding: .1rem .5rem; font-size: .75rem; }
 
@@ -307,8 +306,7 @@ button.kroom-admin-menu-reset { width: auto; margin: .5rem 0 0; padding: 0; back
 .kroom-admin-nodrop { outline: 1px dashed var(--kroom-cancel-color, #dc2626); cursor: not-allowed; }
 /* no page here: a section nobody wrote */
 .kroom-admin-kind-section > details > summary { color: var(--kroom-cancel-color, #dc2626); }
-.kroom-admin-menu-fields select { width: auto; margin: .1rem 0 0; padding: .1rem 1.75rem .1rem .4rem; height: auto; font-size: .8rem; }
-.kroom-admin-menu-fields label select { display: block; }
+.kroom-admin-menu-fields select { display: inline-block; width: auto; margin: 0; padding: .1rem 1.75rem .1rem .4rem; height: auto; font-size: .8rem; }
 
 /* a new page: its name, its segment, on one line */
 .kroom-admin-new-page { display: flex; gap: .25rem; margin: .5rem 0 0; }

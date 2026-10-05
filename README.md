@@ -555,6 +555,11 @@ and words them (`MenuItem`: `slug`, `label` and `description` by language, `chil
 exist: a page made since appears after the arranged ones, an entry no page answers any more is dropped. Until
 one is stored, the tree is derived from the pages, a deeper URL nesting under its first segment.
 
+The one entry that is no page is a link (`href`, anything with a scheme — `https://…`, `mailto:…`), which exists by
+being stored: it has words and a place in the tree, never a page under it, is never the current page, and a
+theme gets it with `external` (`#nav` adds `rel="external"`). In the panel the new-entry form has one input
+for both — a segment makes a page, an address a link.
+
 A page's label is its title, its description the page's — one field each, by language, so the menu and the page
 cannot disagree: the site's `lang` is the default, `languages` the others it speaks, and a request's language
 is what `installContentSite { requestLanguage = { it.language } }` answers (kroom-webapp-l10n's, or the

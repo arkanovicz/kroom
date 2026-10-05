@@ -96,8 +96,18 @@ class NavigationTest {
 
         admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"slug":"a b","label":{}}]}""") }
             .let { assertEquals(HttpStatusCode.BadRequest, it.status) }
-        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"href":"https://y","label":{}}]}""") }
-            .let { assertEquals(HttpStatusCode.BadRequest, it.status, "an entry is a page: no address elsewhere") }
+        // a link: no page answers it, it exists by being stored — never here, never a draft, no pages under it
+        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"slug":"about","label":{}},
+            {"href":"https://y.example/doc","label":{"en":"Elsewhere"},"description":{"en":"Out there"}},{"href":"mailto:x@y.example","label":{}}]}""") }
+            .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        val linked = client.get("/about").bodyAsText()
+        assertContains(linked, """<li><a href="https://y.example/doc" rel="external">Elsewhere</a><small>Out there</small></li>""")
+        assertContains(linked, """<a href="mailto:x@y.example" rel="external">mailto:x@y.example</a>""", message = "a link without words shows its address")
+        assertContains(admin.get("/api/site/menu").bodyAsText(), """"href":"https://y.example/doc","label":{"en":"Elsewhere"},"description":{"en":"Out there"},"kind":"link","movable":true""")
+        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"href":"nowhere","label":{}}]}""") }
+            .let { assertEquals(HttpStatusCode.BadRequest, it.status, "an address has a scheme") }
+        admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"href":"https://y","label":{},"children":[{"slug":"a","label":{}}]}]}""") }
+            .let { assertEquals(HttpStatusCode.BadRequest, it.status, "a link has no pages under it") }
         admin.put("/api/site/menu") { contentType(ContentType.Application.Json); setBody("""{"items":[{"slug":"a","label":{}},{"slug":"a","label":{}}]}""") }
             .let { assertEquals(HttpStatusCode.BadRequest, it.status, "two entries cannot be one page") }
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/site/menu").status)

@@ -54,6 +54,11 @@ fun Route.siteRoutes() {
             // an editor's view: a draft resolves (they may see it), what is missing does not
             fun state(path: String) = if (path in served) PageState.PUBLISHED else site.authored.get(path)?.let { PageState.DRAFT } ?: PageState.MISSING
             fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
+                if (item.external) {
+                    set("kind", "link")
+                    set("movable", true)
+                    return@apply
+                }
                 val path = "$parent/${item.slug}"
                 set("path", path)
                 set("kind", kind(path))
