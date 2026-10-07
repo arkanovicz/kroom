@@ -1,7 +1,11 @@
 package com.republicate.kroom.markdown
 
-import org.apache.velocity.engine.ResourceLoader
+import kotlinx.io.Source
+import kotlinx.io.asSource
+import kotlinx.io.buffered
 import org.apache.velocity.engine.ResourceNotFoundException
+import org.apache.velocity.engine.resource.Content
+import org.apache.velocity.engine.resource.ResourceLoader
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -14,14 +18,12 @@ class DirectoryLoader(private val root: Path) : ResourceLoader {
         return path
     }
 
-    override fun load(name: String): String {
-        val path = resolve(name)
-        if (!Files.isRegularFile(path)) throw ResourceNotFoundException("no such block: $name")
-        return Files.readString(path)
+    override fun find(name: String): Content? {
+        val path = resolve(name).takeIf { Files.isRegularFile(it) } ?: return null
+        val stamp = Files.getLastModifiedTime(path).toMillis()
+        return object : Content() {
+            override fun open(): Source = Files.newInputStream(path).asSource().buffered()
+            override fun isModified(): Boolean = !Files.isRegularFile(path) || Files.getLastModifiedTime(path).toMillis() != stamp
+        }
     }
-
-    override fun exists(name: String): Boolean = Files.isRegularFile(resolve(name))
-
-    override fun lastModified(name: String): Long? =
-        resolve(name).takeIf { Files.isRegularFile(it) }?.let { Files.getLastModifiedTime(it).toMillis() }
 }

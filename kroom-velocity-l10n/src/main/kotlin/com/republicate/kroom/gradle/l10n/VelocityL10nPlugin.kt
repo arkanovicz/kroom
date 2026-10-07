@@ -45,13 +45,14 @@ class VelocityL10nPlugin : Plugin<Project> {
             "org.apache.velocity:velocity-engine-common:${BuildInfo.VELOCITY_VERSION}"
         )
 
-        // Resolve $ref-bearing templates + the macro libraries from the generated, translated trees.
+        // Resolve $ref-bearing templates + the macro libraries from the generated, translated trees: the
+        // build reads both from the one configuration (velocity -20261007-01)
         project.pluginManager.apply("org.apache.velocity.engine")
         val velocity = project.extensions.getByType(VelocityExtension::class.java)
-        velocity.templateRoot(generatedRoot.get().dir("templates").asFile.absolutePath)
-        velocity.macroLibraries.add("kroom-macros.vtl")   // kroom's own (#versioned, …), always available
-        velocity.macroLibraries.addAll(project.provider {
-            ext.macroLibraries.getOrElse(emptyList()).map { project.file(it).name }
+        velocity.property("resource.loader.stock.sources", generatedRoot.get().dir("templates").asFile.absolutePath)
+        velocity.settings.put("velocimacro.library.path", project.provider {
+            // kroom's own (#versioned, …) always available, then the application's
+            (listOf("kroom-macros.vtl") + ext.macroLibraries.getOrElse(emptyList()).map { project.file(it).name }).joinToString(",")
         })
 
         // Generated stubs → main Kotlin source set; the task-output provider wires compile dependsOn generate.

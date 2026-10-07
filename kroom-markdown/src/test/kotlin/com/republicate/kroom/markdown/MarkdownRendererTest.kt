@@ -1,7 +1,8 @@
 package com.republicate.kroom.markdown
 
-import org.apache.velocity.engine.ResourceLoader
-import org.apache.velocity.engine.ResourceNotFoundException
+import org.apache.velocity.engine.Config
+import org.apache.velocity.engine.resource.ResourceLoader
+import org.apache.velocity.engine.resource.content
 import org.apache.velocity.engine.SandboxViolationException
 import org.apache.velocity.engine.StrictReferenceException
 import org.apache.velocity.engine.VelocityContext
@@ -31,8 +32,7 @@ class MarkdownRendererTest {
 
     /** Blocks from the test classpath's `content/` — a store stand-in. */
     private val content = ResourceLoader { name ->
-        javaClass.classLoader.getResource("content/${name.trimStart('/')}")?.readText()
-            ?: throw ResourceNotFoundException("no such block: $name")
+        javaClass.classLoader.getResource("content/${name.trimStart('/')}")?.readText()?.let(::content)
     }
 
     private fun config(vararg properties: Pair<String, Any?>) =
@@ -244,10 +244,8 @@ class MarkdownRendererTest {
     /** The same macro, the same block, on a velocity 3.0 page engine: kroom imposes no facade. */
     @Test
     fun `a 3_0 page engine renders the same block`() {
-        val pages = ResourceLoader { name ->
-            javaClass.classLoader.getResource(name)?.readText() ?: throw ResourceNotFoundException(name)
-        }
-        val engine = Engine(compiler = org.apache.velocity.engine.jvm.ScriptingCompiler(), loader = pages)
+        val pages = ResourceLoader { name -> javaClass.classLoader.getResource(name)?.readText()?.let(::content) }
+        val engine = Engine(org.apache.velocity.engine.jvm.ScriptingCompiler(), Config(loaders = listOf("pages"))).apply { addResourceLoader("pages", pages) }
         engine.addMacro("markdown", MarkdownMacro(config()))
         assertEquals(
             "<main><h2>Les Vagabonds</h2>\n<p>club 13Ma</p>\n</main>",

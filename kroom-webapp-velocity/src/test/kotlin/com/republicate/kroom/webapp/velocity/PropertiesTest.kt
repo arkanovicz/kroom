@@ -17,6 +17,6 @@ class PropertiesTest {
     @Test
     fun `an application property overrides a kroom default`() {
         assertEquals("false", engineWith("velocimacro.library.autoreload" to "false").getProperty("velocimacro.library.autoreload").toString())
-        assertEquals("classpath", engineWith().getProperty("resource.loaders").let { (it as? List<*>)?.joinToString(",") ?: it.toString() })
+        assertEquals("stock,classpath", engineWith().getProperty("resource.loaders").let { (it as? List<*>)?.joinToString(",") ?: it.toString() })
     }
 }

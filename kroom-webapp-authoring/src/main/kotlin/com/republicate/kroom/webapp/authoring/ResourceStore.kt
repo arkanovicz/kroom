@@ -1,7 +1,10 @@
 package com.republicate.kroom.webapp.authoring
 
-import org.apache.velocity.engine.ResourceLoader
-import org.apache.velocity.engine.ResourceNotFoundException
+import kotlinx.io.Buffer
+import kotlinx.io.Source
+import kotlinx.io.writeString
+import org.apache.velocity.engine.resource.Content
+import org.apache.velocity.engine.resource.ResourceLoader
 import java.security.MessageDigest
 
 /**
@@ -47,12 +50,15 @@ abstract class ResourceStore(private val sigil: String = "%%@") : ResourceLoader
 
     // --- the source seen by velocity: header + body, exactly as stored ---------------------------
 
-    override fun load(name: String): String =
-        source(read(name.trimStart('/')) ?: throw ResourceNotFoundException("no such content: $name"))
-
-    override fun exists(name: String): Boolean = read(name.trimStart('/')) != null
-
-    override fun lastModified(name: String): Long? = read(name.trimStart('/'))?.updated?.takeIf { it > 0 }
+    override fun find(name: String): Content? {
+        val path = name.trimStart('/')
+        val block = read(path) ?: return null
+        return object : Content() {
+            override fun open(): Source = Buffer().also { it.writeString(source(block)) }
+            // a later write is a new rev; a store without revs answers by its update stamp
+            override fun isModified(): Boolean = read(path)?.let { it.rev != block.rev || it.updated != block.updated } ?: true
+        }
+    }
 
     // --- header <-> body, the one place the file's shape is known --------------------------------
 

@@ -27,9 +27,11 @@ class VelocityPlugin(config: VelocityConfig) {
     val engine: VelocityEngine = VelocityEngine().apply {
         setProperty(RuntimeConstants.INPUT_ENCODING, "UTF-8")
 
+        // `stock` serves the templates a build compiled (velocity -20261007-01: resource.loaders is the whole
+        // truth); first in production, after the files in dev so an edited source wins
         if (config.devMode && config.devDir != null) {
             // Dev mode: file first (hot reload), then classpath (for macros library)
-            setProperty(RuntimeConstants.RESOURCE_LOADERS, "file,classpath")
+            setProperty(RuntimeConstants.RESOURCE_LOADERS, "file,classpath,stock")
             setProperty("resource.loader.file.class", FileResourceLoader::class.java.name)
             setProperty("resource.loader.file.path", config.devDir!!.absolutePath)
             setProperty("resource.loader.file.cache", false)
@@ -37,13 +39,13 @@ class VelocityPlugin(config: VelocityConfig) {
             setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
         } else if (config.templatePath != null) {
             // Production: templates under templatePath by bare name, macros library at classpath root
-            setProperty(RuntimeConstants.RESOURCE_LOADERS, "templates,root")
+            setProperty(RuntimeConstants.RESOURCE_LOADERS, "stock,templates,root")
             setProperty("resource.loader.templates.class", ClasspathResourceLoader::class.java.name)
             setProperty("resource.loader.templates.path", config.templatePath)
             setProperty("resource.loader.root.class", ClasspathResourceLoader::class.java.name)
         } else {
             // Production: everything at classpath root
-            setProperty(RuntimeConstants.RESOURCE_LOADERS, "classpath")
+            setProperty(RuntimeConstants.RESOURCE_LOADERS, "stock,classpath")
             setProperty("resource.loader.classpath.class", ClasspathResourceLoader::class.java.name)
         }
 

@@ -1,7 +1,8 @@
 package com.republicate.kroom.markdown
 
-import org.apache.velocity.engine.ResourceLoader
-import org.apache.velocity.engine.ResourceNotFoundException
+import org.apache.velocity.engine.Config
+import org.apache.velocity.engine.resource.ResourceLoader
+import org.apache.velocity.engine.resource.content
 import org.apache.velocity.engine.VelocityContext
 import org.apache.velocity.engine.VelocityEngine
 import org.apache.velocity.engine.jvm.ScriptingCompiler
@@ -80,9 +81,9 @@ class ShapeTest {
     /** The probe an editor sets in a page render: only the asked block answers, with its arguments and tools. */
     @Test
     fun `a page render fills the shape of the asked block`() {
-        val pages = ResourceLoader { name -> javaClass.classLoader.getResource(name)?.readText() ?: throw ResourceNotFoundException(name) }
-        val engine = VelocityEngine(compiler = ScriptingCompiler(), loader = pages)
-        engine.addMacro("markdown", MarkdownMacro(MarkdownConfig(loader = { throw ResourceNotFoundException(it) })))
+        val pages = ResourceLoader { name -> javaClass.classLoader.getResource(name)?.readText()?.let(::content) }
+        val engine = VelocityEngine(ScriptingCompiler(), Config(loaders = listOf("pages"))).apply { addResourceLoader("pages", pages) }
+        engine.addMacro("markdown", MarkdownMacro(MarkdownConfig()))
         val asked = mutableMapOf<String, Any?>("pages/club/13Ma/description.md" to null)
         engine.mergeTemplate("pages/club/_code_.html", VelocityContext(mutableMapOf(
             "code" to "13Ma", "club" to club, MarkdownMacro.SHAPES to asked)))

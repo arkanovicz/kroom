@@ -6,6 +6,20 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### velocity 3.0.0-BETA-20261007-01
+- One resource manager serves every named resource, root or `#parse`d child, kept as its loader's `cache` /
+  `modification_check_interval` say: a computed `#parse($name)` is re-read when its file changes (a dev-edited
+  region showed only after a restart — reported from site2026; pinned in `DevDirTest`).
+- The 3.0 loader contract is `ResourceLoader { find(name): Content? }` (`org.apache.velocity.engine.resource`),
+  null meaning *not mine*, a `Content` opening its text and knowing whether it changed: `MarkdownConfig.loader`,
+  `DirectoryLoader` and `ResourceStore` follow — `load`/`exists`/`lastModified` are gone, `content(text)` stands
+  in for a loader written as a lambda. The block engine lists its store as the `blocks` loader
+  (`markdown.resource.loader.blocks.*` for its cache policy; nothing kept by default).
+- `resource.loaders` is the whole truth: `VelocityPlugin` lists `stock` — the templates a build compiled —
+  first in production, after the files in dev (an edited source wins). kroom-velocity-l10n points the build
+  at its generated tree with `resource.loader.stock.sources` and `velocimacro.library.path`
+  (`templateRoot`/`macroLibraries` are gone from the extension).
+
 #### kroom-webapp-authoring
 - (added) Warm-up: once the server listens, a content site requests `/` from itself in the background, so the
   first visitor does not pay the compilers' start (`warmUp`, on by default).

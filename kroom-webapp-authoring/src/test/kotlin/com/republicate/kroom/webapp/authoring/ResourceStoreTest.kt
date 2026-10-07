@@ -2,6 +2,7 @@ package com.republicate.kroom.webapp.authoring
 
 import java.nio.file.Files
 import kotlin.io.path.readText
+import kotlinx.io.readString
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -25,8 +26,13 @@ class ResourceStoreTest {
         assertEquals("## Les Vagabonds\n\nUn club.", block.body)
         assertEquals("admin", block.author)
 
-        val source = store.load("club/description.md")
-        assertEquals("%%@ author admin\n%%@ updated 1757000000\n\n## Les Vagabonds\n\nUn club.", source)
+        val found = store.find("club/description.md")!!
+        assertEquals("%%@ author admin\n%%@ updated 1757000000\n\n## Les Vagabonds\n\nUn club.", found.open().use { it.readString() })
+        // what velocity keeps, it asks again after a write: the content it holds knows it is stale
+        assertEquals(false, found.isModified())
+        store.write("club/description.md", "## Les Vagabonds\n\nUn club, changé.", mapOf("author" to "admin"))
+        assertEquals(true, found.isModified())
+        assertEquals(null, store.find("club/nowhere.md"), "a block nobody wrote is not the store's")
     }
 
     @Test

@@ -1,8 +1,7 @@
 package com.republicate.kroom.markdown
 
 import org.apache.velocity.engine.Config
-import org.apache.velocity.engine.ResourceLoader
-import org.apache.velocity.engine.ResourceNotFoundException
+import org.apache.velocity.engine.resource.ResourceLoader
 import org.apache.velocity.engine.runtime.introspection.Sandbox
 
 /**
@@ -13,8 +12,8 @@ import org.apache.velocity.engine.runtime.introspection.Sandbox
  * ([fromProperties]).
  */
 data class MarkdownConfig(
-    /** Where blocks are read from — typically the same store the editor writes through. */
-    val loader: ResourceLoader = ResourceLoader { throw ResourceNotFoundException("no markdown loader configured for \"$it\"") },
+    /** Where blocks are read from — typically the same store the editor writes through; none by default (every block is missing). */
+    val loader: ResourceLoader = ResourceLoader { null },
 
     /** The sandbox's rules, in velocity's ACL syntax; null runs blocks unsandboxed. No `$x.class` either: a
      *  block has no business with reflection, and the editor's completion lists what the sandbox lets through. */

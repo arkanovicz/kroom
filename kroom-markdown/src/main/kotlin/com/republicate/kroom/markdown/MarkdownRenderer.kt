@@ -56,7 +56,7 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
     }
 
     /** Whether the loader holds a block at [path]. */
-    fun exists(path: String): Boolean = config.loader.exists(path)
+    fun exists(path: String): Boolean = engine.resourceExists(path)
 
     /** Render markdown the caller already holds — an editor preview, a draft never written to a loader. */
     fun renderSource(source: String, context: Context, name: String = "markdown"): String =
@@ -86,6 +86,9 @@ private fun markdownCompiler(config: MarkdownConfig) = ScriptingCompiler(sandbox
 
 private fun markdownEngine(config: MarkdownConfig, compiler: ScriptingCompiler) = VelocityEngine(
     compiler = compiler,
-    loader = config.loader,
-    config = config.engine.copy(lexerSource = MarkdownVtl),
-)
+    // the one loader, the store's: kept as `markdown.resource.loader.blocks.*` says (nothing, by default)
+    config = config.engine.copy(lexerSource = MarkdownVtl, loaders = listOf(BLOCKS)),
+).apply { addResourceLoader(BLOCKS, config.loader) }
+
+/** The name the block engine lists its store under. */
+private const val BLOCKS = "blocks"
