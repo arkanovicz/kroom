@@ -136,11 +136,11 @@ class ThemeTest {
         assertContains(page, """<div class="content skinny"><h1>About us</h1></div>""")
         assertContains(page, """<meta name="skinny" content="on">""")
         assertContains(page, """<link rel="stylesheet" href="/css/skinny.css?v=""")
-        // site2026: an authored page's editable default is the skin's rewritten region, not kroom's generic one
+        // site2026: an authored page's footer is the skin's rewritten region, not kroom's generic one — nor a block
         val admin = visitor("admin")
         admin.post("/api/site/pages") { contentType(ContentType.Application.Json); setBody("""{"path":"/notes","status":"published"}""") }
         val authored = admin.get("/notes").bodyAsText()
-        assertContains(authored, """data-content="pages/notes/footer.md"""")
+        assertFalse(authored.contains("pages/notes/footer.md"), "the footer is the site's, not the page's")
         assertContains(authored, """<small class="skinny-foot">skinny foot</small>""")
         assertFalse(authored.contains("github.com/arkanovicz/kroom"), "kroom's own footer line stays out")
         storage.settings("site")["theme"] = "basic"

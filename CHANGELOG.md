@@ -21,6 +21,11 @@ All notable changes to kroom will be documented in this file.
   (`templateRoot`/`macroLibraries` are gone from the extension).
 
 #### kroom-webapp-authoring
+- An authored page has no `header`, `west` or `footer` block any more: those regions are the site's (its theme's
+  partials, worded by the `name` and `footer` settings), never a page's. The handle on them opened an empty
+  editor over a default a block could not reproduce. A block written there is ignored.
+- A root page is born with its content, the loop over its children (`AuthoredPage.TOC`): a section's page is
+  a table of contents until its editor says otherwise. `kroom/page.html` hands every content block `$children`.
 - (added) Warm-up: once the server listens, a content site requests `/` from itself in the background, so the
   first visitor does not pay the compilers' start (`warmUp`, on by default).
 - kroom's own templates name with `_`, never `-`, so a build can compile them (a compiled template's path

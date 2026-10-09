@@ -571,11 +571,11 @@ content store right where a template's would be (`pages/company/history/content.
 other, previewed within its page. Authored pages answer after the templates, in the not-found phase: a
 developer's page wins, an editor cannot take `/login`. Deleting the record leaves its blocks in the store.
 
-A region is what its block makes it. Written, everyone sees it. Not written, a visitor sees nothing there —
-or the site's default, for `$header`, `$west` and `$footer` — and whoever may write it finds a sliver in its
-place, unseen until hovered, that says what it is (*right sidebar*) and offers the edit handle; the default
-itself carries the handle where there is one, and writing it overrides the default for that page. Trashing
-the block (the editor's trash, `DELETE /api/content/{path}`) brings the default, or the emptiness, back.
+A region is what its block makes it. Written, everyone sees it. Not written, a visitor sees nothing there,
+and whoever may write it finds a sliver in its place, unseen until hovered, that says what it is (*right
+sidebar*) and offers the edit handle. Trashing the block (the editor's trash, `DELETE /api/content/{path}`)
+brings the emptiness back. Header, west and footer are the site's, never a page's: the theme's partials render
+them, the `site.name` and `site.footer` settings word them.
 
 A page is a `draft` until published: its editors see it, marked *draft* in the menu; visitors and the sitemap
 do not.
@@ -596,7 +596,10 @@ pages on the left by default, or nothing). A section no page answers leads to it
 a developer's handle is greyed) and its label, which opens an accordion: the label and description in the
 chosen language, the page itself (a section offers to create it), and for an editor's page its layout,
 publish/unpublish, delete. A new page is typed by its name, the segment derived from it (`Notre Société` →
-`notre-societe`) until typed over. Every gesture stores the tree.
+`notre-societe`) until typed over. A root page is born
+with its content: the loop listing the pages under it, an ordinary block an editor rewrites or trashes, so a
+section's page is a table of contents until it says otherwise (`AuthoredPage.TOC`; the page hands every content
+block `$children`). Every gesture stores the tree.
 
 `GET`/`PUT`/`DELETE /api/site/menu` (the tree; its arrangement; forgetting it), `POST /api/site/pages`
 (`{path, label, layout}`, a draft), `POST /api/site/pages/move` (`{from, to}`),

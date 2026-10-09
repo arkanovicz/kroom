@@ -426,11 +426,6 @@ ul.kroom-revisions button {
     white-space: nowrap;
 }
 
-/* a region showing the site's default: always something to hover, even when the default says nothing */
-.kroom-region-default > .kroom-block {
-    min-height: 1.5rem;
-}
-
 /* completion: what may follow the reference at the caret, under it */
 .kroom-pane[data-pane="source"] {
     position: relative;

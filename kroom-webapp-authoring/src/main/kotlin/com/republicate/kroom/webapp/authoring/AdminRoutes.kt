@@ -107,6 +107,7 @@ fun Route.siteRoutes() {
             if (site.authored.taken(path))
                 return@post respondError("a page already answers $path", HttpStatusCode.Conflict, "pageExists", mapOf("path" to path))
             site.authored.put(page)
+            site.authored.seed(page, session.id)
             // its words are its menu entry's: the label it was given is stored there
             asked.getObject("label")?.entries?.associate { (k, v) -> k to v.toString() }?.filterValues { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
                 ?.let { label -> site.rewrite(path) { it.copy(label = label) } }

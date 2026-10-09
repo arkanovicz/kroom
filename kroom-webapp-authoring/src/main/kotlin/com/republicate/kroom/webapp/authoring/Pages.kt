@@ -15,7 +15,7 @@ import io.ktor.server.response.respondText
  * per region, in the content store where a template's would be
  * (`pages/company/history/content.md`), edited in place like any other. A single template renders them all.
  * A region is what its block makes it: written, everyone sees it; not written, whoever may write it finds a
- * sliver there with the edit handle (the site's default, for the regions that have one), and a visitor nothing.
+ * sliver there with the edit handle, and a visitor nothing. Header, west and footer are the site's, not a page's.
  */
 data class AuthoredPage(
     /** `/company/history`: the slug tree, as in the menu. */
@@ -42,6 +42,8 @@ data class AuthoredPage(
 
     companion object {
         const val DRAFT = "draft"
+        /** What a root page's content block starts as: its children, as the page hands them (`$children`). */
+        const val TOC = "%foreach(\$child in \$children)\n- [\$child.label](\$child.href)%if(\$child.description) — \$child.description%end\n%end"
         const val PUBLISHED = "published"
         private val PATH = Regex("(/[A-Za-z0-9_-]+)+")
 
@@ -86,6 +88,17 @@ internal class AuthoredPages(private val site: Site) {
     fun all(): List<AuthoredPage> = records.list(Int.MAX_VALUE).values.mapNotNull { AuthoredPage.parse(it).getOrNull() }.sortedBy { it.path }
 
     fun put(page: AuthoredPage) = records.put(id(page.path), page.toJson())
+
+    /**
+     * A root page is born with its content: the loop listing the pages under it, an ordinary block [author]
+     * may rewrite or trash — a section's page is a table of contents until it says otherwise. A page made
+     * again where a deleted one left its blocks keeps them.
+     */
+    fun seed(page: AuthoredPage, author: String) {
+        if (page.path.count { it == '/' } != 1) return
+        val block = "pages${page.path}/content.md"
+        if (site.storage.content.read(block) == null) site.storage.content.write(block, AuthoredPage.TOC, mapOf("author" to author))
+    }
 
     fun delete(path: String): Boolean = records.delete(id(path))
 

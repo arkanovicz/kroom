@@ -14,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 /** Pages editors make: a record and blocks, drafts theirs to see, published for all, rendered through one template. */
 class PagesTest {
@@ -90,20 +91,41 @@ class PagesTest {
         assertFalse(asVisitor.contains("kroom-region"), "nor any sliver")
         assertContains(visitor("au").get("/legal/notes").bodyAsText(), "kroom-region-empty", message = "an author may write it too")
 
-        // the west has a site default: the editor sees it with the handle, the visitor sees it plain
-        assertContains(asEditor, """data-content="pages/legal/notes/west.md"""")
+        // the west is the site's, not the page's: the same for editor and visitor, no handle
         assertContains(asEditor, """<nav class="west" aria-label="Legal">""")
         assertContains(asVisitor, """<nav class="west" aria-label="Legal">""")
-        assertFalse(asVisitor.contains("pages/legal/notes/west.md"))
+        assertFalse(asEditor.contains("pages/legal/notes/west.md"), "no block for a page's west")
 
         storage.content.write("pages/legal/notes/east.md", "On the **side**", mapOf("author" to "ed"))
         storage.content.write("pages/legal/notes/west.md", "Our own **west**", mapOf("author" to "ed"))
         val written = visitor().get("/legal/notes").bodyAsText()
         assertContains(written, "On the <strong>side</strong>")
-        assertContains(written, "Our own <strong>west</strong>")
-        assertFalse(written.contains("""<nav class="west""""), "the override replaces the default")
-        assertEquals(HttpStatusCode.OK, editor.delete("/api/content/pages/legal/notes/west.md").status)
-        assertContains(visitor().get("/legal/notes").bodyAsText(), """<nav class="west" aria-label="Legal">""", message = "trashed, the default is back")
+        assertFalse(written.contains("Our own"), "a west block under the page is ignored")
+        assertContains(written, """<nav class="west" aria-label="Legal">""", message = "the site's west stays")
+    }
+
+    @Test
+    fun `a root page is born with its table of contents - the loop over its children, a block like any other`() = testApplication {
+        site()
+        val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides","label":{"en":"Guides"},"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertEquals(AuthoredPage.TOC, storage.content.read("pages/guides/content.md")?.body, "the loop, stored as the page's content")
+        assertEquals("ed", storage.content.read("pages/guides/content.md")?.meta?.get("author"))
+        assertFalse(visitor().get("/guides").bodyAsText().contains("""<li><a href="/guides/"""), "nothing under it yet: the loop lists nothing")
+
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides/first","label":{"en":"First steps"},"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertNull(storage.content.read("pages/guides/first/content.md"), "a deeper page is born empty")
+        editor.json(HttpMethod.Put, "/api/site/menu", """{"items":[{"slug":"guides","label":{"en":"Guides"},"children":[{"slug":"first","label":{"en":"First steps"},"description":{"en":"Where to begin"}}]}]}""")
+            .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        val toc = visitor().get("/guides").bodyAsText()
+        assertContains(toc, """<li><a href="/guides/first">First steps</a> — Where to begin</li>""", message = "the child, its words from the menu")
+
+        // the loop is the editor's: rewritten, the page says what it says; made again where blocks were left, a page keeps them
+        storage.content.write("pages/guides/content.md", "All our **guides**", mapOf("author" to "ed"))
+        assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>")
+        assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/guides").status)
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides","status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>", message = "its block stayed, the loop is not written over it")
     }
 
     @Test
@@ -114,11 +136,14 @@ class PagesTest {
         val path = "pages/company/content.md"
         val held = editor.post("/api/content/lock/$path")
         assertEquals(HttpStatusCode.OK, held.status, held.bodyAsText())
+        // a root page is born with its loop: the editor opens on it, and submits over its revision
+        assertContains(held.bodyAsText(), "%foreach(")
+        val rev = Regex(""""rev":"([^"]*)"""").find(held.bodyAsText())!!.groupValues[1]
         val preview = editor.json(HttpMethod.Post, "/api/content/preview/$path", """{"page":"/company","body":"## Draft\n\nbeing *written*"}""")
         assertEquals(HttpStatusCode.OK, preview.status, preview.bodyAsText())
         assertContains(preview.bodyAsText(), "being <em>written</em>")
         assertContains(preview.bodyAsText(), "<title>Company — kroom</title>", message = "the page, not a fragment")
-        val submitted = editor.json(HttpMethod.Post, "/api/content/$path", """{"page":"/company","rev":"","body":"## Written"}""")
+        val submitted = editor.json(HttpMethod.Post, "/api/content/$path", """{"page":"/company","rev":"$rev","body":"## Written"}""")
         assertEquals(HttpStatusCode.OK, submitted.status, submitted.bodyAsText())
         assertEquals("## Written", storage.content.read(path)!!.body)
     }
@@ -140,7 +165,7 @@ class PagesTest {
         assertContains(page, "<title>Field notes — kroom</title>", message = "its words followed")
         assertEquals(null, storage.content.read("pages/notes/content.md"))
         val history = (storage.content as Versioned).log("pages/legal/notes/content.md")
-        assertEquals(listOf("moved from pages/notes/content.md", null, null), history.map { it.message }, "its past followed, and the move is in it")
+        assertEquals(listOf("moved from pages/notes/content.md", null, null, null), history.map { it.message }, "its past followed (the loop it was born with, two writes), and the move is in it")
         assertContains(visitor().get("/about").bodyAsText(), """<a href="/legal/notes">Field notes</a>""")
 
         // its words follow even under a parent the stored arrangement never heard of
