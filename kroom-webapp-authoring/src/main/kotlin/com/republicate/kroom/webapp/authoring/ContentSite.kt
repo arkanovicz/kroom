@@ -84,6 +84,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     config.loginPage?.let { page ->
         site.hiddenPages += page
         site.loginRoute = "/" + page.removePrefix("${config.pagePrefix}/").removeSuffix(".${config.pageExtension}")
+        site.rememberWhereFrom()
     }
     // a tool of a plugin that is off resolves to nothing: a block calling it fails, and renders `broken`
     site.tools.forEach { (name, owned) -> velocity.registerApplication(name) { owned.value.takeIf { site.enabled(owned.owner) } } }

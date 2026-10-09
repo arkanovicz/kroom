@@ -51,8 +51,17 @@ class IdentityTest {
             }
         }
         val browser = createClient { install(HttpCookies); followRedirects = false }
+        // the login page asked for from /story: the site remembers, and a refusal forgets nothing
+        val asked = browser.get("/login") { header(HttpHeaders.Referrer, "http://localhost/story?x=1") }
+        assertContains(asked.headers[HttpHeaders.SetCookie].orEmpty(), "kroom_from=", message = "where one was, kept while logging in")
         val refused = browser.submitForm("/login", parameters { append("user", "admin"); append("password", "nope") })
         assertContains(refused.bodyAsText(), "admin / admin")          // the page again, with `$failed`
+        val back = browser.submitForm("/login", parameters { append("user", "admin"); append("password", "admin") })
+        assertEquals(HttpStatusCode.Found, back.status)
+        assertEquals("/story?x=1", back.headers[HttpHeaders.Location])
+        assertContains(back.headers[HttpHeaders.SetCookie].orEmpty(), "kroom_from=;", message = "and forgotten once there")
+        browser.post("/logout")
+        assertFalse(browser.get("/login") { header(HttpHeaders.Referrer, "http://evil.example/x") }.headers[HttpHeaders.SetCookie].orEmpty().contains("kroom_from"), "another host's page is not remembered")
         val accepted = browser.submitForm("/login", parameters { append("user", "admin"); append("password", "admin"); append("from", "/club/13Ma") })
         assertEquals(HttpStatusCode.Found, accepted.status)
         assertEquals("/club/13Ma", accepted.headers[HttpHeaders.Location])

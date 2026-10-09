@@ -439,6 +439,10 @@ installContentSite {
 }
 ```
 
+Logged in, one is back where one was: serving its login page, the site remembers the page it was reached
+from (a short-lived cookie), nothing in the address or the form. An application that knows better sets a
+`from` field.
+
 `Roles.can(roles, permission, target)` is open, for rights a flat table cannot say (an editor of one club's
 pages only). kroom asks `content.edit` (target: the block path),
 `pages.edit` (target: the page path) and `site.admin`.
