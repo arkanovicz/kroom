@@ -24,6 +24,8 @@ All notable changes to kroom will be documented in this file.
 - An authored page has no `header`, `west` or `footer` block any more: those regions are the site's (its theme's
   partials, worded by the `name` and `footer` settings), never a page's. The handle on them opened an empty
   editor over a default a block could not reproduce. A block written there is ignored.
+- A page is born where it goes: the pages panel's bottom form is a phantom row dragged into the tree, which
+  asks the name and creates the page under that list, at that index (a link is stored there the same way).
 - A root page is born with its content, the loop over its children (`AuthoredPage.TOC`): a section's page is
   a table of contents until its editor says otherwise. `kroom/page.html` hands every content block `$children`.
 - (added) Warm-up: once the server listens, a content site requests `/` from itself in the background, so the

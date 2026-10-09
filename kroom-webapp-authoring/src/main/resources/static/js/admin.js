@@ -41,7 +41,8 @@
         pagesDerived: 'in the order the pages come', pagesArranged: 'as you arranged them', pagesReset: 'forget this arrangement',
         pageDrag: 'drag to move', pageStays: 'it stays in its list: reordered, not moved', pageHasChildren: 'it has pages under it: it cannot move yet',
         pageLabel: 'label', pageDescription: 'description', pageLayout: 'layout', pageNone: 'no page here', pageCreate: 'create this page',
-        pageSourced: 'a developer\'s page', pageDelete: 'delete this page', linkDelete: 'remove this link', pageNewLabel: 'new page or link: its name', pageNewSlug: 'segment / URL',
+        pageSourced: 'a developer\'s page', pageDelete: 'delete this page', linkDelete: 'remove this link', pageNewLabel: 'its name', pageNewSlug: 'segment / URL',
+        pageNew: 'drag me where a new page or link goes', pageBorn: 'create', pageUnborn: 'cancel',
         publish: 'publish', unpublish: 'unpublish', draft: 'draft', published: 'published',
         confirmDeletePage: 'Delete this page? Its blocks stay in the store.',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
@@ -72,7 +73,8 @@
         pagesDerived: 'dans l’ordre où viennent les pages', pagesArranged: 'telles que vous les avez arrangées', pagesReset: 'oublier cet arrangement',
         pageDrag: 'glisser pour déplacer', pageStays: 'elle reste dans sa liste\u00a0: on la réordonne, on ne la déplace pas', pageHasChildren: 'elle a des pages sous elle\u00a0: elle ne peut pas encore bouger',
         pageLabel: 'libellé', pageDescription: 'description', pageLayout: 'mise en page', pageNone: 'pas de page ici', pageCreate: 'créer cette page',
-        pageSourced: 'page d’un développeur', pageDelete: 'supprimer cette page', linkDelete: 'retirer ce lien', pageNewLabel: 'nouvelle page ou lien\u00a0: son nom', pageNewSlug: 'segment / URL',
+        pageSourced: 'page d’un développeur', pageDelete: 'supprimer cette page', linkDelete: 'retirer ce lien', pageNewLabel: 'son nom', pageNewSlug: 'segment / URL',
+        pageNew: 'glissez-moi où va une nouvelle page ou un lien', pageBorn: 'créer', pageUnborn: 'annuler',
         publish: 'publier', unpublish: 'dépublier', draft: 'brouillon', published: 'publiée',
         confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
@@ -200,7 +202,7 @@
             let opened = null;                          // the accordion left open, by path or address, across re-renders
             const strip = (list) => list.map(i => ({ slug: i.slug, href: i.href, label: i.label || {}, description: i.description || {}, children: strip(i.children || []) }));
             // an address elsewhere: anything with a scheme — what a segment can never be
-            const LINK = /^[A-Za-z][A-Za-z0-9+.-]*:.+$/;
+            const LINK = /^[A-Za-z][A-Za-z0-9+.\-]*:.+$/;     // `\-`: the pattern attribute compiles with the v flag, a bare `-` in a class is an error there
             const fail = (err) => body.appendChild(element('p', 'kroom-admin-error', said(err)));
             const refresh = async () => { answer = await api.getJson(siteApi + 'menu'); render(); };
             // their order and words; whatever happens, the tree shown is the server's
@@ -210,7 +212,7 @@
             };
             const act = async (call) => { try { await call(); await refresh(); } catch (err) { fail(err); } };
             // the tree as the DOM now has it: what a drop made of it
-            const read = (ul) => [...ul.children].filter(li => li._item).map(li => Object.assign({}, li._item, { children: read(li.querySelector(':scope > ul')) }));
+            const read = (ul) => !ul ? [] : [...ul.children].filter(li => li._item).map(li => Object.assign({}, li._item, { children: read(li.querySelector(':scope > ul')) }));   // a newborn has no list yet
             const slugify = (text) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
             const field = (into, name, item, key) => {
@@ -283,7 +285,7 @@
                     ghostClass: 'kroom-admin-ghost',
                     // within its own list anything is reordered; only a page that may move leaves it
                     onMove: (ev, original) => {
-                        const allowed = ev.to === ev.from || !!ev.dragged._item?.movable;
+                        const allowed = ev.to === ev.from || !!ev.dragged._item?.movable || ev.dragged.classList.contains('kroom-admin-phantom');
                         body.querySelectorAll('.kroom-admin-nodrop').forEach(el => el.classList.remove('kroom-admin-nodrop'));
                         if (!allowed) {
                             ev.to.classList.add('kroom-admin-nodrop');
@@ -291,6 +293,8 @@
                         }
                         return allowed;
                     },
+                    // the phantom row dropped here: a page (or a link) is born at this very place
+                    onAdd: (ev) => { if (ev.item.classList.contains('kroom-admin-phantom')) born(ev.item, ev.to._path); },
                     onEnd: async (ev) => {
                         body.querySelectorAll('.kroom-admin-nodrop').forEach(el => el.classList.remove('kroom-admin-nodrop'));
                         if (ev.from === ev.to && ev.oldIndex === ev.newIndex) return;
@@ -304,6 +308,39 @@
                     }
                 });
                 return ul;
+            };
+
+            // where the phantom landed, what it is called, then where — the segment follows the name until it is
+            // typed over; an address typed there instead (a scheme says so) makes a link, stored in the tree. The
+            // page is created under the list it was dropped in, and the tree stored with it at that very index.
+            const born = (li, path) => {
+                li.replaceChildren();
+                const form = li.appendChild(element('form', 'kroom-admin-new-page'));
+                const name = form.appendChild(element('input'));
+                name.name = 'label'; name.placeholder = t('pageNewLabel'); name.required = true;
+                const slug = form.appendChild(element('input'));
+                slug.name = 'slug'; slug.placeholder = t('pageNewSlug'); slug.required = true; slug.pattern = `[A-Za-z0-9_\\-]+|${LINK.source.slice(1, -1)}`;
+                let typed = false;
+                name.addEventListener('input', () => { if (!typed) slug.value = slugify(name.value); });
+                slug.addEventListener('input', () => { typed = slug.value !== ''; });
+                const create = form.appendChild(element('button', null, '\u2713'));
+                create.type = 'submit'; create.title = t('pageBorn'); create.setAttribute('aria-label', t('pageBorn'));
+                const cancel = form.appendChild(element('button', 'secondary outline', '\u2715'));
+                cancel.type = 'button'; cancel.title = t('pageUnborn'); cancel.setAttribute('aria-label', t('pageUnborn'));
+                cancel.addEventListener('click', () => li.remove());
+                form.addEventListener('keydown', (e) => { if (e.key === 'Escape') li.remove(); });
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const where = slug.value.trim(), label = { [lang]: name.value.trim() };
+                    if (LINK.test(where)) li._item = { href: where, label };
+                    else {
+                        try { await api.postJson(siteApi + 'pages', { path: `${path}/${where}`, label }); }
+                        catch (err) { await refresh(); return fail(err); }
+                        li._item = { slug: where, label, children: [] };
+                    }
+                    store(read(root));
+                });
+                name.focus();
             };
 
             let root;
@@ -322,23 +359,15 @@
                 }
                 root = body.appendChild(tree(answer.items, ''));
                 root.classList.add('kroom-admin-menu-root');
-                // a new page: what it is called, then where — the segment follows the name until it is typed over;
-                // an address typed there instead (a scheme says so) makes a link, stored in the tree
-                const form = body.appendChild(element('form', 'kroom-admin-new-page'));
-                const name = form.appendChild(element('input'));
-                name.name = 'label'; name.placeholder = t('pageNewLabel'); name.required = true;
-                const slug = form.appendChild(element('input'));
-                slug.name = 'slug'; slug.placeholder = t('pageNewSlug'); slug.required = true; slug.pattern = `[A-Za-z0-9_-]+|${LINK.source.slice(1, -1)}`;
-                let typed = false;
-                name.addEventListener('input', () => { if (!typed) slug.value = slugify(name.value); });
-                slug.addEventListener('input', () => { typed = slug.value !== ''; });
-                const create = form.appendChild(element('button', null, '+'));
-                create.type = 'submit'; create.title = t('pageCreate'); create.setAttribute('aria-label', t('pageCreate'));
-                form.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const where = slug.value.trim(), label = { [lang]: name.value.trim() };
-                    if (LINK.test(where)) store([...answer.items, { href: where, label }]);
-                    else act(() => api.postJson(siteApi + 'pages', { path: '/' + where, label }));
+                // the phantom row: dragged into the tree, it becomes a page (or a link) right there
+                const source = body.appendChild(element('ul', 'kroom-admin-menu kroom-admin-menu-source'));
+                const phantom = source.appendChild(element('li', 'kroom-admin-menu-entry kroom-admin-phantom'));
+                phantom.appendChild(element('span', 'kroom-admin-handle', '\u283f'));
+                phantom.appendChild(element('span', 'kroom-admin-muted', t('pageNew')));
+                phantom.title = t('pageNew');
+                if (window.Sortable) new window.Sortable(source, {
+                    group: { name: 'kroom-menu', pull: 'clone', put: false }, sort: false, handle: '.kroom-admin-handle',
+                    animation: 150, fallbackOnBody: true, ghostClass: 'kroom-admin-ghost'
                 });
                 if (answer.stored) action(body, 'pagesReset', 'kroom-admin-menu-reset', () => act(() => api.deleteJson(siteApi + 'menu')));
             };

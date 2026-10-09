@@ -309,7 +309,10 @@ button.kroom-admin-menu-reset { width: auto; margin: .5rem 0 0; padding: 0; back
 .kroom-admin-menu-fields select { display: inline-block; width: auto; margin: 0; padding: .1rem 1.75rem .1rem .4rem; height: auto; font-size: .8rem; }
 
 /* a new page: its name, its segment, on one line */
-.kroom-admin-new-page { display: flex; gap: .25rem; margin: .5rem 0 0; }
+.kroom-admin-menu-source { margin-top: .5rem; }
+.kroom-admin-phantom { outline: 1px dashed var(--pico-muted-border-color, #ddd); outline-offset: -1px; font-size: .8rem; line-height: 1.6; }
+.kroom-admin-phantom:hover { outline-color: var(--kroom-edit-color, #2563eb); }
+.kroom-admin-new-page { display: flex; gap: .25rem; margin: .125rem 0; grid-column: 1 / -1; }
 .kroom-admin-new-page input { flex: 2 1 0; min-width: 0; margin: 0; padding: .2rem .4rem; height: auto; font-size: .8rem; border-style: dashed; }
 .kroom-admin-new-page input[name="slug"] { flex: 1 1 0; font-family: var(--pico-font-family-monospace, monospace); }
 .kroom-admin-new-page button { width: auto; margin: 0; padding: 0 .6rem; font-size: .9rem; line-height: 1.4; }

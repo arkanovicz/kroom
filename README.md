@@ -595,8 +595,9 @@ pages on the left by default, or nothing). A section no page answers leads to it
 (SortableJS; a phantom row shows where it lands, a page's own list, empty, is how it gets a first child;
 a developer's handle is greyed) and its label, which opens an accordion: the label and description in the
 chosen language, the page itself (a section offers to create it), and for an editor's page its layout,
-publish/unpublish, delete. A new page is typed by its name, the segment derived from it (`Notre Société` →
-`notre-societe`) until typed over. A root page is born
+publish/unpublish, delete. A new page is born where it goes: a phantom row under the tree, dragged into place,
+asks its name — the segment derived from it (`Notre Société` → `notre-societe`) until typed over, an address
+there instead makes a link — and the page is created under that list, at that very index. A root page is born
 with its content: the loop listing the pages under it, an ordinary block an editor rewrites or trashes, so a
 section's page is a table of contents until it says otherwise (`AuthoredPage.TOC`; the page hands every content
 block `$children`). Every gesture stores the tree.
