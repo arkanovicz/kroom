@@ -291,3 +291,7 @@ Ideal for games with chat: game state is authoritative, chat history is replayed
 ## License
 
 Apache 2.0
+
+## Disclaimer
+
+Commits co-authored with AI agents.
