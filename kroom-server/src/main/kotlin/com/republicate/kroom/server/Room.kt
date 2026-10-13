@@ -120,6 +120,7 @@ abstract class Room<S : Any>(val id: String) {
      * Stop room and cleanup
      */
     fun stop() {
+        eventQueue.close()
         processingJob?.cancel()
         scope.cancel()
         actors.values.forEach { it.disconnect() }
@@ -155,77 +156,65 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Actor joins the room.
-     * @param actor The actor joining
+     * Actor joins the room. The join runs on the loop like everything else that touches the
+     * channels: the newcomer gets `state` (the snapshot, [stateToJson] for that actor) then the
+     * replay, and only then the frames queued behind the join — its own hook's broadcasts included.
+     * Nothing written elsewhere can slip in before the snapshot. A stopped room hands back a
+     * closed channel: the stream ends, the browser retries and learns the room is gone.
      * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
     suspend fun join(actor: Actor, lastEventId: String? = null): Channel<ServerSentEvent> {
+        val ready = CompletableDeferred<Channel<ServerSentEvent>>()
+        if (!eventQueue.trySend(Event.Join(actor, lastEventId, ready)).isSuccess) {
+            return Channel<ServerSentEvent>(0).also { it.close() }
+        }
+        return ready.await()
+    }
+
+    /**
+     * Spectator joins the room: [join], a [Spectator] is an [Actor] that only reads.
+     */
+    suspend fun joinAsSpectator(spectator: Spectator, lastEventId: String? = null): Channel<ServerSentEvent> =
+        join(spectator, lastEventId)
+
+    /**
+     * Actor or spectator leaves. On the loop too, so the leave hook's broadcasts are ordered with
+     * everything else; returns once the room has forgotten the connection.
+     */
+    suspend fun leave(actor: Actor) {
+        val done = CompletableDeferred<Unit>()
+        if (eventQueue.trySend(Event.Leave(actor, done)).isSuccess) done.await()
+    }
+
+    private suspend fun processJoin(actor: Actor, lastEventId: String?) {
         val channel = Channel<ServerSentEvent>(channelCapacity)
         actor.channel = channel
-
         replace(actor)
+        if (actor is Spectator) _spectatorCount.value = spectators.size
 
-        // Register user and track this connection
         actor.user?.let { user ->
             val isNewUser = !users.containsKey(user.userId)
             users[user.userId] = user
             user.addConnection(id, actor)
-            if (isNewUser) {
-                _userCount.value = users.size
-            }
+            if (isNewUser && actor !is Spectator) _userCount.value = users.size
         }
+        logger.debug("${if (actor is Spectator) "Spectator" else "Actor"} '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections, ${spectators.size} spectators)")
 
-        logger.debug("Actor '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections)")
-
-        // First complete the join (seat assignment in Table), then send state
-        onActorJoined(actor)
-        sendStateTo(actor)
-
-        // Replay missed events if history is enabled and lastEventId is valid
+        // the hook first (a Table seats before it snapshots); its broadcasts queue behind this join
+        try {
+            if (actor is Spectator) onSpectatorJoined(actor) else onActorJoined(actor)
+        } catch (e: Exception) {
+            logger.error("Join hook failed in room '$id' for '${actor.name}'", e)
+        }
+        sendSafe(actor, ServerSentEvent(data = stateToJson(actor).toString(), event = "state"))
         replayIfNeeded(actor, lastEventId)
-
-        return channel
     }
 
-    /**
-     * Spectator joins the room.
-     * @param spectator The spectator joining
-     * @param lastEventId Optional Last-Event-ID from SSE reconnect header
-     */
-    suspend fun joinAsSpectator(spectator: Spectator, lastEventId: String? = null): Channel<ServerSentEvent> {
-        val channel = Channel<ServerSentEvent>(channelCapacity)
-        spectator.channel = channel
-
-        replace(spectator)
-        _spectatorCount.value = spectators.size
-
-        // Track spectator's user if authenticated
-        spectator.user?.let { user ->
-            users[user.userId] = user
-            user.addConnection(id, spectator)
-        }
-
-        logger.debug("Spectator '${spectator.name}' joined room '$id' (${spectators.size} spectators)")
-
-        // First complete the join, then send state
-        onSpectatorJoined(spectator)
-        sendStateTo(spectator)
-
-        // Replay missed events if history is enabled and lastEventId is valid
-        replayIfNeeded(spectator, lastEventId)
-
-        return channel
-    }
-
-    /**
-     * Actor or spectator leaves.
-     */
-    suspend fun leave(actor: Actor) {
+    private suspend fun processLeave(actor: Actor) {
         // a replaced connection (same tab back) leaves nothing: the newcomer owns the slot
         if (actors[actor.connectionId] !== actor && spectators[actor.connectionId] !== actor) return
         actor.disconnect()
 
-        // Clean up user connection tracking
         val userFullyLeft = actor.user?.let { user ->
             val noMoreConnections = user.removeConnection(id, actor)
             if (noMoreConnections) {
@@ -235,18 +224,21 @@ abstract class Room<S : Any>(val id: String) {
             noMoreConnections
         } ?: true  // Anonymous actors always "fully leave"
 
-        if (actor is Spectator) {
-            spectators.remove(actor.connectionId)
-            _spectatorCount.value = spectators.size
-            logger.debug("Spectator '${actor.name}' left room '$id'")
-            onSpectatorLeft(actor)
-        } else {
-            actors.remove(actor.connectionId)
-            logger.debug("Actor '${actor.name}' left room '$id' (userFullyLeft=$userFullyLeft)")
-            onActorLeft(actor, userFullyLeft)
+        try {
+            if (actor is Spectator) {
+                spectators.remove(actor.connectionId)
+                _spectatorCount.value = spectators.size
+                logger.debug("Spectator '${actor.name}' left room '$id'")
+                onSpectatorLeft(actor)
+            } else {
+                actors.remove(actor.connectionId)
+                logger.debug("Actor '${actor.name}' left room '$id' (userFullyLeft=$userFullyLeft)")
+                onActorLeft(actor, userFullyLeft)
+            }
+        } catch (e: Exception) {
+            logger.error("Leave hook failed in room '$id' for '${actor.name}'", e)
         }
 
-        // Check if room should close
         if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty()) {
             stop()
             Lobby.remove(id)
@@ -294,12 +286,20 @@ abstract class Room<S : Any>(val id: String) {
     abstract fun stateToJson(): Json.Object
 
     /**
-     * Called when actor joins - override to customize.
+     * The snapshot a joining connection gets as its `state` frame. Override when a viewer sees the
+     * room differently (a seat, a hand, its own match): catch-up is this frame's job alone, a join
+     * hook never addresses the joiner — an event then only ever means a transition.
+     */
+    open fun stateToJson(actor: Actor): Json.Object = stateToJson()
+
+    /**
+     * Called when actor joins, on the loop (like [handleAction]: no awaited I/O), before the
+     * `state` frame. What it broadcasts reaches the newcomer after its snapshot.
      */
     protected open suspend fun onActorJoined(actor: Actor) {}
 
     /**
-     * Called when actor leaves - override to customize.
+     * Called when actor leaves, on the loop (no awaited I/O).
      * @param actor The actor that left
      * @param userFullyLeft True if the user has no more connections to this room
      */
@@ -331,18 +331,8 @@ abstract class Room<S : Any>(val id: String) {
     protected open fun shouldCloseWhenEmpty(): Boolean = true
 
     /**
-     * Send current state to an actor.
-     */
-    protected open suspend fun sendStateTo(actor: Actor) {
-        actor.channel?.send(ServerSentEvent(
-            data = stateToJson().toString(),
-            event = "state"
-        ))
-    }
-
-    /**
      * Replay missed events to an actor if history is enabled.
-     * Called after sendStateTo() - history complements the current state.
+     * Called after the `state` frame - history complements the current state.
      * If lastEventId is null (fresh connect), replays entire buffer.
      * If lastEventId is present, replays events after that ID.
      */
@@ -471,6 +461,12 @@ abstract class Room<S : Any>(val id: String) {
                 }
                 event.verdict.complete(result)
             }
+            is Event.Join -> {
+                try { processJoin(event.actor, event.lastEventId) } finally { event.ready.complete(event.actor.channel ?: Channel<ServerSentEvent>(0).also { it.close() }) }
+            }
+            is Event.Leave -> {
+                try { processLeave(event.actor) } finally { event.done.complete(Unit) }
+            }
             is Event.Feedback -> {
                 val sse = frame(event.event, event.data)
                 // the acting tab when its stream is open, else every tab of the user (a detached
@@ -575,6 +571,8 @@ abstract class Room<S : Any>(val id: String) {
         data class Targeted(val actorId: String, val event: String, val data: String) : Event()
         class Act(val actor: Actor, val intent: Json.Object, val verdict: CompletableDeferred<ActionResult>) : Event()
         class Feedback(val actor: Actor, val event: String, val data: String) : Event()
+        class Join(val actor: Actor, val lastEventId: String?, val ready: CompletableDeferred<Channel<ServerSentEvent>>) : Event()
+        class Leave(val actor: Actor, val done: CompletableDeferred<Unit>) : Event()
     }
 }
 

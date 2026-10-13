@@ -93,6 +93,11 @@ browser  click [data-intent=play] ──POST /api/rooms/<room>/act──▶ Room
   its connection: no leave, no join flicker. No open stream: the feedback goes to all the user's tabs.
 - The loop never waits on a consumer: a tab that stops draining its buffer is dropped (its stream
   ends, the browser reconnects with `Last-Event-ID` and gets state + replay).
+- A join runs on the loop too: the newcomer's first frame is `state`, its snapshot — `stateToJson(actor)`,
+  the viewer's own (a seat, a hand, its match) — then the replay, then whatever was queued behind the
+  join, the join hook's own broadcasts included. Catch-up is the snapshot's job alone, a hook never
+  addresses the joiner: an event only ever means a transition. Hooks run on the loop, same rule as
+  `handleAction`: no awaited I/O.
 
 Browser side, convention over configuration, no code per call site:
 

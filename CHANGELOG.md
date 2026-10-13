@@ -15,6 +15,12 @@ All notable changes to kroom will be documented in this file.
 - A connection id already present in the room is the same tab back: the newcomer replaces it, the
   stale `leave` is a no-op (no leave/join flicker on reconnect). Compose ids with
   `Actor.connectionId(user, tabId)`.
+- `join` and `leave` run on the loop: the newcomer's `state` frame precedes the join hook's broadcasts
+  (they used to race, a hook's `activity` could land before the snapshot) and any frame queued after
+  the join; a frame queued before it never reaches it. `onActorJoined` / `onActorLeft` (and the
+  spectator pair) now run on the loop: no awaited I/O. The snapshot is per viewer, `stateToJson(actor)`
+  (defaults to `stateToJson()`): `sendStateTo` is gone, `Table` overrides the former instead; a hook
+  that used to resend the joiner its own context moves that into the snapshot.
 
 #### velocity 3.0.0-BETA-20261007-01
 - One resource manager serves every named resource, root or `#parse`d child, kept as its loader's `cache` /

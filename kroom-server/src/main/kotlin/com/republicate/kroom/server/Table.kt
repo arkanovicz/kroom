@@ -1,7 +1,6 @@
 package com.republicate.kroom.server
 
 import com.republicate.kson.Json
-import io.ktor.sse.*
 
 /**
  * Player connection status for seats.
@@ -175,16 +174,10 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
     }
 
     /**
-     * Send state to actor with their seat number included.
-     * Override stateToJsonForSeat() instead of stateToJson() for seat-aware serialization.
+     * The viewer's snapshot carries its seat: override [stateToJsonForSeat] for seat-aware serialization.
      */
-    override suspend fun sendStateTo(actor: Actor) {
-        val seatNumber = actor.user?.let { getSeatForUser(it)?.number }
-        actor.channel?.send(ServerSentEvent(
-            data = stateToJsonForSeat(seatNumber).toString(),
-            event = "state"
-        ))
-    }
+    override fun stateToJson(actor: Actor): Json.Object =
+        stateToJsonForSeat(actor.user?.let { getSeatForUser(it)?.number })
 
     /**
      * Convert state to JSON, including the viewer's seat number and spectators.

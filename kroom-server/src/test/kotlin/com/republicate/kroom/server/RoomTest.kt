@@ -15,6 +15,10 @@ class RoomTest {
         override fun shouldCloseWhenEmpty() = false
         override val channelCapacity = 8
         override fun stateToJson(): Json.Object = Json.Object()
+        override fun stateToJson(actor: Actor): Json.Object = Json.Object("you" to actor.name)
+        var onJoin: (Actor) -> Unit = {}
+        override suspend fun onActorJoined(actor: Actor) = onJoin(actor)
+        override suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) { if (userFullyLeft) broadcast("gone", Json.Object("who" to actor.name)) }
         override fun handleAction(actor: Actor, action: Json.Object): ActionResult = when (action.getString("type")) {
             "ok" -> { broadcast("moved", Json.Object("by" to actor.name)); ActionResult.Success() }
             "emit" -> ActionResult.Success("done", Json.Object("x" to 1))
@@ -129,6 +133,48 @@ class RoomTest {
         room.leave(again)
         assertEquals(0, room.userCount.value)
         assertNull(room.getUser("u"))
+    }
+
+    @Test fun `the snapshot comes first, the join hook's broadcasts after it, and it is the viewer's`() = runBlocking {
+        val room = room()
+        room.onJoin = { room.broadcast("hello", Json.Object("to" to it.name)); room.sendTo(it, "psst", Json.Object()) }
+        val a = actor(user("u"), "t1")
+        val ch = room.join(a)
+        ch.next().let { assertEquals("state", it.event); assertEquals("""{"you":"u"}""", it.data) }
+        assertEquals("hello", ch.next().event)
+        assertEquals("psst", ch.next().event)
+        assertNull(ch.tryReceive().getOrNull())
+    }
+
+    @Test fun `a frame queued before the join never reaches the newcomer, one queued after always does`() = runBlocking {
+        val room = room()
+        val first = actor(user("u"), "t1")
+        room.join(first).state()
+        val a = actor(user("v"), "t1")
+        room.broadcast("before", Json.Object())
+        val ch = room.join(a)
+        room.broadcast("after", Json.Object())
+        ch.state()
+        assertEquals("after", ch.next().event)
+        assertNull(ch.tryReceive().getOrNull())
+    }
+
+    @Test fun `a leave is ordered with the frames, its hook speaks after it`() = runBlocking {
+        val room = room()
+        val stay = actor(user("u"), "t1"); val go = actor(user("v"), "t1")
+        val ch = room.join(stay).also { it.state() }
+        room.join(go).state()
+        room.leave(go)
+        assertNull(room.getUser("v"))
+        ch.next().let { assertEquals("gone", it.event); assertEquals("""{"who":"v"}""", it.data) }
+    }
+
+    @Test fun `a stopped room hands a closed channel`() = runBlocking {
+        val room = room()
+        room.stop()
+        val ch = room.join(actor(user("u"), "t1"))
+        assertTrue(ch.isClosedForReceive)
+        room.leave(actor(user("u"), "t1")) // returns
     }
 
     @Test fun `a connection id is composed under the user`() {
