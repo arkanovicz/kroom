@@ -76,6 +76,11 @@ All notable changes to kroom will be documented in this file.
   replay), `into(store, ...names)` dispatching `{type: name, payload}`.
 - jsdom smoke test: `kroom-webapp-assets/src/test/js/smoke.sh`.
 
+#### kroom-examples/chifoumi
+- The proof of the intents door: every player gesture is a `[data-intent]` button, the three REST
+  routes and the second copy of the matchmaking logic are gone (`intents { … }` + `handleAction`),
+  a frame for a player reaches every tab of theirs, a reconnecting tab keeps its connection.
+
 #### kroom-webapp-authoring-starter
 - A site starter: a jar asking a few questions and writing a site pinned to the build it came from (its build,
   `Main.kt`, two pages, `compose.yml` on the plain JDK image run as the creator, `run.sh`, `.env`, this
@@ -225,6 +230,15 @@ All notable changes to kroom will be documented in this file.
   and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
+
+#### kroom-webapp-l10n
+- A skip prefix names a segment: `/events/` also spares `/events` itself (the bare path was
+  redirected to `/en/events`, which no `EventSource` follows usefully).
+
+#### kroom-examples/chifoumi
+- Runs again: serializable session cookie, `install(SSE)`, the assets module on the classpath (its
+  pages loaded `/js/domhelper.js` from nowhere), the scripting engine for its interpreted templates,
+  `#versioned` script tags over a version cache, dev-mode static serving from the sources.
 
 #### kroom-webapp-assets
 - domhelper's synthetic `click()` now bubbles (delegated handlers never saw it); `sse.off(name)`

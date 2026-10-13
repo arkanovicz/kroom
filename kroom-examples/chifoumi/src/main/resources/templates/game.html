@@ -43,19 +43,19 @@
 
             <!-- Move buttons -->
             <div id="move-buttons" class="move-buttons">
-                <button class="move-btn" data-move="rock" title="Rock">
+                <button class="move-btn" data-intent="play" data-move="rock" title="Rock">
                     <span class="emoji">🪨</span>
                     <span class="label">Rock</span>
                 </button>
-                <button class="move-btn" data-move="paper" title="Paper">
+                <button class="move-btn" data-intent="play" data-move="paper" title="Paper">
                     <span class="emoji">📄</span>
                     <span class="label">Paper</span>
                 </button>
-                <button class="move-btn" data-move="scissors" title="Scissors">
+                <button class="move-btn" data-intent="play" data-move="scissors" title="Scissors">
                     <span class="emoji">✂️</span>
                     <span class="label">Scissors</span>
                 </button>
-                <button class="move-btn" data-move="well" title="Well">
+                <button class="move-btn" data-intent="play" data-move="well" title="Well">
                     <span class="emoji">🕳️</span>
                     <span class="label">Well</span>
                 </button>
@@ -81,15 +81,16 @@
             <div id="match-result" class="match-result" style="display: none;">
                 <h2 id="match-result-title">Match Over!</h2>
                 <p id="match-result-message"></p>
-                <button id="play-again-btn" class="primary">Play Again</button>
+                <button id="play-again-btn" data-intent="join_queue" class="primary">Play Again</button>
                 <a href="/$lang/index.html" role="button" class="secondary">Back to Lobby</a>
             </div>
         </article>
     </main>
 
-    <script src="/js/domhelper.js"></script>
-    <script src="/js/api.js"></script>
-    <script src="/js/sse.js"></script>
-    <script src="/js/game.js"></script>
+    <script src="#versioned('/js/domhelper.js')"></script>
+    <script src="#versioned('/js/api.js')"></script>
+    <script src="#versioned('/js/sse.js')"></script>
+    <script src="#versioned('/js/intents.js')"></script>
+    <script src="#versioned('/js/game.js')"></script>
 </body>
 </html>

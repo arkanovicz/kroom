@@ -17,7 +17,6 @@ const MOVE_EMOJI = {
 document.addEventListener('DOMContentLoaded', () => {
     checkSession();
     setupMoveButtons();
-    setupPlayAgain();
 });
 
 // Check session and get match info
@@ -47,73 +46,45 @@ function checkSession() {
     });
 }
 
-// Setup move buttons
+// The click itself is an intent (intents.js); here only the highlight of the chosen move
 function setupMoveButtons() {
     $$('.move-btn').forEach(btn => {
         btn.on('click', () => {
             if (waitingForOpponent) return;
-            const move = btn.data('move');
-            playMove(move);
-        });
-    });
-}
-
-// Setup play again button
-function setupPlayAgain() {
-    $('#play-again-btn').on('click', () => {
-        // Join queue again
-        api.postJson('queue/join', {}).then(result => {
-            if (result.matched) {
-                // New match, reload page
-                window.location.reload();
-            } else {
-                // Waiting for opponent, go to lobby
-                goToLobby();
-            }
-        });
-    });
-}
-
-// Play a move
-function playMove(move) {
-    if (waitingForOpponent) return;
-
-    myMove = move;
-
-    // Disable buttons and show selection
-    $$('.move-btn').forEach(btn => {
-        btn.disable(true);
-        if (btn.data('move') === move) {
+            myMove = btn.data('move');
             btn.addClass('selected');
-        }
+        });
     });
+}
 
+// A move accepted: all buttons wait for the opponent
+function movePlayed() {
+    $$('.move-btn').forEach(btn => btn.disable(true));
     $('#game-message').text('Waiting for opponent...');
     waitingForOpponent = true;
-
-    api.postJson('play', { move }).then(result => {
-        if (result.waiting) {
-            // Still waiting for opponent
-            return;
-        }
-
-        if (result.round) {
-            // Round complete, will be handled by SSE
-        }
-    }).catch(err => {
-        console.error('Error:', err);
-        resetMoveButtons();
-        $('#game-message').text('Error: ' + err.message);
-    });
 }
 
 // Connect to SSE for real-time updates
 function connectSSE() {
     sseConnection = sse('/events').connect();
+    intents.attach({ room: 'chifoumi-lobby', sse: sseConnection });
 
     sseConnection.on('open', () => {
         console.log('SSE connected');
     });
+
+    sseConnection.onJson('accepted', ({ intent }) => {
+        if (intent === 'play') movePlayed();
+    });
+
+    sseConnection.onJson('rejected', ({ intent }) => {
+        if (intent === 'play') resetMoveButtons();
+    });
+
+    // Play again: a new match reloads, a wait goes back to the lobby
+    // (joining the stream resends the current match: same id, nothing to do)
+    sseConnection.onJson('match', (m) => { if (m.id !== match.id) window.location.reload(); });
+    sseConnection.onJson('queue', () => goToLobby());
 
     // Opponent is waiting
     sseConnection.onJson('waiting', (data) => {

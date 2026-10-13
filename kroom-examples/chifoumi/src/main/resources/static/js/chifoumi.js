@@ -7,7 +7,6 @@ let sseConnection = null;
 document.addEventListener('DOMContentLoaded', () => {
     checkSession();
     setupLoginForm();
-    setupQueueButtons();
 });
 
 // Check if already logged in
@@ -49,46 +48,17 @@ function showLobby() {
     $('#player-display').text(playerName);
 }
 
-// Setup queue buttons
-function setupQueueButtons() {
-    $('#find-match-btn').on('click', () => {
-        joinQueue();
-    });
-
-    $('#cancel-search-btn').on('click', () => {
-        leaveQueue();
-    });
-}
-
-// Join matchmaking queue
-function joinQueue() {
-    $('#queue-status').hide();
-    $('#searching').show();
-
-    api.postJson('queue/join', {}).then(result => {
-        if (result.matched) {
-            // Match found immediately, redirect to game
-            goToGame();
-        }
-        // Otherwise, wait for SSE match event
-    }).catch(err => {
-        $('#queue-status').show();
-        $('#searching').hide();
-        alert('Error: ' + err.message);
-    });
-}
-
-// Leave queue
-function leaveQueue() {
-    api.postJson('queue/leave', {}).then(() => {
-        $('#queue-status').show();
-        $('#searching').hide();
-    });
+// Searching, or ready to search: the queue events say which
+function searching(on) {
+    if (on) { $('#queue-status').hide(); $('#searching').show(); }
+    else { $('#queue-status').show(); $('#searching').hide(); }
 }
 
 // Connect to SSE
 function connectSSE() {
     sseConnection = sse('/events').connect();
+    // the lobby's buttons: a click is an intent, the stream answers
+    intents.attach({ room: 'chifoumi-lobby', sse: sseConnection });
 
     sseConnection.on('open', () => {
         console.log('SSE connected');
@@ -112,6 +82,11 @@ function connectSSE() {
     // Queue position update
     sseConnection.onJson('queue', (data) => {
         console.log('Queue position:', data.position);
+        searching(true);
+    });
+
+    sseConnection.onJson('accepted', ({ intent }) => {
+        if (intent === 'leave_queue') searching(false);
     });
 
     // Activity feed

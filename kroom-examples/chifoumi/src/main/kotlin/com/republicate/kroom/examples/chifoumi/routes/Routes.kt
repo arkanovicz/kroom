@@ -1,10 +1,12 @@
 package com.republicate.kroom.examples.chifoumi.routes
 
 import com.republicate.kroom.examples.chifoumi.game.MatchStats
-import com.republicate.kroom.examples.chifoumi.game.Move
 import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
-import com.republicate.kroom.examples.chifoumi.sse.PlayResult
 import com.republicate.kroom.server.Actor
+import com.republicate.kroom.server.Users
+import com.republicate.kroom.server.intents
+import com.republicate.kroom.server.lastEventId
+import com.republicate.kroom.server.tabId
 import com.republicate.kroom.webapp.core.respondError
 import com.republicate.kroom.webapp.core.respondJson
 import com.republicate.kroom.webapp.core.respondSuccess
@@ -22,6 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Simple session for anonymous players.
  */
+@kotlinx.serialization.Serializable
 data class PlayerSession(val identifier: String, val playerName: String)
 
 /**
@@ -37,8 +40,10 @@ fun Route.chifoumiRoutes() {
             return@sse
         }
 
-        val actor = Actor(connectionId = session.identifier, name = session.playerName)
-        val channel = ChifoumiLobby.join(actor)
+        // identity = the session; the tab id keeps a reconnecting tab the same connection
+        val user = Users.getOrCreate(session.identifier, session.playerName)
+        val actor = Actor(Actor.connectionId(user, call.tabId), user, session.playerName)
+        val channel = ChifoumiLobby.join(actor, call.lastEventId)
 
         try {
             channel.consumeAsFlow().collect { event ->
@@ -97,64 +102,9 @@ fun Route.chifoumiRoutes() {
             respondSuccess("Goodbye!")
         }
 
-        // Join matchmaking queue
-        post("/queue/join") {
-            val session = call.sessions.get<PlayerSession>()
-                ?: return@post respondError("Not logged in", HttpStatusCode.Unauthorized)
-
-            val match = ChifoumiLobby.joinQueue(session.playerName)
-            respondJson {
-                set("success", true)
-                if (match != null) {
-                    set("matched", true)
-                    set("match", match.toJson())
-                } else {
-                    set("matched", false)
-                    set("position", ChifoumiLobby.getQueueSize())
-                }
-            }
-        }
-
-        // Leave matchmaking queue
-        post("/queue/leave") {
-            val session = call.sessions.get<PlayerSession>()
-                ?: return@post respondError("Not logged in", HttpStatusCode.Unauthorized)
-
-            ChifoumiLobby.leaveQueue(session.playerName)
-            respondSuccess()
-        }
-
-        // Play a move
-        post("/play") {
-            val session = call.sessions.get<PlayerSession>()
-                ?: return@post respondError("Not logged in", HttpStatusCode.Unauthorized)
-
-            val body = call.receiveText()
-            val moveStr = com.republicate.kson.Json.parse(body)?.asObject()?.getString("move")
-                ?: return@post respondError("Move required")
-
-            val move = Move.fromString(moveStr)
-                ?: return@post respondError("Invalid move: $moveStr")
-
-            when (val result = ChifoumiLobby.playMove(session.playerName, move)) {
-                is PlayResult.NotInMatch -> respondError("Not in a match")
-                is PlayResult.MatchFinished -> respondError("Match already finished")
-                is PlayResult.InvalidMove -> respondError(result.reason)
-                is PlayResult.WaitingForOpponent -> respondJson {
-                    set("success", true)
-                    set("waiting", true)
-                }
-                is PlayResult.RoundComplete -> respondJson {
-                    set("success", true)
-                    set("round", result.round.toJson())
-                }
-                is PlayResult.MatchComplete -> respondJson {
-                    set("success", true)
-                    set("round", result.round.toJson())
-                    set("match", result.match.toJson())
-                    set("finished", true)
-                }
-            }
+        // Every move of a player: POST /api/rooms/chifoumi-lobby/act {type, ...}
+        intents { call ->
+            call.sessions.get<PlayerSession>()?.let { Users.getOrCreate(it.identifier, it.playerName) }
         }
 
         // Get current match status

@@ -137,7 +137,8 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
         val path = call.request.path()
 
         // Skip configured prefixes and paths
-        if (config.skipPrefixes.any { path.startsWith(it) } ||
+        // a prefix names a segment: "/events/" also spares "/events" itself
+        if (config.skipPrefixes.any { path.startsWith(it) || path == it.trimEnd('/') } ||
             config.skipPaths.any { path == it }) {
             return@intercept
         }
