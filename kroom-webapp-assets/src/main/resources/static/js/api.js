@@ -50,14 +50,28 @@ const api = (function() {
     // Body-carrying request. FormData passes through untouched (the browser sets the
     // multipart Content-Type + boundary); anything else is sent as JSON. Either way the
     // Accept and Authorization headers are kept — only Content-Type is dropped for uploads.
-    function send(method, path, body) {
+    function send(method, path, body, extra) {
         const isForm = body instanceof FormData;
         return fetch(base + path, {
             credentials: "same-origin",
             method,
             body: isForm ? body : JSON.stringify(body),
-            headers: isForm ? headers(undefined, false) : headers()
+            headers: Object.assign(isForm ? headers(undefined, false) : headers(), extra)
         });
+    }
+
+    // One id per tab, kept across reloads: the server aims an intent's verdict at the tab that acted.
+    let tab = null;
+    function tabId() {
+        if (tab) return tab;
+        try { tab = sessionStorage.getItem('kroom.tabId'); } catch (_) { /* storage blocked */ }
+        if (!tab) {
+            // randomUUID needs a secure context
+            tab = window.crypto?.randomUUID?.()
+                ?? Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+            try { sessionStorage.setItem('kroom.tabId', tab); } catch (_) { /* this page's life only */ }
+        }
+        return tab;
     }
 
     return {
@@ -100,6 +114,18 @@ const api = (function() {
 
         deleteJson: (path, body) => {
             return api.delete(path, body)
+                .then(resp => resp.ok ? (resp.body ? resp.json() : Promise.resolve({})) : Promise.reject(resp))
+                .catch(err => error(err));
+        },
+
+        tabId,
+
+        // Fire and forget: the verdict comes down the event stream. `target` is a room name,
+        // or a path of the app's own when it holds a slash.
+        act: (target, type, payload) => {
+            const path = target.includes('/') ? target : `rooms/${encodeURIComponent(target)}/act`;
+            // the intent's name wins over a payload key: it keys the verdict
+            return send('POST', path, { ...payload, type }, { 'X-Kroom-Tab': tabId() })
                 .then(resp => resp.ok ? (resp.body ? resp.json() : Promise.resolve({})) : Promise.reject(resp))
                 .catch(err => error(err));
         }

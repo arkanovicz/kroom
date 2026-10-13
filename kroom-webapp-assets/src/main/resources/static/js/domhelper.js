@@ -407,7 +407,7 @@ NodeList.prototype.focus = function() {
 };
 
 Element.prototype.click = function() {
-    this.dispatchEvent(new Event('click'));
+    this.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     return this;
 };
 NodeList.prototype.click = function() {

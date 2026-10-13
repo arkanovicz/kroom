@@ -76,6 +76,14 @@ open class Actor(
 
     companion object {
         /**
+         * A connection id is the user's id and the tab's, composed here and nowhere else: a tab id
+         * is a routing key the browser chose, never a credential — composed under the authenticated
+         * user it cannot reach another user's slot. No tab id: a fresh id per connection.
+         */
+        fun connectionId(user: User, tabId: String?): String =
+            "${user.userId}/${tabId?.takeIf { it.isNotBlank() } ?: java.util.UUID.randomUUID()}"
+
+        /**
          * Create an Actor with a userId string (backward compatible factory).
          * If userId is non-null, looks up or creates a User.
          * @deprecated Use Actor(connectionId, user, name) constructor instead

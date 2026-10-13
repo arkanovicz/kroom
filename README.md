@@ -53,12 +53,63 @@ class ChatRoom(id: String) : Room<ChatState>(id) {
 }
 
 // Setup Ktor
+Lobby.register(ChatRoom("lobby"))
 routing {
     kroomAssets()  // serve shared JS/CSS
-    sseRoute("/events/{room}") { roomId, actor -> Lobby.join(roomId, actor) }
-    post("/api/{room}/action") { /* dispatch to room */ }
+    sse("/events/{room}") {
+        val user = call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } ?: return@sse
+        val actor = Actor(Actor.connectionId(user, call.tabId), user)
+        val channel = Lobby.get<ChatState>(call.parameters["room"]!!)!!.join(actor, call.lastEventId)
+        try { for (event in channel) send(event) } finally { room.leave(actor) }
+    }
+    route("/api") {
+        intents { call -> call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } }
+    }
 }
 ```
+
+## Intents
+
+An **intent** is a named JSON message going up (`{type, …}`), an **event** a named one going down.
+Both cross one membrane, the room's serialized loop, and the browser keeps one path: everything it
+learns comes down the stream.
+
+```
+browser  click [data-intent=play] ──POST /api/rooms/<room>/act──▶ Room.act(actor, intent) ──▶ handleAction, on the loop
+                                                                        │ broadcasts of the handler
+         store.dispatch  ◀──────────────── SSE ─────────────────────────┤ then `accepted` {intent}
+         trigger freed / reason shown  ◀────────────────────────────────┘ or   `rejected` {intent, reason}, to the acting tab
+```
+
+- `Room.act(actor, intent)` queues the intent and returns a `Deferred<ActionResult>`: the **verdict**,
+  never data. `handleAction` runs on the loop, so `state` needs no lock; a `Success(event, data)` is
+  broadcast; an exception is a rejection. The verdict never waits on I/O: launch, do not await.
+- `Route.intents { call -> user }` mounts `POST /rooms/{room}/act` and answers an honest `200 {}` /
+  `400 {error}` that the browser does not read.
+- The feedback frame goes to the **tab** that acted: the browser keeps a tab id (`sessionStorage`,
+  `api.tabId()`), sends it on the stream (`?tabId=`) and on each intent (`X-Kroom-Tab`); the server
+  composes the connection id as `<userId>/<tabId>` (`Actor.connectionId`), so a tab id is a routing
+  key under its own user, never a credential. The same tab back (reconnect, duplicated tab) replaces
+  its connection: no leave, no join flicker. No open stream: the feedback goes to all the user's tabs.
+- The loop never waits on a consumer: a tab that stops draining its buffer is dropped (its stream
+  ends, the browser reconnects with `Last-Event-ID` and gets state + replay).
+
+Browser side, convention over configuration, no code per call site:
+
+```html
+<button data-intent="play" data-move="rock">Rock</button>   <!-- payload = the other data-* -->
+<script src="/js/intents.js"></script>
+```
+```javascript
+const conn = sse('/events/lobby').into(store, 'state', 'chat').connect();  // event name = action type
+intents.attach({ room: 'lobby', sse: conn, store });  // store optional
+```
+
+A click sets `aria-busy` (pico shows the spinner) and `disabled`, posts the intent and forgets it;
+a second click meanwhile is ignored. `accepted` frees the trigger; `rejected` frees it and shows
+the reason in a `<small class="intent-reason">` right after it. The HTTP failure (offline, refused
+before the loop) and the stream's `open` are the safety nets: nothing stays busy for ever. Nothing a
+call site wants to do on success may depend on the HTTP answer: it reacts to the event.
 
 ## Heartbeat and Dead Connection Detection
 
@@ -136,7 +187,9 @@ Shared client-side libraries for Ktor webapps:
 | File | Description |
 |------|-------------|
 | `domhelper.js` | Lightweight jQuery-like DOM manipulation |
-| `api.js` | Fetch wrapper for REST APIs |
+| `api.js` | Fetch wrapper for REST APIs, `api.act` for intents |
+| `sse.js` | EventSource wrapper: named events, reconnect, `into(store)` |
+| `intents.js` | `[data-intent]` triggers, busy until the verdict comes down the stream |
 | `store.js` | Minimal Redux-like state management |
 
 ### Usage
@@ -151,7 +204,9 @@ routing {
 ```html
 <script src="/js/kroom/domhelper.js"></script>
 <script src="/js/kroom/api.js"></script>
+<script src="/js/kroom/sse.js"></script>
 <script src="/js/kroom/store.js"></script>
+<script src="/js/kroom/intents.js"></script>
 ```
 
 Or with cache-busting:
@@ -218,6 +273,11 @@ api.getHtml('fragment')        // GET -> HTML string
 api.postJson('users', data)    // POST -> JSON
 api.putJson('users/1', data)   // PUT -> JSON
 api.deleteJson('users/1')      // DELETE -> JSON
+
+// Intents (see above): fire and forget, the verdict comes down the stream
+api.act('lobby', 'play', { move: 'rock' })   // POST rooms/lobby/act {type:'play', move:'rock'}, X-Kroom-Tab
+api.act('game/7/act', 'play', { move })      // a path of the app's own (holds a slash)
+api.tabId()                                  // this tab's id (sessionStorage)
 ```
 
 ### store.js
@@ -685,6 +745,8 @@ class MyChatRoom(id: String) : Room<MyState>(id) {
 - Only events in `historicizableEvents` are buffered and replayed
 - Game events (rolled, played, etc.) use state-on-join, not replay
 - Server restart detection: stale client IDs are ignored
+- `call.lastEventId` reads the header, or the `lastEventId` query parameter sse.js sends on the
+  fresh `EventSource` it opens after a `CLOSED` (a reconnect of its own carries the header)
 - Buffer size configurable via `historyBufferSize` (default: 50)
 
 Ideal for games with chat: game state is authoritative, chat history is replayed on reconnect.

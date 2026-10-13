@@ -6,6 +6,16 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-server
+- `handleAction` is called by `Room.act(actor, intent)` on the room's loop, by nothing else: a
+  `Success(event, data)` is now broadcast, an exception is a rejection; the acting tab gets an
+  `accepted` / `rejected` frame after the handler's own broadcasts.
+- The loop never waits on a consumer: a connection whose buffer is full is dropped (`trySend`), its
+  stream ends and the browser reconnects with `Last-Event-ID`. The buffer holds `max(64, 2 × historyBufferSize)`.
+- A connection id already present in the room is the same tab back: the newcomer replaces it, the
+  stale `leave` is a no-op (no leave/join flicker on reconnect). Compose ids with
+  `Actor.connectionId(user, tabId)`.
+
 #### velocity 3.0.0-BETA-20261007-01
 - One resource manager serves every named resource, root or `#parse`d child, kept as its loader's `cache` /
   `modification_check_interval` say: a computed `#parse($name)` is re-read when its file changes (a dev-edited
@@ -51,6 +61,20 @@ All notable changes to kroom will be documented in this file.
   2.x-legitimate, but a block has no business with reflection.
 
 ### Added
+
+#### kroom-server
+- Intents (`private/intents.md`): `Room.act` returning the verdict as a `Deferred`, `act(user, tabId,
+  intent)` for routes, `Route.intents { call -> user }` mounting `POST /rooms/{room}/act`,
+  `call.tabId` / `call.lastEventId` (header or query). Pinned in `RoomTest`.
+
+#### kroom-webapp-assets
+- `intents.js`: `[data-intent]` triggers posting `{type, ...data-*}` fire-and-forget, busy
+  (`aria-busy`, `disabled`) until the `accepted` / `rejected` frame; the reason shows after the
+  trigger; HTTP failure and stream `open` are the safety nets. `intents.attach({room|act, sse, store?, payload?})`.
+- `api.act(room|path, type, payload)` with the `X-Kroom-Tab` header; `api.tabId()` (sessionStorage).
+- `sse.js`: `?tabId=` and `?lastEventId=` on the url it opens (a manual retry after `CLOSED` keeps
+  replay), `into(store, ...names)` dispatching `{type: name, payload}`.
+- jsdom smoke test: `kroom-webapp-assets/src/test/js/smoke.sh`.
 
 #### kroom-webapp-authoring-starter
 - A site starter: a jar asking a few questions and writing a site pinned to the build it came from (its build,
@@ -201,6 +225,10 @@ All notable changes to kroom will be documented in this file.
   and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
+
+#### kroom-webapp-assets
+- domhelper's synthetic `click()` now bubbles (delegated handlers never saw it); `sse.off(name)`
+  keeps the EventSource listener bound once (a later `on` doubled every event).
 
 #### kroom-webapp-authoring
 - An authored page's editable default for its header, west and footer was kroom's generic region by literal

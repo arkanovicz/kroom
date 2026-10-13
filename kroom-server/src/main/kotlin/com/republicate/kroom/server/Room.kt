@@ -135,16 +135,35 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
+     * Per-connection buffer: the loop never waits on a consumer (see [sendSafe]), and a join fills it
+     * with the state frame plus the replay before the route starts draining.
+     */
+    protected open val channelCapacity: Int
+        get() = maxOf(64, historyBufferSize * 2)
+
+    /**
+     * A connection id already present is the same tab back (reconnect, or a duplicated tab): the
+     * newcomer takes the slot, the stale connection is closed and its later [leave] is a no-op.
+     */
+    private fun replace(actor: Actor) {
+        val evicted = if (actor is Spectator) spectators.put(actor.connectionId, actor) else actors.put(actor.connectionId, actor)
+        val crossed = if (actor is Spectator) actors.remove(actor.connectionId) else spectators.remove(actor.connectionId)
+        val stale = (evicted ?: crossed)?.takeIf { it !== actor } ?: return
+        stale.disconnect()
+        stale.user?.removeConnection(id, stale)
+        logger.debug("Connection '${actor.connectionId}' replaced in room '$id'")
+    }
+
+    /**
      * Actor joins the room.
      * @param actor The actor joining
      * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
     suspend fun join(actor: Actor, lastEventId: String? = null): Channel<ServerSentEvent> {
-        val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
+        val channel = Channel<ServerSentEvent>(channelCapacity)
         actor.channel = channel
 
-        // Register actor by connectionId
-        actors[actor.connectionId] = actor
+        replace(actor)
 
         // Register user and track this connection
         actor.user?.let { user ->
@@ -174,10 +193,10 @@ abstract class Room<S : Any>(val id: String) {
      * @param lastEventId Optional Last-Event-ID from SSE reconnect header
      */
     suspend fun joinAsSpectator(spectator: Spectator, lastEventId: String? = null): Channel<ServerSentEvent> {
-        val channel = Channel<ServerSentEvent>(Channel.BUFFERED)
+        val channel = Channel<ServerSentEvent>(channelCapacity)
         spectator.channel = channel
 
-        spectators[spectator.connectionId] = spectator
+        replace(spectator)
         _spectatorCount.value = spectators.size
 
         // Track spectator's user if authenticated
@@ -202,6 +221,8 @@ abstract class Room<S : Any>(val id: String) {
      * Actor or spectator leaves.
      */
     suspend fun leave(actor: Actor) {
+        // a replaced connection (same tab back) leaves nothing: the newcomer owns the slot
+        if (actors[actor.connectionId] !== actor && spectators[actor.connectionId] !== actor) return
         actor.disconnect()
 
         // Clean up user connection tracking
@@ -233,10 +254,39 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * Handle an action from an actor.
-     * Returns the result to broadcast or send.
+     * The room's reducer: called by [act] on the loop, never from a route — `state` needs no lock
+     * here. Return the verdict, never data: a [ActionResult.Success] carrying an event is
+     * broadcast, then `accepted` reaches the acting tab; an [ActionResult.Error] reaches it as
+     * `rejected`. Side effects that need I/O are launched, not awaited: the verdict never waits.
      */
     abstract fun handleAction(actor: Actor, action: Json.Object): ActionResult
+
+    /**
+     * An actor's intent, queued on the loop. The returned promise is the verdict for whoever has
+     * a reason to wait (a route answering an honest status, a test, a peer); the browser does not,
+     * it reacts to the `accepted` / `rejected` frame like to any event.
+     */
+    fun act(actor: Actor, intent: Json.Object): Deferred<ActionResult> {
+        val verdict = CompletableDeferred<ActionResult>()
+        if (actor is Spectator) {
+            verdict.complete(ActionResult.Error("spectators cannot act"))
+        } else if (!eventQueue.trySend(Event.Act(actor, intent, verdict)).isSuccess) {
+            verdict.complete(ActionResult.Error("room '$id' is closed"))
+        }
+        return verdict
+    }
+
+    /**
+     * The route-side door: an intent arrives with a session and a tab id, not a connection. The
+     * connection id is composed server-side ([Actor.connectionId]) so a tab id lands under its own
+     * user, never under another's; a tab with no open stream still acts, as a detached actor, and
+     * its feedback goes to the user's other connections if any.
+     */
+    suspend fun act(user: User, tabId: String?, intent: Json.Object): ActionResult {
+        val connectionId = Actor.connectionId(user, tabId)
+        val actor = getActor(connectionId) ?: Actor(connectionId, user)
+        return act(actor, intent).await()
+    }
 
     /**
      * Convert state to JSON for client.
@@ -382,26 +432,52 @@ abstract class Room<S : Any>(val id: String) {
      * Process queued event.
      */
     private suspend fun processEvent(event: Event) {
-        val msgId = messageId.incrementAndGet().toString()
+        fun frame(name: String, data: String) =
+            ServerSentEvent(data = data, event = name, id = messageId.incrementAndGet().toString())
         when (event) {
             is Event.Broadcast -> {
-                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                val sse = frame(event.event, event.data)
                 bufferIfHistoricizable(event.event, sse)
                 sendToAll(sse)
             }
             is Event.BroadcastToActors -> {
-                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                val sse = frame(event.event, event.data)
                 bufferIfHistoricizable(event.event, sse)
                 sendToActors(sse)
             }
             is Event.BroadcastToSpectators -> {
-                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
+                val sse = frame(event.event, event.data)
                 bufferIfHistoricizable(event.event, sse)
                 sendToSpectators(sse)
             }
-            is Event.Targeted -> {
-                val sse = ServerSentEvent(data = event.data, event = event.event, id = msgId)
-                sendToActor(event.actorId, sse)
+            is Event.Targeted -> sendToActor(event.actorId, frame(event.event, event.data))
+            is Event.Act -> {
+                val result = try {
+                    handleAction(event.actor, event.intent)
+                } catch (e: Exception) {
+                    logger.error("Intent failed in room '$id'", e)
+                    ActionResult.Error(e.message ?: "internal error")
+                }
+                // the handler's own broadcasts are already queued: the feedback lands after them,
+                // so the acting tab sees the new state before its trigger is freed
+                val type = event.intent.getString("type")
+                when (result) {
+                    is ActionResult.Success -> {
+                        result.event?.let { broadcast(it, result.data ?: Json.Object()) }
+                        eventQueue.trySend(Event.Feedback(event.actor, "accepted", Json.Object("intent" to type).toString()))
+                    }
+                    is ActionResult.Error ->
+                        eventQueue.trySend(Event.Feedback(event.actor, "rejected", Json.Object("intent" to type, "reason" to result.message).toString()))
+                }
+                event.verdict.complete(result)
+            }
+            is Event.Feedback -> {
+                val sse = frame(event.event, event.data)
+                // the acting tab when its stream is open, else every tab of the user (a detached
+                // actor, a stream that closed meanwhile); only a tab with that intent in flight reacts
+                val connected = actors[event.actor.connectionId]
+                if (connected != null) sendSafe(connected, sse)
+                else event.actor.user?.getConnectionsInRoom(id)?.forEach { sendSafe(it, sse) }
             }
         }
     }
@@ -439,11 +515,16 @@ abstract class Room<S : Any>(val id: String) {
             ?: spectators[actorId]?.let { sendSafe(it, sse) }
     }
 
-    private suspend fun sendSafe(actor: Actor, sse: ServerSentEvent) {
-        try {
-            actor.channel?.send(sse)
-        } catch (e: Exception) {
-            logger.warn("Failed to send to ${actor.name}", e)
+    /**
+     * The loop never waits on a consumer: a full buffer means a tab that stopped draining (frozen
+     * in the background, slow link), and it is dropped — its stream ends, the browser reconnects
+     * on its own with Last-Event-ID and gets state + replay. Nobody else pays.
+     */
+    private fun sendSafe(actor: Actor, sse: ServerSentEvent) {
+        val channel = actor.channel ?: return
+        if (channel.trySend(sse).isFailure) {
+            logger.warn("Dropping '${actor.name}' from room '$id': not draining")
+            actor.disconnect()
         }
     }
 
@@ -492,6 +573,8 @@ abstract class Room<S : Any>(val id: String) {
         data class BroadcastToActors(val event: String, val data: String) : Event()
         data class BroadcastToSpectators(val event: String, val data: String) : Event()
         data class Targeted(val actorId: String, val event: String, val data: String) : Event()
+        class Act(val actor: Actor, val intent: Json.Object, val verdict: CompletableDeferred<ActionResult>) : Event()
+        class Feedback(val actor: Actor, val event: String, val data: String) : Event()
     }
 }
 

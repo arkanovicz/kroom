@@ -26,7 +26,22 @@ class SSEConnection {
         this.handlers = {};
         this.eventSource = null;
         this.connected = false;
+        this.lastEventId = null;
         this.provider = window.kroomSSE || null;
+    }
+
+    // A fresh EventSource sends no Last-Event-ID: the query carries it, so a manual retry keeps replay.
+    _url() {
+        const params = [];
+        const tab = typeof api !== 'undefined' && api.tabId ? api.tabId() : null;
+        if (tab) params.push(`tabId=${encodeURIComponent(tab)}`);
+        if (this.lastEventId) params.push(`lastEventId=${encodeURIComponent(this.lastEventId)}`);
+        if (!params.length) return this.url;
+        return this.url + (this.url.includes('?') ? '&' : '?') + params.join('&');
+    }
+
+    _seen(event) {
+        if (event.lastEventId) this.lastEventId = event.lastEventId;
     }
 
     connect() {
@@ -36,7 +51,7 @@ class SSEConnection {
 
         if (this.provider) {
             // Native bridge - delegate to app
-            this.provider.connect(this.url, {
+            this.provider.connect(this._url(), {
                 onOpen: () => {
                     this.connected = true;
                     console.log(`SSE connected to ${this.url} (native)`);
@@ -53,7 +68,7 @@ class SSEConnection {
             });
         } else {
             // Browser - use EventSource
-            this.eventSource = new EventSource(this.url);
+            this.eventSource = new EventSource(this._url());
 
             this.eventSource.onopen = () => {
                 this.connected = true;
@@ -75,6 +90,7 @@ class SSEConnection {
 
             // Default message handler (unnamed events)
             this.eventSource.onmessage = (event) => {
+                this._seen(event);
                 this.emit('message', event.data);
             };
 
@@ -88,7 +104,10 @@ class SSEConnection {
     // one EventSource listener per custom event, fanning out to all its handlers
     _bind(eventName) {
         if (this.eventSource && !['open', 'error', 'message'].includes(eventName)) {
-            this.eventSource.addEventListener(eventName, (event) => this.emit(eventName, event.data));
+            this.eventSource.addEventListener(eventName, (event) => {
+                this._seen(event);
+                this.emit(eventName, event.data);
+            });
         }
     }
 
@@ -119,7 +138,7 @@ class SSEConnection {
             if (handler) {
                 this.handlers[eventName] = this.handlers[eventName].filter(h => h !== handler);
             } else {
-                delete this.handlers[eventName];
+                this.handlers[eventName] = []; // the EventSource listener stays bound, once
             }
         }
         return this;
@@ -150,6 +169,14 @@ class SSEConnection {
                 console.error(`Failed to parse JSON for ${eventName}:`, err);
             }
         });
+    }
+
+    /**
+     * Mirror events into a store: event name = action type. EventSource has no wildcard, hence the names.
+     */
+    into(store, ...names) {
+        names.forEach(name => this.onJson(name, payload => store.dispatch({ type: name, payload })));
+        return this;
     }
 
     isConnected() {
