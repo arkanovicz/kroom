@@ -72,6 +72,12 @@ All notable changes to kroom will be documented in this file.
 - Intents (`private/intents.md`): `Room.act` returning the verdict as a `Deferred`, `act(user, tabId,
   intent)` for routes, `Route.intents { call -> user }` mounting `POST /rooms/{room}/act`,
   `call.tabId` / `call.lastEventId` (header or query). Pinned in `RoomTest`.
+- `ChatHistory`, where a room's chat lives beyond its RAM tail: `tail(n)` seeds the sequence and the
+  snapshot when the room starts, `append` is write-behind (the loop never waits on it), `before(seq, n)`
+  pages scroll-back; `MemoryChatHistory(capacity = 1000)` is the default. `ChatRoom(id, history)` numbers,
+  keeps the last 50, broadcasts, then persists; `ChatMessage` carries an `Author(id, name, avatar)`
+  (`from` stays in the JSON as the author's name). `Route.chatHistory { call -> user }` mounts
+  `GET /rooms/{room}/history?before=&n=`. Pinned in `ChatRoomTest`.
 
 #### kroom-webapp-assets
 - `intents.js`: `[data-intent]` triggers posting `{type, ...data-*}` fire-and-forget, busy

@@ -134,7 +134,7 @@ fun Application.configureRouting() {
                     return@post
                 }
 
-                room.sendChat(from, text)
+                room.sendChat(Author(from ?: "anonymous", from ?: "Anonymous"), text)
                 call.respondText("""{"success":true}""", ContentType.Application.Json)
             }
         }

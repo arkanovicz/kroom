@@ -756,6 +756,18 @@ class MyChatRoom(id: String) : Room<MyState>(id) {
 
 Ideal for games with chat: game state is authoritative, chat history is replayed on reconnect.
 
+## Chat history
+
+`ChatRoom(id, history: ChatHistory = MemoryChatHistory())` keeps a chat beyond the replay buffer. The room
+numbers a message (`seq`, monotonic), keeps the last 50 in RAM — what a `state` frame carries —, broadcasts
+it, then hands it to the store in the background: the loop never waits on a store. The store is asked twice
+on its own terms: `tail(n)` when the room starts, to seed the sequence and the tail, and `before(seq, n)` for
+scroll-back, which `Route.chatHistory { call -> user }` serves as `GET /rooms/{room}/history?before=&n=`
+(`{messages: [...]}`, oldest first). Catch-up over a short gap is the stream's replay, not the store's. A
+message carries its `Author(id, name, avatar)`: the user's id, or an external one once a bridge speaks for
+someone else. Write a `ChatHistory` over your database and hand it to the room; `MemoryChatHistory` keeps
+the last 1000 and dies with the process.
+
 ## Starting a site
 
 From a machine with Docker and nothing else:

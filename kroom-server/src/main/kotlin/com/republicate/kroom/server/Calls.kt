@@ -38,3 +38,20 @@ fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
         }
     }
 }
+
+/**
+ * Scroll-back, `GET /rooms/{room}/history?before=<seq>&n=<count>` → `{messages: [...]}`, oldest
+ * first; no `before` means from the latest. [principal] names the reading user; null refuses.
+ */
+fun Route.chatHistory(principal: suspend (ApplicationCall) -> User?) {
+    get("/rooms/{room}/history") {
+        principal(call)
+            ?: return@get call.respondText("""{"error":"not logged in"}""", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+        val room = Lobby.get<Any>(call.parameters["room"]!!) as? ChatRoom
+            ?: return@get call.respondText("""{"error":"no such chat room"}""", ContentType.Application.Json, HttpStatusCode.NotFound)
+        val before = call.request.queryParameters["before"]?.toLongOrNull() ?: Long.MAX_VALUE
+        val n = (call.request.queryParameters["n"]?.toIntOrNull() ?: 50).coerceIn(1, 500)
+        val messages = room.before(before, n)
+        call.respondText(Json.Object("messages" to Json.Array(messages.map { it.toJson() })).toString(), ContentType.Application.Json)
+    }
+}
