@@ -3,8 +3,12 @@ package com.republicate.kroom.examples.chifoumi.sse
 import com.republicate.kroom.examples.chifoumi.game.Match
 import com.republicate.kroom.examples.chifoumi.game.MatchStats
 import com.republicate.kroom.examples.chifoumi.game.Move
-import com.republicate.kroom.server.ActionResult
+import com.republicate.kroom.event.Audience
+import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Reason
 import com.republicate.kroom.server.Actor
+import com.republicate.kroom.server.Join
+import com.republicate.kroom.server.Leave
 import com.republicate.kroom.server.Room
 import com.republicate.kroom.server.User
 import com.republicate.kson.Json
@@ -20,9 +24,16 @@ data class LobbyState(
     val activeMatchCount: Int = 0
 )
 
+/** The three gestures of a player; what comes back to them is the same event, with its verdict. */
+class JoinQueue(json: Json.MutableObject = Json.MutableObject()) : Event("join_queue", Audience.USERS, json = json)
+class LeaveQueue(json: Json.MutableObject = Json.MutableObject()) : Event("leave_queue", Audience.USERS, json = json)
+class Play(json: Json.MutableObject = Json.MutableObject()) : Event("play", Audience.USERS, json = json) {
+    val move by string().required
+}
+
 /**
  * Main lobby room for Chifoumi Arena: presence, matchmaking queue, activity feed, active matches.
- * Every move of a player is an intent handled here, on the room's loop; the routes only forward.
+ * Every gesture of a player is an event handled here, on the room's loop; the routes only forward.
  */
 object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
     private val log = LoggerFactory.getLogger("chifoumi.lobby")
@@ -58,20 +69,35 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
     override fun stateToJson(actor: Actor): Json.Object =
         Json.MutableObject(stateToJson()).apply { getMatch(actor.name)?.let { set("match", it.toJson()) } }
 
-    override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
-        return when (val type = action.getString("type")) {
-            "join_queue" -> joinQueue(actor.name)
-            "leave_queue" -> {
-                matchQueue.remove(actor.name)
-                updateState()
-                ActionResult.Success()
+    init {
+        on(::JoinQueue) { actor, _ -> joinQueue(actor.name) }
+        on(::LeaveQueue) { actor, _ -> matchQueue.remove(actor.name); updateState(); null }
+        on(::Play) { actor, play ->
+            val move = Move.fromString(play.move) ?: return@on Reason("invalid", Json.Object("field" to "move"))
+            play(actor.name, move)
+        }
+        on(::Join) { actor, join ->
+            val user = actor.user ?: return@on null
+            players[actor.name] = user
+            // the first tab of the player is the arrival; a second tab, a reconnect are not
+            if (join.first == true) addActivity(ActivityEvent.PlayerJoined(actor.name))
+            null
+        }
+        on(::Leave) { actor, leave ->
+            if (leave.last != true) return@on null
+            val login = actor.name
+            players.remove(login)
+            matchQueue.remove(login)
+            updateState()
+            playerMatches[login]?.let { matchId ->
+                activeMatches[matchId]?.let { match ->
+                    val opponent = if (match.player1 == login) match.player2 else match.player1
+                    addActivity(ActivityEvent.PlayerLeft(login, opponent))
+                    endMatch(matchId)
+                }
             }
-            "play" -> {
-                val moveStr = action.getString("move") ?: return ActionResult.Error("Missing move")
-                val move = Move.fromString(moveStr) ?: return ActionResult.Error("Invalid move: $moveStr")
-                play(actor.name, move)
-            }
-            else -> ActionResult.Error("Unknown action: $type")
+            addActivity(ActivityEvent.PlayerDisconnected(login))
+            null
         }
     }
 
@@ -79,8 +105,8 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
         players[login]?.let { sendToUser(it, event, data) }
     }
 
-    private fun joinQueue(login: String): ActionResult {
-        if (matchQueue.contains(login) || playerMatches.containsKey(login)) return ActionResult.Success()
+    private fun joinQueue(login: String): Reason? {
+        if (matchQueue.contains(login) || playerMatches.containsKey(login)) return null
 
         val opponent = matchQueue.poll()
         if (opponent != null && opponent != login) {
@@ -99,25 +125,25 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
             tell(login, "queue", Json.Object("position" to matchQueue.size))
             log.info("$login joined queue (position: ${matchQueue.size})")
         }
-        return ActionResult.Success()
+        return null
     }
 
-    private fun play(login: String, move: Move): ActionResult {
-        val matchId = playerMatches[login] ?: return ActionResult.Error("Not in a match")
-        val match = activeMatches[matchId] ?: return ActionResult.Error("Match not found")
-        if (match.isFinished) return ActionResult.Error("Match already finished")
+    private fun play(login: String, move: Move): Reason? {
+        val matchId = playerMatches[login] ?: return Reason("not_in_match")
+        val match = activeMatches[matchId] ?: return Reason("no_match")
+        if (match.isFinished) return Reason("match_finished")
         val opponent = if (match.player1 == login) match.player2 else match.player1
 
         val round = try {
             match.play(login, move)
         } catch (e: IllegalArgumentException) {
-            return ActionResult.Error(e.message ?: "Invalid move")
+            return Reason("already_played")
         }
         MatchStats.recordMove(move)
 
         if (round == null) {
             tell(opponent, "waiting", Json.Object("player" to login))
-            return ActionResult.Success()
+            return null
         }
 
         val roundData = Json.Object("round" to round.toJson())
@@ -134,33 +160,7 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
             tell(opponent, "result", resultData)
             endMatch(matchId)
         }
-        return ActionResult.Success()
-    }
-
-    override suspend fun onActorJoined(actor: Actor) {
-        val user = actor.user ?: return
-        players[actor.name] = user
-
-        // the first tab of the player is the arrival; a second tab, a reconnect are not
-        if (user.getConnectionsInRoom(id).size == 1) addActivity(ActivityEvent.PlayerJoined(actor.name))
-    }
-
-    override suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
-        if (!userFullyLeft) return
-        val login = actor.name
-        players.remove(login)
-
-        matchQueue.remove(login)
-        updateState()
-
-        playerMatches[login]?.let { matchId ->
-            activeMatches[matchId]?.let { match ->
-                val opponent = if (match.player1 == login) match.player2 else match.player1
-                addActivity(ActivityEvent.PlayerLeft(login, opponent))
-                endMatch(matchId)
-            }
-        }
-        addActivity(ActivityEvent.PlayerDisconnected(login))
+        return null
     }
 
     /**

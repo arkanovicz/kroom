@@ -27,6 +27,9 @@ open class Actor(
     var channel: Channel<ServerSentEvent>? = null
         internal set
 
+    /** The tab part of the connection id (see [connectionId]): metadata the browser filters on. */
+    val tab: String get() = connectionId.substringAfter('/', "")
+
     /**
      * Whether the actor is currently connected.
      */

@@ -6,10 +6,42 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-server — rooms over Event (branch `kroom-events`)
+- `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler
+  together, `on(::Play) { actor, play -> Reason? }` (null = applied); the class goes in the room's
+  `catalog` (`GET /rooms/{room}/events` serves it as data, `Route.events()`), the handler runs on
+  the loop. The door (`act(user, tab, name, json)`, `Route.intents`) refuses an unknown name, a bad
+  shape, a missing permission (`permits(user, permission)`, open) or a spectator with `400` before
+  the loop. `act` returns `Deferred<Event>`, the event in its final stage.
+- The feedback is the event itself: `accepted` / `rejected` frames are gone, the acting event comes
+  back to its emitter with `_.stage` (`APPLIED` / `REJECTED`, `_.reason` + `_.args`) after the
+  handler's own emissions; a rejection reaches the emitter alone. Every frame's `id` is its seq.
+- Audience is declared on the class (`ROOM` / `USERS` / `GLOBAL`), members named at `emit(event, to)`,
+  the emitter when none. `broadcastToActors` / `broadcastToSpectators` / `sendTo(actor, …)` are
+  gone; `broadcast` and `sendToUser` birth room-born `Generic` events.
+- Hooks are gone: `Join` and `Leave` are events the room births (`user`, `displayName`, `spectator`,
+  `first` / `last`), handled with `on(::Join)` / `on(::Leave)`; `Table` seats there, its
+  `onPlayerSeated` / `onPlayerDisconnected` / `onPlayerConnectionClosed` are no longer `suspend`,
+  `handleStatusAction` is the `Status` event. The room hears `join` / `leave` after the joiner's `state`.
+- Replay is gone: `needsHistory`, `historicizableEvents`, `historyBufferSize`, `join(actor, lastEventId)`,
+  `call.lastEventId`. A reconnect is a join, the snapshot is the truth. `channelCapacity` is 64.
+- `ChatRoom`: `Chat` is the event (`text` in, `seq` / `from` / `author` / `timestamp` added by the
+  room), persisted in seq order by one writer after emission (`persist()` is its last stage).
+- `trace(event)` at every stage change, `emitted(event)` after the frame; `Actor.tab`.
+- `kroom-common` is now an `api` dependency of `kroom-server`.
+
+#### kroom-webapp-assets
+- `intents.js` frees a trigger on the frame of its own name whose `_.tab` is this tab (`APPLIED`),
+  shows `_.reason` (+ `_.args`) on `REJECTED`; it listens to every `[data-intent]` name under its
+  root (and to a name on its first click), beside the host's own handlers. `sse.js` sends no
+  `lastEventId` any more (no replay).
+
+#### kroom-examples/chifoumi
+- Declares `JoinQueue`, `LeaveQueue`, `Play` (audience `USERS`: the opponent never sees the move) and
+  handles `Join` / `Leave`; the pages react to their own `play` / `leave_queue` frames.
+
 #### kroom-server
-- `handleAction` is called by `Room.act(actor, intent)` on the room's loop, by nothing else: a
-  `Success(event, data)` is now broadcast, an exception is a rejection; the acting tab gets an
-  `accepted` / `rejected` frame after the handler's own broadcasts.
+- (superseded above) `handleAction` called by `Room.act` on the loop, `accepted` / `rejected` frames.
 - The loop never waits on a consumer: a connection whose buffer is full is dropped (`trySend`), its
   stream ends and the browser reconnects with `Last-Event-ID`. The buffer holds `max(64, 2 × historyBufferSize)`.
 - A connection id already present in the room is the same tab back: the newcomer replaces it, the

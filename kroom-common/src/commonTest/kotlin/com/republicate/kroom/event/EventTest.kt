@@ -60,6 +60,8 @@ class EventTest {
         assertNotNull(play.meta.at)
         play.emit(42)
         assertEquals(42L, play.meta.seq)
+        assertEquals(Stage.APPLIED, play.stage) // the wire says the verdict
+        assertFailsWith<IllegalStateException> { play.emit(43) }
         play.persist()
         assertEquals(Stage.PERSISTED, play.stage)
         val meta = play.json.getObject("_")!!
@@ -78,14 +80,17 @@ class EventTest {
     @Test fun `a rejection carries its reason and is emitted`() {
         val play = Play(Json.MutableObject("move" to "PAPER")).accept("alice")
         play.reject(Reason("not_your_turn", Json.Object("turn" to "bob"))).emit(7)
-        assertEquals(Stage.EMITTED, play.stage)
+        assertEquals(Stage.REJECTED, play.stage)
+        assertTrue(play.emitted)
+        assertFailsWith<IllegalStateException> { play.persist() }
         assertEquals("not_your_turn", play.meta.reason)
         assertEquals("bob", play.meta.args!!.getString("turn"))
     }
 
     @Test fun `a room-born event applies from birth`() {
         val match = Match(Json.MutableObject("player1" to "a", "player2" to "b")).apply().emit(1)
-        assertEquals(Stage.EMITTED, match.stage)
+        assertEquals(Stage.APPLIED, match.stage)
+        assertFailsWith<IllegalStateException> { Match(Json.MutableObject("player1" to "a", "player2" to "b")).persist() }
         assertNull(match.meta.from)
     }
 

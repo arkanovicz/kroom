@@ -5,8 +5,11 @@
 //   <button data-intent="play" data-move="rock">Rock</button>
 //   intents.attach({ room: 'chifoumi', sse: conn, store });
 //
-// A click posts {type: 'play', move: 'rock'} and leaves the button busy; the server's `accepted`
-// or `rejected` frame frees it, a rejection showing its reason right after it. Call sites hold no code.
+// A click posts {type: 'play', move: 'rock'} and leaves the button busy; the event itself comes
+// back as a `play` frame, its metadata under `_`: APPLIED frees the button, REJECTED frees it and
+// shows `_.reason` (+ `_.args`) right after it. Call sites hold no code. A frame is this tab's
+// feedback when `_.tab` is its id — a door always stamps one; another tab's `play`, a room-born
+// `play`, are just events.
 
 const intents = (function() {
     // in flight in this tab, by intent name (a rerender may replace the element) → click token
@@ -41,6 +44,12 @@ const intents = (function() {
         root().querySelectorAll(`[data-intent-reason="${quote(intent)}"]`).forEach(r => r.remove());
     }
 
+    // a key plus its args, raw: the host may localize it
+    function reasonText(reason, args) {
+        const entries = Object.entries(args || {});
+        return entries.length ? `${reason} (${entries.map(([k, v]) => `${k}: ${v}`).join(', ')})` : reason;
+    }
+
     function showReason(intent, reason, triggers) {
         clearReason(intent);
         // the trigger may have been rerendered: fall back to any of that name
@@ -72,9 +81,34 @@ const intents = (function() {
         if (!pending.has(intent)) return;   // not ours, or already settled
         const triggers = busyTriggers(intent);
         free(intent);
-        if (kind === 'rejected') showReason(intent, verdict.reason || 'rejected', triggers);
+        if (kind === 'rejected') showReason(intent, reasonText(verdict.reason || 'rejected', verdict.args), triggers);
         else clearReason(intent);
         attached?.store?.dispatch({ type: kind, payload: verdict });
+    }
+
+    // The frames of an intent name: ours when `_.tab` is this tab.
+    function frame(intent) {
+        return (data) => {
+            if (!pending.has(intent)) return;
+            let event;
+            try { event = JSON.parse(data); } catch (err) { return console.error(`bad ${intent} frame:`, err); }
+            const meta = event?._ || {};
+            if (meta.tab !== api.tabId()) return;
+            if (meta.stage === 'REJECTED' || meta.reason !== undefined) {
+                settle('rejected', { intent, reason: meta.reason, args: meta.args || {} });
+            } else {
+                settle('accepted', { intent });
+            }
+        };
+    }
+
+    // sse.on() adds beside the host's handlers of the same name; ours are kept to be removed alone.
+    function listen(intent) {
+        const { sse, handlers } = attached;
+        if (!sse || handlers.has(intent)) return;
+        const handler = frame(intent);
+        handlers.set(intent, handler);
+        sse.on(intent, handler);
     }
 
     function onClick(event) {
@@ -84,6 +118,7 @@ const intents = (function() {
         event.preventDefault();
         const intent = el.dataset.intent;
         if (pending.has(intent)) return;
+        listen(intent);     // a trigger rendered after attach
         const token = ++tokens;
         pending.set(intent, token);
         setBusy(el, true);
@@ -97,31 +132,25 @@ const intents = (function() {
             });
     }
 
-    function frame(kind) {
-        return (data) => {
-            let verdict;
-            try { verdict = JSON.parse(data); } catch (err) { return console.error(`bad ${kind} frame:`, err); }
-            settle(kind, verdict);
-        };
-    }
-
     function attach({ room, act, sse, store, payload, root = document }) {
         detach();
-        const handlers = { accepted: frame('accepted'), rejected: frame('rejected'), open: freeAll };
         attached = {
-            root, store, sse, handlers,
+            root, store, sse,
+            handlers: new Map(),    // intent name → our frame handler
             act: act || ((type, body) => api.act(room, type, body)),
             payload: payload || datasetPayload
         };
         root.addEventListener('click', onClick);
-        Object.entries(handlers).forEach(([name, handler]) => sse?.on(name, handler));
+        sse?.on('open', freeAll);
+        root.querySelectorAll('[data-intent]').forEach(el => listen(el.dataset.intent));
     }
 
     function detach() {
         if (!attached) return;
         const { root, sse, handlers } = attached;
         root.removeEventListener('click', onClick);
-        Object.entries(handlers).forEach(([name, handler]) => sse?.off(name, handler));
+        sse?.off('open', freeAll);
+        handlers.forEach((handler, name) => sse?.off(name, handler));
         freeAll();
         attached = null;
     }

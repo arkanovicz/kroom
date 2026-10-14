@@ -17,7 +17,7 @@ application {
 }
 
 dependencies {
-    implementation(project(":kroom-common"))
+    api(project(":kroom-common")) // Event is the room's API
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)

@@ -3,6 +3,7 @@
 //
 // Browser: uses native EventSource
 // Native WebView: delegates to window.kroomSSE if provided by the app
+// No replay: a (re)connection starts from the room's `state` snapshot; `?tabId=` names the tab.
 
 /**
  * SSE connection with automatic reconnection and platform abstraction.
@@ -26,22 +27,14 @@ class SSEConnection {
         this.handlers = {};
         this.eventSource = null;
         this.connected = false;
-        this.lastEventId = null;
         this.provider = window.kroomSSE || null;
     }
 
-    // A fresh EventSource sends no Last-Event-ID: the query carries it, so a manual retry keeps replay.
+    // the server aims a tab's own feedback by this id
     _url() {
-        const params = [];
         const tab = typeof api !== 'undefined' && api.tabId ? api.tabId() : null;
-        if (tab) params.push(`tabId=${encodeURIComponent(tab)}`);
-        if (this.lastEventId) params.push(`lastEventId=${encodeURIComponent(this.lastEventId)}`);
-        if (!params.length) return this.url;
-        return this.url + (this.url.includes('?') ? '&' : '?') + params.join('&');
-    }
-
-    _seen(event) {
-        if (event.lastEventId) this.lastEventId = event.lastEventId;
+        if (!tab) return this.url;
+        return this.url + (this.url.includes('?') ? '&' : '?') + `tabId=${encodeURIComponent(tab)}`;
     }
 
     connect() {
@@ -90,7 +83,6 @@ class SSEConnection {
 
             // Default message handler (unnamed events)
             this.eventSource.onmessage = (event) => {
-                this._seen(event);
                 this.emit('message', event.data);
             };
 
@@ -104,10 +96,7 @@ class SSEConnection {
     // one EventSource listener per custom event, fanning out to all its handlers
     _bind(eventName) {
         if (this.eventSource && !['open', 'error', 'message'].includes(eventName)) {
-            this.eventSource.addEventListener(eventName, (event) => {
-                this._seen(event);
-                this.emit(eventName, event.data);
-            });
+            this.eventSource.addEventListener(eventName, (event) => this.emit(eventName, event.data));
         }
     }
 

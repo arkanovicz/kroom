@@ -49,12 +49,9 @@ fun Application.configureRouting() {
             val room = RoomManager.getOrCreateRoom(roomName)
             val user = Users.getOrCreate(login, login)
             val actor = Actor(connectionId = Actor.connectionId(user, call.tabId), user = user, name = login)
-            val lastEventId = call.lastEventId
+            logger.info("User '$login' connecting to room '$roomName'")
 
-            logger.info("User '$login' connecting to room '$roomName'" +
-                (lastEventId?.let { " (reconnect from event $it)" } ?: ""))
-
-            val channel = room.join(actor, lastEventId)
+            val channel = room.join(actor)
 
             try {
                 // Read events from the channel and send them to the client

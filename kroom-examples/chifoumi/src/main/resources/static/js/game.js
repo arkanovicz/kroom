@@ -73,12 +73,10 @@ function connectSSE() {
         console.log('SSE connected');
     });
 
-    sseConnection.onJson('accepted', ({ intent }) => {
-        if (intent === 'play') movePlayed();
-    });
-
-    sseConnection.onJson('rejected', ({ intent }) => {
-        if (intent === 'play') resetMoveButtons();
+    // our own play, back with its verdict (the opponent never gets it)
+    sseConnection.onJson('play', ({ _ }) => {
+        if (_.tab !== api.tabId()) return;
+        if (_.stage === 'APPLIED') movePlayed(); else resetMoveButtons();
     });
 
     // Play again: a new match reloads, a wait goes back to the lobby

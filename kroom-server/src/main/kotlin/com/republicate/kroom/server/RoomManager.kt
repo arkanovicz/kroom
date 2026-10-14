@@ -46,7 +46,7 @@ object RoomManager {
      */
     fun getRoomInfo(name: String): RoomInfo? {
         return rooms[name]?.let { room ->
-            RoomInfo(name, room.actorCount.value, room.getActors().map { it.name })
+            RoomInfo(name, room.userCount.value, room.getActors().map { it.name })
         }
     }
 
@@ -55,7 +55,7 @@ object RoomManager {
      */
     fun getAllRoomInfo(): List<RoomInfo> {
         return rooms.map { (name, room) ->
-            RoomInfo(name, room.actorCount.value, room.getActors().map { it.name })
+            RoomInfo(name, room.userCount.value, room.getActors().map { it.name })
         }
     }
 

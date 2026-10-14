@@ -5,7 +5,6 @@ import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
 import com.republicate.kroom.server.Actor
 import com.republicate.kroom.server.Users
 import com.republicate.kroom.server.intents
-import com.republicate.kroom.server.lastEventId
 import com.republicate.kroom.server.tabId
 import com.republicate.kroom.webapp.core.respondError
 import com.republicate.kroom.webapp.core.respondJson
@@ -43,7 +42,7 @@ fun Route.chifoumiRoutes() {
         // identity = the session; the tab id keeps a reconnecting tab the same connection
         val user = Users.getOrCreate(session.identifier, session.playerName)
         val actor = Actor(Actor.connectionId(user, call.tabId), user, session.playerName)
-        val channel = ChifoumiLobby.join(actor, call.lastEventId)
+        val channel = ChifoumiLobby.join(actor)
 
         try {
             channel.consumeAsFlow().collect { event ->

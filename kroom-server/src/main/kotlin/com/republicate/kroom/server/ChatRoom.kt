@@ -1,96 +1,88 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Audience
+import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicLong
 
-/**
- * Simple chat room state: the RAM tail, what a snapshot carries.
- */
+/** Simple chat room state: the RAM tail, what a snapshot carries. */
 data class ChatState(
     val history: ArrayDeque<ChatMessage> = ArrayDeque(),
     val maxHistory: Int = 50
 )
 
+/** A line of chat: the text comes in, the room adds who, when and the message's seq. */
+class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", Audience.ROOM, json = json) {
+    val text by string().required
+    var seq by long()
+    var from by string()
+    var author by obj()
+    var timestamp by string()
+
+    fun toMessage() = ChatMessage(seq!!, Author(author!!.getString("id")!!, author!!.getString("name")!!, author!!.getString("avatar")), text, timestamp!!)
+}
+
 /**
- * A chat room: a `chat` intent is numbered, kept in the RAM tail, broadcast, then persisted in
- * the background by [history] ([MemoryChatHistory] by default). A reconnect gets the tail in its
- * `state` and the replay of what it missed; older messages come from [before].
+ * A chat room: a `chat` event is numbered, kept in the RAM tail, emitted, then persisted in the
+ * background by [history] ([MemoryChatHistory] by default). A join gets the tail in its `state`;
+ * older messages come from [before].
  */
 open class ChatRoom(id: String, private val history: ChatHistory = MemoryChatHistory()) : Room<ChatState>(id) {
     override var state = ChatState()
     private val messageSeq = AtomicLong(0)
 
+    // one writer, in seq order: the store sees the messages as the room numbered them
+    private val writer = Channel<Chat>(Channel.UNLIMITED)
+
     init {
-        historicizableEvents.add("chat")
         // seed the sequence and the tail from what the store kept: once, before the first join
         runBlocking { history.tail(state.maxHistory) }.forEach { state.history.addLast(it) }
         state.history.lastOrNull()?.let { messageSeq.set(it.seq) }
-    }
+        scope.launch { for (chat in writer) { history.append(chat.toMessage()); trace(chat.persist()) } }
 
-    override fun needsHistory() = true
-
-    override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
-        return when (action.getString("type")) {
-            "chat" -> {
-                val text = action.getString("text") ?: return ActionResult.Error("Missing text")
-                sendChat(Author.of(actor), text)
-                ActionResult.Success()
-            }
-            else -> ActionResult.Error("Unknown action type: ${action.getString("type")}")
-        }
+        on(::Chat) { actor, chat -> record(chat, Author.of(actor)); null }
+        on(::Join) { _, _ -> broadcastUsers(); null }
+        on(::Leave) { _, leave -> if (leave.last == true) broadcastUsers(); null }
     }
 
     override fun stateToJson(): Json.Object = Json.Object(
         "id" to id,
         "history" to Json.Array(synchronized(state.history) { state.history.map { it.toJson() } }),
-        "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
-        // Legacy field for backward compatibility
-        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
+        "users" to usersJson()
     )
 
-    /**
-     * Say something in the room: numbered, broadcast, persisted behind.
-     */
+    /** Say something in the room from elsewhere than a door (a bridge, a route): same life from APPLIED on. */
     fun sendChat(author: Author, text: String): ChatMessage {
-        val msg = ChatMessage(
-            seq = messageSeq.incrementAndGet(),
-            author = author,
-            text = text,
-            timestamp = Instant.now().toString()
-        )
+        val chat = Chat(Json.MutableObject("text" to text))
+        record(chat, author)
+        emit(chat)
+        return chat.toMessage()
+    }
+
+    private fun record(chat: Chat, author: Author) {
+        chat.seq = messageSeq.incrementAndGet()
+        chat.from = author.name
+        chat.author = author.toJson()
+        chat.timestamp = Instant.now().toString()
         synchronized(state.history) {
-            state.history.addLast(msg)
+            state.history.addLast(chat.toMessage())
             while (state.history.size > state.maxHistory) state.history.removeFirst()
         }
-        broadcast("chat", msg.toJson())
-        scope.launch { history.append(msg) }
-        return msg
+    }
+
+    override fun emitted(event: Event) {
+        if (event is Chat && event.stage == Stage.APPLIED) writer.trySend(event)
     }
 
     /** Scroll-back: up to [n] messages older than [seq], oldest first. */
     suspend fun before(seq: Long, n: Int = 50): List<ChatMessage> = history.before(seq, n)
 
-    override suspend fun onActorJoined(actor: Actor) {
-        // Broadcast updated user list
-        broadcast("users", Json.Object(
-            "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
-            // Legacy field
-            "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
-        ))
-    }
-
-    override suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
-        // Only broadcast if user fully left (not just closing one of multiple tabs)
-        if (userFullyLeft) {
-            broadcast("users", Json.Object(
-                "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
-                // Legacy field
-                "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "name" to it.name) })
-            ))
-        }
-    }
+    private fun usersJson() = Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) })
+    private fun broadcastUsers() = broadcast("users", Json.Object("users" to usersJson()))
 }

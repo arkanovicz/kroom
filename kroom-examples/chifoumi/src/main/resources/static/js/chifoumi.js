@@ -90,8 +90,8 @@ function connectSSE() {
         searching(true);
     });
 
-    sseConnection.onJson('accepted', ({ intent }) => {
-        if (intent === 'leave_queue') searching(false);
+    sseConnection.onJson('leave_queue', ({ _ }) => {
+        if (_.stage === 'APPLIED') searching(false);
     });
 
     // Activity feed

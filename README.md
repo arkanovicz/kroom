@@ -44,12 +44,13 @@ dependencies {
 
 ```kotlin
 // Define a room
+class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", json = json) {
+    val text by string().required          // the declaration: a typed view over the JSON, data for the catalog
+}
 class ChatRoom(id: String) : Room<ChatState>(id) {
     override var state = ChatState()
     override fun stateToJson() = state.toJson()
-    override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
-        // handle chat messages
-    }
+    init { on(::Chat) { actor, chat -> state.add(actor.name, chat.text); null } }   // null = applied
 }
 
 // Setup Ktor
@@ -59,7 +60,7 @@ routing {
     sse("/events/{room}") {
         val user = call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } ?: return@sse
         val actor = Actor(Actor.connectionId(user, call.tabId), user)
-        val channel = Lobby.get<ChatState>(call.parameters["room"]!!)!!.join(actor, call.lastEventId)
+        val channel = Lobby.get<ChatState>(call.parameters["room"]!!)!!.join(actor)
         try { for (event in channel) send(event) } finally { room.leave(actor) }
     }
     route("/api") {
@@ -68,36 +69,54 @@ routing {
 }
 ```
 
-## Intents
+## Events
 
-An **intent** is a named JSON message going up (`{type, …}`), an **event** a named one going down.
-Both cross one membrane, the room's serialized loop, and the browser keeps one path: everything it
-learns comes down the stream.
+One class goes through E, from a gesture to a row: an `Event` (kroom-common, the same class on the
+JVM and in Kotlin/JS) — a name, a payload, metadata. The payload is JSON, the class a typed view
+over it (`val move by enum<Move>().required`, the property name is the key); declaring a field
+records it, so the declaration is data (`describe()`, served as `GET /api/rooms/<room>/events`).
+The metadata lives under the reserved key `_` beside the payload, and holds the event's life:
 
 ```
-browser  click [data-intent=play] ──POST /api/rooms/<room>/act──▶ Room.act(actor, intent) ──▶ handleAction, on the loop
-                                                                        │ broadcasts of the handler
-         store.dispatch  ◀──────────────── SSE ─────────────────────────┤ then `accepted` {intent}
-         trigger freed / reason shown  ◀────────────────────────────────┘ or   `rejected` {intent, reason}, to the acting tab
+browser  click [data-intent=play] ──POST /api/rooms/<room>/act {type, …}──▶ act: the door — accept (shape, permission), stateless
+                                                                          ▼  on the loop: the handler applies or rejects
+         store.dispatch  ◀──────────────── SSE ───────────────────────────┤  the handler's own emissions, to their audience
+         trigger freed / reason shown  ◀──────────────────────────────────┘  then the event itself, with its stage, to its audience
+
+event: play   id: 42   data: {"_":{"stage":"APPLIED","from":"alice","tab":"t1","seq":42},"move":"rock"}
+event: play   id: 43   data: {"_":{"stage":"REJECTED","from":"alice","tab":"t1","reason":"not_your_turn","args":{}}}
 ```
 
-- `Room.act(actor, intent)` queues the intent and returns a `Deferred<ActionResult>`: the **verdict**,
-  never data. `handleAction` runs on the loop, so `state` needs no lock; a `Success(event, data)` is
-  broadcast; an exception is a rejection. The verdict never waits on I/O: launch, do not await.
-- `Route.intents { call -> user }` mounts `POST /rooms/{room}/act` and answers an honest `200 {}` /
-  `400 {error}` that the browser does not read.
-- The feedback frame goes to the **tab** that acted: the browser keeps a tab id (`sessionStorage`,
-  `api.tabId()`), sends it on the stream (`?tabId=`) and on each intent (`X-Kroom-Tab`); the server
-  composes the connection id as `<userId>/<tabId>` (`Actor.connectionId`), so a tab id is a routing
-  key under its own user, never a credential. The same tab back (reconnect, duplicated tab) replaces
-  its connection: no leave, no join flicker. No open stream: the feedback goes to all the user's tabs.
-- The loop never waits on a consumer: a tab that stops draining its buffer is dropped (its stream
-  ends, the browser reconnects with `Last-Event-ID` and gets state + replay).
-- A join runs on the loop too: the newcomer's first frame is `state`, its snapshot — `stateToJson(actor)`,
-  the viewer's own (a seat, a hand, its match) — then the replay, then whatever was queued behind the
-  join, the join hook's own broadcasts included. Catch-up is the snapshot's job alone, a hook never
-  addresses the joiner: an event only ever means a transition. Hooks run on the loop, same rule as
-  `handleAction`: no awaited I/O.
+- **One declaration per event**, class and handler together: `on(::Play) { actor, play -> … }`
+  registers the class in the room's `catalog` (what a door may bring) and its handler. The
+  handler runs on the loop, no awaited I/O, applies the event to the state and answers `null`
+  (applied) or a `Reason` (rejected; a key and arguments the browser localizes). A thrown
+  `Event.Rejected` is the same, any other exception is `error`.
+- **The door** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) accepts
+  stateless: an unknown name, a bad shape, a missing permission (`permits(user, permission)`, the
+  host's call), a spectator — refused with `400` before the loop, never queued. Then `200` or `400`
+  with the event as the body, an honest status the browser does not read.
+- **The feedback is the event itself**: it comes back to its emitter after the handler's own
+  emissions, so the tab sees the new state before its trigger is freed. A rejection reaches its
+  emitter alone. The browser correlates by name and frees `[data-intent=play]` on a `play` frame
+  whose `_.tab` is its own.
+- **Audience** is declared on the class: `ROOM` (everyone), `USERS` (users the room names at
+  `emit(event, to = …)`, the emitter when none — so `Play` declares `USERS` and the opponent never
+  sees the move), `GLOBAL` (every connection of the server).
+- **A join is an event**: the room births `Join` at a connect and `Leave` at a disconnect,
+  handled with `on(::Join)` like any other (`Table` seats there). The joiner gets `state` — its own
+  snapshot, `stateToJson(actor)` — before anything queued behind the join, then the room hears
+  `join`. Catch-up is the snapshot's job alone, so an event only ever means a transition.
+- **Every frame's `id` is its seq.** No replay: a reconnect is a join, the snapshot is the truth,
+  a store dedupes by seq. `broadcast(name, data)` / `sendToUser` birth room-born `Generic` events.
+- **Tab id**: `sessionStorage` `kroom.tabId`, `?tabId=` on the stream, `X-Kroom-Tab` on an intent;
+  the server composes `connectionId = <userId>/<tabId>` (`Actor.connectionId`), so a tab id lands
+  under its own user and is never a credential. The same tab back replaces its connection; a
+  detached tab (no open stream) still acts, its frame reaches the user's other tabs.
+- **The loop never waits on a consumer**: a tab that stops draining is dropped, its stream ends,
+  the browser reconnects and joins again.
+- `trace(event)` is called at every stage change: the operator's line. `emitted(event)` is where a
+  store persists, off the loop (`ChatRoom` → `ChatHistory`, then `persist()`).
 
 Browser side, convention over configuration, no code per call site:
 
@@ -106,15 +125,17 @@ Browser side, convention over configuration, no code per call site:
 <script src="/js/intents.js"></script>
 ```
 ```javascript
-const conn = sse('/events/lobby').into(store, 'state', 'chat').connect();  // event name = action type
+const conn = sse('/events/lobby').into(store, 'state', 'chat').connect();  // event name = store slot
 intents.attach({ room: 'lobby', sse: conn, store });  // store optional
 ```
 
 A click sets `aria-busy` (pico shows the spinner) and `disabled`, posts the intent and forgets it;
-a second click meanwhile is ignored. `accepted` frees the trigger; `rejected` frees it and shows
-the reason in a `<small class="intent-reason">` right after it. The HTTP failure (offline, refused
-before the loop) and the stream's `open` are the safety nets: nothing stays busy for ever. Nothing a
-call site wants to do on success may depend on the HTTP answer: it reacts to the event.
+a second click meanwhile is ignored. The event back with `_.stage` `APPLIED` frees the trigger;
+`REJECTED` frees it and shows `_.reason` in a `<small class="intent-reason">` right after it. The
+HTTP failure (offline, refused at the door) and the stream's `open` are the safety nets: nothing
+stays busy for ever. Nothing a call site wants to do on success may depend on the HTTP answer: it
+reacts to the event. Reactions never emit: only a gesture, a clock or a room's handler births an
+event, which is what makes feedback loops impossible.
 
 ## Heartbeat and Dead Connection Detection
 
@@ -733,28 +754,12 @@ The `Table` class:
 - Handles reconnection by user identity matching
 - Player status tracking (online/idle/away/offline) with `Seat.status`
 
-## Last-Event-ID Replay
+## Reconnect
 
-SSE supports automatic reconnection with `Last-Event-ID` header. kroom can replay missed events selectively:
-
-```kotlin
-class MyChatRoom(id: String) : Room<MyState>(id) {
-    init {
-        historicizableEvents.add("chat")  // Only "chat" events are replayed
-    }
-
-    override fun needsHistory() = true  // Enable event buffering
-}
-```
-
-- Only events in `historicizableEvents` are buffered and replayed
-- Game events (rolled, played, etc.) use state-on-join, not replay
-- Server restart detection: stale client IDs are ignored
-- `call.lastEventId` reads the header, or the `lastEventId` query parameter sse.js sends on the
-  fresh `EventSource` it opens after a `CLOSED` (a reconnect of its own carries the header)
-- Buffer size configurable via `historyBufferSize` (default: 50)
-
-Ideal for games with chat: game state is authoritative, chat history is replayed on reconnect.
+`EventSource` reconnects on its own; after a `CLOSED` (non-200: expired session, restart window,
+room gone) sse.js opens a fresh one. Either way the server sees a join and answers with the
+snapshot: there is no replay buffer, anything a client must not miss belongs in `stateToJson(actor)`,
+and a store dedupes by the seq every frame carries as its `id`.
 
 ## Chat history
 

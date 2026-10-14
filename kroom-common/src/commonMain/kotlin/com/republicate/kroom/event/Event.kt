@@ -7,8 +7,11 @@ import kotlin.time.ExperimentalTime
 /** Where an applied event goes: every connection, the room, or users the room names (the emitter at least). */
 enum class Audience { GLOBAL, ROOM, USERS }
 
-/** One life, in order. A room-born event starts at APPLIED; a rejection is emitted to its emitter alone. */
-enum class Stage { BORN, ACCEPTED, APPLIED, REJECTED, EMITTED, PERSISTED }
+/**
+ * One life, in order; the stage on the wire is the verdict, the seq the proof it went out.
+ * A room-born event starts at APPLIED; a rejection is emitted to its emitter alone.
+ */
+enum class Stage { BORN, ACCEPTED, APPLIED, REJECTED, PERSISTED }
 
 /** What the browser localizes: a key and its arguments, never a sentence. */
 class Reason(val key: String, val args: Json.Object = Json.Object()) {
@@ -25,7 +28,7 @@ class Reason(val key: String, val args: Json.Object = Json.Object()) {
  * The stages are the lifecycle, walked in order on this very object; a step out of order is an
  * error of the object, not a rule of a room. Who steps: a door [accept]s (stateless: a session,
  * a permission, a well-formed payload), a room [apply]s or [reject]s (with state, on its loop),
- * the loop [emit]s, a store [persist]s. A reaction never births an event: only a gesture, a
+ * the loop [emit]s (a seq, the stage stays the verdict), a store [persist]s. A reaction never births an event: only a gesture, a
  * clock, or a room's apply does.
  */
 abstract class Event(
@@ -57,10 +60,17 @@ abstract class Event(
         meta.args = reason.args
     }
 
-    /** Numbered and on the wire; a rejection reaches its emitter whatever the declared audience. */
-    fun emit(seq: Long): Event = step(Stage.EMITTED, Stage.APPLIED, Stage.REJECTED) { meta.seq = seq }
+    /** Numbered and on the wire, once; a rejection reaches its emitter whatever the declared audience. */
+    fun emit(seq: Long): Event {
+        check(stage == Stage.APPLIED || stage == Stage.REJECTED) { "$name: $stage → emit" }
+        check(meta.seq == null) { "$name: emitted twice" }
+        meta.seq = seq
+        return this
+    }
 
-    fun persist(): Event = step(Stage.PERSISTED, Stage.EMITTED) {}
+    val emitted: Boolean get() = meta.seq != null
+
+    fun persist(): Event = step(Stage.PERSISTED, Stage.APPLIED) { check(emitted) { "$name: persisted before emitted" } }
 
     private inline fun step(to: Stage, vararg from: Stage, stamp: () -> Unit): Event {
         check(stage in from) { "$name: $stage → $to" }

@@ -1,6 +1,14 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Audience
+import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Reason
 import com.republicate.kson.Json
+
+/** A seated player tells the table how present it is; `offline` is the table's to say. */
+class Status(json: Json.MutableObject = Json.MutableObject()) : Event("status", Audience.USERS, json = json) {
+    val status by string().required
+}
 
 /**
  * Player connection status for seats.
@@ -61,6 +69,33 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
 
     // Seats array (1-indexed, index 0 unused for cleaner API)
     private val seats: Array<Seat> = Array(seatCount + 1) { Seat(it) }
+
+    init {
+        on(::Join) { actor, _ ->
+            val seatNumber = assignActorToSeat(actor)
+            if (seatNumber != null) onPlayerSeated(actor, seatNumber) else onSpectatorJoined(actor)
+            null
+        }
+        on(::Leave) { actor, leave ->
+            val seat = actor.user?.let { getSeatForUser(it) }
+            if (seat != null) {
+                if (leave.last == true) { disconnectSeat(actor.user!!); onPlayerDisconnected(actor, seat.number) }
+                else onPlayerConnectionClosed(actor, seat.number)
+            }
+            null
+        }
+        on(::Status) { actor, status ->
+            val newStatus = try { PlayerStatus.valueOf(status.status.uppercase()) } catch (e: IllegalArgumentException) {
+                return@on Reason("invalid", Json.Object("field" to "status"))
+            }
+            // the table alone says OFFLINE
+            if (newStatus == PlayerStatus.OFFLINE) return@on Reason("forbidden", Json.Object("status" to "offline"))
+            val user = actor.user ?: return@on Reason("unauthenticated")
+            val seat = getSeatForUser(user) ?: return@on Reason("not_seated")
+            updatePlayerStatus(seat.number, newStatus)
+            null
+        }
+    }
 
     /**
      * Get seat by number (1-indexed).
@@ -168,7 +203,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
      * Default behavior: assign to first empty seat or reconnect to existing seat.
      * Returns the assigned seat number, or null if joining as spectator.
      */
-    protected open suspend fun assignActorToSeat(actor: Actor): Int? {
+    protected open fun assignActorToSeat(actor: Actor): Int? {
         val user = actor.user ?: return null  // No identity = spectator
         return assignSeat(user, actor.name)
     }
@@ -259,74 +294,25 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
         )
     })
 
-    override suspend fun onActorJoined(actor: Actor) {
-        val seatNumber = assignActorToSeat(actor)
-        if (seatNumber != null) {
-            onPlayerSeated(actor, seatNumber)
-        } else {
-            onSpectatorJoined(actor as? Spectator ?: Spectator(actor.connectionId, actor.user, actor.name))
-        }
-    }
-
-    override suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
-        val user = actor.user
-        if (user != null) {
-            val seat = getSeatForUser(user)
-            if (seat != null) {
-                if (userFullyLeft) {
-                    // User has no more connections - mark as offline
-                    disconnectSeat(user)
-                    onPlayerDisconnected(actor, seat.number)
-                } else {
-                    // User still has other connections - just a tab closing
-                    onPlayerConnectionClosed(actor, seat.number)
-                }
-                return
-            }
-        }
-        // Not a seated player - must be spectator behavior from parent
-    }
-
-    /**
-     * Handle a status action from a client.
-     * Call this from handleAction when action type is "status".
-     * @return ActionResult.Success if handled, null if not a status action
-     */
-    protected fun handleStatusAction(actor: Actor, action: Json.Object): ActionResult? {
-        if (action.getString("type") != "status") return null
-        val statusStr = action.getString("status") ?: return ActionResult.Error("Missing status field")
-        val newStatus = try {
-            PlayerStatus.valueOf(statusStr.uppercase())
-        } catch (e: IllegalArgumentException) {
-            return ActionResult.Error("Invalid status: $statusStr")
-        }
-        // Don't allow clients to set OFFLINE (that's server-controlled)
-        if (newStatus == PlayerStatus.OFFLINE) {
-            return ActionResult.Error("Cannot set OFFLINE status")
-        }
-        // Use user to find seat
-        val user = actor.user ?: return ActionResult.Error("Not authenticated")
-        val seat = getSeatForUser(user) ?: return ActionResult.Error("Player not found")
-        updatePlayerStatus(seat.number, newStatus)
-        return ActionResult.Success()
-    }
-
     /**
      * Called when a player takes a seat.
      */
-    protected open suspend fun onPlayerSeated(actor: Actor, seatNumber: Int) {}
+    protected open fun onPlayerSeated(actor: Actor, seatNumber: Int) {}
+
+    /** A connection that found no seat watches. */
+    protected open fun onSpectatorJoined(actor: Actor) {}
 
     /**
      * Called when a seated player fully disconnects (no more connections).
      * Seat is retained for reconnect.
      */
-    protected open suspend fun onPlayerDisconnected(actor: Actor, seatNumber: Int) {}
+    protected open fun onPlayerDisconnected(actor: Actor, seatNumber: Int) {}
 
     /**
      * Called when one of a player's connections closes, but they still have other connections.
      * Default: no-op. Override if you need to track individual connection closures.
      */
-    protected open suspend fun onPlayerConnectionClosed(actor: Actor, seatNumber: Int) {}
+    protected open fun onPlayerConnectionClosed(actor: Actor, seatNumber: Int) {}
 
     override fun toJson(): Json.Object = Json.Object(
         "id" to id,

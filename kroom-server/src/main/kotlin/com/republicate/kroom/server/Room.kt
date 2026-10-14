@@ -1,5 +1,10 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Audience
+import com.republicate.kroom.event.Catalog
+import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Reason
+import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.*
@@ -8,94 +13,92 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.slf4j.LoggerFactory
-import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+/** An event with no declaration: what [Room.broadcast] births, what the door rejects by name. */
+class Generic(name: String, json: Json.MutableObject = Json.MutableObject(), audience: Audience = Audience.ROOM) :
+    Event(name, audience, json = json)
+
+/** Born by the room at a connect, to the room: who arrived. The joiner's own feedback is the `state` frame. */
+class Join(json: Json.MutableObject = Json.MutableObject()) : Event("join", json = json) {
+    var user by string()
+    var displayName by string()
+    var spectator by bool()
+    var first by bool()      // the user's first connection to the room
+}
+
+/** Born by the room at a disconnect, to the room. */
+class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", json = json) {
+    var user by string()
+    var displayName by string()
+    var spectator by bool()
+    var last by bool()       // the user's last connection to the room
+}
+
 /**
- * Base Room class for SSE-based real-time communication with generic state.
+ * A room: state, membership (users; actors write, spectators read), one loop, and the events
+ * it speaks. An [Event] arrives at the door ([act]), is applied on the loop by the handler its
+ * declaration registered ([on]), and comes back to its audience with its stage — the emitter is
+ * always in it, so the frame is the feedback. Every emitted frame carries the room's seq.
  *
- * A Room tracks both Users (persistent identities) and Actors (individual connections).
- * A User can have multiple simultaneous connections (Actors) to the same room,
- * for example when opening multiple browser tabs.
- *
- * @param S The type of room state
- * @param id Unique room identifier
+ * A join is an event too: the room births [Join] at a connect, the handler runs, the joiner gets
+ * its `state` snapshot ([stateToJson]) before anything queued behind, then the room hears `join`.
  */
 abstract class Room<S : Any>(val id: String) {
     protected val logger = LoggerFactory.getLogger("kroom.room")
 
-    /**
-     * Room state - must be initialized by subclass
-     */
     abstract var state: S
 
-    // Users present in this room (userId -> User)
     protected val users = ConcurrentHashMap<String, User>()
-
-    // Actors (individual connections) - keyed by connectionId for event processing
     protected val actors = ConcurrentHashMap<String, Actor>()
-
-    // Spectators (observers) - keyed by connectionId
     protected val spectators = ConcurrentHashMap<String, Spectator>()
 
-    // Event queue for async processing
-    private val eventQueue = Channel<Event>(Channel.UNLIMITED)
-
-    // Message ID counter
-    private val messageId = AtomicLong(1)
-
+    private val queue = Channel<Op>(Channel.UNLIMITED)
+    private val seq = AtomicLong(0)
     private var processingJob: Job? = null
-
-    // Coroutine scope
     protected val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // Participant counts (user-centric, not connection-centric)
     private val _userCount = MutableStateFlow(0)
     val userCount: StateFlow<Int> = _userCount.asStateFlow()
-
     private val _spectatorCount = MutableStateFlow(0)
     val spectatorCount: StateFlow<Int> = _spectatorCount.asStateFlow()
+    val connectionCount: Int get() = actors.size + spectators.size
 
-    // Legacy: actorCount now reflects unique users, not connections
-    @Deprecated("Use userCount instead for unique users, or connectionCount for raw connections")
-    val actorCount: StateFlow<Int> = _userCount
+    // ---- declarations
+
+    /** The events a door may bring: what `GET /rooms/{room}/events` serves as data. */
+    val catalog = Catalog()
+    private val handlers = HashMap<String, (Actor, Event) -> Reason?>()
+    private val system = setOf("join", "leave")
 
     /**
-     * Total number of active connections (actors + spectators).
+     * One declaration: the class (its factory, for the door) and its handler (for the loop).
+     * The handler applies the event to the state and answers null, or a [Reason] to reject it;
+     * a thrown [Event.Rejected] is the same, any other exception is `error`, logged. It runs on
+     * the loop: no awaited I/O. What it [emit]s lands before the event's own frame.
      */
-    val connectionCount: Int
-        get() = actors.size + spectators.size
-
-    companion object {
-        const val DEFAULT_HISTORY_BUFFER_SIZE = 50
+    @Suppress("UNCHECKED_CAST")
+    protected fun <E : Event> on(factory: (Json.MutableObject) -> E, handler: (Actor, E) -> Reason?) {
+        val name = factory(Json.MutableObject()).name
+        if (name !in system) catalog.register(factory)
+        handlers[name] = { actor, event -> handler(actor, event as E) }
     }
 
-    // History buffer for Last-Event-ID replay (only allocated if needsHistory() returns true)
-    private val historyBuffer: ArrayDeque<ServerSentEvent>? by lazy {
-        if (needsHistory()) ArrayDeque(historyBufferSize) else null
+    /** Whether [user] holds [permission] here; the host's call (authoring's roles), everything by default. */
+    protected open fun permits(user: User, permission: String): Boolean = true
+
+    /** Every stage change of every event: the operator's line. */
+    protected open fun trace(event: Event) {
+        if (logger.isDebugEnabled) logger.debug("{} {} {}", id, event.name, event.meta.json)
     }
 
-    /**
-     * Override to enable Last-Event-ID replay on reconnect.
-     * Default is false - games typically don't need history since state is sent on join.
-     * Enable for chat-like rooms where history complements the current state.
-     */
-    protected open fun needsHistory(): Boolean = false
-
-    /**
-     * Buffer size for event history. Only used when needsHistory() returns true.
-     */
-    protected open val historyBufferSize: Int = DEFAULT_HISTORY_BUFFER_SIZE
-
-    /**
-     * Event names that should be buffered for Last-Event-ID replay.
-     * Configurable at runtime - add event names to enable replay for specific events.
-     * Example: `historicizableEvents.add("chat")`
-     */
-    protected open val historicizableEvents: MutableSet<String> = mutableSetOf()
+    /** An event just went on the wire: where a store persists it, off the loop. */
+    protected open fun emitted(event: Event) {}
 
     init {
+        on(::Join) { _, _ -> null }
+        on(::Leave) { _, _ -> null }
         start()
     }
 
@@ -104,43 +107,114 @@ abstract class Room<S : Any>(val id: String) {
             logger.info("Room '$id' started")
             while (isActive) {
                 try {
-                    val event = eventQueue.receive()
-                    processEvent(event)
+                    process(queue.receive())
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     logger.error("Error in room '$id'", e)
                 }
             }
-            logger.info("Room '$id' stopped")
         }
     }
 
-    /**
-     * Stop room and cleanup
-     */
     fun stop() {
-        eventQueue.close()
+        queue.close()
         processingJob?.cancel()
         scope.cancel()
         actors.values.forEach { it.disconnect() }
         spectators.values.forEach { it.disconnect() }
-        // Clean up user connections to this room
-        users.values.forEach { user ->
-            user.connectionsByRoom.remove(id)
-        }
-        actors.clear()
-        spectators.clear()
-        users.clear()
+        users.values.forEach { it.connectionsByRoom.remove(id) }
+        actors.clear(); spectators.clear(); users.clear()
         logger.info("Room '$id' stopped")
     }
 
+    // ---- the door
+
     /**
-     * Per-connection buffer: the loop never waits on a consumer (see [sendSafe]), and a join fills it
-     * with the state frame plus the replay before the route starts draining.
+     * An event at the door: accepted here, stateless (the shape, the permission, not a spectator),
+     * then queued for the handler. A refusal at the door is answered, never queued nor emitted:
+     * the returned event is `REJECTED`. Otherwise the promise is the event in its final stage.
      */
-    protected open val channelCapacity: Int
-        get() = maxOf(64, historyBufferSize * 2)
+    fun act(actor: Actor, event: Event): Deferred<Event> {
+        val verdict = CompletableDeferred<Event>()
+        val refused = when {
+            actor is Spectator -> Reason("spectator")
+            event.name in system || handlers[event.name] == null -> Reason("unknown")
+            event.permission?.let { p -> actor.user?.let { u -> permits(u, p) } != true } == true -> Reason("forbidden")
+            else -> null
+        }
+        if (refused == null && event.stage == Stage.BORN) {
+            try {
+                event.accept(actor.user?.userId ?: actor.connectionId, actor.tab)
+            } catch (e: Event.Rejected) {
+                return verdict.also { it.complete(event.reject(e.reason).also(::trace)) }
+            }
+        }
+        if (refused != null) return verdict.also { it.complete(event.reject(refused).also(::trace)) }
+        trace(event)
+        if (!queue.trySend(Op.Act(actor, event, verdict)).isSuccess) verdict.complete(event.reject(Reason("closed")))
+        return verdict
+    }
+
+    /**
+     * The route's door: a session and a tab, not a connection. The name is looked up in the
+     * [catalog]; the connection id is composed server-side so the tab lands under its own user.
+     */
+    suspend fun act(user: User, tab: String?, name: String, json: Json.MutableObject): Event {
+        val connectionId = Actor.connectionId(user, tab)
+        val actor = getActor(connectionId) ?: Actor(connectionId, user)
+        val event = catalog.of(name, json) ?: return Generic(name, json).reject(Reason("unknown")).also(::trace)
+        return act(actor, event).await()
+    }
+
+    // ---- emissions
+
+    /**
+     * A room-born event, or one the handler made for others: queued behind what is already
+     * queued, numbered and framed on the loop. [to] names the users of a `USERS` audience; none
+     * means the emitter. A `BORN` event applies here: it had no door.
+     */
+    fun emit(event: Event, to: Collection<User> = emptyList()) {
+        if (event.stage == Stage.BORN) event.apply()
+        queue.trySend(Op.Emit(event, to.map { it.userId }))
+    }
+
+    fun emit(event: Event, vararg to: User) = emit(event, to.toList())
+
+    /** Convenience: a room-born [Generic] to the room. */
+    fun broadcast(name: String, data: Json.Object) = emit(Generic(name, Json.MutableObject(data)))
+
+    /** Convenience: a room-born [Generic] to one user, every tab of theirs. */
+    fun sendToUser(user: User, name: String, data: Json.Object) = emit(Generic(name, Json.MutableObject(data), Audience.USERS), user)
+
+    fun sendToUser(userId: String, name: String, data: Json.Object) { users[userId]?.let { sendToUser(it, name, data) } }
+
+    // ---- connections
+
+    /**
+     * A connection joins. On the loop like everything else: the newcomer gets `state`, then the
+     * frames queued behind the join — the join handler's emissions, then `join` itself to the
+     * room. Nothing written elsewhere can slip in before the snapshot. A stopped room hands back
+     * a closed channel: the stream ends, the browser retries and learns the room is gone.
+     */
+    suspend fun join(actor: Actor): Channel<ServerSentEvent> {
+        val ready = CompletableDeferred<Channel<ServerSentEvent>>()
+        if (!queue.trySend(Op.Join(actor, ready)).isSuccess) return closed()
+        return ready.await()
+    }
+
+    suspend fun joinAsSpectator(spectator: Spectator): Channel<ServerSentEvent> = join(spectator)
+
+    /** A connection leaves; returns once the room has forgotten it. */
+    suspend fun leave(actor: Actor) {
+        val done = CompletableDeferred<Unit>()
+        if (queue.trySend(Op.Leave(actor, done)).isSuccess) done.await()
+    }
+
+    private fun closed() = Channel<ServerSentEvent>(0).also { it.close() }
+
+    /** Per-connection buffer: the loop never waits on a consumer (see [sendSafe]). */
+    protected open val channelCapacity: Int = 64
 
     /**
      * A connection id already present is the same tab back (reconnect, or a duplicated tab): the
@@ -155,89 +229,49 @@ abstract class Room<S : Any>(val id: String) {
         logger.debug("Connection '${actor.connectionId}' replaced in room '$id'")
     }
 
-    /**
-     * Actor joins the room. The join runs on the loop like everything else that touches the
-     * channels: the newcomer gets `state` (the snapshot, [stateToJson] for that actor) then the
-     * replay, and only then the frames queued behind the join — its own hook's broadcasts included.
-     * Nothing written elsewhere can slip in before the snapshot. A stopped room hands back a
-     * closed channel: the stream ends, the browser retries and learns the room is gone.
-     * @param lastEventId Optional Last-Event-ID from SSE reconnect header
-     */
-    suspend fun join(actor: Actor, lastEventId: String? = null): Channel<ServerSentEvent> {
-        val ready = CompletableDeferred<Channel<ServerSentEvent>>()
-        if (!eventQueue.trySend(Event.Join(actor, lastEventId, ready)).isSuccess) {
-            return Channel<ServerSentEvent>(0).also { it.close() }
-        }
-        return ready.await()
-    }
-
-    /**
-     * Spectator joins the room: [join], a [Spectator] is an [Actor] that only reads.
-     */
-    suspend fun joinAsSpectator(spectator: Spectator, lastEventId: String? = null): Channel<ServerSentEvent> =
-        join(spectator, lastEventId)
-
-    /**
-     * Actor or spectator leaves. On the loop too, so the leave hook's broadcasts are ordered with
-     * everything else; returns once the room has forgotten the connection.
-     */
-    suspend fun leave(actor: Actor) {
-        val done = CompletableDeferred<Unit>()
-        if (eventQueue.trySend(Event.Leave(actor, done)).isSuccess) done.await()
-    }
-
-    private suspend fun processJoin(actor: Actor, lastEventId: String?) {
+    private fun processJoin(actor: Actor) {
         val channel = Channel<ServerSentEvent>(channelCapacity)
         actor.channel = channel
         replace(actor)
-        if (actor is Spectator) _spectatorCount.value = spectators.size
-
+        val spectator = actor is Spectator
+        if (spectator) _spectatorCount.value = spectators.size
+        var first = true
         actor.user?.let { user ->
-            val isNewUser = !users.containsKey(user.userId)
+            first = !users.containsKey(user.userId)
             users[user.userId] = user
             user.addConnection(id, actor)
-            if (isNewUser && actor !is Spectator) _userCount.value = users.size
+            if (first && !spectator) _userCount.value = users.size
         }
-        logger.debug("${if (actor is Spectator) "Spectator" else "Actor"} '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections, ${spectators.size} spectators)")
+        logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections, ${spectators.size} spectators)")
 
-        // the hook first (a Table seats before it snapshots); its broadcasts queue behind this join
-        try {
-            if (actor is Spectator) onSpectatorJoined(actor) else onActorJoined(actor)
-        } catch (e: Exception) {
-            logger.error("Join hook failed in room '$id' for '${actor.name}'", e)
-        }
-        sendSafe(actor, ServerSentEvent(data = stateToJson(actor).toString(), event = "state"))
-        replayIfNeeded(actor, lastEventId)
+        val join = Join().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.first = first }
+        join.meta.from = actor.user?.userId
+        handle(actor, join)
+        // the snapshot, straight on the channel: this op owns the loop, nothing interleaves
+        val snapshot = Json.MutableObject(stateToJson(actor))
+        snapshot[Event.META] = Json.Object("stage" to Stage.APPLIED.name, "seq" to seq.get())
+        sendSafe(actor, ServerSentEvent(data = snapshot.toString(), event = "state", id = seq.get().toString()))
+        if (join.stage == Stage.APPLIED) emit(join)
     }
 
-    private suspend fun processLeave(actor: Actor) {
+    private fun processLeave(actor: Actor) {
         // a replaced connection (same tab back) leaves nothing: the newcomer owns the slot
         if (actors[actor.connectionId] !== actor && spectators[actor.connectionId] !== actor) return
         actor.disconnect()
+        val spectator = actor is Spectator
+        val last = actor.user?.let { user ->
+            val none = user.removeConnection(id, actor)
+            if (none) { users.remove(user.userId); _userCount.value = users.size }
+            none
+        } ?: true
+        if (spectator) { spectators.remove(actor.connectionId); _spectatorCount.value = spectators.size }
+        else actors.remove(actor.connectionId)
+        logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' left room '$id' (last=$last)")
 
-        val userFullyLeft = actor.user?.let { user ->
-            val noMoreConnections = user.removeConnection(id, actor)
-            if (noMoreConnections) {
-                users.remove(user.userId)
-                _userCount.value = users.size
-            }
-            noMoreConnections
-        } ?: true  // Anonymous actors always "fully leave"
-
-        try {
-            if (actor is Spectator) {
-                spectators.remove(actor.connectionId)
-                _spectatorCount.value = spectators.size
-                logger.debug("Spectator '${actor.name}' left room '$id'")
-                onSpectatorLeft(actor)
-            } else {
-                actors.remove(actor.connectionId)
-                logger.debug("Actor '${actor.name}' left room '$id' (userFullyLeft=$userFullyLeft)")
-                onActorLeft(actor, userFullyLeft)
-            }
-        } catch (e: Exception) {
-            logger.error("Leave hook failed in room '$id' for '${actor.name}'", e)
-        }
+        val leave = Leave().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.last = last }
+        leave.meta.from = actor.user?.userId
+        handle(actor, leave)
+        if (leave.stage == Stage.APPLIED) emit(leave)
 
         if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty()) {
             stop()
@@ -245,276 +279,61 @@ abstract class Room<S : Any>(val id: String) {
         }
     }
 
-    /**
-     * The room's reducer: called by [act] on the loop, never from a route — `state` needs no lock
-     * here. Return the verdict, never data: a [ActionResult.Success] carrying an event is
-     * broadcast, then `accepted` reaches the acting tab; an [ActionResult.Error] reaches it as
-     * `rejected`. Side effects that need I/O are launched, not awaited: the verdict never waits.
-     */
-    abstract fun handleAction(actor: Actor, action: Json.Object): ActionResult
-
-    /**
-     * An actor's intent, queued on the loop. The returned promise is the verdict for whoever has
-     * a reason to wait (a route answering an honest status, a test, a peer); the browser does not,
-     * it reacts to the `accepted` / `rejected` frame like to any event.
-     */
-    fun act(actor: Actor, intent: Json.Object): Deferred<ActionResult> {
-        val verdict = CompletableDeferred<ActionResult>()
-        if (actor is Spectator) {
-            verdict.complete(ActionResult.Error("spectators cannot act"))
-        } else if (!eventQueue.trySend(Event.Act(actor, intent, verdict)).isSuccess) {
-            verdict.complete(ActionResult.Error("room '$id' is closed"))
+    /** The handler, then the stage it earned. */
+    private fun handle(actor: Actor, event: Event) {
+        val reason = try {
+            handlers[event.name]?.invoke(actor, event)
+        } catch (e: Event.Rejected) {
+            e.reason
+        } catch (e: Exception) {
+            logger.error("'${event.name}' failed in room '$id'", e)
+            Reason("error")
         }
-        return verdict
+        if (reason == null) event.apply() else event.reject(reason)
+        trace(event)
     }
 
-    /**
-     * The route-side door: an intent arrives with a session and a tab id, not a connection. The
-     * connection id is composed server-side ([Actor.connectionId]) so a tab id lands under its own
-     * user, never under another's; a tab with no open stream still acts, as a detached actor, and
-     * its feedback goes to the user's other connections if any.
-     */
-    suspend fun act(user: User, tabId: String?, intent: Json.Object): ActionResult {
-        val connectionId = Actor.connectionId(user, tabId)
-        val actor = getActor(connectionId) ?: Actor(connectionId, user)
-        return act(actor, intent).await()
-    }
+    // ---- the loop
 
-    /**
-     * Convert state to JSON for client.
-     */
-    abstract fun stateToJson(): Json.Object
-
-    /**
-     * The snapshot a joining connection gets as its `state` frame. Override when a viewer sees the
-     * room differently (a seat, a hand, its own match): catch-up is this frame's job alone, a join
-     * hook never addresses the joiner — an event then only ever means a transition.
-     */
-    open fun stateToJson(actor: Actor): Json.Object = stateToJson()
-
-    /**
-     * Called when actor joins, on the loop (like [handleAction]: no awaited I/O), before the
-     * `state` frame. What it broadcasts reaches the newcomer after its snapshot.
-     */
-    protected open suspend fun onActorJoined(actor: Actor) {}
-
-    /**
-     * Called when actor leaves, on the loop (no awaited I/O).
-     * @param actor The actor that left
-     * @param userFullyLeft True if the user has no more connections to this room
-     */
-    protected open suspend fun onActorLeft(actor: Actor, userFullyLeft: Boolean) {
-        // Default implementation for backward compatibility - subclasses can override
-        @Suppress("DEPRECATION")
-        onActorLeft(actor)
-    }
-
-    /**
-     * @deprecated Override onActorLeft(actor, userFullyLeft) instead
-     */
-    @Deprecated("Override onActorLeft(actor, userFullyLeft) instead")
-    protected open suspend fun onActorLeft(actor: Actor) {}
-
-    /**
-     * Called when spectator joins - override to customize.
-     */
-    protected open suspend fun onSpectatorJoined(spectator: Spectator) {}
-
-    /**
-     * Called when spectator leaves - override to customize.
-     */
-    protected open suspend fun onSpectatorLeft(spectator: Spectator) {}
-
-    /**
-     * Whether room should close when all users leave.
-     */
-    protected open fun shouldCloseWhenEmpty(): Boolean = true
-
-    /**
-     * Replay missed events to an actor if history is enabled.
-     * Called after the `state` frame - history complements the current state.
-     * If lastEventId is null (fresh connect), replays entire buffer.
-     * If lastEventId is present, replays events after that ID.
-     */
-    private suspend fun replayIfNeeded(actor: Actor, lastEventId: String?) {
-        if (!needsHistory()) return
-
-        val buffer = historyBuffer ?: return
-
-        val eventsToReplay = if (lastEventId == null) {
-            // Fresh connect: replay entire buffer
-            synchronized(buffer) { buffer.toList() }
-        } else {
-            val clientId = lastEventId.toLongOrNull()
-            if (clientId == null) {
-                logger.warn("Invalid Last-Event-ID format: $lastEventId")
-                return
-            }
-
-            val serverId = messageId.get()
-            if (clientId > serverId) {
-                // Server restart detected: client's ID is ahead of ours
-                logger.info("Server restart detected for actor '${actor.name}': client lastEventId=$clientId > server messageId=$serverId")
-                return
-            }
-
-            synchronized(buffer) {
-                buffer.filter { sse ->
-                    val eventId = sse.id?.toLongOrNull() ?: return@filter false
-                    eventId > clientId
-                }
-            }
-        }
-
-        if (eventsToReplay.isNotEmpty()) {
-            logger.debug("Replaying ${eventsToReplay.size} events to '${actor.name}' (lastEventId=${lastEventId ?: "none"})")
-            eventsToReplay.forEach { sse ->
-                sendSafe(actor, sse)
-            }
-        }
-    }
-
-    /**
-     * Broadcast event to all (actors + spectators).
-     */
-    fun broadcast(event: String, data: Json.Object) {
-        eventQueue.trySend(Event.Broadcast(event, data.toString()))
-    }
-
-    /**
-     * Broadcast event to actors only.
-     */
-    fun broadcastToActors(event: String, data: Json.Object) {
-        eventQueue.trySend(Event.BroadcastToActors(event, data.toString()))
-    }
-
-    /**
-     * Broadcast event to spectators only.
-     */
-    fun broadcastToSpectators(event: String, data: Json.Object) {
-        eventQueue.trySend(Event.BroadcastToSpectators(event, data.toString()))
-    }
-
-    /**
-     * Send event to specific actor by connectionId.
-     */
-    fun sendTo(actor: Actor, event: String, data: Json.Object) {
-        eventQueue.trySend(Event.Targeted(actor.connectionId, event, data.toString()))
-    }
-
-    /**
-     * Send event to all connections of a specific user.
-     */
-    fun sendToUser(user: User, event: String, data: Json.Object) {
-        user.getConnectionsInRoom(id).forEach { actor ->
-            eventQueue.trySend(Event.Targeted(actor.connectionId, event, data.toString()))
-        }
-    }
-
-    /**
-     * Send event to a user by userId.
-     */
-    fun sendToUser(userId: String, event: String, data: Json.Object) {
-        users[userId]?.let { sendToUser(it, event, data) }
-    }
-
-    /**
-     * Process queued event.
-     */
-    private suspend fun processEvent(event: Event) {
-        fun frame(name: String, data: String) =
-            ServerSentEvent(data = data, event = name, id = messageId.incrementAndGet().toString())
-        when (event) {
-            is Event.Broadcast -> {
-                val sse = frame(event.event, event.data)
-                bufferIfHistoricizable(event.event, sse)
-                sendToAll(sse)
-            }
-            is Event.BroadcastToActors -> {
-                val sse = frame(event.event, event.data)
-                bufferIfHistoricizable(event.event, sse)
-                sendToActors(sse)
-            }
-            is Event.BroadcastToSpectators -> {
-                val sse = frame(event.event, event.data)
-                bufferIfHistoricizable(event.event, sse)
-                sendToSpectators(sse)
-            }
-            is Event.Targeted -> sendToActor(event.actorId, frame(event.event, event.data))
-            is Event.Act -> {
-                val result = try {
-                    handleAction(event.actor, event.intent)
-                } catch (e: Exception) {
-                    logger.error("Intent failed in room '$id'", e)
-                    ActionResult.Error(e.message ?: "internal error")
-                }
-                // the handler's own broadcasts are already queued: the feedback lands after them,
+    private fun process(op: Op) {
+        when (op) {
+            is Op.Act -> {
+                handle(op.actor, op.event)
+                // the handler's own emissions are already queued: the event's frame lands after them,
                 // so the acting tab sees the new state before its trigger is freed
-                val type = event.intent.getString("type")
-                when (result) {
-                    is ActionResult.Success -> {
-                        result.event?.let { broadcast(it, result.data ?: Json.Object()) }
-                        eventQueue.trySend(Event.Feedback(event.actor, "accepted", Json.Object("intent" to type).toString()))
-                    }
-                    is ActionResult.Error ->
-                        eventQueue.trySend(Event.Feedback(event.actor, "rejected", Json.Object("intent" to type, "reason" to result.message).toString()))
+                queue.trySend(Op.Emit(op.event, emptyList()))
+                op.verdict.complete(op.event)
+            }
+            is Op.Emit -> {
+                val event = op.event.emit(seq.incrementAndGet())
+                trace(event)
+                val frame = ServerSentEvent(data = event.json.toString(), event = event.name, id = event.meta.seq.toString())
+                when {
+                    event.stage == Stage.REJECTED -> toUsers(listOfNotNull(event.meta.from), frame)
+                    event.audience == Audience.GLOBAL -> Lobby.listRooms().forEach { it.toAll(frame) }
+                    event.audience == Audience.ROOM -> toAll(frame)
+                    else -> toUsers(op.to.ifEmpty { listOfNotNull(event.meta.from) }, frame)
                 }
-                event.verdict.complete(result)
+                emitted(event)
             }
-            is Event.Join -> {
-                try { processJoin(event.actor, event.lastEventId) } finally { event.ready.complete(event.actor.channel ?: Channel<ServerSentEvent>(0).also { it.close() }) }
-            }
-            is Event.Leave -> {
-                try { processLeave(event.actor) } finally { event.done.complete(Unit) }
-            }
-            is Event.Feedback -> {
-                val sse = frame(event.event, event.data)
-                // the acting tab when its stream is open, else every tab of the user (a detached
-                // actor, a stream that closed meanwhile); only a tab with that intent in flight reacts
-                val connected = actors[event.actor.connectionId]
-                if (connected != null) sendSafe(connected, sse)
-                else event.actor.user?.getConnectionsInRoom(id)?.forEach { sendSafe(it, sse) }
-            }
+            is Op.Join -> try { processJoin(op.actor) } finally { op.ready.complete(op.actor.channel ?: closed()) }
+            is Op.Leave -> try { processLeave(op.actor) } finally { op.done.complete(Unit) }
         }
     }
 
-    /**
-     * Buffer event for Last-Event-ID replay if event name is in historicizableEvents.
-     */
-    private fun bufferIfHistoricizable(eventName: String, sse: ServerSentEvent) {
-        if (eventName !in historicizableEvents) return
-        historyBuffer?.let { buffer ->
-            synchronized(buffer) {
-                buffer.addLast(sse)
-                while (buffer.size > historyBufferSize) {
-                    buffer.removeFirst()
-                }
-            }
-        }
+    private fun toAll(frame: ServerSentEvent) {
+        actors.values.forEach { sendSafe(it, frame) }
+        spectators.values.forEach { sendSafe(it, frame) }
     }
 
-    private suspend fun sendToAll(sse: ServerSentEvent) {
-        actors.values.forEach { sendSafe(it, sse) }
-        spectators.values.forEach { sendSafe(it, sse) }
-    }
-
-    private suspend fun sendToActors(sse: ServerSentEvent) {
-        actors.values.forEach { sendSafe(it, sse) }
-    }
-
-    private suspend fun sendToSpectators(sse: ServerSentEvent) {
-        spectators.values.forEach { sendSafe(it, sse) }
-    }
-
-    private suspend fun sendToActor(actorId: String, sse: ServerSentEvent) {
-        actors[actorId]?.let { sendSafe(it, sse) }
-            ?: spectators[actorId]?.let { sendSafe(it, sse) }
+    private fun toUsers(userIds: Collection<String>, frame: ServerSentEvent) {
+        userIds.forEach { userId -> users[userId]?.getConnectionsInRoom(id)?.forEach { sendSafe(it, frame) } }
     }
 
     /**
      * The loop never waits on a consumer: a full buffer means a tab that stopped draining (frozen
      * in the background, slow link), and it is dropped — its stream ends, the browser reconnects
-     * on its own with Last-Event-ID and gets state + replay. Nobody else pays.
+     * and joins again. Nobody else pays.
      */
     private fun sendSafe(actor: Actor, sse: ServerSentEvent) {
         val channel = actor.channel ?: return
@@ -524,68 +343,39 @@ abstract class Room<S : Any>(val id: String) {
         }
     }
 
+    // ---- state
+
+    abstract fun stateToJson(): Json.Object
+
     /**
-     * Get list of all actors (connections).
+     * The snapshot a joining connection gets as its `state` frame. Override when a viewer sees the
+     * room differently (a seat, a hand, its own match): catch-up is this frame's job alone, and an
+     * event only ever means a transition.
      */
+    open fun stateToJson(actor: Actor): Json.Object = stateToJson()
+
+    protected open fun shouldCloseWhenEmpty(): Boolean = true
+
     fun getActors(): List<Actor> = actors.values.toList()
-
-    /**
-     * Get list of all users (unique identities).
-     */
     fun getUsers(): List<User> = users.values.toList()
-
-    /**
-     * Get list of spectators.
-     */
     fun getSpectators(): List<Spectator> = spectators.values.toList()
-
-    /**
-     * Get an actor by connectionId.
-     */
     fun getActor(connectionId: String): Actor? = actors[connectionId] ?: spectators[connectionId]
-
-    /**
-     * Get a user by userId.
-     */
     fun getUser(userId: String): User? = users[userId]
 
-    /**
-     * Room info for lobby.
-     */
+    /** Room info for lobby. */
     open fun toJson(): Json.Object = Json.Object(
         "id" to id,
         "userCount" to users.size,
         "connectionCount" to actors.size,
         "spectatorCount" to spectators.size,
         "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
-        // Legacy field for backward compatibility
-        "actorCount" to users.size,
-        "actors" to Json.Array(actors.values.map { Json.Object("id" to it.connectionId, "userId" to it.user?.userId, "name" to it.name) })
+        "events" to catalog.describe()
     )
 
-    // Event types for queue
-    sealed class Event {
-        data class Broadcast(val event: String, val data: String) : Event()
-        data class BroadcastToActors(val event: String, val data: String) : Event()
-        data class BroadcastToSpectators(val event: String, val data: String) : Event()
-        data class Targeted(val actorId: String, val event: String, val data: String) : Event()
-        class Act(val actor: Actor, val intent: Json.Object, val verdict: CompletableDeferred<ActionResult>) : Event()
-        class Feedback(val actor: Actor, val event: String, val data: String) : Event()
-        class Join(val actor: Actor, val lastEventId: String?, val ready: CompletableDeferred<Channel<ServerSentEvent>>) : Event()
-        class Leave(val actor: Actor, val done: CompletableDeferred<Unit>) : Event()
+    private sealed class Op {
+        class Act(val actor: Actor, val event: Event, val verdict: CompletableDeferred<Event>) : Op()
+        class Emit(val event: Event, val to: List<String>) : Op()
+        class Join(val actor: Actor, val ready: CompletableDeferred<Channel<ServerSentEvent>>) : Op()
+        class Leave(val actor: Actor, val done: CompletableDeferred<Unit>) : Op()
     }
-}
-
-/**
- * Result of handling an action.
- */
-sealed class ActionResult {
-    /** Action succeeded, optionally broadcast an event */
-    data class Success(
-        val event: String? = null,
-        val data: Json.Object? = null
-    ) : ActionResult()
-
-    /** Action failed with error message */
-    data class Error(val message: String) : ActionResult()
 }
