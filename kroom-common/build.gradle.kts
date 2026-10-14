@@ -112,7 +112,11 @@ kotlin {
                 implementation(libs.kotlin.reflect)
             }
         }
-        val jvmTest by getting
+        val jvmTest by getting {
+            dependencies {
+                runtimeOnly(libs.slf4j.simple) // kson logs through slf4j on the JVM
+            }
+        }
         val commonJsMain by getting
         val commonJsTest by getting
         val jsMain by getting

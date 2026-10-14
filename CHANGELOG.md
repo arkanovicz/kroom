@@ -68,6 +68,18 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-common
+- `event.Event`, the one thing that goes through E, the same class on every target: a name, a
+  payload (a `JsonView` over the kson object — `val move by enum<Move>().required`, the property
+  name is the key, declaring a field records it) and metadata under the reserved `_` key. Its life
+  is walked in order on the object itself: `accept(from, tab)` (a door, stateless: the shape),
+  `apply()` / `reject(reason)` (a room, with state), `emit(seq)`, `persist()`; a step out of order
+  is the object's error, a room-born event applies from birth. A subclass is a declaration — name,
+  `Audience` (`GLOBAL` / `ROOM` / `USERS`), permission, fields — that `describe()` serves as data;
+  a `Catalog` rebuilds an event from a frame by name. `Reason` is a key and arguments, localized
+  by the browser. Pinned in `EventTest`, JVM and JS. Nothing uses it yet (branch `kroom-events`).
+- jvmTest runs with `slf4j-simple`: kson logs through slf4j on the JVM.
+
 #### kroom-server
 - Intents (`private/intents.md`): `Room.act` returning the verdict as a `Deferred`, `act(user, tabId,
   intent)` for routes, `Route.intents { call -> user }` mounting `POST /rooms/{room}/act`,
