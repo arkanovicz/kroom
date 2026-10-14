@@ -92,6 +92,9 @@ All notable changes to kroom will be documented in this file.
 - The proof of the intents door: every player gesture is a `[data-intent]` button, the three REST
   routes and the second copy of the matchmaking logic are gone (`intents { … }` + `handleAction`),
   a frame for a player reaches every tab of theirs, a reconnecting tab keeps its connection.
+- A player's match is in their snapshot (`stateToJson(actor)`), the join hook no longer resends it:
+  `match` only ever means "started", the game page reloads on it unconditionally and the lobby goes
+  to the game when its `state` carries a match.
 
 #### kroom-webapp-authoring-starter
 - A site starter: a jar asking a few questions and writing a site pinned to the build it came from (its build,

@@ -73,6 +73,11 @@ function connectSSE() {
         $('#online-num').text(data.users.length);
     });
 
+    // Back in the lobby with a match running: the snapshot says so
+    sseConnection.onJson('state', (s) => {
+        if (s.match) goToGame();
+    });
+
     // Match found
     sseConnection.onJson('match', (match) => {
         console.log('Match found:', match);

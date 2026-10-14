@@ -54,6 +54,10 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
         "activity" to Json.Array(activityFeed.map { it.toJson() })
     )
 
+    // the viewer's snapshot carries its match, if any: `match` then only ever means "started"
+    override fun stateToJson(actor: Actor): Json.Object =
+        Json.MutableObject(stateToJson()).apply { getMatch(actor.name)?.let { set("match", it.toJson()) } }
+
     override fun handleAction(actor: Actor, action: Json.Object): ActionResult {
         return when (val type = action.getString("type")) {
             "join_queue" -> joinQueue(actor.name)
@@ -136,11 +140,6 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
     override suspend fun onActorJoined(actor: Actor) {
         val user = actor.user ?: return
         players[actor.name] = user
-
-        // this tab resumes its match, if any
-        playerMatches[actor.name]?.let { matchId ->
-            activeMatches[matchId]?.let { match -> sendTo(actor, "match", match.toJson()) }
-        }
 
         // the first tab of the player is the arrival; a second tab, a reconnect are not
         if (user.getConnectionsInRoom(id).size == 1) addActivity(ActivityEvent.PlayerJoined(actor.name))

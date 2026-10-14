@@ -82,8 +82,7 @@ function connectSSE() {
     });
 
     // Play again: a new match reloads, a wait goes back to the lobby
-    // (joining the stream resends the current match: same id, nothing to do)
-    sseConnection.onJson('match', (m) => { if (m.id !== match.id) window.location.reload(); });
+    sseConnection.onJson('match', () => window.location.reload());
     sseConnection.onJson('queue', () => goToLobby());
 
     // Opponent is waiting
