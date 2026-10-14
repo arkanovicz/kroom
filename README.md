@@ -690,7 +690,9 @@ asks its name — the segment derived from it (`Notre Société` → `notre-soci
 there instead makes a link — and the page is created under that list, at that very index. A root page is born
 with its content: the loop listing the pages under it, an ordinary block an editor rewrites or trashes, so a
 section's page is a table of contents until it says otherwise (`AuthoredPage.TOC`; the page hands every content
-block `$children`). Every gesture stores the tree.
+block `$children`). Every gesture stores the tree and reloads the page — the menu, the west, a TOC are
+server-rendered — and the bar reopens where it was (the panel and the entry, kept per tab); a newborn page is
+opened, to be written.
 
 `GET`/`PUT`/`DELETE /api/site/menu` (the tree; its arrangement; forgetting it), `POST /api/site/pages`
 (`{path, label, layout}`, a draft), `POST /api/site/pages/move` (`{from, to}`),

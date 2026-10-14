@@ -134,6 +134,12 @@
         return svg;
     }
 
+    // the panel and the entry left open, per tab: a gesture reloads the page, the bar reopens where it was
+    const memory = {
+        get: (key) => { try { return sessionStorage.getItem('kroom.admin.' + key); } catch { return null; } },
+        set: (key, value) => { try { value == null ? sessionStorage.removeItem('kroom.admin.' + key) : sessionStorage.setItem('kroom.admin.' + key, value); } catch { /* no storage: the bar just closes */ } }
+    };
+
     // --- the bar -----------------------------------------------------------------------------------
 
     const entries = JSON.parse(bar.dataset.entries || '[]');
@@ -153,11 +159,13 @@
         if (!entry.href) control.addEventListener('click', () => toggle(entry, label, control));
         nav.appendChild(control);
     }
+    nav.querySelector(`button[data-entry="${CSS.escape(memory.get('panel') || '')}"]`)?.click();
 
     function toggle(entry, label, control) {
         nav.querySelectorAll('[aria-pressed]').forEach(b => b.removeAttribute('aria-pressed'));
         if (open === entry.id) { close(); return; }
         open = entry.id;
+        memory.set('panel', entry.id);
         control.setAttribute('aria-pressed', 'true');
         panel.replaceChildren();
         const header = panel.appendChild(element('header'));
@@ -178,6 +186,7 @@
 
     function close() {
         open = null;
+        memory.set('panel', null);
         panel.hidden = true;
         nav.querySelectorAll('[aria-pressed]').forEach(b => b.removeAttribute('aria-pressed'));
     }
@@ -199,18 +208,21 @@
         async pages(body) {
             let answer = await api.getJson(siteApi + 'menu');
             let lang = answer.lang;
-            let opened = null;                          // the accordion left open, by path or address, across re-renders
+            let opened = memory.get('entry');           // the accordion left open, by path or address, across re-renders and reloads
             const strip = (list) => list.map(i => ({ slug: i.slug, href: i.href, label: i.label || {}, description: i.description || {}, children: strip(i.children || []) }));
             // an address elsewhere: anything with a scheme — what a segment can never be
             const LINK = /^[A-Za-z][A-Za-z0-9+.\-]*:.+$/;     // `\-`: the pattern attribute compiles with the v flag, a bare `-` in a class is an error there
             const fail = (err) => body.appendChild(element('p', 'kroom-admin-error', said(err)));
             const refresh = async () => { answer = await api.getJson(siteApi + 'menu'); render(); };
-            // their order and words; whatever happens, the tree shown is the server's
+            // their order and words; whatever happens, the tree shown is the server's. Done, the page reloads: the
+            // menu, the west, a TOC are rendered by the server, and the bar reopens where it was
             const store = async (items) => {
-                try { await api.putJson(siteApi + 'menu', { items: strip(items) }); await refresh(); }
+                try { await api.putJson(siteApi + 'menu', { items: strip(items) }); location.reload(); }
                 catch (err) { await refresh(); fail(err); }
             };
-            const act = async (call) => { try { await call(); await refresh(); } catch (err) { fail(err); } };
+            const act = async (call, then = () => location.reload()) => { try { await call(); then(); } catch (err) { fail(err); } };
+            // a page just made is opened, to be written
+            const born = (path) => { location.href = path; };
             // the tree as the DOM now has it: what a drop made of it
             const read = (ul) => !ul ? [] : [...ul.children].filter(li => li._item).map(li => Object.assign({}, li._item, { children: read(li.querySelector(':scope > ul')) }));   // a newborn has no list yet
             const slugify = (text) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -240,7 +252,7 @@
                 details.name = 'kroom-admin-menu';
                 const key = item.path ?? item.href;
                 details.open = opened === key;
-                details.addEventListener('toggle', () => { if (details.open) opened = key; else if (opened === key) opened = null; });
+                details.addEventListener('toggle', () => { if (details.open) opened = key; else if (opened === key) opened = null; memory.set('entry', opened); });
                 const summary = details.appendChild(element('summary', null, item.label?.[lang] || item.label?.[answer.lang] || item.slug || item.href));
                 if (item.status === 'draft') summary.appendChild(element('small', 'kroom-admin-muted', ' ' + t('draft')));
                 const fields = details.appendChild(element('div', 'kroom-admin-menu-fields'));
@@ -253,7 +265,7 @@
                     action(fields.appendChild(element('div', 'kroom-admin-actions')), 'linkDelete', 'secondary outline', () => { li.remove(); store(read(root)); });
                 } else if (item.kind === 'section') {
                     page.appendChild(element('span', null, `${item.path} \u2014 ${t('pageNone')} `));
-                    action(page, 'pageCreate', 'outline', () => act(() => api.postJson(siteApi + 'pages', { path: item.path, label: item.label || {} })));
+                    action(page, 'pageCreate', 'outline', () => act(() => api.postJson(siteApi + 'pages', { path: item.path, label: item.label || {} }), () => born(item.path)));
                 } else {
                     page.appendChild(link(item.path, item.path + ' \u2197'));
                     if (!authored) page.appendChild(element('small', 'kroom-admin-muted', ' \u2014 ' + t('pageSourced')));
@@ -267,7 +279,8 @@
                     const out = item.status === 'published';
                     action(actions, out ? 'unpublish' : 'publish', null, () => act(() => api.putJson(siteApi + 'pages' + item.path, { status: out ? 'draft' : 'published' })));
                     action(actions, 'pageDelete', 'secondary outline', () => {
-                        if (window.confirm(t('confirmDeletePage'))) act(() => api.deleteJson(siteApi + 'pages' + item.path));
+                        // the page one is on, deleted, answers nothing any more: home instead
+                        if (window.confirm(t('confirmDeletePage'))) act(() => api.deleteJson(siteApi + 'pages' + item.path), () => { if (location.pathname === item.path) location.href = '/'; else location.reload(); });
                     });
                 }
                 li.appendChild(tree(item.children ??= [], item.path));
@@ -294,7 +307,7 @@
                         return allowed;
                     },
                     // the phantom row dropped here: a page (or a link) is born at this very place
-                    onAdd: (ev) => { if (ev.item.classList.contains('kroom-admin-phantom')) born(ev.item, ev.to._path); },
+                    onAdd: (ev) => { if (ev.item.classList.contains('kroom-admin-phantom')) birth(ev.item, ev.to._path); },
                     onEnd: async (ev) => {
                         body.querySelectorAll('.kroom-admin-nodrop').forEach(el => el.classList.remove('kroom-admin-nodrop'));
                         if (ev.from === ev.to && ev.oldIndex === ev.newIndex) return;
@@ -313,7 +326,7 @@
             // where the phantom landed, what it is called, then where — the segment follows the name until it is
             // typed over; an address typed there instead (a scheme says so) makes a link, stored in the tree. The
             // page is created under the list it was dropped in, and the tree stored with it at that very index.
-            const born = (li, path) => {
+            const birth = (li, path) => {
                 li.replaceChildren();
                 const form = li.appendChild(element('form', 'kroom-admin-new-page'));
                 const name = form.appendChild(element('input'));
@@ -332,13 +345,14 @@
                 form.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const where = slug.value.trim(), label = { [lang]: name.value.trim() };
-                    if (LINK.test(where)) li._item = { href: where, label };
-                    else {
-                        try { await api.postJson(siteApi + 'pages', { path: `${path}/${where}`, label }); }
-                        catch (err) { await refresh(); return fail(err); }
+                    if (LINK.test(where)) { li._item = { href: where, label }; return store(read(root)); }
+                    // the page, then the tree with it at this very index, then the page itself
+                    try {
+                        await api.postJson(siteApi + 'pages', { path: `${path}/${where}`, label });
                         li._item = { slug: where, label, children: [] };
-                    }
-                    store(read(root));
+                        await api.putJson(siteApi + 'menu', { items: strip(read(root)) });
+                    } catch (err) { await refresh(); return fail(err); }
+                    born(`${path}/${where}`);
                 });
                 name.focus();
             };

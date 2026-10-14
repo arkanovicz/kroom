@@ -78,6 +78,8 @@ All notable changes to kroom will be documented in this file.
   editor over a default a block could not reproduce. A block written there is ignored.
 - A page is born where it goes: the pages panel's bottom form is a phantom row dragged into the tree, which
   asks the name and creates the page under that list, at that index (a link is stored there the same way).
+- The pages panel reloads the page after every action — the menu, the west, a TOC are server-rendered — and
+  the admin bar reopens where it was (panel and entry, `sessionStorage`); a newborn page is opened.
 - Logged in, one is back where one was: serving its login page, the site remembers the page it was reached
   from (`kroom_from`, a short-lived cookie); `POST /login` goes there, or where a `from` field says.
 - A root page is born with its content, the loop over its children (`AuthoredPage.TOC`): a section's page is
