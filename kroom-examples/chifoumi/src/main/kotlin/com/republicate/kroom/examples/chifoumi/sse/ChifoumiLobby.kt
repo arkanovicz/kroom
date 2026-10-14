@@ -146,7 +146,8 @@ object ChifoumiLobby : Room<LobbyState>("chifoumi-lobby") {
             return null
         }
 
-        val roundData = Json.Object("round" to round.toJson())
+        // the match beside the round: the page shows the server's score, it counts nothing itself
+        val roundData = Json.Object("round" to round.toJson(), "match" to match.toJson())
         tell(login, "round", roundData)
         tell(opponent, "round", roundData)
 

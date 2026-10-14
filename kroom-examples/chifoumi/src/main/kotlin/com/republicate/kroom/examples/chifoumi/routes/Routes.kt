@@ -4,6 +4,7 @@ import com.republicate.kroom.examples.chifoumi.game.MatchStats
 import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
 import com.republicate.kroom.server.Actor
 import com.republicate.kroom.server.Users
+import com.republicate.kroom.server.events
 import com.republicate.kroom.server.intents
 import com.republicate.kroom.server.tabId
 import com.republicate.kroom.webapp.core.respondError
@@ -105,6 +106,8 @@ fun Route.chifoumiRoutes() {
         intents { call ->
             call.sessions.get<PlayerSession>()?.let { Users.getOrCreate(it.identifier, it.playerName) }
         }
+        // What the room accepts: GET /api/rooms/chifoumi-lobby/events
+        events()
 
         // Get current match status
         get("/match") {

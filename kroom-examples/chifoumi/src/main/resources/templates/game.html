@@ -14,9 +14,8 @@
                 <li><a href="/$lang/index.html"><strong>Chifoumi Arena</strong></a></li>
             </ul>
             <ul>
-                <li id="match-info">
-                    Round <span id="round-num">1</span>/3
-                </li>
+                <li id="match-info">Round <span id="round-num">1</span></li>
+                <li>First to <span id="target">5</span></li>
             </ul>
         </nav>
     </header>
@@ -75,7 +74,19 @@
                     </div>
                 </div>
                 <p id="round-message"></p>
+                <p id="round-verdict"></p>
             </div>
+
+            <!-- Why a move wins, winner-loser; held here so l10n translates them -->
+            <ul id="verdicts" hidden>
+                <li data-verdict="rock-scissors">Rock blunts the scissors.</li>
+                <li data-verdict="paper-rock">Paper covers the rock.</li>
+                <li data-verdict="paper-well">Paper covers the well.</li>
+                <li data-verdict="scissors-paper">Scissors cut the paper.</li>
+                <li data-verdict="well-rock">The rock falls into the well.</li>
+                <li data-verdict="well-scissors">The scissors fall into the well.</li>
+                <li data-verdict="draw">Same move, nobody scores.</li>
+            </ul>
 
             <!-- Match result -->
             <div id="match-result" class="match-result" style="display: none;">

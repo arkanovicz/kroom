@@ -39,6 +39,10 @@ All notable changes to kroom will be documented in this file.
 #### kroom-examples/chifoumi
 - Declares `JoinQueue`, `LeaveQueue`, `Play` (audience `USERS`: the opponent never sees the move) and
   handles `Join` / `Leave`; the pages react to their own `play` / `leave_queue` frames.
+- A match goes to the first player with 5 won rounds (was best of 3, with draws overflowing
+  "Round n/3"); the `round` frame carries the match, the page shows the server's score and round
+  number instead of counting its own; a round says why it went that way ("Paper covers the rock.",
+  translated with the page); the match result reads the frame's `match` (it showed "undefined wins").
 
 #### kroom-server
 - (superseded above) `handleAction` called by `Room.act` on the loop, `accepted` / `rejected` frames.

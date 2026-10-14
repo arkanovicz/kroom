@@ -79,6 +79,30 @@ msgstr "en ligne"
 msgid "Round"
 msgstr "Manche"
 
+msgid "First to"
+msgstr "Premier à"
+
+msgid "Rock blunts the scissors."
+msgstr "La pierre émousse les ciseaux."
+
+msgid "Paper covers the rock."
+msgstr "La feuille enveloppe la pierre."
+
+msgid "Paper covers the well."
+msgstr "La feuille recouvre le puits."
+
+msgid "Scissors cut the paper."
+msgstr "Les ciseaux coupent la feuille."
+
+msgid "The rock falls into the well."
+msgstr "La pierre tombe dans le puits."
+
+msgid "The scissors fall into the well."
+msgstr "Les ciseaux tombent dans le puits."
+
+msgid "Same move, nobody scores."
+msgstr "Même coup, personne ne marque."
+
 msgid "VS"
 msgstr "VS"
 

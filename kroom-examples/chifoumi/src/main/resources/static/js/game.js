@@ -92,13 +92,11 @@ function connectSSE() {
     });
 
     // Round complete
-    sseConnection.onJson('round', (round) => {
-        showRoundResult(round);
-    });
+    sseConnection.onJson('round', showRoundResult);
 
     // Match complete
     sseConnection.onJson('result', (result) => {
-        match = result;
+        match = result.match;
         showMatchResult();
     });
 }
@@ -114,10 +112,19 @@ function updateMatchDisplay() {
     $('#player2-score').text(match.score2);
 
     $('#round-num').text(match.round);
+    $('#target').text(match.target);
 }
 
-// Show round result
-function showRoundResult(round) {
+// Why the round went that way, winner's move first (the page holds the phrases, translated)
+function verdict(round) {
+    const key = round.result === 0 ? 'draw'
+        : round.result === 1 ? `${round.move1}-${round.move2}` : `${round.move2}-${round.move1}`;
+    return $(`#verdicts [data-verdict="${key}"]`)?.text() || '';
+}
+
+// Show round result: the round that just ended and the match as the server counts it
+function showRoundResult({ round, match: current }) {
+    match = current;
     const isPlayer1 = match.player1 === playerName;
     const myMoveResult = isPlayer1 ? round.move1 : round.move2;
     const oppMoveResult = isPlayer1 ? round.move2 : round.move1;
@@ -146,15 +153,10 @@ function showRoundResult(round) {
     indicator.removeClass('win lose draw').addClass(resultClass);
     indicator.text(round.winner ? '✓' : '=');
     $('#round-message').text(message);
+    $('#round-verdict').text(verdict(round));
 
-    // Update scores
-    if (round.result !== 0) {
-        const isP1Win = round.result === 1;
-        const newScore1 = parseInt($('#player1-score').text()) + (isP1Win ? 1 : 0);
-        const newScore2 = parseInt($('#player2-score').text()) + (isP1Win ? 0 : 1);
-        $('#player1-score').text(newScore1);
-        $('#player2-score').text(newScore2);
-    }
+    $('#player1-score').text(match.score1);
+    $('#player2-score').text(match.score2);
 
     // Auto-advance to next round after delay
     setTimeout(() => {
@@ -169,9 +171,7 @@ function nextRound() {
     myMove = null;
     waitingForOpponent = false;
 
-    // Update round number
-    const roundNum = parseInt($('#round-num').text()) + 1;
-    $('#round-num').text(roundNum);
+    $('#round-num').text(match.round);
 
     // Reset UI
     $('#round-result').hide();

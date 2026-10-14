@@ -4,13 +4,13 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * A match between two players, best of N rounds.
+ * A match between two players, first to [target] won rounds; draws count for nobody.
  */
 class Match(
     val id: String = UUID.randomUUID().toString().take(8),
     val player1: String,
     val player2: String,
-    val bestOf: Int = 3
+    val target: Int = 5
 ) {
     private val rounds = mutableListOf<Round>()
     private var currentRound: Round? = null
@@ -18,10 +18,7 @@ class Match(
     val score1: Int get() = rounds.count { it.winner == player1 }
     val score2: Int get() = rounds.count { it.winner == player2 }
 
-    val isFinished: Boolean get() {
-        val winsNeeded = (bestOf / 2) + 1
-        return score1 >= winsNeeded || score2 >= winsNeeded
-    }
+    val isFinished: Boolean get() = score1 >= target || score2 >= target
 
     val winner: String? get() = when {
         !isFinished -> null
@@ -79,7 +76,7 @@ class Match(
         set("score1", score1)
         set("score2", score2)
         set("round", roundNumber)
-        set("bestOf", bestOf)
+        set("target", target)
         set("finished", isFinished)
         winner?.let { set("winner", it) }
     }
