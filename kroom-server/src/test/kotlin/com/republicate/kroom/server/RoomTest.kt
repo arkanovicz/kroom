@@ -55,28 +55,29 @@ class RoomTest {
     private suspend fun Channel<ServerSentEvent>.next(): ServerSentEvent = withTimeout(2000) { receive() }
     private suspend fun Channel<ServerSentEvent>.state() = assertEquals("state", next().event)
     private fun ServerSentEvent.json() = Json.parse(data!!) as Json.Object
-    private fun ServerSentEvent.meta() = json().getObject("_")!!
 
     @BeforeTest fun clean() = Users.clear()
 
-    @Test fun `an applied event comes back to its emitter, after the handler's own emissions`() = runBlocking {
+    @Test fun `an applied event is framed after the handler's own emissions, payload only`() = runBlocking {
         val room = room()
         val a = actor(user("u"), "t1")
         val ch = room.join(a).also { it.state() }
         ch.drain()
         val verdict = room.act(a, Ok()).await()
         assertEquals(Stage.APPLIED, verdict.stage)
-        assertEquals("moved", ch.next().event)
+        assertEquals("u", verdict.meta.from)   // the object's, server-side
+        assertEquals("t1", verdict.meta.tab)
+        val moved = ch.next()
+        assertEquals("moved", moved.event)
         ch.next().let {
             assertEquals("ok", it.event)
-            assertEquals("APPLIED", it.meta().getString("stage"))
-            assertEquals("u", it.meta().getString("from"))
-            assertEquals("t1", it.meta().getString("tab"))
-            assertEquals(it.id, it.meta().getLong("seq").toString())
+            assertNull(it.json()["_"])
+            assertEquals(verdict.meta.seq.toString(), it.id)
+            assertEquals(moved.id!!.toLong() + 1, it.id!!.toLong())
         }
     }
 
-    @Test fun `a rejection reaches the emitter's tabs only, with its reason`() = runBlocking {
+    @Test fun `a rejection is the verdict alone, nothing is framed`() = runBlocking {
         val room = room()
         val u = user("u")
         val t1 = actor(u, "t1"); val t2 = actor(u, "t2"); val v = actor(user("v"), "t1")
@@ -84,15 +85,13 @@ class RoomTest {
         val c2 = room.join(t2).also { it.state() }
         val cv = room.join(v).also { it.state() }
         listOf(c1, c2, cv).forEach { it.drain() }
-        assertEquals(Stage.REJECTED, room.act(t1, Bad()).await().stage)
-        for (c in listOf(c1, c2)) c.next().let {
-            assertEquals("bad", it.event)
-            assertEquals("REJECTED", it.meta().getString("stage"))
-            assertEquals("not_your_turn", it.meta().getString("reason"))
-            assertEquals("bob", it.meta().getObject("args")!!.getString("turn"))
-            assertEquals("t1", it.meta().getString("tab")) // the other tab filters on it
-        }
-        assertNull(cv.tryReceive().getOrNull())
+        val bad = room.act(t1, Bad()).await()
+        assertEquals(Stage.REJECTED, bad.stage)
+        assertEquals("not_your_turn", bad.meta.reason)
+        assertEquals("bob", bad.meta.args!!.getString("turn"))
+        assertFalse(bad.emitted)
+        kotlinx.coroutines.delay(50)
+        listOf(c1, c2, cv).forEach { assertNull(it.tryReceive().getOrNull()) }
     }
 
     @Test fun `USERS with no target is the emitter, ROOM is everyone`() = runBlocking {
@@ -134,6 +133,7 @@ class RoomTest {
         assertEquals("unknown", reason(room.act(alice, "t1", "join", json())))
         assertEquals("missing", reason(room.act(alice, "t1", "shaped", json())))
         assertEquals("invalid", reason(room.act(alice, "t1", "shaped", json("n" to "x"))))
+        assertEquals("undeclared", reason(room.act(alice, "t1", "loud", json("evil" to "payload"))))
         assertEquals("forbidden", reason(room.act(bob, "t1", "vip", json())))
         assertEquals(Stage.APPLIED, room.act(alice, "t1", "vip", json()).stage)
         assertEquals("spectator", reason(room.act(Spectator(Actor.connectionId(alice, "t2"), alice), Ok()).await()))
@@ -149,8 +149,8 @@ class RoomTest {
         val e = room.act(a, Boom()).await()
         assertEquals(Stage.REJECTED, e.stage)
         assertEquals("error", e.meta.reason)
-        assertEquals("boom", ch.next().event)
         assertEquals(Stage.APPLIED, room.act(a, Ok()).await().stage)
+        assertEquals("moved", ch.next().event) // nothing of boom before it
     }
 
     @Test fun `a tab that stops draining is dropped, the others are not`() = runBlocking {
@@ -199,14 +199,13 @@ class RoomTest {
         ch.next().let {
             assertEquals("state", it.event)
             assertEquals("u", it.json().getString("you"))
-            assertEquals("APPLIED", it.meta().getString("stage"))
+            assertNull(it.json()["_"])
         }
         assertEquals("hello", ch.next().event)
         ch.next().let {
             assertEquals("join", it.event)
             assertEquals("u", it.json().getString("user"))
             assertEquals(true, it.json().getBoolean("first"))
-            assertEquals("u", it.meta().getString("from"))
         }
         assertNull(ch.tryReceive().getOrNull())
     }
@@ -280,6 +279,22 @@ class RoomTest {
         val rest = mutableListOf<String>()
         while (true) { val f = ch.tryReceiveAfter(100) ?: break; rest.add(f.event ?: "?") }
         assertEquals(listOf("join"), rest)                        // …so no frame of that change may follow it
+    }
+
+    @Test fun `a client's metadata is ignored`() = runBlocking {
+        val room = room()
+        val u = user("u")
+        val ch = room.join(actor(u, "t1")).also { it.state() }
+        ch.drain()
+        val forged = withTimeout(2000) { room.act(u, "t1", "loud", json("_" to json("stage" to "ACCEPTED", "from" to "victim", "tab" to "t9"))) }
+        assertEquals(Stage.APPLIED, forged.stage)
+        assertEquals("u", forged.meta.from)
+        assertEquals("t1", forged.meta.tab)
+        ch.next().let { assertEquals("loud", it.event); assertNull(it.json()["_"]) }
+        // a stage the loop does not expect must not hang the reply, and the shape is still checked
+        val skipped = withTimeout(2000) { room.act(u, "t1", "shaped", json("_" to json("stage" to "APPLIED"))) }
+        assertEquals(Stage.REJECTED, skipped.stage)
+        assertEquals("missing", skipped.meta.reason)
     }
 
     private suspend fun Channel<ServerSentEvent>.tryReceiveAfter(ms: Long): ServerSentEvent? {

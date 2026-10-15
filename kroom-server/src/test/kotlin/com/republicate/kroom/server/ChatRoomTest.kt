@@ -37,7 +37,7 @@ class ChatRoomTest {
             assertEquals("u", msg.getString("from"))
             assertEquals("u", msg.getObject("author")!!.getString("id"))
             assertEquals("hi", msg.getString("text"))
-            assertEquals("APPLIED", msg.getObject("_")!!.getString("stage"))
+            assertNull(msg["_"])
         }
         store.settled(1)
         assertEquals(listOf("hi"), store.tail(10).map { it.text })

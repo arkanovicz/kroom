@@ -15,8 +15,9 @@ abstract class JsonView(val json: Json.MutableObject) {
     /** The declaration, in declaration order. */
     val fields: List<Field<*>> get() = declared
 
-    /** Required fields present and every present field of its kind; null when well-formed. */
+    /** Required fields present, every present field of its kind, no key beyond the declared; null when well-formed. */
     fun validate(): Reason? = declared.firstNotNullOfOrNull { it.check(json) }
+        ?: json.keys.firstOrNull { k -> declared.none { it.name == k } }?.let { Reason("undeclared", Json.Object("field" to it)) }
 
     enum class Kind { STRING, INT, LONG, DOUBLE, BOOL, OBJECT, ARRAY }
 

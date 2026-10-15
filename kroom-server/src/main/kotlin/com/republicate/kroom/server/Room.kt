@@ -38,11 +38,11 @@ class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", js
 
 /**
  * A room: state, membership (users; actors write, spectators read), one loop, and the events
- * it speaks. An [Event] arrives at the door ([act]), is applied on the loop by the handler its
- * declaration registered ([on]), and comes back to its audience with its stage — the emitter is
- * always in it, so the frame is the feedback. Every emitted frame carries its position on the
- * room's channel (seq); a step of the loop numbers and writes everything it produces before it
- * returns, so a snapshot taken at a position holds exactly the transitions up to it.
+ * it speaks. An [Event] is validated ([act]), applied on the loop by the handler its declaration
+ * registered ([on]), and framed to its audience, the emitter among them: the stream carries the
+ * facts, the verdict is the reply. Every frame's id is its position on the room's channel (seq);
+ * a step of the loop numbers and writes everything it produces before it returns, so a snapshot
+ * taken at a position holds exactly the transitions up to it.
  *
  * A join is an event too: the room births [Join] at a connect; the joiner gets its `state`
  * snapshot ([stateToJson]) first, then its own `join` like everyone, the handler's emissions before it.
@@ -136,9 +136,9 @@ abstract class Room<S : Any>(val id: String) {
     // ---- the door
 
     /**
-     * An event at the door: accepted here, stateless (the shape, the permission, not a spectator),
-     * then queued for the handler. A refusal at the door is answered, never queued nor emitted:
-     * the returned event is `REJECTED`. Otherwise the promise is the event in its final stage.
+     * Validation, stateless (the declared shape and nothing else, the permission, not a spectator),
+     * then the loop. A refusal here or there is answered, never framed: the returned event is
+     * `REJECTED` with its reason. The promise is the event in its final stage.
      */
     fun act(actor: Actor, event: Event): Deferred<Event> {
         val verdict = CompletableDeferred<Event>()
@@ -162,8 +162,8 @@ abstract class Room<S : Any>(val id: String) {
     }
 
     /**
-     * The route's door: a session and a tab, not a connection. The name is looked up in the
-     * [catalog]; the connection id is composed server-side so the tab lands under its own user.
+     * The route's entry: a session and a client id, not a connection. The name is looked up in the
+     * [catalog]; the connection id is composed server-side so the client lands under its own user.
      */
     suspend fun act(user: User, tab: String?, name: String, json: Json.MutableObject): Event {
         val connectionId = Actor.connectionId(user, tab)
@@ -258,9 +258,7 @@ abstract class Room<S : Any>(val id: String) {
         logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections, ${spectators.size} spectators)")
 
         // the snapshot at this position, straight on the channel; the join is the transition after it
-        val snapshot = Json.MutableObject(stateToJson(actor))
-        snapshot[Event.META] = Json.Object("stage" to Stage.APPLIED.name, "seq" to seq.get())
-        sendSafe(actor, ServerSentEvent(data = snapshot.toString(), event = "state", id = seq.get().toString()))
+        sendSafe(actor, ServerSentEvent(data = stateToJson(actor).toString(), event = "state", id = seq.get().toString()))
         val join = Join().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.first = first }
         join.meta.from = actor.user?.userId
         handle(actor, join)
@@ -315,9 +313,8 @@ abstract class Room<S : Any>(val id: String) {
             when (op) {
                 is Op.Act -> {
                     handle(op.actor, op.event)
-                    // the handler's own emissions are already framed: the event's frame lands after them,
-                    // so the acting tab sees the new state before its trigger is freed
-                    frame(op.event, emptyList())
+                    // the handler's own emissions are already framed: the event's frame lands after them
+                    if (op.event.stage == Stage.APPLIED) frame(op.event, emptyList())
                     op.verdict.complete(op.event)
                 }
                 is Op.Emit -> frame(op.event, op.to)
@@ -335,11 +332,8 @@ abstract class Room<S : Any>(val id: String) {
         val emitted = event.emit(seq.incrementAndGet())
         trace(emitted)
         val frame = ServerSentEvent(data = emitted.json.toString(), event = emitted.name, id = emitted.meta.seq.toString())
-        when {
-            emitted.stage == Stage.REJECTED -> toUsers(listOfNotNull(emitted.meta.from), frame)
-            emitted.audience == Audience.ROOM -> toAll(frame)
-            else -> toUsers(to.ifEmpty { listOfNotNull(emitted.meta.from) }, frame)
-        }
+        if (emitted.audience == Audience.ROOM) toAll(frame)
+        else toUsers(to.ifEmpty { listOfNotNull(emitted.meta.from) }, frame)
         emitted(emitted)
     }
 

@@ -13,13 +13,13 @@ val ApplicationCall.tabId: String?
     get() = request.queryParameters["tabId"] ?: request.header("X-Kroom-Tab")
 
 private suspend fun ApplicationCall.json(status: HttpStatusCode, body: String) = respondText(body, ContentType.Application.Json, status)
-private fun refusal(reason: String) = """{"_":{"stage":"REJECTED","reason":"$reason","args":{}}}"""
+private fun refusal(reason: String, args: Json.Object = Json.Object()) = Json.Object("reason" to reason, "args" to args).toString()
 
 /**
- * The door, `POST /rooms/{room}/act` with `{type, …}`: the event of that name over that JSON goes
- * to the room; the answer is the event with its stage, `200` applied, `400` rejected — an honest
- * status the browser does not read (the event comes back down the stream). [principal] names the
- * acting user from the call (its session); null refuses.
+ * Intents, `POST /rooms/{room}/act` with `{type, …}`: the event of that name over that JSON goes
+ * to the room; the reply is the verdict and nothing else — `200` `{}` applied, `400` `{reason,
+ * args}` rejected. The effects come down the stream, to the emitter like to everyone.
+ * [principal] names the acting user from the call (its session); null refuses.
  */
 fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
     post("/rooms/{room}/act") {
@@ -29,7 +29,8 @@ fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
         val name = json.getString("type") ?: return@post call.json(HttpStatusCode.BadRequest, refusal("no_type"))
         json.remove("type")
         val event = room.act(user, call.tabId, name, json)
-        call.json(if (event.stage == Stage.APPLIED) HttpStatusCode.OK else HttpStatusCode.BadRequest, event.json.toString())
+        if (event.stage == Stage.APPLIED) call.json(HttpStatusCode.OK, "{}")
+        else call.json(HttpStatusCode.BadRequest, refusal(event.meta.reason ?: "rejected", event.meta.args ?: Json.Object()))
     }
 }
 

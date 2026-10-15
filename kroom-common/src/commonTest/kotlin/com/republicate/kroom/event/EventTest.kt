@@ -25,7 +25,7 @@ class EventTest {
         assertNull(play.note)
         play.note = "gg"
         assertEquals("gg", play.json["note"])
-        assertEquals("""{"move":"ROCK","_":{},"note":"gg"}""", play.json.toString())
+        assertEquals("""{"move":"ROCK","note":"gg"}""", play.json.toString())
     }
 
     @Test fun `a declaration is data`() {
@@ -44,6 +44,7 @@ class EventTest {
         assertEquals("invalid {\"field\":\"move\",\"kind\":\"STRING\"}", Play(Json.MutableObject("move" to "WELL")).validate().toString())
         assertEquals("invalid {\"field\":\"round\",\"kind\":\"INT\"}", Match(Json.MutableObject("player1" to "a", "player2" to "b", "round" to "x")).validate().toString())
         assertNull(Match(Json.MutableObject("player1" to "a", "player2" to "b")).validate())
+        assertEquals("undeclared {\"field\":\"evil\"}", Play(Json.MutableObject("move" to "ROCK", "evil" to 1)).validate().toString())
         val e = assertFailsWith<Event.Rejected> { Play().accept("alice") }
         assertEquals("missing", e.reason.key)
         assertFailsWith<IllegalStateException> { Play().move }
@@ -64,9 +65,7 @@ class EventTest {
         assertFailsWith<IllegalStateException> { play.emit(43) }
         play.persist()
         assertEquals(Stage.PERSISTED, play.stage)
-        val meta = play.json.getObject("_")!!
-        assertEquals("PERSISTED", meta.getString("stage"))
-        assertEquals("PAPER", play.json.getString("move"))
+        assertEquals("""{"move":"PAPER"}""", play.json.toString()) // the metadata is the object's, never the wire's
     }
 
     @Test fun `a step out of order is the object's error`() {
@@ -77,11 +76,12 @@ class EventTest {
         assertFailsWith<IllegalStateException> { play.reject(Reason("late")) }
     }
 
-    @Test fun `a rejection carries its reason and is emitted`() {
+    @Test fun `a rejection carries its reason and goes no further`() {
         val play = Play(Json.MutableObject("move" to "PAPER")).accept("alice")
-        play.reject(Reason("not_your_turn", Json.Object("turn" to "bob"))).emit(7)
+        play.reject(Reason("not_your_turn", Json.Object("turn" to "bob")))
         assertEquals(Stage.REJECTED, play.stage)
-        assertTrue(play.emitted)
+        assertFailsWith<IllegalStateException> { play.emit(7) }
+        assertFalse(play.emitted)
         assertFailsWith<IllegalStateException> { play.persist() }
         assertEquals("not_your_turn", play.meta.reason)
         assertEquals("bob", play.meta.args!!.getString("turn"))
@@ -97,20 +97,20 @@ class EventTest {
     @Test fun `a catalog rebuilds an event from a frame and describes itself`() {
         val catalog = Catalog().register(::Play).register(::Match)
         assertEquals(setOf("play", "match"), catalog.names)
-        val e = catalog.of("play", """{"_":{"stage":"APPLIED","from":"alice","seq":3},"move":"SCISSORS"}""")
+        val e = catalog.of("play", """{"move":"SCISSORS"}""")
         assertIs<Play>(e)
-        assertEquals(Stage.APPLIED, e.stage)
+        assertEquals(Stage.BORN, e.stage)
         assertEquals(Move.SCISSORS, e.move)
-        assertEquals(3L, e.meta.seq)
         assertNull(catalog.of("dance"))
         assertEquals(2, catalog.describe().size)
     }
 
-    @Test fun `metadata parsed as an immutable object is adopted`() {
-        val json = Json.MutableObject("_" to Json.Object("from" to "x"), "move" to "ROCK")
+    @Test fun `a client's metadata is dropped at birth`() {
+        val json = Json.MutableObject("_" to Json.Object("from" to "x", "stage" to "APPLIED"), "move" to "ROCK")
         val play = Play(json)
-        assertEquals("x", play.meta.from)
-        play.meta.tab = "t"
-        assertEquals("t", (json["_"] as Json.Object).getString("tab"))
+        assertEquals(Stage.BORN, play.stage)
+        assertNull(play.meta.from)
+        assertNull(json["_"])
+        assertNull(play.validate())
     }
 }

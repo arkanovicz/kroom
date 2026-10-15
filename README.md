@@ -75,16 +75,15 @@ One class goes through E, from a gesture to a row: an `Event` (kroom-common, the
 JVM and in Kotlin/JS) — a name, a payload, metadata. The payload is JSON, the class a typed view
 over it (`val move by enum<Move>().required`, the property name is the key); declaring a field
 records it, so the declaration is data (`describe()`, served as `GET /api/rooms/<room>/events`).
-The metadata lives under the reserved key `_` beside the payload, and holds the event's life:
+The payload alone is the wire; the metadata (who, when, the stage, a reason) is the object's,
+server-side, and a `_` a client sends is dropped at birth:
 
 ```
-browser  click [data-intent=play] ──POST /api/rooms/<room>/act {type, …}──▶ act: the door — accept (shape, permission), stateless
-                                                                          ▼  on the loop: the handler applies or rejects
-         store.dispatch  ◀──────────────── SSE ───────────────────────────┤  the handler's own emissions, to their audience
-         trigger freed / reason shown  ◀──────────────────────────────────┘  then the event itself, with its stage, to its audience
+browser  click [data-intent=play] ──POST /api/rooms/<room>/act {type, …}──▶ act: validation (declared shape, permission), stateless
+         trigger freed / reason shown  ◀── 200 {} | 400 {reason, args} ───┤  on the loop: the handler applies or rejects
+         store.dispatch  ◀──────────────── SSE ───────────────────────────┘  the handler's own emissions, then the event, to their audience
 
-event: play   id: 42   data: {"_":{"stage":"APPLIED","from":"alice","tab":"t1","seq":42},"move":"rock"}
-event: play   id: 43   data: {"_":{"stage":"REJECTED","from":"alice","tab":"t1","reason":"not_your_turn","args":{}}}
+event: play   id: 42   data: {"move":"rock"}
 ```
 
 - **One declaration per event**, class and handler together: `on(::Play) { actor, play -> … }`
@@ -92,14 +91,14 @@ event: play   id: 43   data: {"_":{"stage":"REJECTED","from":"alice","tab":"t1",
   handler runs on the loop, no awaited I/O, applies the event to the state and answers `null`
   (applied) or a `Reason` (rejected; a key and arguments the browser localizes). A thrown
   `Event.Rejected` is the same, any other exception is `error`.
-- **The door** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) accepts
-  stateless: an unknown name, a bad shape, a missing permission (`permits(user, permission)`, the
-  host's call), a spectator — refused with `400` before the loop, never queued. Then `200` or `400`
-  with the event as the body, an honest status the browser does not read.
-- **The feedback is the event itself**: it comes back to its emitter after the handler's own
-  emissions, so the tab sees the new state before its trigger is freed. A rejection reaches its
-  emitter alone. The browser correlates by name and frees `[data-intent=play]` on a `play` frame
-  whose `_.tab` is its own.
+- **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
+  stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
+  permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`
+  before the loop, never queued.
+- **The reply is the verdict**, nothing else: `200` `{}` applied, `400` `{reason, args}` rejected
+  (by validation or by the handler). A rejection is framed to nobody. The effects come down the
+  stream, to the emitter like to everyone: a page handles `play` on one path, author or not.
+  `[data-intent=play]` is busy for the span of its POST; a `4xx` shows its reason after it.
 - **Audience** is declared on the class: `ROOM` (everyone), `USERS` (users the room names at
   `emit(event, to = …)`, the emitter when none — so `Play` declares `USERS` and the opponent never
   sees the move). Nothing crosses rooms: what every page must hear is a lobby room's frame.
@@ -109,12 +108,14 @@ event: play   id: 43   data: {"_":{"stage":"REJECTED","from":"alice","tab":"t1",
   snapshot's job alone, so an event only ever means a transition: a step of the loop numbers and
   writes everything it produces before it returns, and a snapshot taken at a position holds
   exactly the transitions up to it.
-- **Every frame's `id` is its seq.** No replay: a reconnect is a join, the snapshot is the truth,
-  a store dedupes by seq. `broadcast(name, data)` / `sendToUser` birth room-born `Generic` events.
-- **Tab id**: `sessionStorage` `kroom.tabId`, `?tabId=` on the stream, `X-Kroom-Tab` on an intent;
-  the server composes `connectionId = <userId>/<tabId>` (`Actor.connectionId`), so a tab id lands
-  under its own user and is never a credential. The same tab back replaces its connection; a
-  detached tab (no open stream) still acts, its frame reaches the user's other tabs.
+- **Every frame's `id` is its position on the room's channel.** No replay: a reconnect is a join,
+  the snapshot is the truth; one stream in order needs no dedupe. `broadcast(name, data)` /
+  `sendToUser` birth room-born `Generic` events.
+- **Tab id**: taken out of `sessionStorage` (`kroom.tabId`) at load and put back on `pagehide`, so
+  a reload finds it and a duplicated tab makes its own; `?tabId=` on the stream, `X-Kroom-Tab` on
+  an intent; the server composes `connectionId = <userId>/<tabId>` (`Actor.connectionId`), so a
+  tab id lands under its own user and is never a credential. The same tab back replaces its
+  connection; a detached tab (no open stream) still acts, its frame reaches the user's other tabs.
 - **The loop never waits on a consumer**: a tab that stops draining is dropped, its stream ends,
   the browser reconnects and joins again.
 - `trace(event)` is called at every stage change: the operator's line. `emitted(event)` is where a
