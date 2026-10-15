@@ -33,6 +33,9 @@ All notable changes to kroom will be documented in this file.
   `POST /rooms/{room}/act` is the verdict and nothing else: `200` `{}` or `400` `{reason, args}`;
   a rejection is framed to nobody. Validation refuses a field beyond the declared (`undeclared`).
   `Event.emit` accepts an applied event only.
+- Presence on the wire is a user's: `join` is framed for a user's first connection, `leave` for
+  the last, after `leaveGrace` (1 s, overridable) so a reload or a blip is no departure; the
+  handlers still hear every connection (`first` / `last`), the last one after the grace.
 - The instant: a step of the loop numbers and writes what it produces before it returns (a
   handler's emissions and the event's own frame are no longer re-enqueued behind a waiting join,
   which saw the change in its snapshot and then again as frames); the joiner's snapshot precedes

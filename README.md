@@ -103,8 +103,10 @@ event: play   id: 42   data: {"move":"rock"}
   `emit(event, to = …)`, the emitter when none — so `Play` declares `USERS` and the opponent never
   sees the move). Nothing crosses rooms: what every page must hear is a lobby room's frame.
 - **A join is an event**: the room births `Join` at a connect and `Leave` at a disconnect,
-  handled with `on(::Join)` like any other (`Table` seats there). The joiner gets `state` — its own
-  snapshot, `stateToJson(actor)` — first, then its own `join` like everyone. Catch-up is the
+  handled with `on(::Join)` like any other (`Table` seats there). The handler hears every
+  connection (`first` / `last`); the wire hears a user's first `join` and last `leave`, the leave
+  after a grace (`leaveGrace`, 1 s) so a reload or a blip is no departure. The joiner gets `state`
+  — its own snapshot, `stateToJson(actor)` — first, then its own `join` like everyone. Catch-up is the
   snapshot's job alone, so an event only ever means a transition: a step of the loop numbers and
   writes everything it produces before it returns, and a snapshot taken at a position holds
   exactly the transitions up to it.

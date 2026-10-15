@@ -23,10 +23,11 @@ class RoomTest {
     class Vip(json: Json.MutableObject = Json.MutableObject()) : Event("vip", permission = "vip", json = json)
     class Slow(json: Json.MutableObject = Json.MutableObject()) : Event("slow", json = json)
 
-    private class TestRoom(id: String) : Room<Json.MutableObject>(id) {
+    private class TestRoom(id: String, val grace: Long = 0) : Room<Json.MutableObject>(id) {
         override var state = Json.MutableObject()
         override fun shouldCloseWhenEmpty() = false
         override val channelCapacity = 8
+        override val leaveGrace = grace
         override fun stateToJson(): Json.Object = Json.Object()
         override fun stateToJson(actor: Actor): Json.Object = Json.Object("you" to actor.name, "n" to state.getInt("n"))
         override fun permits(user: User, permission: String) = user.userId == "alice"
@@ -254,6 +255,53 @@ class RoomTest {
         assertEquals("t1", actor(u, "t1").tab)
         assertTrue(Actor.connectionId(u, null).startsWith("u/"))
         assertTrue(Actor.connectionId(u, " ").length > "u/".length)
+    }
+
+    // ---- presence on the wire: a user's first and last connection, the last after a grace
+
+    @Test fun `a second connection of a user is not on the wire, its handler still hears it`() = runBlocking {
+        val room = room()
+        val u = user("u")
+        val heard = mutableListOf<String>()
+        room.onJoin = { heard.add(it.tab) }
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        val c1 = room.join(actor(u, "t1")).also { it.state() }
+        assertEquals("join", cv.next().event)
+        val c2 = room.join(actor(u, "t2")).also { it.state() }
+        c1.next().let { assertEquals("join", it.event) } // its own first
+        room.leave(room.getActor(Actor.connectionId(u, "t2"))!!)
+        kotlinx.coroutines.delay(50)
+        assertNull(cv.tryReceive().getOrNull())
+        assertNull(c1.tryReceive().getOrNull())
+        assertEquals(listOf("t1", "t1", "t2"), heard)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        assertEquals("gone", cv.next().event)                 // the handler, on the last only
+        cv.next().let { assertEquals("leave", it.event); assertEquals(true, it.json().getBoolean("last")) }
+        assertNull(room.getUser("u"))
+    }
+
+    @Test fun `a user back within the grace never left, one who is not leaves after it`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 200)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        assertEquals("join", cv.next().event)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        kotlinx.coroutines.delay(50)
+        assertNotNull(room.getUser("u"))                      // still here, for now
+        room.join(actor(u, "t1")).state()                     // a reload
+        kotlinx.coroutines.delay(300)
+        assertNull(cv.tryReceive().getOrNull())               // no leave, no join: nothing happened
+        assertNotNull(room.getUser("u"))
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        kotlinx.coroutines.delay(50)
+        assertNull(cv.tryReceive().getOrNull())
+        kotlinx.coroutines.delay(300)
+        assertEquals("gone", cv.next().event)                 // the handler heard it once, after the grace
+        cv.next().let { assertEquals("leave", it.event); assertEquals(true, it.json().getBoolean("last")) }
+        assertNull(room.getUser("u"))
     }
 
     // ---- the instant: a snapshot at a position holds exactly the transitions up to it

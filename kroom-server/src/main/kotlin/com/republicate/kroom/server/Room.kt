@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong
 class Generic(name: String, json: Json.MutableObject = Json.MutableObject(), audience: Audience = Audience.ROOM) :
     Event(name, audience, json = json)
 
-/** Born by the room at a connect, to the room: who arrived. The joiner's own feedback is the `state` frame. */
+/** Born by the room at a connect: the handler hears every one, the room's wire a user's first. */
 class Join(json: Json.MutableObject = Json.MutableObject()) : Event("join", json = json) {
     var user by string()
     var displayName by string()
@@ -28,7 +28,11 @@ class Join(json: Json.MutableObject = Json.MutableObject()) : Event("join", json
     var first by bool()      // the user's first connection to the room
 }
 
-/** Born by the room at a disconnect, to the room. */
+/**
+ * Born by the room at a disconnect: the handler hears a connection that was not the user's last at
+ * once, the last after the grace, and not at all when the user is back within it; the room's wire
+ * hears the last only.
+ */
 class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", json = json) {
     var user by string()
     var displayName by string()
@@ -229,6 +233,9 @@ abstract class Room<S : Any>(val id: String) {
     /** Per-connection buffer: the loop never waits on a consumer (see [sendSafe]). */
     protected open val channelCapacity: Int = 64
 
+    /** How long (ms) a user's last connection may be gone before the room says `leave`: a reload, a blip. */
+    protected open val leaveGrace: Long = 1000
+
     /**
      * A connection id already present is the same tab back (reconnect, or a duplicated tab): the
      * newcomer takes the slot, the stale connection is closed and its later [leave] is a no-op.
@@ -262,7 +269,8 @@ abstract class Room<S : Any>(val id: String) {
         val join = Join().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.first = first }
         join.meta.from = actor.user?.userId
         handle(actor, join)
-        if (join.stage == Stage.APPLIED) emit(join)
+        // the handler hears every connection, the wire hears a user's first
+        if (first && join.stage == Stage.APPLIED) emit(join)
     }
 
     private fun processLeave(actor: Actor) {
@@ -270,19 +278,28 @@ abstract class Room<S : Any>(val id: String) {
         if (actors[actor.connectionId] !== actor && spectators[actor.connectionId] !== actor) return
         actor.disconnect()
         val spectator = actor is Spectator
-        val last = actor.user?.let { user ->
-            val none = user.removeConnection(id, actor)
-            if (none) { users.remove(user.userId); _userCount.value = users.size }
-            none
-        } ?: true
         if (spectator) { spectators.remove(actor.connectionId); _spectatorCount.value = spectators.size }
         else actors.remove(actor.connectionId)
-        logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' left room '$id' (last=$last)")
+        val user = actor.user
+        val none = user?.removeConnection(id, actor) ?: true
+        logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' left room '$id' (last=$none)")
+        if (user != null && none && leaveGrace > 0) {
+            // the user's last connection: a reload or a blip is back within the grace, a departure is not
+            scope.launch {
+                delay(leaveGrace)
+                step { if (users.containsKey(user.userId) && !user.isConnectedTo(id)) gone(actor, spectator, true) }
+            }
+        } else gone(actor, spectator, none)
+    }
 
-        val leave = Leave().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.last = last }
-        leave.meta.from = actor.user?.userId
+    /** The leave itself: the handler hears every connection, the wire hears a user's last. */
+    private fun gone(actor: Actor, spectator: Boolean, last: Boolean) {
+        val user = actor.user
+        if (last && user != null) { users.remove(user.userId); _userCount.value = users.size }
+        val leave = Leave().also { it.user = user?.userId; it.displayName = actor.name; it.spectator = spectator; it.last = last }
+        leave.meta.from = user?.userId
         handle(actor, leave)
-        if (leave.stage == Stage.APPLIED) emit(leave)
+        if (last && leave.stage == Stage.APPLIED) emit(leave)
 
         if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty()) {
             stop()
