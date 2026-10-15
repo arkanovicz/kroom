@@ -40,13 +40,18 @@ class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", js
  * A room: state, membership (users; actors write, spectators read), one loop, and the events
  * it speaks. An [Event] arrives at the door ([act]), is applied on the loop by the handler its
  * declaration registered ([on]), and comes back to its audience with its stage — the emitter is
- * always in it, so the frame is the feedback. Every emitted frame carries the room's seq.
+ * always in it, so the frame is the feedback. Every emitted frame carries its position on the
+ * room's channel (seq); a step of the loop numbers and writes everything it produces before it
+ * returns, so a snapshot taken at a position holds exactly the transitions up to it.
  *
- * A join is an event too: the room births [Join] at a connect, the handler runs, the joiner gets
- * its `state` snapshot ([stateToJson]) before anything queued behind, then the room hears `join`.
+ * A join is an event too: the room births [Join] at a connect; the joiner gets its `state`
+ * snapshot ([stateToJson]) first, then its own `join` like everyone, the handler's emissions before it.
  */
 abstract class Room<S : Any>(val id: String) {
     protected val logger = LoggerFactory.getLogger("kroom.room")
+    // the thread inside a step: what a handler emits is framed at once, nothing a step produces is re-enqueued
+    @Volatile private var loopThread: Thread? = null
+    private val onLoop: Boolean get() = Thread.currentThread() === loopThread
 
     abstract var state: S
 
@@ -170,13 +175,21 @@ abstract class Room<S : Any>(val id: String) {
     // ---- emissions
 
     /**
-     * A room-born event, or one the handler made for others: queued behind what is already
-     * queued, numbered and framed on the loop. [to] names the users of a `USERS` audience; none
-     * means the emitter. A `BORN` event applies here: it had no door.
+     * A room-born event, or one the handler made for others. From inside a step (a handler) it is
+     * numbered and framed at once, before the step returns: a snapshot taken later holds it and
+     * never sees its frame. From elsewhere (a bridge, a clock) it is a step of its own, queued.
+     * [to] names the users of a `USERS` audience; none means the emitter. A `BORN` event applies
+     * here: it had no door.
      */
     fun emit(event: Event, to: Collection<User> = emptyList()) {
         if (event.stage == Stage.BORN) event.apply()
-        queue.trySend(Op.Emit(event, to.map { it.userId }))
+        val userIds = to.map { it.userId }
+        if (onLoop) frame(event, userIds) else queue.trySend(Op.Emit(event, userIds))
+    }
+
+    /** Runs [block] as a step of the loop: what it changes and emits is one instant. */
+    protected fun step(block: () -> Unit) {
+        if (onLoop) block() else queue.trySend(Op.Run(block))
     }
 
     fun emit(event: Event, vararg to: User) = emit(event, to.toList())
@@ -192,10 +205,10 @@ abstract class Room<S : Any>(val id: String) {
     // ---- connections
 
     /**
-     * A connection joins. On the loop like everything else: the newcomer gets `state`, then the
-     * frames queued behind the join — the join handler's emissions, then `join` itself to the
-     * room. Nothing written elsewhere can slip in before the snapshot. A stopped room hands back
-     * a closed channel: the stream ends, the browser retries and learns the room is gone.
+     * A connection joins. On the loop like everything else: the newcomer gets `state`, the room
+     * as it is at that position, then every transition after it — its own `join` first, with
+     * what the join handler emits. A stopped room hands back a closed channel: the stream ends,
+     * the browser retries and learns the room is gone.
      */
     suspend fun join(actor: Actor): Channel<ServerSentEvent> {
         val ready = CompletableDeferred<Channel<ServerSentEvent>>()
@@ -244,13 +257,13 @@ abstract class Room<S : Any>(val id: String) {
         }
         logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' joined room '$id' (${users.size} users, ${actors.size} connections, ${spectators.size} spectators)")
 
-        val join = Join().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.first = first }
-        join.meta.from = actor.user?.userId
-        handle(actor, join)
-        // the snapshot, straight on the channel: this op owns the loop, nothing interleaves
+        // the snapshot at this position, straight on the channel; the join is the transition after it
         val snapshot = Json.MutableObject(stateToJson(actor))
         snapshot[Event.META] = Json.Object("stage" to Stage.APPLIED.name, "seq" to seq.get())
         sendSafe(actor, ServerSentEvent(data = snapshot.toString(), event = "state", id = seq.get().toString()))
+        val join = Join().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.first = first }
+        join.meta.from = actor.user?.userId
+        handle(actor, join)
         if (join.stage == Stage.APPLIED) emit(join)
     }
 
@@ -295,30 +308,39 @@ abstract class Room<S : Any>(val id: String) {
 
     // ---- the loop
 
+    /** One step: what it changes and what it frames are one instant, numbered before it returns. */
     private fun process(op: Op) {
-        when (op) {
-            is Op.Act -> {
-                handle(op.actor, op.event)
-                // the handler's own emissions are already queued: the event's frame lands after them,
-                // so the acting tab sees the new state before its trigger is freed
-                queue.trySend(Op.Emit(op.event, emptyList()))
-                op.verdict.complete(op.event)
-            }
-            is Op.Emit -> {
-                val event = op.event.emit(seq.incrementAndGet())
-                trace(event)
-                val frame = ServerSentEvent(data = event.json.toString(), event = event.name, id = event.meta.seq.toString())
-                when {
-                    event.stage == Stage.REJECTED -> toUsers(listOfNotNull(event.meta.from), frame)
-                    event.audience == Audience.GLOBAL -> Lobby.listRooms().forEach { it.toAll(frame) }
-                    event.audience == Audience.ROOM -> toAll(frame)
-                    else -> toUsers(op.to.ifEmpty { listOfNotNull(event.meta.from) }, frame)
+        loopThread = Thread.currentThread()
+        try {
+            when (op) {
+                is Op.Act -> {
+                    handle(op.actor, op.event)
+                    // the handler's own emissions are already framed: the event's frame lands after them,
+                    // so the acting tab sees the new state before its trigger is freed
+                    frame(op.event, emptyList())
+                    op.verdict.complete(op.event)
                 }
-                emitted(event)
+                is Op.Emit -> frame(op.event, op.to)
+                is Op.Run -> op.block()
+                is Op.Join -> try { processJoin(op.actor) } finally { op.ready.complete(op.actor.channel ?: closed()) }
+                is Op.Leave -> try { processLeave(op.actor) } finally { op.done.complete(Unit) }
             }
-            is Op.Join -> try { processJoin(op.actor) } finally { op.ready.complete(op.actor.channel ?: closed()) }
-            is Op.Leave -> try { processLeave(op.actor) } finally { op.done.complete(Unit) }
+        } finally {
+            loopThread = null
         }
+    }
+
+    /** Numbers the event at the channel's next position and writes it to its audience. */
+    private fun frame(event: Event, to: List<String>) {
+        val emitted = event.emit(seq.incrementAndGet())
+        trace(emitted)
+        val frame = ServerSentEvent(data = emitted.json.toString(), event = emitted.name, id = emitted.meta.seq.toString())
+        when {
+            emitted.stage == Stage.REJECTED -> toUsers(listOfNotNull(emitted.meta.from), frame)
+            emitted.audience == Audience.ROOM -> toAll(frame)
+            else -> toUsers(to.ifEmpty { listOfNotNull(emitted.meta.from) }, frame)
+        }
+        emitted(emitted)
     }
 
     private fun toAll(frame: ServerSentEvent) {
@@ -375,6 +397,7 @@ abstract class Room<S : Any>(val id: String) {
     private sealed class Op {
         class Act(val actor: Actor, val event: Event, val verdict: CompletableDeferred<Event>) : Op()
         class Emit(val event: Event, val to: List<String>) : Op()
+        class Run(val block: () -> Unit) : Op()
         class Join(val actor: Actor, val ready: CompletableDeferred<Channel<ServerSentEvent>>) : Op()
         class Leave(val actor: Actor, val done: CompletableDeferred<Unit>) : Op()
     }

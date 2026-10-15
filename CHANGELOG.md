@@ -16,7 +16,7 @@ All notable changes to kroom will be documented in this file.
 - The feedback is the event itself: `accepted` / `rejected` frames are gone, the acting event comes
   back to its emitter with `_.stage` (`APPLIED` / `REJECTED`, `_.reason` + `_.args`) after the
   handler's own emissions; a rejection reaches the emitter alone. Every frame's `id` is its seq.
-- Audience is declared on the class (`ROOM` / `USERS` / `GLOBAL`), members named at `emit(event, to)`,
+- Audience is declared on the class (`ROOM` / `USERS`; `GLOBAL` is gone, nothing crosses rooms), members named at `emit(event, to)`,
   the emitter when none. `broadcastToActors` / `broadcastToSpectators` / `sendTo(actor, …)` are
   gone; `broadcast` and `sendToUser` birth room-born `Generic` events.
 - Hooks are gone: `Join` and `Leave` are events the room births (`user`, `displayName`, `spectator`,
@@ -28,6 +28,10 @@ All notable changes to kroom will be documented in this file.
 - `ChatRoom`: `Chat` is the event (`text` in, `seq` / `from` / `author` / `timestamp` added by the
   room), persisted in seq order by one writer after emission (`persist()` is its last stage).
 - `trace(event)` at every stage change, `emitted(event)` after the frame; `Actor.tab`.
+- The instant: a step of the loop numbers and writes what it produces before it returns (a
+  handler's emissions and the event's own frame are no longer re-enqueued behind a waiting join,
+  which saw the change in its snapshot and then again as frames); the joiner's snapshot precedes
+  its own `join` and the join handler. `ChatRoom.sendChat` is a step of the loop (`suspend`).
 - `kroom-common` is now an `api` dependency of `kroom-server`.
 
 #### kroom-webapp-assets

@@ -7,6 +7,7 @@ import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.*
@@ -20,16 +21,20 @@ class RoomTest {
     class Boom(json: Json.MutableObject = Json.MutableObject()) : Event("boom", json = json)
     class Shaped(json: Json.MutableObject = Json.MutableObject()) : Event("shaped", json = json) { val n by int().required }
     class Vip(json: Json.MutableObject = Json.MutableObject()) : Event("vip", permission = "vip", json = json)
+    class Slow(json: Json.MutableObject = Json.MutableObject()) : Event("slow", json = json)
 
     private class TestRoom(id: String) : Room<Json.MutableObject>(id) {
         override var state = Json.MutableObject()
         override fun shouldCloseWhenEmpty() = false
         override val channelCapacity = 8
         override fun stateToJson(): Json.Object = Json.Object()
-        override fun stateToJson(actor: Actor): Json.Object = Json.Object("you" to actor.name)
+        override fun stateToJson(actor: Actor): Json.Object = Json.Object("you" to actor.name, "n" to state.getInt("n"))
         override fun permits(user: User, permission: String) = user.userId == "alice"
         var onJoin: (Actor) -> Unit = {}
+        var onSlow: () -> Unit = {}
         init {
+            // the state changes, then (after a pause the test controls) the frames describing it
+            on(::Slow) { _, _ -> state["n"] = (state.getInt("n") ?: 0) + 1; onSlow(); broadcast("moved", Json.Object()); null }
             on(::Ok) { actor, _ -> broadcast("moved", Json.Object("by" to actor.name)); null }
             on(::Loud) { _, _ -> null }
             on(::Bad) { _, _ -> Reason("not_your_turn", Json.Object("turn" to "bob")) }
@@ -241,7 +246,7 @@ class RoomTest {
 
     @Test fun `the catalog is the door's events, as data`() {
         val d = room().catalog.describe().map { (it as Json.Object).getString("name") }
-        assertEquals(listOf("ok", "loud", "bad", "boom", "shaped", "vip"), d)
+        assertEquals(listOf("slow", "ok", "loud", "bad", "boom", "shaped", "vip"), d)
     }
 
     @Test fun `a connection id is composed under the user, the tab reads back`() {
@@ -250,6 +255,35 @@ class RoomTest {
         assertEquals("t1", actor(u, "t1").tab)
         assertTrue(Actor.connectionId(u, null).startsWith("u/"))
         assertTrue(Actor.connectionId(u, " ").length > "u/".length)
+    }
+
+    // ---- the instant: a snapshot at a position holds exactly the transitions up to it
+
+    @Test fun `a join queued while a handler runs sees that change once`() = runBlocking {
+        val room = room()
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        room.onSlow = { entered.countDown(); release.await() }
+        val a = actor(user("u"), "t1"); val v = actor(user("v"), "t1")
+        room.join(a).state()
+        val verdict = room.act(a, Slow())
+        entered.await()                                           // the loop is inside the handler, the state already changed
+        val joining = async { room.join(v) }
+        kotlinx.coroutines.delay(100)                             // the join is queued behind the running op
+        release.countDown()
+        assertEquals(Stage.APPLIED, verdict.await().stage)
+        val ch = joining.await()
+        ch.next().let {
+            assertEquals("state", it.event)
+            assertEquals(1, it.json().getInt("n"))                // the snapshot holds the change…
+        }
+        val rest = mutableListOf<String>()
+        while (true) { val f = ch.tryReceiveAfter(100) ?: break; rest.add(f.event ?: "?") }
+        assertEquals(listOf("join"), rest)                        // …so no frame of that change may follow it
+    }
+
+    private suspend fun Channel<ServerSentEvent>.tryReceiveAfter(ms: Long): ServerSentEvent? {
+        kotlinx.coroutines.delay(ms); return tryReceive().getOrNull()
     }
 
     /** Presence frames (`join` of self and others) are not what a test is about: skip them. */

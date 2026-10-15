@@ -4,6 +4,7 @@ import com.republicate.kroom.event.Audience
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -57,12 +58,12 @@ open class ChatRoom(id: String, private val history: ChatHistory = MemoryChatHis
         "users" to usersJson()
     )
 
-    /** Say something in the room from elsewhere than a door (a bridge, a route): same life from APPLIED on. */
-    fun sendChat(author: Author, text: String): ChatMessage {
+    /** Say something in the room from elsewhere than a door (a bridge, a route): a step of the loop, same life from APPLIED on. */
+    suspend fun sendChat(author: Author, text: String): ChatMessage {
         val chat = Chat(Json.MutableObject("text" to text))
-        record(chat, author)
-        emit(chat)
-        return chat.toMessage()
+        val sent = CompletableDeferred<ChatMessage>()
+        step { record(chat, author); emit(chat); sent.complete(chat.toMessage()) }
+        return sent.await()
     }
 
     private fun record(chat: Chat, author: Author) {

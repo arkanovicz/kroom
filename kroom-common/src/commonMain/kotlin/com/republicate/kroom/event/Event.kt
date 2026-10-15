@@ -4,8 +4,8 @@ import com.republicate.kson.Json
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/** Where an applied event goes: every connection, the room, or users the room names (the emitter at least). */
-enum class Audience { GLOBAL, ROOM, USERS }
+/** Where an applied event goes: the room, or users the room names (the emitter at least). Nothing crosses rooms. */
+enum class Audience { ROOM, USERS }
 
 /**
  * One life, in order; the stage on the wire is the verdict, the seq the proof it went out.

@@ -102,11 +102,13 @@ event: play   id: 43   data: {"_":{"stage":"REJECTED","from":"alice","tab":"t1",
   whose `_.tab` is its own.
 - **Audience** is declared on the class: `ROOM` (everyone), `USERS` (users the room names at
   `emit(event, to = …)`, the emitter when none — so `Play` declares `USERS` and the opponent never
-  sees the move), `GLOBAL` (every connection of the server).
+  sees the move). Nothing crosses rooms: what every page must hear is a lobby room's frame.
 - **A join is an event**: the room births `Join` at a connect and `Leave` at a disconnect,
   handled with `on(::Join)` like any other (`Table` seats there). The joiner gets `state` — its own
-  snapshot, `stateToJson(actor)` — before anything queued behind the join, then the room hears
-  `join`. Catch-up is the snapshot's job alone, so an event only ever means a transition.
+  snapshot, `stateToJson(actor)` — first, then its own `join` like everyone. Catch-up is the
+  snapshot's job alone, so an event only ever means a transition: a step of the loop numbers and
+  writes everything it produces before it returns, and a snapshot taken at a position holds
+  exactly the transitions up to it.
 - **Every frame's `id` is its seq.** No replay: a reconnect is a join, the snapshot is the truth,
   a store dedupes by seq. `broadcast(name, data)` / `sendToUser` birth room-born `Generic` events.
 - **Tab id**: `sessionStorage` `kroom.tabId`, `?tabId=` on the stream, `X-Kroom-Tab` on an intent;
