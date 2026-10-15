@@ -60,19 +60,22 @@ const api = (function() {
         });
     }
 
-    // One id per tab, kept across reloads: the server aims an intent's verdict at the tab that acted.
+    // One id per tab: taken out of sessionStorage at load and put back on pagehide, so a reload
+    // finds it again while a tab duplicated alive (its storage copied) finds none and makes its own.
     let tab = null;
-    function tabId() {
-        if (tab) return tab;
-        try { tab = sessionStorage.getItem('kroom.tabId'); } catch (_) { /* storage blocked */ }
-        if (!tab) {
-            // randomUUID needs a secure context
-            tab = window.crypto?.randomUUID?.()
-                ?? Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-            try { sessionStorage.setItem('kroom.tabId', tab); } catch (_) { /* this page's life only */ }
-        }
-        return tab;
+    try {
+        tab = sessionStorage.getItem('kroom.tabId');
+        sessionStorage.removeItem('kroom.tabId');
+    } catch (_) { /* storage blocked */ }
+    if (!tab) {
+        // randomUUID needs a secure context
+        tab = window.crypto?.randomUUID?.()
+            ?? Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     }
+    window.addEventListener('pagehide', () => {
+        try { sessionStorage.setItem('kroom.tabId', tab); } catch (_) { /* this page's life only */ }
+    });
+    const tabId = () => tab;
 
     return {
         get: (path, accept) => fetch(base + path, {
@@ -120,8 +123,8 @@ const api = (function() {
 
         tabId,
 
-        // Fire and forget: the verdict comes down the event stream. `target` is a room name,
-        // or a path of the app's own when it holds a slash.
+        // The reply is the verdict: 200 accepted, 4xx rejects with `.data` = {reason, args}; the
+        // effects come down the stream. `target` is a room name, or a path of the app's own when it holds a slash.
         act: (target, type, payload) => {
             const path = target.includes('/') ? target : `rooms/${encodeURIComponent(target)}/act`;
             // the intent's name wins over a payload key: it keys the verdict

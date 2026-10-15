@@ -28,6 +28,11 @@ All notable changes to kroom will be documented in this file.
 - `ChatRoom`: `Chat` is the event (`text` in, `seq` / `from` / `author` / `timestamp` added by the
   room), persisted in seq order by one writer after emission (`persist()` is its last stage).
 - `trace(event)` at every stage change, `emitted(event)` after the frame; `Actor.tab`.
+- The wire is the payload: no `_` metadata on frames (the stage, `from`, `tab`, `seq` were there;
+  the seq is the frame's `id`), and a `_` a client sends is dropped at birth. The reply of
+  `POST /rooms/{room}/act` is the verdict and nothing else: `200` `{}` or `400` `{reason, args}`;
+  a rejection is framed to nobody. Validation refuses a field beyond the declared (`undeclared`).
+  `Event.emit` accepts an applied event only.
 - The instant: a step of the loop numbers and writes what it produces before it returns (a
   handler's emissions and the event's own frame are no longer re-enqueued behind a waiting join,
   which saw the change in its snapshot and then again as frames); the joiner's snapshot precedes
@@ -35,10 +40,11 @@ All notable changes to kroom will be documented in this file.
 - `kroom-common` is now an `api` dependency of `kroom-server`.
 
 #### kroom-webapp-assets
-- `intents.js` frees a trigger on the frame of its own name whose `_.tab` is this tab (`APPLIED`),
-  shows `_.reason` (+ `_.args`) on `REJECTED`; it listens to every `[data-intent]` name under its
-  root (and to a name on its first click), beside the host's own handlers. `sse.js` sends no
-  `lastEventId` any more (no replay).
+- `intents.js`: a trigger is busy for the span of its POST; the reply is the verdict (`200`
+  frees, `4xx` frees and shows `reason` + `args` after it). It no longer listens to the stream
+  (`attach`'s `sse` is ignored). `api.js`: the tab id is taken out of `sessionStorage` at load and
+  put back on `pagehide` (a duplicated tab makes its own); `act` rejects with `.data` =
+  `{reason, args}`. `sse.js` sends no `lastEventId` any more (no replay).
 
 #### kroom-examples/chifoumi
 - Declares `JoinQueue`, `LeaveQueue`, `Play` (audience `USERS`: the opponent never sees the move) and

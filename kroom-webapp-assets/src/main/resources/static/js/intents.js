@@ -1,15 +1,14 @@
-// intents.js - intents up, verdicts down: the busy trigger and its feedback
-// Part of kroom-webapp-assets (after domhelper.js, api.js, sse.js)
+// intents.js - intents up, verdicts back: the busy trigger and its feedback
+// Part of kroom-webapp-assets (after domhelper.js, api.js)
 //
 // Usage:
 //   <button data-intent="play" data-move="rock">Rock</button>
-//   intents.attach({ room: 'chifoumi', sse: conn, store });
+//   intents.attach({ room: 'chifoumi', store });
 //
-// A click posts {type: 'play', move: 'rock'} and leaves the button busy; the event itself comes
-// back as a `play` frame, its metadata under `_`: APPLIED frees the button, REJECTED frees it and
-// shows `_.reason` (+ `_.args`) right after it. Call sites hold no code. A frame is this tab's
-// feedback when `_.tab` is its id — a door always stamps one; another tab's `play`, a room-born
-// `play`, are just events.
+// A click posts {type: 'play', move: 'rock'} and leaves the button busy until the reply, which is
+// the verdict: 200 frees it, 4xx frees it and shows `reason` (+ `args`) right after it. Call sites
+// hold no code. The stream carries only events, the author's own as anyone's: the page handles them
+// on one path.
 
 const intents = (function() {
     // in flight in this tab, by intent name (a rerender may replace the element) → click token
@@ -75,40 +74,14 @@ const intents = (function() {
         busyTriggers().forEach(el => setBusy(el, false));
     }
 
-    // One verdict per click, whichever arrives first: the frame or the HTTP failure.
     function settle(kind, verdict) {
         const intent = verdict?.intent;
-        if (!pending.has(intent)) return;   // not ours, or already settled
+        if (!pending.has(intent)) return;   // already settled
         const triggers = busyTriggers(intent);
         free(intent);
         if (kind === 'rejected') showReason(intent, reasonText(verdict.reason || 'rejected', verdict.args), triggers);
         else clearReason(intent);
         attached?.store?.dispatch({ type: kind, payload: verdict });
-    }
-
-    // The frames of an intent name: ours when `_.tab` is this tab.
-    function frame(intent) {
-        return (data) => {
-            if (!pending.has(intent)) return;
-            let event;
-            try { event = JSON.parse(data); } catch (err) { return console.error(`bad ${intent} frame:`, err); }
-            const meta = event?._ || {};
-            if (meta.tab !== api.tabId()) return;
-            if (meta.stage === 'REJECTED' || meta.reason !== undefined) {
-                settle('rejected', { intent, reason: meta.reason, args: meta.args || {} });
-            } else {
-                settle('accepted', { intent });
-            }
-        };
-    }
-
-    // sse.on() adds beside the host's handlers of the same name; ours are kept to be removed alone.
-    function listen(intent) {
-        const { sse, handlers } = attached;
-        if (!sse || handlers.has(intent)) return;
-        const handler = frame(intent);
-        handlers.set(intent, handler);
-        sse.on(intent, handler);
     }
 
     function onClick(event) {
@@ -118,39 +91,37 @@ const intents = (function() {
         event.preventDefault();
         const intent = el.dataset.intent;
         if (pending.has(intent)) return;
-        listen(intent);     // a trigger rendered after attach
         const token = ++tokens;
         pending.set(intent, token);
         setBusy(el, true);
         clearReason(intent);
         const { act, payload } = attached;
-        // the promise is a safety net only (transport down, refused before the loop)
+        // only the click still pending settles (free() or detach() may have dropped it)
+        const ours = () => pending.get(intent) === token;
         Promise.resolve()
             .then(() => act(intent, payload(el)))
-            .catch(err => {
-                if (pending.get(intent) === token) settle('rejected', { intent, reason: err?.message || String(err) });
-            });
+            .then(
+                () => { if (ours()) settle('accepted', { intent }); },
+                err => {
+                    if (ours()) settle('rejected', { intent,
+                        reason: err?.data?.reason ?? err?.message ?? String(err), args: err?.data?.args ?? {} });
+                });
     }
 
-    function attach({ room, act, sse, store, payload, root = document }) {
+    // `sse`, from callers of the frame era, is ignored
+    function attach({ room, act, store, payload, root = document }) {
         detach();
         attached = {
-            root, store, sse,
-            handlers: new Map(),    // intent name → our frame handler
+            root, store,
             act: act || ((type, body) => api.act(room, type, body)),
             payload: payload || datasetPayload
         };
         root.addEventListener('click', onClick);
-        sse?.on('open', freeAll);
-        root.querySelectorAll('[data-intent]').forEach(el => listen(el.dataset.intent));
     }
 
     function detach() {
         if (!attached) return;
-        const { root, sse, handlers } = attached;
-        root.removeEventListener('click', onClick);
-        sse?.off('open', freeAll);
-        handlers.forEach((handler, name) => sse?.off(name, handler));
+        attached.root.removeEventListener('click', onClick);
         freeAll();
         attached = null;
     }

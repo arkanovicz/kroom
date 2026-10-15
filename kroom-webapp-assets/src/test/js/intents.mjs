@@ -1,5 +1,5 @@
 // What intents.js, api.act and sse.js's stream parameters do, checked against a fake DOM, a fake server
-// and a fake EventSource. Not part of `gradle test`: `./smoke.sh` here (node runs in docker).
+// and a fake EventSource (sse.js needs one to load). Not part of `gradle test`: `./smoke.sh` here (node runs in docker).
 
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
@@ -14,7 +14,8 @@ const check = (what, got, want) => {
 };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-/** The scripts loaded as a browser loads them (one shared scope), fetch and EventSource faked. */
+/** The scripts loaded as a browser loads them (one shared scope), fetch and EventSource faked.
+ *  `responder(url, body)` answers each fetch with {status, payload}, or a promise of it; a throw is a transport failure. */
 function page(html, responder = () => ({})) {
     const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`,
         { runScripts: 'outside-only', url: 'http://localhost/chifoumi' });
@@ -23,9 +24,9 @@ function page(html, responder = () => ({})) {
     const sources = [];
     window.Response = Response;
     window.fetch = async (url, options = {}) => {
-        calls.push({ url, method: options.method || 'GET', headers: options.headers,
-            body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
-        const { status = 200, payload = {} } = responder(url) || {};
+        const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+        calls.push({ url, method: options.method || 'GET', headers: options.headers, body });
+        const { status = 200, payload = {} } = (await responder(url, body)) || {};
         return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
     };
     window.EventSource = class {
@@ -60,11 +61,19 @@ const buttons = `
 
 // --- a click, its busy trigger and its post -------------------------------------------------------
 {
-    const { calls, sources, click, $, window, api, sse, intents } = page(buttons);
-    const conn = sse('/events/chifoumi').connect();
+    // per intent: a reply, or a pending one the test resolves
+    const replies = {};
+    const hold = (intent) => new Promise(resolve => { replies[intent] = { release: resolve }; });
+    const { calls, click, $, window, api, intents } = page(buttons, (url, body) => {
+        const reply = replies[body?.type];
+        if (reply?.release) return new Promise(resolve => { reply.answer = resolve; });
+        if (reply?.throws) throw new Error(reply.throws);
+        return reply;
+    });
     const dispatched = [];
-    intents.attach({ room: 'chifoumi', sse: conn, store: { dispatch: (a) => dispatched.push(a) } });
+    intents.attach({ room: 'chifoumi', store: { dispatch: (a) => dispatched.push(a) } });
 
+    hold('play');
     click('[data-move="rock"] span');
     const rock = $('[data-move="rock"]');
     check('a click marks its trigger busy', [rock.getAttribute('aria-busy'), rock.disabled], ['true', true]);
@@ -73,107 +82,109 @@ const buttons = `
     check('the intent is posted to the room', [calls.length, calls[0]?.url, calls[0]?.method], [1, '/api/rooms/chifoumi/act', 'POST']);
     check('its body is the type plus the other data-*', calls[0]?.body, { move: 'rock', type: 'play' });
     check('it names its tab', calls[0]?.headers['X-Kroom-Tab'], api.tabId());
-    check('the tab id is kept for the tab', window.sessionStorage.getItem('kroom.tabId'), api.tabId());
+    check('busy spans the post', [rock.getAttribute('aria-busy'), intents.busy('play')], ['true', true]);
 
     click('[data-move="paper"]');
     await sleep(10);
     check('a second click of a busy intent vanishes', [calls.length, $('[data-move="paper"]').hasAttribute('aria-busy')], [1, false]);
 
+    replies.leave = { status: 200, payload: {} };
     click('[data-intent="leave"]');
     await sleep(10);
     check('another intent is not blocked', [calls.length, calls[1]?.body], [2, { type: 'leave' }]);
+    dispatched.length = 0;
 
-    const es = sources[0];
-    const hostSaw = [];
-    conn.onJson('play', (e) => hostSaw.push(e));    // the host's own listener of the same event
-    const applied = (tab, seq) => ({ _: { stage: 'APPLIED', from: 'alice', tab, seq }, move: 'rock' });
+    replies.play.answer({ status: 200, payload: {} });
+    await sleep(10);
+    check('a 200 frees the trigger', [rock.hasAttribute('aria-busy'), rock.disabled, intents.busy('play')], [false, false, false]);
+    check('the acceptance reaches the store', dispatched, [{ type: 'accepted', payload: { intent: 'play' } }]);
+    check('and leaves no reason', $('[data-intent-reason="play"]'), null);
 
-    es.fire('play', applied('another-tab', 41), '41');
-    check("another tab's frame does not free the trigger", [rock.getAttribute('aria-busy'), intents.busy('play')], ['true', true]);
-    es.fire('play', applied(api.tabId(), 42), '42');
-    check('our applied frame frees the trigger', [rock.hasAttribute('aria-busy'), rock.disabled, intents.busy('play')], [false, false, false]);
-    check('the other intent stays busy', intents.busy('leave'), true);
-    check('the verdict reaches the store', dispatched, [{ type: 'accepted', payload: { intent: 'play' } }]);
-    check("the host's listener sees every frame", hostSaw.map(e => e._.seq), [41, 42]);
-
+    replies.play = { status: 400, payload: { reason: 'not_your_turn', args: {} } };
     click('[data-move="paper"]');
-    es.fire('play', { _: { stage: 'REJECTED', from: 'alice', tab: api.tabId(), reason: 'not_your_turn', args: {} } });
+    await sleep(10);
     const paper = $('[data-move="paper"]');
     const reason = paper.nextElementSibling;
-    check('a rejected frame frees the trigger', [paper.hasAttribute('aria-busy'), paper.disabled, intents.busy('play')], [false, false, false]);
+    check('a 400 frees the trigger', [paper.hasAttribute('aria-busy'), paper.disabled, intents.busy('play')], [false, false, false]);
     check('and shows its reason right after it',
         [reason?.tagName, reason?.className, reason?.getAttribute('role'), reason?.dataset.intentReason, reason?.textContent],
         ['SMALL', 'intent-reason', 'alert', 'play', 'not_your_turn']);
     check('the rejection reaches the store', dispatched[1], { type: 'rejected', payload: { intent: 'play', reason: 'not_your_turn', args: {} } });
 
-    es.fire('play', { _: { stage: 'REJECTED', tab: api.tabId(), reason: 'again', args: {} } });
-    check('a frame with nothing in flight does nothing',
-        [window.document.querySelectorAll('.intent-reason').length, $('.intent-reason').textContent, dispatched.length], [1, 'not_your_turn', 2]);
-
+    replies.play = { status: 400, payload: { reason: 'missing', args: { field: 'move', max: 3 } } };
     click('[data-move="paper"]');
-    es.fire('play', { _: { stage: 'REJECTED', reason: 'missing', args: { field: 'move', max: 3 } } });
-    check('an untargeted frame (room-born) is not ours', intents.busy('play'), true);
-    es.fire('play', { _: { stage: 'REJECTED', tab: api.tabId(), reason: 'missing', args: { field: 'move', max: 3 } } });
+    await sleep(10);
     check('the args follow the reason',
-        [intents.busy('play'), $('[data-intent-reason="play"]')?.textContent], [false, 'missing (field: move, max: 3)']);
+        [window.document.querySelectorAll('.intent-reason').length, $('[data-intent-reason="play"]')?.textContent], [1, 'missing (field: move, max: 3)']);
 
+    replies.play = { throws: 'network down' };
     click('[data-move="rock"]');
     check('the next click removes the reason', $('[data-intent-reason="play"]'), null);
+    await sleep(10);
+    check('a transport failure frees and shows its message',
+        [intents.busy('play'), rock.nextElementSibling?.textContent], [false, 'network down']);
 
-    es.opened();
-    check('a (re)opened stream frees everything in flight',
-        [intents.busy('play'), intents.busy('leave'), window.document.querySelectorAll('[aria-busy]').length], [false, false, 0]);
-
-    intents.detach();
+    hold('play');
     click('[data-move="rock"]');
     await sleep(10);
-    check('detached, a click does nothing', [intents.busy('play'), calls.length], [false, 5]);
-    es.fire('play', applied(api.tabId(), 43));
-    check("detached, the host's listener stays", [hostSaw.length, hostSaw.at(-1)._.seq], [7, 43]);
+    intents.free('play');
+    const before = dispatched.length;
+    replies.play.answer({ status: 400, payload: { reason: 'late', args: {} } });
+    await sleep(10);
+    check('a reply to a click no longer pending settles nothing',
+        [dispatched.length - before, $('[data-intent-reason="play"]')], [0, null]);
+
+    intents.detach();
+    const posted = calls.length;
+    click('[data-move="rock"]');
+    await sleep(10);
+    check('detached, a click does nothing', [intents.busy('play'), calls.length], [false, posted]);
+}
+
+// --- the tab id: taken at load, put back on pagehide ----------------------------------------------
+{
+    const { window, api } = page('');
+    const id = api.tabId();
+    check('the id is taken out of sessionStorage at load', window.sessionStorage.getItem('kroom.tabId'), null);
+    window.dispatchEvent(new window.Event('pagehide'));
+    check('pagehide puts it back for a reload', window.sessionStorage.getItem('kroom.tabId'), id);
+    const other = page('').api.tabId();
+    check('another page makes its own', [typeof other, other.length > 0, other !== id], ['string', true, true]);
 }
 
 // --- a trigger rendered after attach --------------------------------------------------------------
 {
-    const { sources, click, $, window, api, sse, intents } = page('<div id="late"></div>');
-    const conn = sse('/events/chifoumi').connect();
-    intents.attach({ room: 'chifoumi', sse: conn });
+    const { click, $, intents } = page('<div id="late"></div>');
+    intents.attach({ room: 'chifoumi' });
     $('#late').innerHTML = '<button data-intent="fold">Fold</button>';
     click('[data-intent="fold"]');
+    check('a late trigger goes busy on its click', intents.busy('fold'), true);
     await sleep(10);
-    sources[0].fire('fold', { _: { stage: 'APPLIED', tab: api.tabId(), seq: 1 } });
-    check('its name is listened to on its first click', intents.busy('fold'), false);
+    check('and its reply frees it', intents.busy('fold'), false);
     intents.detach();
 }
 
-// --- the HTTP safety net --------------------------------------------------------------------------
+// --- an HTTP error without a reason ---------------------------------------------------------------
 {
-    const { calls, sources, click, $, sse, intents } = page(buttons,
+    const { calls, click, $, intents } = page(buttons,
         (url) => url.includes('chifoumi') ? { status: 503, payload: { error: 'server restarting' } } : {});
-    const conn = sse('/events/chifoumi').connect();
-    intents.attach({ room: 'chifoumi', sse: conn });
+    intents.attach({ room: 'chifoumi' });
     click('[data-move="rock"]');
     await sleep(20);
     const rock = $('[data-move="rock"]');
     check('a failed post frees the trigger', [rock.hasAttribute('aria-busy'), intents.busy('play')], [false, false]);
     check('and shows the error as its reason', rock.nextElementSibling?.textContent, 'server restarting');
-    sources[0].fire('play', { _: { stage: 'REJECTED', reason: 'error', args: {} } });
-    check('the frame that follows shows it once, not twice', document_reasons($), 1);
     click('[data-move="rock"]');
     check('the next click clears it', $('.intent-reason'), null);
     check('and posts again', (await sleep(10), calls.length), 2);
 }
 
-function document_reasons($) {
-    return $('body').querySelectorAll('.intent-reason').length;
-}
-
 // --- options: act, payload, root ------------------------------------------------------------------
 {
-    const { click, $, sse, intents } = page(`<div id="a">${buttons}</div><button id="out" data-intent="play">x</button>`);
-    const conn = sse('/events/chifoumi').connect();
+    const { click, $, intents } = page(`<div id="a">${buttons}</div><button id="out" data-intent="play">x</button>`);
     const acted = [];
-    intents.attach({ act: (type, payload) => { acted.push([type, payload]); return Promise.resolve({}); },
-        payload: (el) => ({ move: el.dataset.move.toUpperCase() }), sse: conn, root: $('#a') });
+    intents.attach({ act: (type, payload) => { acted.push([type, payload]); return new Promise(() => {}); },
+        payload: (el) => ({ move: el.dataset.move.toUpperCase() }), sse: {}, root: $('#a') });
     click('#a [data-move="paper"]');
     await sleep(10);
     check('act and payload override the defaults', acted, [['play', { move: 'PAPER' }]]);
@@ -203,10 +214,10 @@ function document_reasons($) {
         .into({ dispatch: (a) => dispatched.push(a) }, 'state', 'played')
         .connect();
     check('the stream names its tab', sources[0].url, `/events/chifoumi?login=joe&tabId=${api.tabId()}`);
-    sources[0].fire('state', { _: { stage: 'APPLIED', seq: 7 }, round: 1 }, '7');
+    sources[0].fire('state', { round: 1 }, '7');
     sources[0].fire('played', { move: 'rock' }, '8');
-    check('into() mirrors named events into the store, metadata untouched', dispatched,
-        [{ type: 'state', payload: { _: { stage: 'APPLIED', seq: 7 }, round: 1 } }, { type: 'played', payload: { move: 'rock' } }]);
+    check('into() mirrors named events into the store', dispatched,
+        [{ type: 'state', payload: { round: 1 } }, { type: 'played', payload: { move: 'rock' } }]);
     sources[0].readyState = window.EventSource.CLOSED;
     sources[0].onerror(new window.Event('error'));
     await sleep(30);
