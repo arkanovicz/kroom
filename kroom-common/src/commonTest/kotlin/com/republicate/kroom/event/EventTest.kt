@@ -102,7 +102,7 @@ class EventTest {
         assertEquals(Stage.BORN, e.stage)
         assertEquals(Move.SCISSORS, e.move)
         assertNull(catalog.of("dance"))
-        assertEquals(2, catalog.describe().size)
+        assertEquals(4, catalog.describe().size)   // join, leave, and the two
     }
 
     @Test fun `a client's metadata is dropped at birth`() {

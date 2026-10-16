@@ -65,7 +65,7 @@ class LogicTest {
     @Test fun `the registry is the alphabet, postable names apart`() {
         val r = Rule.registry
         assertEquals(setOf("add", "note", "wait"), r.names)
-        assertEquals(setOf("add", "set", "note", "wait"), r.all)
+        assertEquals(setOf("join", "leave", "add", "set", "note", "wait"), r.all)   // the room's own first: on every wire
         assertNull(r.of("set"))                      // nobody posts what is only fired
         assertNotNull(r.frame("set", Json.MutableObject("n" to 1)))
         val d = r.describe().map { it as Json.Object }.associateBy { it.getString("name")!! }

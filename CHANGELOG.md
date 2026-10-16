@@ -27,6 +27,8 @@ All notable changes to kroom will be documented in this file.
   `call.lastEventId`. A reconnect is a join, the snapshot is the truth. `channelCapacity` is 64.
 - `ChatRoom`: `Chat` is the event (`text` in, `seq` / `from` / `author` / `timestamp` added by the
   room), persisted in seq order by one writer after emission (`persist()` is its last stage).
+  `Chat` and `ChatState` live in `kroom-common` (`com.republicate.kroom.event`), the browser's
+  too; `Chat.toMessage()` / `ChatMessage.toChat()` are the server's extensions.
 - `trace(event)` at every stage change, `emitted(event)` after the frame; `Actor.tab`.
 - The wire is the payload: no `_` metadata on frames (the stage, `from`, `tab`, `seq` were there;
   the seq is the frame's `id`), and a `_` a client sends is dropped at birth. The reply of
@@ -89,7 +91,13 @@ All notable changes to kroom will be documented in this file.
   (the snapshot has it all; the feed, the counts, "who is waiting" are derived). Players are user
   ids on the wire, names beside (`name1` / `name2`). The lobby page has the room's chat box and
   reports presence (`status`); `MatchStats` / `ActivityEvent` are gone, `Match` is `Game`.
-  `LobbyTest`: the rule as a function, and a recorded match (`private/scratch/chifoumi-frames.jsonl`).
+  `LobbyTest`: the rule as a function, and a recorded match, whose fold through `Store` must be
+  the snapshot the room would serve (commutation); the recording is the golden in
+  `chifoumi-common/src/commonTest/resources/frames.jsonl` (the test says when to refresh it),
+  replayed by `FoldTest` on the JVM and on node and by the pages' jsdom harness.
+- `kroom-examples/chifoumi-common` (multiplatform, JVM + JS): the lobby's declarations, fold and
+  typed layer (`Lobby.kt`, `LobbyLogic`, `Move`) moved out of the server module, one class for
+  both runtimes (`LobbyLogic.registry` is the alphabet, the browser's too).
 - Enum fields read whatever the case (`move: "rock"`), the JSON stays as sent.
 - `held()` with nothing fired: a no-arg overload (a vararg of an inferred `Nothing` built a
   `Void[]` the JVM refused).
@@ -171,6 +179,11 @@ All notable changes to kroom will be documented in this file.
   a `Catalog` rebuilds an event from a frame by name. `Reason` is a key and arguments, localized
   by the browser. Pinned in `EventTest`, JVM and JS. Nothing uses it yet (branch `kroom-events`).
 - jvmTest runs with `slf4j-simple`: kson logs through slf4j on the JVM.
+- `event.Store(state, registry, me)`: a room as a client folds it, on any target — `state`
+  replaces, `join` / `leave` / `status` keep `users`, the viewer's own `cancel` releases
+  `pending` (`hold` / `release` for the reply's word), every other frame goes through the same
+  `State.reduce` the server runs. `Registry` knows `join` and `leave` (`all`, `describe()`,
+  `frame()`), posted by nobody.
 
 #### kroom-server
 - Intents (`private/intents.md`): `Room.act` returning the verdict as a `Deferred`, `act(user, tabId,

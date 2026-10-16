@@ -1,12 +1,12 @@
 package com.republicate.kroom.examples.chifoumi.game
 
 import com.republicate.kroom.event.Cancel
+import com.republicate.kroom.event.Chat
+import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Fires
 import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Leave
-import com.republicate.kroom.server.Chat
-import com.republicate.kroom.server.ChatState
 import com.republicate.kson.Json
 
 /*

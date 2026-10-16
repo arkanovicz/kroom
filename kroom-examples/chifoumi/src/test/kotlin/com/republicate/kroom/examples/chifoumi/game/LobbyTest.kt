@@ -5,6 +5,7 @@ import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Fired
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Stage
+import com.republicate.kroom.event.Store
 import com.republicate.kroom.server.Actor
 import com.republicate.kroom.server.ChatRoom
 import com.republicate.kroom.server.MemoryChatHistory
@@ -106,7 +107,7 @@ class LobbyTest {
         suspend fun act(who: Actor, e: Event): Event = room.act(who, e).await().also { assertNotEquals(Stage.REJECTED, it.stage, it.meta.reason) }
         act(a, Match())
         act(b, Match())
-        act(a, com.republicate.kroom.server.Chat(json("text" to "gl hf")))
+        act(a, com.republicate.kroom.event.Chat(json("text" to "gl hf")))
         act(a, Play(json("move" to "ROCK")))
         act(b, Play(json("move" to "PAPER")))
         act(b, Play(json("move" to "WELL")))
@@ -117,9 +118,19 @@ class LobbyTest {
 
         val seen = mutableListOf<ServerSentEvent>()
         while (true) { val f = cb.tryReceive().getOrNull() ?: break; seen += f }
-        // the recording the pages' harness replays (src/test/js/smoke.sh), under the module's build
-        File("build/frames.jsonl").writeText(seen.joinToString("\n") { """{"id":${it.id},"event":"${it.event}","data":${it.data}}""" } + "\n")
         assertEquals(listOf("state", "join", "match", "match", "chat", "play", "play", "round", "play", "cancel", "play", "play", "round", "leave", "match"), seen.map { it.event })
+        // commutation: the fold of what bob's tab received is the snapshot bob would get now
+        val final = room.stateToJson(b)
+        val store = Store(LobbyState(), LobbyLogic.registry, "b")
+        seen.forEach { store.fold(it.event!!, it.data!!) }
+        assertEquals(final.toString(), store.json.toString())   // as text: kson's equals tells a parsed 1 (a Long) from a counted 1 (an Int)
+        // the recording, the golden of the browser's fold (chifoumi-common's FoldTest) and of the pages (src/test/js): refresh it when the wire changes
+        val recording = seen.joinToString("") { """{"id":${it.id},"event":"${it.event}","data":${it.data}}""" + "\n" } + """{"event":"final","data":$final}""" + "\n"
+        File("build/frames.jsonl").writeText(recording)
+        val golden = File("../chifoumi-common/src/commonTest/resources/frames.jsonl")
+        val refresh = "refresh the golden: cp build/frames.jsonl $golden"
+        assertTrue(golden.exists(), refresh)
+        assertEquals(seen.map { it.event }, golden.readLines().filter { it.isNotBlank() }.map { (Json.parse(it) as Json.Object).getString("event") }.filter { it != "final" }, refresh)
         val snapshot = Json.parse(seen[0].data!!) as Json.Object
         // the joiner is in its own snapshot, and its `join` follows: presence folds by id, so both agree
         assertEquals(listOf("a", "b"), snapshot.getArray("users")!!.map { (it as Json.Object).getString("id") })

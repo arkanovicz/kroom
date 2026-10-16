@@ -1,5 +1,7 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.ChatState
+
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 

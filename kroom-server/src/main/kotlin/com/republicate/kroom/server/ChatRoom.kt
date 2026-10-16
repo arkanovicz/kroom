@@ -1,5 +1,7 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Chat
+import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Logic
 import com.republicate.kroom.event.Outcome
@@ -13,27 +15,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
-
-/** The RAM tail, what a snapshot carries: the last [max] lines, the fold of the `chat` frames. A room with more extends it. */
-open class ChatState(json: Json.MutableObject = Json.MutableObject(), val max: Int = 50) : State(json) {
-    val history by log(::Chat, max)
-    override fun reduce(frame: Event) { if (frame is Chat) history += frame }
-}
-
-/** A line of chat: the text comes in, the rule adds who, when and the message's seq. */
-class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", json = json) {
-    val text by string().required
-    var seq by long().out
-    var from by string().out
-    var author by obj().out
-    var timestamp by string().out
-
-    fun toMessage() = ChatMessage(seq!!, Author(author!!.getString("id")!!, author!!.getString("name")!!, author!!.getString("avatar")), text, timestamp!!)
-
-    companion object {
-        fun of(message: ChatMessage) = Chat(Json.MutableObject(message.toJson()))
-    }
-}
 
 /** The rule: a line is numbered and signed. The sequence continues the tail's, the store's. A composing rule delegates its `Chat` here. */
 class ChatLogic : Logic<ChatState> {
@@ -63,7 +44,7 @@ open class ChatRoom<S : ChatState>(id: String, private val history: ChatHistory,
 
     init {
         // the tail comes from the store: once, before the first join
-        runBlocking { history.tail(state.max) }.forEach { state.history += Chat.of(it) }
+        runBlocking { history.tail(state.max) }.forEach { state.history += it.toChat() }
         scope.launch { for (chat in writer) { history.append(chat.toMessage()); trace(chat.persist()) } }
     }
 
@@ -85,3 +66,6 @@ open class ChatRoom<S : ChatState>(id: String, private val history: ChatHistory,
 
 /** A chat room and nothing more. */
 fun ChatRoom(id: String, history: ChatHistory = MemoryChatHistory()): ChatRoom<ChatState> = ChatRoom(id, history, ChatState(), ChatLogic())
+
+fun Chat.toMessage() = ChatMessage(seq!!, Author(author!!.getString("id")!!, author!!.getString("name")!!, author!!.getString("avatar")), text, timestamp!!)
+fun ChatMessage.toChat() = Chat(Json.MutableObject(toJson()))

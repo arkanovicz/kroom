@@ -38,6 +38,8 @@ project(":kroom-webapp-authoring-demo").projectDir = file("kroom-webapp-authorin
 include("kroom-webapp-authoring-starter")
 project(":kroom-webapp-authoring-starter").projectDir = file("kroom-webapp-authoring/starter")
 // Examples
+include("kroom-examples:chifoumi-common")
+project(":kroom-examples:chifoumi-common").projectDir = file("kroom-examples/chifoumi-common")
 include("kroom-examples:chifoumi")
 project(":kroom-examples:chifoumi").projectDir = file("kroom-examples/chifoumi")
 

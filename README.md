@@ -96,7 +96,10 @@ event: play   id: 42   data: {"move":"rock"}
   `fires`, every other name on the wire. The room (`LogicRoom(id, state, logic)`) is the machine:
   it runs the rule on its loop, frames what it fired, folds every frame into the state as it goes,
   so the server's state is the fold it serves and `reduce*(snapshot@N, frames) == snapshot@M` by
-  construction.
+  construction. A client folds the stream with the same class: `Store(state, registry, me)`
+  replaces on `state`, keeps `users` from the presence frames and `pending` from the viewer's own
+  `cancel`, and hands every other frame to the same `reduce`. The registry lists `join` and
+  `leave` with the rest: every name on the wire, posted by nobody.
 
   ```kotlin
   class Counter : State() {
@@ -150,9 +153,12 @@ event: play   id: 42   data: {"move":"rock"}
   composed through `ChatLogic`). Its grammar heads `game/Lobby.kt`; `LobbyLogic` is the typed
   layer a generator will write (one member per arrow, `play(…): Outcome<Round>`, and the `when`),
   `ChifoumiLogic` the hand part; the live matches, with the move of a round in progress, are the
-  rule's fields, never on the wire. The pages fold the same `reduce` in `static/js/state.js`;
-  the activity feed, the stats, "who is waiting" are derived from `match`, `round`, `join`,
-  `leave`, not events of their own. `LobbyTest` records a whole match's frames, the pages' golden.
+  rule's fields, never on the wire. The declarations and the fold are one class compiled for the
+  JVM and the browser (`kroom-examples/chifoumi-common`, multiplatform); the activity feed, the
+  stats, "who is waiting" are derived from `match`, `round`, `join`, `leave`, not events of their
+  own. `LobbyTest` records a whole match's frames and checks their fold is the snapshot the room
+  would serve; the recording is the golden `FoldTest` replays on the JVM and on node, and the
+  pages' jsdom harness replays through the pages.
 - **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
   stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
   permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`

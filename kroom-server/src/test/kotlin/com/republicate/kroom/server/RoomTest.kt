@@ -252,7 +252,7 @@ class RoomTest {
 
     @Test fun `the registry is the door's events, as data`() {
         val d = room().registry.describe().map { (it as Json.Object).getString("name") }
-        assertEquals(listOf("slow", "ok", "loud", "bad", "boom", "shaped", "vip"), d)
+        assertEquals(listOf("join", "leave", "slow", "ok", "loud", "bad", "boom", "shaped", "vip"), d)
     }
 
     @Test fun `a connection id is composed under the user, the tab reads back`() {

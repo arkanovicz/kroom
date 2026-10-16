@@ -17,6 +17,7 @@ application {
 }
 
 dependencies {
+    implementation(project(":kroom-examples:chifoumi-common")) // the lobby's declarations and fold, the browser's too
     implementation(project(":kroom-webapp-core"))
     implementation(project(":kroom-webapp-assets")) // the stock scripts the pages load from /js/
     implementation(project(":kroom-webapp-velocity"))

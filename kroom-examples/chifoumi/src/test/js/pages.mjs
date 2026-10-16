@@ -1,5 +1,5 @@
-// The chifoumi pages in jsdom, driven by the frames a JVM test recorded (LobbyTest, Bob's tab,
-// build/frames.jsonl): the same gestures, the same frames, the DOM as the player would see it.
+// The chifoumi pages in jsdom, driven by the frames a JVM test recorded (LobbyTest, Bob's tab, the golden
+// in chifoumi-common's test resources): the same gestures, the same frames, the DOM as the player would see it.
 // Prints what it sees; the hard checks are the few `must` lines.
 import { createRequire } from 'module';
 import fs from 'fs';
@@ -7,7 +7,7 @@ const require = createRequire('/home/app/kroom-webapp-assets/src/test/js/');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const R = '/home/app/kroom-examples/chifoumi/src/main/resources';
 const A = '/home/app/kroom-webapp-assets/src/main/resources/static/js';
-const frames = fs.readFileSync('/home/app/kroom-examples/chifoumi/build/frames.jsonl', 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+const frames = fs.readFileSync('/home/app/kroom-examples/chifoumi-common/src/commonTest/resources/frames.jsonl', 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(f => f.event !== 'final');
 let failed = 0;
 const must = (cond, label) => { if (!cond) { failed++; console.log('FAIL', label); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));

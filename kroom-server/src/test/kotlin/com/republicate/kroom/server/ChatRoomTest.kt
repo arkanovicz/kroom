@@ -1,5 +1,6 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Chat
 import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
 import io.ktor.sse.*
