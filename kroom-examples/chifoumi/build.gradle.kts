@@ -28,4 +28,12 @@ dependencies {
     implementation(libs.ktor.server.sse)
     runtimeOnly(libs.velocity.engine.scripting) // the example renders its templates interpreted
     implementation(libs.slf4j.simple)
+
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

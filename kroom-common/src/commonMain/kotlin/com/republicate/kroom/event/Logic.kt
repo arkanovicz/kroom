@@ -42,6 +42,8 @@ class Fired<out F : Event>(val events: List<F>, val held: Boolean = false, val r
 fun <F : Event> fired(vararg events: F): Fired<F> = Fired(events.toList())
 /** The intent stays pending, firing these meanwhile. */
 fun <F : Event> held(vararg events: F): Fired<F> = Fired(events.toList(), held = true)
+/** The intent stays pending, its own frame and nothing more. (A vararg of an inferred `Nothing` is an array the JVM refuses: hence the overload.) */
+fun held(): Fired<Nothing> = Fired(emptyList(), held = true)
 /** The intent's own frame and nothing more. */
 val done: Fired<Nothing> = Fired(emptyList())
 

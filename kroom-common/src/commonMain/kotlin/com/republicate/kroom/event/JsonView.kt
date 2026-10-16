@@ -34,8 +34,9 @@ abstract class JsonView(val json: Json.MutableObject) {
     protected fun bool() = Field<Boolean?>(Kind.BOOL, { j, k -> j.getBoolean(k) })
     protected fun obj() = Field<Json.Object?>(Kind.OBJECT, { j, k -> j.getObject(k) })
     protected fun array() = Field<Json.Array?>(Kind.ARRAY, { j, k -> j.getArray(k) })
+    /** Read whatever the case (a button says `rock`), written as the constant's name. */
     protected inline fun <reified E : Enum<E>> enum() =
-        Field<E?>(Kind.STRING, { j, k -> j.getString(k)?.let { enumValueOf<E>(it) } }, { it?.name })
+        Field<E?>(Kind.STRING, { j, k -> j.getString(k)?.let { s -> enumValues<E>().firstOrNull { it.name.equals(s, ignoreCase = true) } ?: throw IllegalArgumentException(s) } }, { it?.name })
 
     /** A nested view, built over the object under the key (which stays the truth); null when absent. */
     protected fun <V : JsonView> obj(view: (Json.MutableObject) -> V) =
@@ -43,6 +44,11 @@ abstract class JsonView(val json: Json.MutableObject) {
 
     /** A list of plain values; absent reads empty, written whole. */
     protected fun <T> list() = Field<List<T>>(Kind.ARRAY, { j, k -> @Suppress("UNCHECKED_CAST") (j.getArray(k)?.toList() as List<T>?) ?: emptyList() }, { Json.MutableArray(it) })
+
+    /** Views by key, over the object under the key; absent reads empty, written whole (`matches + (id to m)`, `matches - id`). */
+    protected fun <V : JsonView> map(view: (Json.MutableObject) -> V) =
+        Field<Map<String, V>>(Kind.OBJECT, { j, k -> j.getObject(k)?.entries?.associate { (id, v) -> id to view(v as Json.MutableObject) } ?: emptyMap() },
+            { m -> Json.MutableObject(m.mapValues { it.value.json }) })
 
     /** An append-only list of views, the last [max] when bounded: a frame named like it appends. */
     protected fun <V : JsonView> log(view: (Json.MutableObject) -> V, max: Int = 0) =

@@ -51,7 +51,7 @@ fun Route.events() {
 fun Route.chatHistory(principal: suspend (ApplicationCall) -> User?) {
     get("/rooms/{room}/history") {
         principal(call) ?: return@get call.json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
-        val room = Lobby.get<Any>(call.parameters["room"]!!) as? ChatRoom ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
+        val room = Lobby.get<Any>(call.parameters["room"]!!) as? ChatRoom<*> ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
         val before = call.request.queryParameters["before"]?.toLongOrNull() ?: Long.MAX_VALUE
         val n = (call.request.queryParameters["n"]?.toIntOrNull() ?: 50).coerceIn(1, 500)
         call.json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.before(before, n).map { it.toJson() })).toString())

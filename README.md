@@ -143,8 +143,16 @@ event: play   id: 42   data: {"move":"rock"}
   The rule hears `Join` / `Leave` / `Status` as events, a user's (first connection, last one), and
   fires what the registry declares for them (`leave = Fires(::Match)`).
 - **The `on()` path** (`on(::Play) { actor, play -> Reason? }`, class and handler together, the
-  handler mutating the room's state and emitting itself) still runs underneath: `Table` and the
-  chifoumi example are on it until their port.
+  handler mutating the room's state and emitting itself) still runs underneath: `Table` is on it
+  until its port.
+- **The chifoumi example is the contract's proof** (`kroom-examples/chifoumi`): one room, a
+  `ChatRoom` whose rule is the game's (`ChatRoom<LobbyState>(id, history, state, logic)`, chat
+  composed through `ChatLogic`). Its grammar heads `game/Lobby.kt`; `LobbyLogic` is the typed
+  layer a generator will write (one member per arrow, `play(…): Outcome<Round>`, and the `when`),
+  `ChifoumiLogic` the hand part; the live matches, with the move of a round in progress, are the
+  rule's fields, never on the wire. The pages fold the same `reduce` in `static/js/state.js`;
+  the activity feed, the stats, "who is waiting" are derived from `match`, `round`, `join`,
+  `leave`, not events of their own. `LobbyTest` records a whole match's frames, the pages' golden.
 - **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
   stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
   permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`
@@ -858,7 +866,7 @@ a bare JRE container, as you, in the current directory. `publish-snapshot.sh` pu
 
 ```bash
 ./gradlew :kroom-server:run           # SSE playground at :8080/playground
-./gradlew :kroom-examples:chifoumi:run  # Rock-paper-scissors at :8081
+./gradlew :kroom-examples:chifoumi:run  # Rock-paper-scissors-well at :8080, two browsers to play
 
 # the authoring demo, every example plugin installed, a Mailpit mailbox beside it to read what the site sends — admin / admin
 KROOM_UID=$(id -u) KROOM_GID=$(id -g) docker compose -f kroom-webapp-authoring/demo/compose.yml up

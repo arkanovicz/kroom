@@ -20,12 +20,12 @@ class EventTest {
     }
 
     @Test fun `the json is the truth, the class a view`() {
-        val play = Play(Json.MutableObject("move" to "ROCK"))
+        val play = Play(Json.MutableObject("move" to "rock"))   // a button's spelling
         assertEquals(Move.ROCK, play.move)
         assertNull(play.note)
         play.note = "gg"
         assertEquals("gg", play.json["note"])
-        assertEquals("""{"move":"ROCK","note":"gg"}""", play.json.toString())
+        assertEquals("""{"move":"rock","note":"gg"}""", play.json.toString())   // the json is the truth, read whatever the case
     }
 
     @Test fun `a declaration is data`() {

@@ -33,7 +33,11 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
         on(::Cancel) { actor, cancel -> cancel(actor, cancel) }
         // the rule hears a user, not a connection
         on(::Join) { actor, join -> if (join.first == true) hook(actor, join, registry.join.names) else null }
-        on(::Leave) { actor, leave -> if (leave.last == true) hook(actor, leave, registry.leave.names) else null }
+        on(::Leave) { actor, leave ->
+            if (leave.last != true) return@on null
+            held.remove(actor.id)   // a departure withdraws what the user held
+            hook(actor, leave, registry.leave.names)
+        }
     }
 
     private fun run(actor: Actor, intent: Event): Reason? {

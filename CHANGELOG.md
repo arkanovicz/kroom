@@ -79,9 +79,21 @@ All notable changes to kroom will be documented in this file.
   `{reason, args}`. `sse.js` sends no `lastEventId` any more (no replay).
 
 #### kroom-examples/chifoumi
-- Declares `JoinQueue`, `LeaveQueue`, `Play` (audience `USERS`: the opponent never sees the move) and
-  handles `Join` / `Leave`; the pages react to their own `play` / `leave_queue` frames.
-- A match goes to the first player with 5 won rounds (was best of 3, with draws overflowing
+- On the contract: one room, `ChatRoom<LobbyState>` with `ChifoumiLogic` (chat composed through
+  `ChatLogic`). Alphabet `chat`, `match` (pending: a deposit while nobody else waits, paired by the
+  next one; `player`, `match` out), `play` (pending, `move` mine, `player` out) `-> round {match,
+  round}`, `leave -> match` (a forfeit); `cancel` withdraws a match wanted or a move. The state
+  (`history`, `queue`, `matches`, `stats`) is the fold of those frames on the server and in
+  `static/js/state.js`; `join_queue` / `leave_queue` / `queue` / `waiting` / `result` / `activity`
+  / `stats` / `connected` frames and the `/api/match`, `/api/stats`, `/api/lobby` endpoints are gone
+  (the snapshot has it all; the feed, the counts, "who is waiting" are derived). Players are user
+  ids on the wire, names beside (`name1` / `name2`). The lobby page has the room's chat box and
+  reports presence (`status`); `MatchStats` / `ActivityEvent` are gone, `Match` is `Game`.
+  `LobbyTest`: the rule as a function, and a recorded match (`private/scratch/chifoumi-frames.jsonl`).
+- Enum fields read whatever the case (`move: "rock"`), the JSON stays as sent.
+- `held()` with nothing fired: a no-arg overload (a vararg of an inferred `Nothing` built a
+  `Void[]` the JVM refused).
+- (before the port) A match goes to the first player with 5 won rounds (was best of 3, with draws overflowing
   "Round n/3"); the `round` frame carries the match, the page shows the server's score and round
   number instead of counting its own; a round says why it went that way ("Paper covers the rock.",
   translated with the page); the match result reads the frame's `match` (it showed "undefined wins").

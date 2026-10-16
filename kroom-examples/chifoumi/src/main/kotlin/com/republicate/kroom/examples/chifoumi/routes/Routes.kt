@@ -1,9 +1,9 @@
 package com.republicate.kroom.examples.chifoumi.routes
 
-import com.republicate.kroom.examples.chifoumi.game.MatchStats
 import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
 import com.republicate.kroom.server.Actor
 import com.republicate.kroom.server.Users
+import com.republicate.kroom.server.chatHistory
 import com.republicate.kroom.server.events
 import com.republicate.kroom.server.intents
 import com.republicate.kroom.server.tabId
@@ -109,31 +109,9 @@ fun Route.chifoumiRoutes() {
         // What the room accepts: GET /api/rooms/chifoumi-lobby/events
         events()
 
-        // Get current match status
-        get("/match") {
-            val session = call.sessions.get<PlayerSession>()
-                ?: return@get respondError("Not logged in", HttpStatusCode.Unauthorized)
-
-            val match = ChifoumiLobby.getMatch(session.playerName)
-            if (match != null) {
-                respondJson { set("match", match.toJson()) }
-            } else {
-                respondJson { set("match", null) }
-            }
-        }
-
-        // Get stats
-        get("/stats") {
-            respondJson { set("stats", MatchStats.toJson()) }
-        }
-
-        // Get lobby info
-        get("/lobby") {
-            respondJson {
-                set("online", ChifoumiLobby.getActors().size)
-                set("queue", ChifoumiLobby.getQueueSize())
-                set("matches", ChifoumiLobby.getActiveMatchCount())
-            }
+        // Scroll-back of the lobby's chat: GET /api/rooms/chifoumi-lobby/history?before=
+        chatHistory { call ->
+            call.sessions.get<PlayerSession>()?.let { Users.getOrCreate(it.identifier, it.playerName) }
         }
     }
 }

@@ -1,166 +1,112 @@
 // Chifoumi Arena - Lobby JS
 
-let playerName = null;
-let sseConnection = null;
+const ROOM = 'chifoumi-lobby';
+let state = null;
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    checkSession();
-    setupLoginForm();
-});
-
-// Check if already logged in
-function checkSession() {
-    api.getJson('session').then(session => {
-        if (session.name) {
-            playerName = session.name;
-            showLobby();
-            connectSSE();
-        }
-    }).catch(() => {
-        // Not logged in, show login form
-    });
-}
-
-// Setup login form
-function setupLoginForm() {
+    api.getJson('session').then(session => { if (session.id) enter(session); }).catch(() => {});
     $('#login-form').on('submit', (e) => {
         e.preventDefault();
-        const name = $('#player-name').value.trim();
+        const name = $('#player-name').val().trim();
         if (name.length < 2) return;
-
         api.postJson('join', { name }).then(result => {
-            if (result.success) {
-                playerName = result.name;
-                showLobby();
-                connectSSE();
-            }
-        }).catch(err => {
-            alert('Error: ' + err.message);
-        });
+            if (result.success) enter(result);
+        }).catch(err => alert('Error: ' + err.message));
     });
-}
+});
 
-// Show lobby section
-function showLobby() {
+function enter(session) {
     $('#login-section').hide();
     $('#lobby-section').show();
-    $('#player-display').text(playerName);
+    $('#player-display').text(session.name);
+    state = initialState(session.id);
+
+    intents.attach({ room: ROOM, payload, store: { dispatch: ({ type, payload: verdict }) => {
+        if (verdict.intent === 'chat' && type === 'accepted') $('#chat-form [name="text"]').val('');
+        render();
+    } } });
+
+    const conn = sse('/events');
+    FRAMES.forEach(name => conn.onJson(name, data => {
+        state = reduce(state, { event: name, data });
+        const line = activity(name, data);
+        if (line) addActivity(line);
+        render();
+    }));
+    conn.onJson('state', () => tracker.start());
+    conn.connect();
 }
 
-// Searching, or ready to search: the queue events say which
-function searching(on) {
-    if (on) { $('#queue-status').hide(); $('#searching').show(); }
+const tracker = new StatusTracker({
+    onStatusChange: (status) => api.act(ROOM, 'status', { status }).catch(() => {})
+});
+
+function render() {
+    if (myMatch(state, state.me)) return goToGame();
+    $('#online-num').text(state.users.length);
+    $('#queue-count').text(state.queue.length ? say('waiting', { n: state.queue.length }) : '');
+    if (searching(state)) { $('#queue-status').hide(); $('#searching').show(); }
     else { $('#queue-status').show(); $('#searching').hide(); }
+    renderChat();
+    renderStats();
 }
 
-// Connect to SSE
-function connectSSE() {
-    sseConnection = sse('/events').connect();
-    // the lobby's buttons: a click is an intent, the stream answers
-    intents.attach({ room: 'chifoumi-lobby', sse: sseConnection });
-
-    sseConnection.on('open', () => {
-        console.log('SSE connected');
+function renderChat() {
+    const log = $('#chat-log').clear();
+    state.history.forEach(line => {
+        const li = document.createElement('li');
+        li.textContent = `${line.author?.name ?? line.from}: ${line.text}`;
+        log.append(li);
     });
+    log.scrollTop = log.scrollHeight;
+}
 
-    sseConnection.on('error', (err) => {
-        console.error('SSE error', err);
-    });
+function renderStats() {
+    const stats = state.stats;
+    $('#stat-matches').text(stats.played || 0);
+    ['rock', 'paper', 'scissors', 'well'].forEach(move => $(`#stat-${move}`).text(stats[move] || 0));
+}
 
-    // Online users update
-    sseConnection.onJson('connected', (data) => {
-        $('#online-num').text(data.users.length);
-    });
+// The feed is what the frames tell, as they come: the snapshot has no past
+function activity(event, data) {
+    switch (event) {
+        case 'join': return say('joined', { name: data.user.name });
+        case 'leave': return say('left', { name: data.user.name });
+        case 'match':
+            if (data.match?.finished) return ended(data.match);
+            return data.match && data.player ? say('started', { a: data.match.name1, b: data.match.name2 }) : null;
+        case 'round': return data.match.finished ? ended(data.match) : null;
+        default: return null;
+    }
+}
 
-    // Back in the lobby with a match running: the snapshot says so
-    sseConnection.onJson('state', (s) => {
-        if (s.match) goToGame();
-    });
-
-    // Match found
-    sseConnection.onJson('match', (match) => {
-        console.log('Match found:', match);
-        goToGame();
-    });
-
-    // Queue position update
-    sseConnection.onJson('queue', (data) => {
-        console.log('Queue position:', data.position);
-        searching(true);
-    });
-
-    sseConnection.onJson('leave_queue', ({ _ }) => {
-        if (_.stage === 'APPLIED') searching(false);
-    });
-
-    // Activity feed
-    sseConnection.onJson('activity', (event) => {
-        addActivityEvent(event);
-    });
-
-    // Stats update
-    sseConnection.onJson('stats', (stats) => {
-        updateStats(stats);
+function ended(m) {
+    const first = m.winner === m.player1;
+    return say('beat', {
+        winner: first ? m.name1 : m.name2,
+        loser: first ? m.name2 : m.name1,
+        score: first ? `${m.score1}-${m.score2}` : `${m.score2}-${m.score1}`
     });
 }
 
-// Add activity event to feed
-function addActivityEvent(event) {
+function addActivity(text) {
     const feed = $('#activity-feed');
-    const empty = feed.find('.empty');
-    if (empty) empty.remove();
-
+    feed.querySelector('.empty')?.remove();
     const li = document.createElement('li');
-    const time = new Date(event.time).toLocaleTimeString();
-
-    switch (event.type) {
-        case 'joined':
-            li.innerHTML = `<strong>${event.player}</strong> joined`;
-            break;
-        case 'disconnected':
-            li.innerHTML = `<strong>${event.player}</strong> left`;
-            break;
-        case 'match_started':
-            li.innerHTML = `<strong>${event.player1}</strong> vs <strong>${event.player2}</strong> started`;
-            break;
-        case 'match_ended':
-            li.innerHTML = `<strong>${event.winner}</strong> beat <strong>${event.loser}</strong> (${event.score})`;
-            break;
-        default:
-            li.innerHTML = JSON.stringify(event);
-    }
-
-    li.innerHTML += `<span class="time">${time}</span>`;
-
-    // Add to top
-    feed.insertBefore(li, feed.firstChild);
-
-    // Keep only last 10
-    while (feed.children.length > 10) {
-        feed.removeChild(feed.lastChild);
-    }
+    li.textContent = text;
+    const time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = new Date().toLocaleTimeString();
+    li.append(time);
+    feed.prepend(li);
+    while (feed.children.length > 10) feed.lastChild.remove();
 }
 
-// Update stats display
-function updateStats(stats) {
-    $('#stat-matches').text(stats.matchesPlayed || 0);
-    if (stats.moves) {
-        $('#stat-rock').text(stats.moves.rock || 0);
-        $('#stat-paper').text(stats.moves.paper || 0);
-        $('#stat-scissors').text(stats.moves.scissors || 0);
-        $('#stat-well').text(stats.moves.well || 0);
-    }
-}
-
-// Navigate to game page
 function goToGame() {
     const lang = document.documentElement.lang || 'en';
     window.location.href = `/${lang}/game.html`;
 }
 
-// Switch language
 function switchLang(lang) {
-    const path = window.location.pathname.replace(/^\/[a-z]{2}\//, `/${lang}/`);
-    window.location.href = path;
+    window.location.href = window.location.pathname.replace(/^\/[a-z]{2}\//, `/${lang}/`);
 }

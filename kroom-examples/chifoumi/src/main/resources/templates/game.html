@@ -59,6 +59,7 @@
                     <span class="label">Well</span>
                 </button>
             </div>
+            <button id="take-back" data-intent="cancel" data-intent-of="play" class="secondary outline" style="display: none;">Take it back</button>
 
             <!-- Round result display -->
             <div id="round-result" class="round-result" style="display: none;">
@@ -88,11 +89,31 @@
                 <li data-verdict="draw">Same move, nobody scores.</li>
             </ul>
 
+            <!-- Sentences the script composes, same reason -->
+            <ul id="messages" hidden>
+                <li data-msg="you">You</li>
+                <li data-msg="choose">Choose your move!</li>
+                <li data-msg="waiting">Waiting for opponent...</li>
+                <li data-msg="opponent-played">{name} has played. Your turn!</li>
+                <li data-msg="took-back">{name} took their move back.</li>
+                <li data-msg="round-win">You win this round!</li>
+                <li data-msg="round-lose">You lose this round!</li>
+                <li data-msg="round-draw">Draw!</li>
+                <li data-msg="victory">Victory!</li>
+                <li data-msg="defeat">Defeat</li>
+                <li data-msg="defeated">You defeated {name}!</li>
+                <li data-msg="wins">{name} wins. Better luck next time!</li>
+            </ul>
+
             <!-- Match result -->
             <div id="match-result" class="match-result" style="display: none;">
                 <h2 id="match-result-title">Match Over!</h2>
                 <p id="match-result-message"></p>
-                <button id="play-again-btn" data-intent="join_queue" class="primary">Play Again</button>
+                <button id="play-again-btn" data-intent="match" class="primary">Play Again</button>
+                <div id="again-searching" style="display: none;">
+                    <p aria-busy="true">Searching for opponent...</p>
+                    <button data-intent="cancel" data-intent-of="match" class="secondary">Cancel</button>
+                </div>
                 <a href="/$lang/index.html" role="button" class="secondary">Back to Lobby</a>
             </div>
         </article>
@@ -102,6 +123,7 @@
     <script src="#versioned('/js/api.js')"></script>
     <script src="#versioned('/js/sse.js')"></script>
     <script src="#versioned('/js/intents.js')"></script>
+    <script src="#versioned('/js/state.js')"></script>
     <script src="#versioned('/js/game.js')"></script>
 </body>
 </html>

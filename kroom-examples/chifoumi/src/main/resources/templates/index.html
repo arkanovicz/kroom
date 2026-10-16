@@ -69,11 +69,12 @@
                         <h3>Ready to play, <span id="player-display"></span>?</h3>
                     </header>
                     <div id="queue-status">
-                        <button data-intent="join_queue" class="primary">Find Match</button>
+                        <button data-intent="match" class="primary">Find Match</button>
+                        <small id="queue-count"></small>
                     </div>
                     <div id="searching" style="display: none;">
                         <p aria-busy="true">Searching for opponent...</p>
-                        <button data-intent="leave_queue" class="secondary">Cancel</button>
+                        <button data-intent="cancel" data-intent-of="match" class="secondary">Cancel</button>
                     </div>
                 </article>
 
@@ -86,6 +87,19 @@
                     </ul>
                 </article>
             </div>
+
+            <article>
+                <header>
+                    <h3>Chat</h3>
+                </header>
+                <ul id="chat-log" class="activity-list"></ul>
+                <form id="chat-form">
+                    <fieldset role="group">
+                        <input type="text" name="text" placeholder="Say something" maxlength="500" autocomplete="off">
+                        <button data-intent="chat">Send</button>
+                    </fieldset>
+                </form>
+            </article>
 
             <article>
                 <header>
@@ -115,6 +129,15 @@
                 </div>
             </article>
         </section>
+
+        <!-- Sentences the script composes; held here so l10n translates them -->
+        <ul id="messages" hidden>
+            <li data-msg="waiting">({n} waiting)</li>
+            <li data-msg="joined">{name} joined</li>
+            <li data-msg="left">{name} left</li>
+            <li data-msg="started">{a} vs {b} started</li>
+            <li data-msg="beat">{winner} beat {loser} ({score})</li>
+        </ul>
     </main>
 
     <footer class="container">
@@ -125,6 +148,8 @@
     <script src="#versioned('/js/api.js')"></script>
     <script src="#versioned('/js/sse.js')"></script>
     <script src="#versioned('/js/intents.js')"></script>
+    <script src="#versioned('/js/status.js')"></script>
+    <script src="#versioned('/js/state.js')"></script>
     <script src="#versioned('/js/chifoumi.js')"></script>
 </body>
 </html>

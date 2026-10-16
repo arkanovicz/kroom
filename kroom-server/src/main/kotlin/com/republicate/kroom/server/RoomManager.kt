@@ -9,12 +9,12 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object RoomManager {
     private val logger = LoggerFactory.getLogger("kroom.manager")
-    private val rooms = ConcurrentHashMap<String, ChatRoom>()
+    private val rooms = ConcurrentHashMap<String, ChatRoom<ChatState>>()
 
     /**
      * Get or create a chat room
      */
-    fun getOrCreateRoom(name: String): ChatRoom {
+    fun getOrCreateRoom(name: String): ChatRoom<ChatState> {
         return rooms.computeIfAbsent(name) {
             logger.info("Creating room '$name'")
             ChatRoom(name)
@@ -24,7 +24,7 @@ object RoomManager {
     /**
      * Get a room if it exists
      */
-    fun getRoom(name: String): ChatRoom? = rooms[name]
+    fun getRoom(name: String): ChatRoom<ChatState>? = rooms[name]
 
     /**
      * Remove a room

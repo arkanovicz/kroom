@@ -136,26 +136,50 @@ msgstr "Victoire !"
 msgid "Defeat"
 msgstr "Défaite"
 
-msgid "Better luck next time!"
-msgstr "Plus de chance la prochaine fois !"
-
 msgid "Play Again"
 msgstr "Rejouer"
 
 msgid "Back to Lobby"
 msgstr "Retour au salon"
 
-msgid "joined"
-msgstr "a rejoint"
-
-msgid "left"
-msgstr "est parti"
-
-msgid "started"
-msgstr "a commencé"
-
-msgid "beat"
-msgstr "a battu"
-
 msgid "Built with"
 msgstr "Construit avec"
+
+msgid "({n} waiting)"
+msgstr "({n} en attente)"
+
+msgid "{name} joined"
+msgstr "{name} est arrivé"
+
+msgid "{name} left"
+msgstr "{name} est parti"
+
+msgid "{a} vs {b} started"
+msgstr "{a} contre {b} a commencé"
+
+msgid "{winner} beat {loser} ({score})"
+msgstr "{winner} a battu {loser} ({score})"
+
+msgid "Chat"
+msgstr "Discussion"
+
+msgid "Say something"
+msgstr "Dites quelque chose"
+
+msgid "Send"
+msgstr "Envoyer"
+
+msgid "Take it back"
+msgstr "Reprendre"
+
+msgid "{name} has played. Your turn!"
+msgstr "{name} a joué. À vous !"
+
+msgid "{name} took their move back."
+msgstr "{name} a repris son coup."
+
+msgid "You defeated {name}!"
+msgstr "Vous avez battu {name} !"
+
+msgid "{name} wins. Better luck next time!"
+msgstr "{name} gagne. Plus de chance la prochaine fois !"

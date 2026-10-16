@@ -14,8 +14,8 @@ import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 
-/** The RAM tail, what a snapshot carries: the last [max] lines, the fold of the `chat` frames. */
-class ChatState(json: Json.MutableObject = Json.MutableObject(), max: Int = 50) : State(json) {
+/** The RAM tail, what a snapshot carries: the last [max] lines, the fold of the `chat` frames. A room with more extends it. */
+open class ChatState(json: Json.MutableObject = Json.MutableObject(), val max: Int = 50) : State(json) {
     val history by log(::Chat, max)
     override fun reduce(frame: Event) { if (frame is Chat) history += frame }
 }
@@ -35,12 +35,13 @@ class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", json
     }
 }
 
-/** The rule: a line is numbered and signed. The sequence is the store's, seeded from its tail. */
-class ChatLogic(last: Long) : Logic<ChatState> {
-    private val seq = AtomicLong(last)
+/** The rule: a line is numbered and signed. The sequence continues the tail's, the store's. A composing rule delegates its `Chat` here. */
+class ChatLogic : Logic<ChatState> {
+    private var seq: AtomicLong? = null
     override val registry = Registry(::Chat)
     override fun fire(state: ChatState, actor: com.republicate.kroom.event.Actor, intent: Event): Outcome<Event> {
         if (intent is Chat) {
+            val seq = seq ?: AtomicLong(state.history.lastOrNull()?.seq ?: 0).also { seq = it }
             intent.seq = seq.incrementAndGet()
             intent.from = actor.name
             intent.author = Author(actor.id, actor.name).toJson()
@@ -55,16 +56,14 @@ class ChatLogic(last: Long) : Logic<ChatState> {
  * background by [history] ([MemoryChatHistory] by default). A join gets the tail in its `state`;
  * older messages come from [before].
  */
-open class ChatRoom private constructor(id: String, private val history: ChatHistory, tail: List<ChatMessage>) :
-    LogicRoom<ChatState>(id, ChatState().also { s -> tail.forEach { s.history += Chat.of(it) } }, ChatLogic(tail.lastOrNull()?.seq ?: 0)) {
-
-    // the tail and the sequence come from the store: once, before the first join
-    constructor(id: String, history: ChatHistory = MemoryChatHistory()) : this(id, history, runBlocking { history.tail(50) })
+open class ChatRoom<S : ChatState>(id: String, private val history: ChatHistory, state: S, logic: Logic<S>) : LogicRoom<S>(id, state, logic) {
 
     // one writer, in seq order: the store sees the messages as the room numbered them
     private val writer = Channel<Chat>(Channel.UNLIMITED)
 
     init {
+        // the tail comes from the store: once, before the first join
+        runBlocking { history.tail(state.max) }.forEach { state.history += Chat.of(it) }
         scope.launch { for (chat in writer) { history.append(chat.toMessage()); trace(chat.persist()) } }
     }
 
@@ -83,3 +82,6 @@ open class ChatRoom private constructor(id: String, private val history: ChatHis
     /** Scroll-back: up to [n] messages older than [seq], oldest first. */
     suspend fun before(seq: Long, n: Int = 50): List<ChatMessage> = history.before(seq, n)
 }
+
+/** A chat room and nothing more. */
+fun ChatRoom(id: String, history: ChatHistory = MemoryChatHistory()): ChatRoom<ChatState> = ChatRoom(id, history, ChatState(), ChatLogic())
