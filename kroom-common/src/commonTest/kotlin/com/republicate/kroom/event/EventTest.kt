@@ -94,8 +94,8 @@ class EventTest {
         assertNull(match.meta.from)
     }
 
-    @Test fun `a catalog rebuilds an event from a frame and describes itself`() {
-        val catalog = Catalog().register(::Play).register(::Match)
+    @Test fun `a registry rebuilds an intent from a frame and describes the alphabet`() {
+        val catalog = Registry(::Play, ::Match)
         assertEquals(setOf("play", "match"), catalog.names)
         val e = catalog.of("play", """{"move":"SCISSORS"}""")
         assertIs<Play>(e)

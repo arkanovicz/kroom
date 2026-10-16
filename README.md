@@ -74,7 +74,9 @@ routing {
 One class goes through E, from a gesture to a row: an `Event` (kroom-common, the same class on the
 JVM and in Kotlin/JS) — a name, a payload, metadata. The payload is JSON, the class a typed view
 over it (`val move by enum<Move>().required`, the property name is the key); declaring a field
-records it, so the declaration is data (`describe()`, served as `GET /api/rooms/<room>/events`).
+records it, so the declaration is data (`describe()`, served as `GET /api/rooms/<room>/events`:
+the state's fields and the alphabet, each name with its fields, what it `fires`, whether it may
+stay `pending`, whether a client may post it).
 The payload alone is the wire; the metadata (who, when, the stage, a reason) is the object's,
 server-side, and a `_` a client sends is dropped at birth:
 
@@ -86,11 +88,63 @@ browser  click [data-intent=play] ──POST /api/rooms/<room>/act {type, …}�
 event: play   id: 42   data: {"move":"rock"}
 ```
 
-- **One declaration per event**, class and handler together: `on(::Play) { actor, play -> … }`
-  registers the class in the room's `catalog` (what a door may bring) and its handler. The
-  handler runs on the loop, no awaited I/O, applies the event to the state and answers `null`
-  (applied) or a `Reason` (rejected; a key and arguments the browser localizes). A thrown
-  `Event.Rejected` is the same, any other exception is `error`.
+- **The contract** (`kroom-common`, the same on every target): a `State` is the marking, a
+  view over the room's JSON whose fields are written in one place, `reduce(frame)`, from a frame
+  (declare them `private set`: a transition that holds the state can only read it); a `Logic` is
+  the firing rule, one function of the state, the actor and the intent, answering an `Outcome`;
+  a `Registry` is the alphabet, the intents (what a door may bring) and, through what each
+  `fires`, every other name on the wire. The room (`LogicRoom(id, state, logic)`) is the machine:
+  it runs the rule on its loop, frames what it fired, folds every frame into the state as it goes,
+  so the server's state is the fold it serves and `reduce*(snapshot@N, frames) == snapshot@M` by
+  construction.
+
+  ```kotlin
+  class Counter : State() {
+      var n by int()                                          // `set {n}` replaces it
+          private set
+      val notes by log(::Note, max = 50)                      // a `note` frame appends
+      override fun reduce(frame: Event) = when (frame) { is Set -> n = frame.n; is Note -> notes += frame; else -> {} }
+  }
+  class Set(json) : Event("set", json = json) { var n by int().required.out }            // the loop fills it, a client may not send it
+  class Add(json) : Event("add", fires = Fires(::Set), json = json) { val by by int().required }
+  class Note(json) : Event("note", json = json) { val text by string().required.mine }  // the author's tabs alone see it
+  class Wait(json) : Event("wait", fires = Fires(::Set), pending = true, json = json)
+
+  object Rule : Logic<Counter> {
+      override val registry = Registry(::Add, ::Note, ::Wait, leave = Fires(::Set))
+      override fun fire(state: Counter, actor: Actor, intent: Event): Outcome<Event> = when (intent) {
+          is Add  -> add(state, intent)
+          is Note -> done                                     // the intent's own frame and nothing more
+          is Wait -> held()                                   // the token stays: pending until `cancel`
+          is Leave -> fired(Set().also { it.n = 0 })
+          else -> Reason("unknown")
+      }
+      fun add(state: Counter, add: Add): Outcome<Set> {       // `Outcome<Set>` reads as the grammar's `add -> set`
+          val n = (state.n ?: 0) + add.by
+          return if (n > 10) Reason("too_big", Json.Object("max" to 10)) else fired(Set().also { it.n = n })
+      }
+  }
+  ```
+
+  A `Reason` is the reply, nothing framed, nothing changed. A `Fired` frames the intent (the
+  deposit is visible), then each event (`fired(…)`, each name checked against the class's
+  `fires`), each reduced into the state. `held()` keeps the intent's token (`pending = true` on
+  the class): the reply says `{pending: true}`, the viewer's snapshot lists the name under
+  `pending`, a second post of it is `already_pending`, `cancel {intent}` withdraws it through
+  `Logic.cancel`; `releasing(user)` on a firing consumes another's token. `Event.to(users…)` on a
+  fired event names its viewers: a message, not a transition, it is not folded into the state.
+  A `mine` field reaches its author's tabs only, so `reduce` must not read one into the state. The rule is a
+  value: `Rule.fire(state, alice, Add(…))` in a test, no room, no loop. What is not on the wire is
+  not in `State`: a secret is a field of the logic.
+- **Presence is kroom's layer**: every snapshot carries `users: [{id, name, status, clients:
+  [{id, kind, status}]}]`, a user's status composed from its clients' (`ONLINE` if any, else
+  `IDLE`, else `AWAY`); `join` carries the user's presence and the count, `leave` the same, a
+  client posting `status {status}` frames the user's composed status and the client that changed.
+  The rule hears `Join` / `Leave` / `Status` as events, a user's (first connection, last one), and
+  fires what the registry declares for them (`leave = Fires(::Match)`).
+- **The `on()` path** (`on(::Play) { actor, play -> Reason? }`, class and handler together, the
+  handler mutating the room's state and emitting itself) still runs underneath: `Table` and the
+  chifoumi example are on it until their port.
 - **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
   stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
   permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`
@@ -99,13 +153,14 @@ event: play   id: 42   data: {"move":"rock"}
   (by validation or by the handler). A rejection is framed to nobody. The effects come down the
   stream, to the emitter like to everyone: a page handles `play` on one path, author or not.
   `[data-intent=play]` is busy for the span of its POST; a `4xx` shows its reason after it.
-- **Audience** is declared on the class: `ROOM` (everyone), `USERS` (users the room names at
-  `emit(event, to = …)`, the emitter when none — so `Play` declares `USERS` and the opponent never
-  sees the move). Nothing crosses rooms: what every page must hear is a lobby room's frame.
+- **Who sees a frame**: the users it names (`Event.to(…)`), else the room; the author's tabs get
+  the payload whole, the others without its `mine` fields. On the `on()` path the class's
+  `Audience` (`ROOM` / `USERS`, the emitter when none named) still applies. Nothing crosses rooms:
+  what every page must hear is a lobby room's frame.
 - **A join is an event**: the room births `Join` at a connect and `Leave` at a disconnect,
-  handled with `on(::Join)` like any other (`Table` seats there). The handler hears every
-  connection (`first` / `last`); the wire hears a user's first `join` and last `leave`, the leave
-  after a grace (`leaveGrace`, 1 s) so a reload or a blip is no departure. The joiner gets `state`
+  handled like any other (`Table` seats there, on the `on()` path, hearing every connection with
+  `first` / `last`). The wire hears a user's first `join` and last `leave`, the leave after a
+  grace (`leaveGrace`, 1 s) so a reload or a blip is no departure. The joiner gets `state`
   — its own snapshot, `stateToJson(actor)` — first, then its own `join` like everyone. Catch-up is the
   snapshot's job alone, so an event only ever means a transition: a step of the loop numbers and
   writes everything it produces before it returns, and a snapshot taken at a position holds

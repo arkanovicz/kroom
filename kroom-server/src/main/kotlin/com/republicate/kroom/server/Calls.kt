@@ -17,8 +17,9 @@ private fun refusal(reason: String, args: Json.Object = Json.Object()) = Json.Ob
 
 /**
  * Intents, `POST /rooms/{room}/act` with `{type, …}`: the event of that name over that JSON goes
- * to the room; the reply is the verdict and nothing else — `200` `{}` applied, `400` `{reason,
- * args}` rejected. The effects come down the stream, to the emitter like to everyone.
+ * to the room; the reply is the verdict and nothing else — `200` `{}` applied (`{pending: true}`
+ * when the intent stays held), `400` `{reason, args}` rejected. The effects come down the stream,
+ * to the emitter like to everyone.
  * [principal] names the acting user from the call (its session); null refuses.
  */
 fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
@@ -29,16 +30,17 @@ fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
         val name = json.getString("type") ?: return@post call.json(HttpStatusCode.BadRequest, refusal("no_type"))
         json.remove("type")
         val event = room.act(user, call.tabId, name, json)
-        if (event.stage == Stage.APPLIED) call.json(HttpStatusCode.OK, "{}")
-        else call.json(HttpStatusCode.BadRequest, refusal(event.meta.reason ?: "rejected", event.meta.args ?: Json.Object()))
+        // a store may have moved it on to PERSISTED already: the verdict is rejected or not
+        if (event.stage == Stage.REJECTED) call.json(HttpStatusCode.BadRequest, refusal(event.meta.reason ?: "rejected", event.meta.args ?: Json.Object()))
+        else call.json(HttpStatusCode.OK, if (event.meta.held == true) """{"pending":true}""" else "{}")
     }
 }
 
-/** The catalog as data, `GET /rooms/{room}/events`: what a browser without Kotlin validates against. */
+/** The registry as data, `GET /rooms/{room}/events`: the state's fields and the alphabet, what a browser without Kotlin reads. */
 fun Route.events() {
     get("/rooms/{room}/events") {
         val room = Lobby.get<Any>(call.parameters["room"]!!) ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
-        call.json(HttpStatusCode.OK, room.catalog.describe().toString())
+        call.json(HttpStatusCode.OK, room.describe().toString())
     }
 }
 

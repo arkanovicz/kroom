@@ -2,11 +2,13 @@ package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Audience
 import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Join
+import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Reason
 import com.republicate.kson.Json
 
 /** A seated player tells the table how present it is; `offline` is the table's to say. */
-class Status(json: Json.MutableObject = Json.MutableObject()) : Event("status", Audience.USERS, json = json) {
+class SeatStatus(json: Json.MutableObject = Json.MutableObject()) : Event("seat_status", Audience.USERS, json = json) {
     val status by string().required
 }
 
@@ -84,7 +86,7 @@ abstract class Table<S : Any>(id: String, val seatCount: Int) : Room<S>(id) {
             }
             null
         }
-        on(::Status) { actor, status ->
+        on(::SeatStatus) { actor, status ->
             val newStatus = try { PlayerStatus.valueOf(status.status.uppercase()) } catch (e: IllegalArgumentException) {
                 return@on Reason("invalid", Json.Object("field" to "status"))
             }

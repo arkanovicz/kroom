@@ -1,5 +1,6 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Presence
 import io.ktor.sse.*
 import kotlinx.coroutines.channels.Channel
 
@@ -18,8 +19,17 @@ import kotlinx.coroutines.channels.Channel
 open class Actor(
     val connectionId: String,
     val user: User? = null,
-    val name: String = user?.displayName ?: "Anonymous"
-) {
+    override val name: String = user?.displayName ?: "Anonymous"
+) : com.republicate.kroom.event.Actor {
+    /** The user's id; a connection without a user is its own. */
+    override val id: String get() = user?.userId ?: connectionId
+    override val client: String? get() = tab.takeIf { it.isNotEmpty() }
+
+    /** What the client last reported of itself; the user's is composed from its clients'. */
+    var status: Presence = Presence.ONLINE
+    /** A tab, an app: what the client said it is at connect. */
+    var kind: String = "web"
+
     /**
      * SSE channel for this actor's connection.
      * Null when disconnected.
@@ -59,23 +69,6 @@ open class Actor(
     override fun hashCode(): Int = connectionId.hashCode()
 
     override fun toString(): String = "Actor($connectionId, user=${user?.userId}, $name)"
-
-    // ========== Backward compatibility ==========
-
-    /**
-     * Legacy compatibility: userId as property.
-     * @deprecated Use user?.userId instead
-     */
-    @Deprecated("Use user?.userId instead", ReplaceWith("user?.userId"))
-    val userId: String?
-        get() = user?.userId
-
-    /**
-     * Legacy compatibility: 'id' as alias for connectionId.
-     * @deprecated Use connectionId instead
-     */
-    @Deprecated("Use connectionId instead", ReplaceWith("connectionId"))
-    val id: String get() = connectionId
 
     companion object {
         /**

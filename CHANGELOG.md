@@ -41,6 +41,35 @@ All notable changes to kroom will be documented in this file.
   which saw the change in its snapshot and then again as frames); the joiner's snapshot precedes
   its own `join` and the join handler. `ChatRoom.sendChat` is a step of the loop (`suspend`).
 - `kroom-common` is now an `api` dependency of `kroom-server`.
+- **The contract** (`kroom-common`): `State` (a view over the room's JSON, `reduce(frame)` its
+  one writer, fields `private set`), `Logic<S>` (`registry`, `fire(state, actor, intent):
+  Outcome<Event>`, `cancel`), `Outcome` = `Reason` | `Fired` (`fired(…)`, `held()`, `done`,
+  `releasing(users)`), `Actor` as a common interface the server's connection implements (`id`,
+  `name`, `client`), `Registry` (was `Catalog`: the intents, and through `fires` every name;
+  `names` postable, `all`, `frame(name, json)`; presence arrows `join` / `leave` / `status`).
+  `Event` declares `fires = Fires(::Round)` and `pending`; `Event.to(users…)` names a frame's
+  viewers; fields are `in` or `.out` (the loop's, `undeclared` if sent) and may be `.mine` (the
+  author's tabs only, `payload(author)`); new kinds `obj(::View)`, `list<T>()`, `log(::View,
+  max)` (append-only, `+=`). `describe()` carries `pending`, `fires`, `out`, `mine`, `postable`.
+- `LogicRoom<S : State>(id, state, logic)` (`kroom-server`): runs the rule on the loop, frames
+  the intent then what it fired (each name checked against `fires`, a stray one is `error`),
+  folds every room-wide frame into the state (`fold`; a frame with `to` is a message, not a
+  transition of the shared marking), keeps the held tokens (`pending`, `already_pending`,
+  `cancel` → `not_pending`), answers `{pending: true}` when an intent is held. Every snapshot
+  carries `users` (presence) and `pending` (the viewer's). `Room(id, registry)`, `describe()` =
+  `{state, events}` (what `GET /rooms/{room}/events` serves now), hooks `fold(frame)` and
+  `follow(intent)`.
+- Presence on the wire: `Join` / `Leave` / `Status` / `Cancel` live in `kroom-common`; `join` and
+  `leave` carry `user: {id, name, status, clients: [{id, kind, status}]}` and `count` (`displayName`,
+  `spectator` are gone, `first` / `last` stay for the `on()` path); `status {status}` posted by a
+  client frames the user's composed status (`Presence`: `ONLINE` / `IDLE` / `AWAY`) and the client
+  that changed; `Actor.status`, `Actor.kind`. `Table`'s `Status` is `SeatStatus` (`seat_status`).
+  The deprecated `Actor.id` / `Actor.userId` aliases are gone (`id` is the user's).
+- `ChatRoom` is a `LogicRoom`: `ChatState.history` is a `log(::Chat, 50)`, the fold of the
+  `chat` frames, seeded from the store's tail; `ChatLogic` numbers and signs; `sendChat` goes
+  through `act` under the author's id; no `users` frame of its own any more (presence is in the
+  snapshot). The verdict is read as rejected-or-not (`Route.intents`, `sendChat`): a store could
+  move a chat on to `PERSISTED` before the reply was written and turn it into a `400`.
 
 #### kroom-webapp-assets
 - `intents.js`: a trigger is busy for the span of its POST; the reply is the verdict (`200`

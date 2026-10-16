@@ -7,8 +7,8 @@ import com.republicate.kroom.event.Audience
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.server.Actor
-import com.republicate.kroom.server.Join
-import com.republicate.kroom.server.Leave
+import com.republicate.kroom.event.Join
+import com.republicate.kroom.event.Leave
 import com.republicate.kroom.server.Room
 import com.republicate.kroom.server.User
 import com.republicate.kson.Json

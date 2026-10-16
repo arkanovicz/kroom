@@ -2,6 +2,8 @@ package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Audience
 import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Join
+import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
@@ -205,8 +207,12 @@ class RoomTest {
         assertEquals("hello", ch.next().event)
         ch.next().let {
             assertEquals("join", it.event)
-            assertEquals("u", it.json().getString("user"))
+            val user = it.json().getObject("user")!!   // presence: the user, its clients, its status
+            assertEquals("u", user.getString("id"))
+            assertEquals("t1", user.getArray("clients")!!.map { c -> (c as Json.Object).getString("id") }.single())
+            assertEquals("ONLINE", user.getString("status"))
             assertEquals(true, it.json().getBoolean("first"))
+            assertEquals(1, it.json().getInt("count"))
         }
         assertNull(ch.tryReceive().getOrNull())
     }
@@ -244,8 +250,8 @@ class RoomTest {
         room.leave(a) // returns
     }
 
-    @Test fun `the catalog is the door's events, as data`() {
-        val d = room().catalog.describe().map { (it as Json.Object).getString("name") }
+    @Test fun `the registry is the door's events, as data`() {
+        val d = room().registry.describe().map { (it as Json.Object).getString("name") }
         assertEquals(listOf("slow", "ok", "loud", "bad", "boom", "shaped", "vip"), d)
     }
 

@@ -25,8 +25,7 @@ class ChatRoomTest {
         val room = ChatRoom("chat-${n++}", store)
         val a = actor(user("u"))
         val ch = room.join(a)
-        assertEquals("state", ch.next().event)
-        assertEquals("users", ch.next().event) // the join handler, after the snapshot
+        assertEquals("state", ch.next().event)   // presence is in it: no `users` frame of the room's own
         assertEquals("join", ch.next().event)
         val chat = room.act(a, Chat(Json.MutableObject("text" to "hi"))).await()
         assertEquals(Stage.APPLIED, chat.stage)

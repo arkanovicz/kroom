@@ -1,10 +1,15 @@
 package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Audience
-import com.republicate.kroom.event.Catalog
+import com.republicate.kroom.event.Client
 import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Join
+import com.republicate.kroom.event.Leave
+import com.republicate.kroom.event.Presence
 import com.republicate.kroom.event.Reason
+import com.republicate.kroom.event.Registry
 import com.republicate.kroom.event.Stage
+import com.republicate.kroom.event.UserPresence
 import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.*
@@ -20,26 +25,6 @@ import java.util.concurrent.atomic.AtomicLong
 class Generic(name: String, json: Json.MutableObject = Json.MutableObject(), audience: Audience = Audience.ROOM) :
     Event(name, audience, json = json)
 
-/** Born by the room at a connect: the handler hears every one, the room's wire a user's first. */
-class Join(json: Json.MutableObject = Json.MutableObject()) : Event("join", json = json) {
-    var user by string()
-    var displayName by string()
-    var spectator by bool()
-    var first by bool()      // the user's first connection to the room
-}
-
-/**
- * Born by the room at a disconnect: the handler hears a connection that was not the user's last at
- * once, the last after the grace, and not at all when the user is back within it; the room's wire
- * hears the last only.
- */
-class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", json = json) {
-    var user by string()
-    var displayName by string()
-    var spectator by bool()
-    var last by bool()       // the user's last connection to the room
-}
-
 /**
  * A room: state, membership (users; actors write, spectators read), one loop, and the events
  * it speaks. An [Event] is validated ([act]), applied on the loop by the handler its declaration
@@ -51,7 +36,7 @@ class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", js
  * A join is an event too: the room births [Join] at a connect; the joiner gets its `state`
  * snapshot ([stateToJson]) first, then its own `join` like everyone, the handler's emissions before it.
  */
-abstract class Room<S : Any>(val id: String) {
+abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()) {
     protected val logger = LoggerFactory.getLogger("kroom.room")
     // the thread inside a step: what a handler emits is framed at once, nothing a step produces is re-enqueued
     @Volatile private var loopThread: Thread? = null
@@ -76,13 +61,11 @@ abstract class Room<S : Any>(val id: String) {
 
     // ---- declarations
 
-    /** The events a door may bring: what `GET /rooms/{room}/events` serves as data. */
-    val catalog = Catalog()
     private val handlers = HashMap<String, (Actor, Event) -> Reason?>()
     private val system = setOf("join", "leave")
 
     /**
-     * One declaration: the class (its factory, for the door) and its handler (for the loop).
+     * One declaration: the class (its factory, for the door; the [registry] has it as postable) and its handler (for the loop).
      * The handler applies the event to the state and answers null, or a [Reason] to reject it;
      * a thrown [Event.Rejected] is the same, any other exception is `error`, logged. It runs on
      * the loop: no awaited I/O. What it [emit]s lands before the event's own frame.
@@ -90,7 +73,7 @@ abstract class Room<S : Any>(val id: String) {
     @Suppress("UNCHECKED_CAST")
     protected fun <E : Event> on(factory: (Json.MutableObject) -> E, handler: (Actor, E) -> Reason?) {
         val name = factory(Json.MutableObject()).name
-        if (name !in system) catalog.register(factory)
+        if (name !in system) registry.register(factory)
         handlers[name] = { actor, event -> handler(actor, event as E) }
     }
 
@@ -104,6 +87,19 @@ abstract class Room<S : Any>(val id: String) {
 
     /** An event just went on the wire: where a store persists it, off the loop. */
     protected open fun emitted(event: Event) {}
+
+    /**
+     * A frame the whole room gets, numbered, goes into the marking before anyone reads it: where a
+     * [State] reduces. A frame some users get (`to`) is a message, not a transition of the shared
+     * marking: folding it would put in the snapshot what the others never received.
+     */
+    protected open fun fold(frame: Event) {}
+
+    /** An intent (or a join, a leave) is framed: what its firing produced follows, on the same step. */
+    protected open fun follow(intent: Event) {}
+
+    /** The alphabet as data: what `GET /rooms/{room}/events` serves. */
+    open fun describe(): Json.Object = Json.Object("events" to registry.describe())
 
     init {
         on(::Join) { _, _ -> null }
@@ -172,7 +168,7 @@ abstract class Room<S : Any>(val id: String) {
     suspend fun act(user: User, tab: String?, name: String, json: Json.MutableObject): Event {
         val connectionId = Actor.connectionId(user, tab)
         val actor = getActor(connectionId) ?: Actor(connectionId, user)
-        val event = catalog.of(name, json) ?: return Generic(name, json).reject(Reason("unknown")).also(::trace)
+        val event = registry.of(name, json) ?: return Generic(name, json).reject(Reason("unknown")).also(::trace)
         return act(actor, event).await()
     }
 
@@ -266,11 +262,20 @@ abstract class Room<S : Any>(val id: String) {
 
         // the snapshot at this position, straight on the channel; the join is the transition after it
         sendSafe(actor, ServerSentEvent(data = stateToJson(actor).toString(), event = "state", id = seq.get().toString()))
-        val join = Join().also { it.user = actor.user?.userId; it.displayName = actor.name; it.spectator = spectator; it.first = first }
+        val join = Join().also { it.user = actor.user?.let(::presence); it.first = first; it.count = users.size }
         join.meta.from = actor.user?.userId
         handle(actor, join)
         // the handler hears every connection, the wire hears a user's first
-        if (first && join.stage == Stage.APPLIED) emit(join)
+        if (first && join.stage == Stage.APPLIED) { emit(join); follow(join) }
+    }
+
+    /** A user as presence sees it now: its status composed from its clients' in this room. */
+    protected fun presence(user: User): UserPresence = UserPresence().also { p ->
+        p.id = user.userId
+        p.name = user.displayName
+        val clients = user.getConnectionsInRoom(id)
+        clients.forEach { c -> p.clients += Client().also { it.id = c.tab; it.kind = c.kind; it.status = c.status } }
+        p.status = clients.minOfOrNull { it.status } ?: Presence.AWAY
     }
 
     private fun processLeave(actor: Actor) {
@@ -296,10 +301,10 @@ abstract class Room<S : Any>(val id: String) {
     private fun gone(actor: Actor, spectator: Boolean, last: Boolean) {
         val user = actor.user
         if (last && user != null) { users.remove(user.userId); _userCount.value = users.size }
-        val leave = Leave().also { it.user = user?.userId; it.displayName = actor.name; it.spectator = spectator; it.last = last }
+        val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size }
         leave.meta.from = user?.userId
         handle(actor, leave)
-        if (last && leave.stage == Stage.APPLIED) emit(leave)
+        if (last && leave.stage == Stage.APPLIED) { emit(leave); follow(leave) }
 
         if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty()) {
             stop()
@@ -330,8 +335,8 @@ abstract class Room<S : Any>(val id: String) {
             when (op) {
                 is Op.Act -> {
                     handle(op.actor, op.event)
-                    // the handler's own emissions are already framed: the event's frame lands after them
-                    if (op.event.stage == Stage.APPLIED) frame(op.event, emptyList())
+                    // the handler's own emissions are already framed: the event's frame lands after them, its firing follows
+                    if (op.event.stage == Stage.APPLIED) { frame(op.event, emptyList()); follow(op.event) }
                     op.verdict.complete(op.event)
                 }
                 is Op.Emit -> frame(op.event, op.to)
@@ -344,23 +349,34 @@ abstract class Room<S : Any>(val id: String) {
         }
     }
 
-    /** Numbers the event at the channel's next position and writes it to its audience. */
+    /**
+     * Numbers the event at the channel's next position, folds it, and writes it: to the users it
+     * names (`to`), else to the room — or, a `USERS` event of the `on()` path, to its emitter. The
+     * author's tabs get the payload whole, the others without its `mine` fields.
+     */
     private fun frame(event: Event, to: List<String>) {
         val emitted = event.emit(seq.incrementAndGet())
         trace(emitted)
-        val frame = ServerSentEvent(data = emitted.json.toString(), event = emitted.name, id = emitted.meta.seq.toString())
-        if (emitted.audience == Audience.ROOM) toAll(frame)
-        else toUsers(to.ifEmpty { listOfNotNull(emitted.meta.from) }, frame)
+        val id = emitted.meta.seq.toString()
+        val whole = ServerSentEvent(data = emitted.json.toString(), event = emitted.name, id = id)
+        val others = if (emitted.mine.isEmpty()) whole else ServerSentEvent(data = emitted.payload(false).toString(), event = emitted.name, id = id)
+        val frame = { actor: Actor -> if (actor.user?.userId == emitted.meta.from) whole else others }
+        val targets = to.ifEmpty { emitted.to }
+        when {
+            targets.isNotEmpty() -> toUsers(targets, frame)
+            emitted.audience == Audience.USERS -> toUsers(listOfNotNull(emitted.meta.from), frame)
+            else -> { fold(emitted); toAll(frame) }
+        }
         emitted(emitted)
     }
 
-    private fun toAll(frame: ServerSentEvent) {
-        actors.values.forEach { sendSafe(it, frame) }
-        spectators.values.forEach { sendSafe(it, frame) }
+    private fun toAll(frame: (Actor) -> ServerSentEvent) {
+        actors.values.forEach { sendSafe(it, frame(it)) }
+        spectators.values.forEach { sendSafe(it, frame(it)) }
     }
 
-    private fun toUsers(userIds: Collection<String>, frame: ServerSentEvent) {
-        userIds.forEach { userId -> users[userId]?.getConnectionsInRoom(id)?.forEach { sendSafe(it, frame) } }
+    private fun toUsers(userIds: Collection<String>, frame: (Actor) -> ServerSentEvent) {
+        userIds.forEach { userId -> users[userId]?.getConnectionsInRoom(id)?.forEach { sendSafe(it, frame(it)) } }
     }
 
     /**
@@ -402,7 +418,7 @@ abstract class Room<S : Any>(val id: String) {
         "connectionCount" to actors.size,
         "spectatorCount" to spectators.size,
         "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
-        "events" to catalog.describe()
+        "events" to registry.describe()
     )
 
     private sealed class Op {
