@@ -58,7 +58,8 @@ All notable changes to kroom will be documented in this file.
   folds every room-wide frame into the state (`fold`; a frame with `to` is a message, not a
   transition of the shared marking), keeps the held tokens (`pending`, `already_pending`,
   `cancel` → `not_pending`), answers `{pending: true}` when an intent is held. Every snapshot
-  carries `users` (presence) and `pending` (the viewer's). `Room(id, registry)`, `describe()` =
+  carries `users` (presence), `pending` (the viewer's) and `me` (the viewer's presence entry,
+  absent for a spectator; 2026-10-17). `Room(id, registry)`, `describe()` =
   `{state, events}` (what `GET /rooms/{room}/events` serves now), hooks `fold(frame)` and
   `follow(intent)`.
 - Presence on the wire: `Join` / `Leave` / `Status` / `Cancel` live in `kroom-common`; `join` and

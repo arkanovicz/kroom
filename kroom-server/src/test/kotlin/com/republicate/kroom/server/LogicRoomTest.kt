@@ -105,6 +105,7 @@ class LogicRoomTest {
             assertEquals(listOf("t1"), u.objects("clients").map { it.getString("id") })
         }
         assertEquals(emptyList(), snapshot.getArray("pending")!!.toList())
+        assertEquals("bob", snapshot.getObject("me")!!.getString("id"))   // the viewer, as its users entry
     }
 
     @Test fun `a reason is the verdict alone, nothing framed, nothing changed`() = runBlocking {

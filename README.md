@@ -143,7 +143,8 @@ event: play   id: 42   data: {"move":"rock"}
   not in `State`: a secret is a field of the logic.
 - **Presence is kroom's layer**: every snapshot carries `users: [{id, name, status, clients:
   [{id, kind, status}]}]`, a user's status composed from its clients' (`ONLINE` if any, else
-  `IDLE`, else `AWAY`); `join` carries the user's presence and the count, `leave` the same, a
+  `IDLE`, else `AWAY`), and `me`, the viewer's own entry (absent for a spectator): the page knows
+  who it is from the frame it already gets, no session call; `join` carries the user's presence and the count, `leave` the same, a
   client posting `status {status}` frames the user's composed status and the client that changed.
   The rule hears `Join` / `Leave` / `Status` as events, a user's (first connection, last one), and
   fires what the registry declares for them (`leave = Fires(::Match)`).

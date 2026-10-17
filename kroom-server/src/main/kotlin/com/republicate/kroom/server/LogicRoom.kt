@@ -93,10 +93,11 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
 
     override fun stateToJson(): Json.Object = state.json
 
-    /** The marking, plus what presence knows and what the viewer holds. */
+    /** The marking, plus what presence knows, what the viewer holds, and who the viewer is (`me`, absent for a spectator). */
     override fun stateToJson(actor: Actor): Json.Object = Json.MutableObject(state.json).also {
         it["users"] = Json.Array(users.values.map { u -> presence(u).json })
         it["pending"] = Json.Array(held[actor.id]?.keys?.toList() ?: emptyList<String>())
+        actor.user?.let { u -> it["me"] = presence(u).json }
     }
 
     override fun describe(): Json.Object = Json.Object("state" to state.describe(), "events" to registry.describe())
