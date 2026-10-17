@@ -5,6 +5,7 @@ rootProject.name = "kroom"
 include("kroom-common")
 include("kroom-view")
 include("kroom-server")
+include("kroom-client")
 
 // Build tooling
 include("kroom-velocity-l10n")

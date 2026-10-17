@@ -169,6 +169,21 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-client (new, KMP jvm+js)
+- The binder: a page is a function of the room's JSON. `commonMain`, tested on the JVM and on
+  node: `Path` (`stats.played`, `users.length`, `@me` = the snapshot's `me.id`; keys and indices,
+  not expressions), `Show` (`p`, `p=lit`, `p!=lit`, `p∋lit`, any behind `!`; `@me` as a literal),
+  `Bindings.scan` (the `data-k-*` attributes off markup, template bodies flagged relative) and
+  `Bindings.check(html, registry, state)` (a root path's head must be a state field or a room key
+  — `users`, `pending`, `me` —, an `on` must name an event: the naming class caught at build).
+  `jsMain`: `Client(state, registry, room)` opens the stream, folds through `Store`, runs
+  `derive` then `on` reactions, flashes `data-k-on` elements for `data-k-for` ms against the
+  frame, projects `data-k-field` / `data-k-show` / `data-k-each` / `data-k-follow` writing only
+  on change; `Intents` posts `[data-intent]` (busy for the span of the POST, the reason shown
+  after the trigger, a form's fields and `data-intent-of` in the payload) through `api.js`,
+  which stays the one owner of the tab id; `say(key, vars)` reads the page's `#messages`. A
+  `@JsExport` facade `kroom` (`on`, `act`, `say`, `connect`, `frame`) for plain-JS pages.
+
 #### kroom-common
 - `event.Event`, the one thing that goes through E, the same class on every target: a name, a
   payload (a `JsonView` over the kson object — `val move by enum<Move>().required`, the property
