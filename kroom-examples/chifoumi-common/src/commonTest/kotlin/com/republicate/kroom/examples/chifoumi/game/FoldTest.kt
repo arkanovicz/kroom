@@ -15,8 +15,7 @@ class FoldTest {
         var checked = false
         golden().lines().filter { it.isNotBlank() }.map { Json.parse(it) as Json.Object }.forEach { line ->
             val event = line.getString("event")!!
-            // as text: kson's equals tells a parsed 1 (a Long) from a counted 1 (an Int)
-            if (event == "final") { assertEquals(line.getObject("data").toString(), store.json.toString()); checked = true }
+            if (event == "final") { assertEquals(line.getObject("data"), store.json); checked = true }
             else store.fold(event, line.getObject("data")!!)
         }
         assertEquals(true, checked)

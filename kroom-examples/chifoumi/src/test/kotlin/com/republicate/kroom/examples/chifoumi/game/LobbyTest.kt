@@ -123,7 +123,7 @@ class LobbyTest {
         val final = room.stateToJson(b)
         val store = Store(LobbyState(), LobbyLogic.registry)
         seen.forEach { store.fold(it.event!!, it.data!!) }
-        assertEquals(final.toString(), store.json.toString())   // as text: kson's equals tells a parsed 1 (a Long) from a counted 1 (an Int)
+        assertEquals(final, store.json)   // kson compares objects as maps, numbers by value
         // the recording, the golden of the browser's fold (chifoumi-common's FoldTest) and of the pages (src/test/js): refresh it when the wire changes
         val recording = seen.joinToString("") { """{"id":${it.id},"event":"${it.event}","data":${it.data}}""" + "\n" } + """{"event":"final","data":$final}""" + "\n"
         File("build/frames.jsonl").writeText(recording)

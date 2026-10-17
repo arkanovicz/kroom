@@ -8,7 +8,7 @@ antlr-kotlin = "1.0.10"
 bouncycastle = "1.81"
 commons-collections4 = "4.5.0"
 commons-lang3 = "3.18.0"
-essential-kson = "2.14"
+essential-kson = "2.16"
 angus-mail = "2.0.5"
 greenmail = "2.1.14"
 # last 0.64.x; JVM-only by design — server-side rendering, not part of kroom's KMP surface

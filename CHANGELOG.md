@@ -179,6 +179,8 @@ All notable changes to kroom will be documented in this file.
   a `Catalog` rebuilds an event from a frame by name. `Reason` is a key and arguments, localized
   by the browser. Pinned in `EventTest`, JVM and JS. Nothing uses it yet (branch `kroom-events`).
 - jvmTest runs with `slf4j-simple`: kson logs through slf4j on the JVM.
+- essential-kson 2.16: objects compare as maps (key order blind), arrays sized, numbers by value
+  (a counted `Int` 1 equals a parsed `Long` 1), so the fold tests compare snapshots as objects.
 - `event.Store(state, registry)`: a room as a client folds it, on any target — `state`
   replaces, `join` / `leave` / `status` keep `users`, every other frame (`cancel` included) goes
   through the same `State.reduce` the server runs. What a viewer holds live is the app's fold to
