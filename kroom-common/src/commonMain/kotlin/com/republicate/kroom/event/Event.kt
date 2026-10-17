@@ -150,8 +150,8 @@ class Registry(
     private val factories = LinkedHashMap<String, (Json.MutableObject) -> Event>()
     private val postable = LinkedHashSet<String>()
 
-    // the room's own first: on every wire, posted by nobody
-    init { fired(::Join); fired(::Leave); intents.forEach { register(it) } }
+    // the room's own first: join and leave on every wire, posted by nobody; status and cancel, kroom's intents, posted by any client
+    init { fired(::Join); fired(::Leave); register(::Status); register(::Cancel); intents.forEach { register(it) } }
 
     /** An intent: a name a door may bring. What it fires is registered with it, as fired only. */
     fun <E : Event> register(factory: (Json.MutableObject) -> E): Registry = apply {

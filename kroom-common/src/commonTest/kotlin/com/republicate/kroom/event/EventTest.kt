@@ -96,13 +96,13 @@ class EventTest {
 
     @Test fun `a registry rebuilds an intent from a frame and describes the alphabet`() {
         val catalog = Registry(::Play, ::Match)
-        assertEquals(setOf("play", "match"), catalog.names)
+        assertEquals(setOf("status", "cancel", "play", "match"), catalog.names)   // kroom's two intents are postable in every room
         val e = catalog.of("play", """{"move":"SCISSORS"}""")
         assertIs<Play>(e)
         assertEquals(Stage.BORN, e.stage)
         assertEquals(Move.SCISSORS, e.move)
         assertNull(catalog.of("dance"))
-        assertEquals(4, catalog.describe().size)   // join, leave, and the two
+        assertEquals(6, catalog.describe().size)   // join, leave, status, cancel, and the two
     }
 
     @Test fun `a client's metadata is dropped at birth`() {

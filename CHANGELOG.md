@@ -201,7 +201,9 @@ All notable changes to kroom will be documented in this file.
   replaces, `join` / `leave` / `status` keep `users`, every other frame (`cancel` included) goes
   through the same `State.reduce` the server runs. What a viewer holds live is the app's fold to
   know, since the release rule is its logic's; the snapshot's `pending` says what was held at join. `Registry` knows `join` and `leave` (`all`, `describe()`,
-  `frame()`), posted by nobody.
+  `frame()`), posted by nobody, and `status` and `cancel`, kroom's own intents, postable in every
+  room (2026-10-18: the server's `on()` used to add them to the shared registry at runtime, so a
+  browser's pristine copy never listened to them).
 
 #### kroom-server
 - Intents (`private/intents.md`): `Room.act` returning the verdict as a `Deferred`, `act(user, tabId,
