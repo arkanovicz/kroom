@@ -11,7 +11,7 @@ expect fun golden(): String
 /** The browser's fold is the server's: the same class, on every platform, reaches the snapshot the room would serve. */
 class FoldTest {
     @Test fun `the fold of the recorded frames is the room's snapshot`() {
-        val store = Store(LobbyState(), LobbyLogic.registry, "b")
+        val store = Store(LobbyState(), LobbyLogic.registry)
         var checked = false
         golden().lines().filter { it.isNotBlank() }.map { Json.parse(it) as Json.Object }.forEach { line ->
             val event = line.getString("event")!!
@@ -21,7 +21,6 @@ class FoldTest {
         }
         assertEquals(true, checked)
         assertEquals(listOf("b"), store.users.map { it.id })   // alice left
-        assertEquals(emptyList(), store.pending)
         assertEquals(1, store.state.history.size)
         assertEquals(emptyMap(), store.state.matches)
         assertEquals(1, store.state.stats!!.played)

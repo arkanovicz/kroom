@@ -179,10 +179,10 @@ All notable changes to kroom will be documented in this file.
   a `Catalog` rebuilds an event from a frame by name. `Reason` is a key and arguments, localized
   by the browser. Pinned in `EventTest`, JVM and JS. Nothing uses it yet (branch `kroom-events`).
 - jvmTest runs with `slf4j-simple`: kson logs through slf4j on the JVM.
-- `event.Store(state, registry, me)`: a room as a client folds it, on any target — `state`
-  replaces, `join` / `leave` / `status` keep `users`, the viewer's own `cancel` releases
-  `pending` (`hold` / `release` for the reply's word), every other frame goes through the same
-  `State.reduce` the server runs. `Registry` knows `join` and `leave` (`all`, `describe()`,
+- `event.Store(state, registry)`: a room as a client folds it, on any target — `state`
+  replaces, `join` / `leave` / `status` keep `users`, every other frame (`cancel` included) goes
+  through the same `State.reduce` the server runs. What a viewer holds live is the app's fold to
+  know, since the release rule is its logic's; the snapshot's `pending` says what was held at join. `Registry` knows `join` and `leave` (`all`, `describe()`,
   `frame()`), posted by nobody.
 
 #### kroom-server

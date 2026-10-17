@@ -96,10 +96,12 @@ event: play   id: 42   data: {"move":"rock"}
   `fires`, every other name on the wire. The room (`LogicRoom(id, state, logic)`) is the machine:
   it runs the rule on its loop, frames what it fired, folds every frame into the state as it goes,
   so the server's state is the fold it serves and `reduce*(snapshot@N, frames) == snapshot@M` by
-  construction. A client folds the stream with the same class: `Store(state, registry, me)`
-  replaces on `state`, keeps `users` from the presence frames and `pending` from the viewer's own
-  `cancel`, and hands every other frame to the same `reduce`. The registry lists `join` and
-  `leave` with the rest: every name on the wire, posted by nobody.
+  construction. A client folds the stream with the same class: `Store(state, registry)`
+  replaces on `state`, keeps `users` from the presence frames, and hands every other frame to the
+  same `reduce`. What the viewer holds is the app's to know: the release rule is its logic's and
+  every release is a frame its `reduce` sees (its `cancel`, a firing, a `leave`); the snapshot's
+  `pending` says what was held at join. The registry lists `join` and `leave` with the rest: every
+  name on the wire, posted by nobody.
 
   ```kotlin
   class Counter : State() {

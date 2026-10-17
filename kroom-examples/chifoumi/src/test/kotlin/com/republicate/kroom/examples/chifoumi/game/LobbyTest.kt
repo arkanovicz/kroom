@@ -121,7 +121,7 @@ class LobbyTest {
         assertEquals(listOf("state", "join", "match", "match", "chat", "play", "play", "round", "play", "cancel", "play", "play", "round", "leave", "match"), seen.map { it.event })
         // commutation: the fold of what bob's tab received is the snapshot bob would get now
         val final = room.stateToJson(b)
-        val store = Store(LobbyState(), LobbyLogic.registry, "b")
+        val store = Store(LobbyState(), LobbyLogic.registry)
         seen.forEach { store.fold(it.event!!, it.data!!) }
         assertEquals(final.toString(), store.json.toString())   // as text: kson's equals tells a parsed 1 (a Long) from a counted 1 (an Int)
         // the recording, the golden of the browser's fold (chifoumi-common's FoldTest) and of the pages (src/test/js): refresh it when the wire changes
