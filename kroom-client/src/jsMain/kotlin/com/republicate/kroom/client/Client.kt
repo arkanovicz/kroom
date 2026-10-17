@@ -9,7 +9,6 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.Element
 import org.w3c.dom.EventSource
-import org.w3c.dom.MessageEvent
 import org.w3c.dom.asList
 import kotlin.js.Promise
 
@@ -33,6 +32,7 @@ class Client<S : State>(
 
     private val reactions = HashMap<String, MutableList<(Event) -> Unit>>()
     private val derives = mutableListOf<(S, String?) -> Unit>()
+    private val onState = mutableListOf<(S) -> Unit>()
     private val flashing = HashMap<Element, Int>()
     private var source: EventSource? = null
     val intents = Intents(this)
@@ -45,6 +45,9 @@ class Client<S : State>(
     /** An effect after a frame of that name (the frame typed by the registry). */
     fun on(name: String, fn: (Event) -> Unit) = apply { reactions.getOrPut(name) { mutableListOf() } += fn }
 
+    /** An effect after the snapshot (a reconnect lands here too). */
+    fun onState(fn: (S) -> Unit) = apply { onState += fn }
+
     /** Computed keys, written into the JSON before each projection (`match` = the viewer's match). */
     fun derive(fn: (S, String?) -> Unit) = apply { derives += fn }
 
@@ -54,7 +57,8 @@ class Client<S : State>(
         val tab = api.tabId() as String?
         val url = if (tab == null) events else events + (if (events.contains('?')) "&" else "?") + "tabId=" + encodeURIComponent(tab)
         val es = EventSource(url)
-        for (name in registry.all + "state") es.addEventListener(name, { e -> frame(name, (e as MessageEvent).data as String) })
+        // a plain object with `data` will do: the harness fakes the source
+        for (name in registry.all + "state") es.addEventListener(name, { e: org.w3c.dom.events.Event -> frame(name, e.asDynamic().data as String) })
         source = es
     }
 
@@ -67,7 +71,7 @@ class Client<S : State>(
         if (event != null) {
             reactions[name]?.forEach { it(event) }
             flash(event)
-        }
+        } else if (name == "state") onState.forEach { it(state) }
         project()
     }
 
@@ -87,7 +91,7 @@ class Client<S : State>(
 
     /** Post an intent to the room; the reply is the verdict (a rejected promise carries `data.reason`). */
     fun act(type: String, payload: Json.Object = Json.Object()): Promise<dynamic> =
-        api.act(room, type, JSON.parse(payload.toString())) as Promise<dynamic>
+        api.act(room, type, JSON.parse(payload.toString())).unsafeCast<Promise<dynamic>>()   // a promise of another realm (a harness) is one too
 
     companion object {
         internal val api: dynamic get() = js("api")
@@ -98,5 +102,5 @@ class Client<S : State>(
 /** A sentence held by the page (`#messages [data-msg=key]`, so l10n translates it), `{k}` filled from [vars]; the key when absent. */
 fun say(key: String, vars: Map<String, Any?> = emptyMap()): String {
     val text = document.querySelector("#messages [data-msg=\"$key\"]")?.textContent ?: key
-    return Regex("""\{(\w+)}""").replace(text) { m -> vars[m.groupValues[1]]?.toString() ?: "" }
+    return Regex("""\{(\w+)\}""").replace(text) { m -> vars[m.groupValues[1]]?.toString() ?: "" }
 }

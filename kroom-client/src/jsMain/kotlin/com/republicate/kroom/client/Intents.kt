@@ -31,7 +31,7 @@ class Intents internal constructor(private val client: Client<*>) {
             busy(el, true)
             clearReason(intent)
             client.act(intent, payload(el)).then<Unit>(
-                onFulfilled = { settle(intent, null) },
+                onFulfilled = { settle(intent, null); formOf(el)?.reset() },
                 onRejected = { err -> settle(intent, reasonOf(err)) })
         })
     }
@@ -44,7 +44,7 @@ class Intents internal constructor(private val client: Client<*>) {
             val a = el.attributes[i] ?: continue
             if (a.name.startsWith("data-") && !a.name.startsWith("data-intent") && !a.name.startsWith("data-k-")) out[camel(a.name.removePrefix("data-"))] = a.value
         }
-        val form = (el as? HTMLButtonElement)?.form ?: (el as? HTMLInputElement)?.form ?: el.closest("form") as? HTMLFormElement
+        val form = formOf(el)
         if (form != null) {
             val fd = FormData(form)
             val keys = js("Array.from(fd.keys())") as Array<String>
@@ -52,6 +52,8 @@ class Intents internal constructor(private val client: Client<*>) {
         }
         return out
     }
+
+    private fun formOf(el: HTMLElement) = (el as? HTMLButtonElement)?.form ?: (el as? HTMLInputElement)?.form ?: el.closest("form") as? HTMLFormElement
 
     private fun camel(s: String) = s.split('-').mapIndexed { i, p -> if (i == 0) p else p.replaceFirstChar { it.uppercase() } }.joinToString("")
 

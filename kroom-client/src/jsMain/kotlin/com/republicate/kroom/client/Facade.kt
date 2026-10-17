@@ -13,7 +13,10 @@ object kroom {
 
     fun attach(c: Any) { client = c as Client<*> }
     val me: String? get() = client?.me
-    fun on(name: String, fn: (dynamic) -> Unit) { client?.on(name) { e: Event -> fn(JSON.parse(e.json.toString())) } }
+    fun on(name: String, fn: (dynamic) -> Unit) {
+        if (name == "state") client?.onState { fn(JSON.parse(it.json.toString())) }
+        else client?.on(name) { e: Event -> fn(JSON.parse(e.json.toString())) }
+    }
     fun act(type: String, payload: dynamic = js("({})")) = client?.act(type, com.republicate.kson.Json.parse(JSON.stringify(payload)) as com.republicate.kson.Json.Object)
     fun connect() { client?.connect() }
     fun frame(name: String, data: String) { client?.frame(name, data) }

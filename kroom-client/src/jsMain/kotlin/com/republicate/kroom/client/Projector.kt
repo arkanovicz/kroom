@@ -47,8 +47,10 @@ internal object Projector {
         return owner !== root && root.contains(owner)
     }
 
+    /** The markup's own text is the default, kept for when the value is absent (`0`, `?`). */
     private fun field(el: Element, value: Any?) {
-        val text = when (value) { null -> ""; else -> value.toString() }
+        if (!el.hasAttribute("data-k-default")) el.setAttribute("data-k-default", if (el is HTMLInputElement || el is HTMLTextAreaElement || el is HTMLSelectElement) "" else el.textContent ?: "")
+        val text = value?.toString() ?: el.getAttribute("data-k-default") ?: ""
         when (el) {
             is HTMLInputElement -> if (el.value != text) el.value = text
             is HTMLTextAreaElement -> if (el.value != text) el.value = text

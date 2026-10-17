@@ -57,11 +57,12 @@ object Bindings {
 
     /**
      * What the markup names that the room does not declare: a root path whose head is no state
-     * field nor room key, an `on` naming no event, a value that does not parse. Paths inside a
-     * template are relative and not checked (the shape of an element is not declared yet).
+     * field nor room key nor a key the app derives, an `on` naming no event, a value that does not
+     * parse. Paths inside a template are relative and not checked (the shape of an element is not
+     * declared yet).
      */
-    fun check(html: String, registry: Registry, state: JsonView): List<String> {
-        val keys = state.fields.map { it.name }.toSet() + roomKeys
+    fun check(html: String, registry: Registry, state: JsonView, derived: Set<String> = emptySet()): List<String> {
+        val keys = state.fields.map { it.name }.toSet() + roomKeys + derived
         val problems = mutableListOf<String>()
         for (b in scan(html)) {
             try {
