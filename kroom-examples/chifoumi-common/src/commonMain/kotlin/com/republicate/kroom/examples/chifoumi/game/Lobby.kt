@@ -37,6 +37,9 @@ class MatchView(json: Json.MutableObject = Json.MutableObject()) : JsonView(json
     val target by int()
     val finished by bool()
     val winner by string()
+    /** Who has played the round in progress, never which move: the fold of `play` and its `cancel`; the `round` frame's match starts afresh. */
+    var played by list<String>()
+        internal set
     fun has(user: String) = user == player1 || user == player2
 }
 
@@ -91,16 +94,20 @@ class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(js
 
     init { if (json["stats"] == null) json["stats"] = Json.MutableObject() }
 
-    /** The viewer's running match, if any: the page's perspective, not a key of the marking. */
-    fun myMatch(me: String?): MatchView? = me?.let { matches.values.firstOrNull { m -> m.finished != true && (m.player1 == it || m.player2 == it) } }
+    /** The running match of a user, if any; the page's perspective (`me`), not a key of the marking. */
+    fun myMatch(user: String?): MatchView? = user?.let { u -> matches.values.firstOrNull { m -> m.finished != true && m.has(u) } }
 
     override fun reduce(frame: Event) {
         super.reduce(frame)
         when (frame) {
             is Match -> frame.match?.let { m -> record(m); queue = queue - listOf(m.player1, m.player2) }
                 ?: frame.player?.let { queue = queue + it }
+            is Play -> frame.player?.let { p -> myMatch(p)?.let { it.played = it.played + p } }
             is Round -> { record(frame.match); stats!!.count(frame.round) }
-            is Cancel -> if (frame.intent == "match") queue = queue - listOfNotNull(frame.user)
+            is Cancel -> when (frame.intent) {
+                "match" -> queue = queue - listOfNotNull(frame.user)
+                "play" -> frame.user?.let { u -> myMatch(u)?.let { it.played = it.played - u } }
+            }
             is Leave -> queue = queue - listOfNotNull(frame.user?.id)
             else -> {}
         }

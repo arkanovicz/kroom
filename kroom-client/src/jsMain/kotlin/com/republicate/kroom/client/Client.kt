@@ -15,7 +15,8 @@ import kotlin.js.Promise
 /**
  * A page on a room: the stream folded by [Store] through the app's [State], the markup under
  * [root] projected after every frame, the `[data-intent]` triggers posting to the room. Reactions
- * (`on`) are effects after a frame, never emissions; `derive` adds computed keys before projection.
+ * (`on`) are effects after a frame, never emissions; they run before `derive`, so what a page
+ * remembers from a frame (a match the marking dropped, a note) can feed the keys it derives.
  *
  * `api.js` stays the one owner of the tab id and of the POST: this client calls it.
  */
@@ -64,14 +65,18 @@ class Client<S : State>(
 
     fun close() { source?.close(); source = null }
 
-    /** One frame: fold, derive, react, flash, project. Also the harness's way in. */
+    /** One frame: fold, react, derive, flash, project. Also the harness's way in. */
     fun frame(name: String, data: String) {
         val event = store.fold(name, data)
+        if (event != null) reactions[name]?.forEach { it(event) }
+        else if (name == "state") onState.forEach { it(state) }
+        refresh()
+        if (event != null) flash(event)
+    }
+
+    /** Derive and project again, no frame: something the page alone holds changed (a timer ran out). */
+    fun refresh() {
         derives.forEach { it(state, me) }
-        if (event != null) {
-            reactions[name]?.forEach { it(event) }
-            flash(event)
-        } else if (name == "state") onState.forEach { it(state) }
         project()
     }
 

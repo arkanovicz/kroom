@@ -163,11 +163,6 @@
     cursor: not-allowed;
 }
 
-.move-btn.selected {
-    background: var(--pico-primary);
-    color: white;
-}
-
 /* Round result */
 .round-result {
     margin: 2rem 0;
@@ -213,15 +208,15 @@
     font-weight: bold;
 }
 
-.result-indicator.win {
+.result-indicator .win {
     color: #2ecc71;
 }
 
-.result-indicator.lose {
+.result-indicator .lose {
     color: #e74c3c;
 }
 
-.result-indicator.draw {
+.result-indicator .draw {
     color: #f39c12;
 }
 
@@ -235,11 +230,11 @@
     margin-bottom: 1rem;
 }
 
-.match-result.winner h2 {
+.match-result h2.winner {
     color: #2ecc71;
 }
 
-.match-result.loser h2 {
+.match-result h2.loser {
     color: #e74c3c;
 }
 

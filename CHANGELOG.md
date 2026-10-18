@@ -102,8 +102,18 @@ All notable changes to kroom will be documented in this file.
   JSON (`users.length`, `me.name`, `queue∋@me`, `history` as a `<template>`, `stats.*`, a
   `data-k-follow` link to the game when the viewer's match is on), `chifoumi.js` keeps only login
   and language. `PagesTest` checks the template's bindings against `LobbyState` and the registry;
-  `pages.mjs` runs the lobby on the bundle (`BUNDLE=` for a dev build). The game page still runs
-  `state.js` (its fold reads the id out of the snapshot's `me` object) until its own port.
+  `pages.mjs` runs the lobby on the bundle (`BUNDLE=` for a dev build).
+- The game page too: `game.html` is bound to `game`, the viewer's perspective over their match
+  (names from their side, `phase` = `choose` / `waiting` / `reveal` / `over`, the round revealed
+  for two seconds, the sentences composed from `#messages`), derived in `Main.kt` from the
+  marking and what the page alone remembers (the match once the room dropped it, the move this
+  tab played, a note); `game.js` opens the stream. **Who has played the round in progress is the
+  fold's** (`MatchView.played`, from `play` and its `cancel`; the `round` frame's match starts
+  afresh): the server's snapshot carries it, so a reconnect lands mid-round knowing both sides;
+  the page no longer keeps a `pending` list. The chosen move is shown beside the take-back
+  button instead of a highlighted disabled button. `state.js`, `sse.js` and `intents.js` leave
+  the chifoumi pages (the JS mirror of the fold is gone); the jsdom harness runs both pages on
+  the bundle.
 - `kroom-examples/chifoumi-common` (multiplatform, JVM + JS): the lobby's declarations, fold and
   typed layer (`Lobby.kt`, `LobbyLogic`, `Move`) moved out of the server module, one class for
   both runtimes (`LobbyLogic.registry` is the alphabet, the browser's too).

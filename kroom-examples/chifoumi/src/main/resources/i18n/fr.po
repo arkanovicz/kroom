@@ -172,6 +172,9 @@ msgstr "Envoyer"
 msgid "Take it back"
 msgstr "Reprendre"
 
+msgid "You played"
+msgstr "Vous avez joué"
+
 msgid "{name} has played. Your turn!"
 msgstr "{name} a joué. À vous !"
 

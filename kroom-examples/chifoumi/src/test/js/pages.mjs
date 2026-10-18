@@ -7,11 +7,11 @@ const require = createRequire('/home/app/kroom-webapp-assets/src/test/js/');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const R = '/home/app/kroom-examples/chifoumi/src/main/resources';
 const A = '/home/app/kroom-webapp-assets/src/main/resources/static/js';
-// the lobby runs on the bundle (chifoumi-common's js executable: the fold, the binder, the app's main — build it first); the game page still on the JS fold
+// both pages run on the bundle (chifoumi-common's js executable: the fold, the binder, the app's main — build it first)
 const BUNDLE = process.env.BUNDLE || '/home/app/kroom-examples/chifoumi-common/build/dist/js/productionExecutable/arena.js';
 for (const kind of ['uncaughtException', 'unhandledRejection']) process.on(kind, e => { failed++; console.log(kind.toUpperCase(), e?.message ?? e, '|', String(e?.stack ?? '').split('\n').slice(1, 5).join(' | ')); });
 const LOBBY = ['domhelper', 'api', 'status'].map(n => `${A}/${n}.js`).concat([BUNDLE, `${R}/static/js/chifoumi.js`]);
-const GAME = ['domhelper', 'api', 'sse', 'intents', 'status'].map(n => `${A}/${n}.js`).concat([`${R}/static/js/state.js`, `${R}/static/js/game.js`]);
+const GAME = ['domhelper', 'api'].map(n => `${A}/${n}.js`).concat([BUNDLE, `${R}/static/js/game.js`]);
 const frames = fs.readFileSync('/home/app/kroom-examples/chifoumi-common/src/commonTest/resources/frames.jsonl', 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(f => f.event !== 'final');
 let failed = 0;
 const must = (cond, label) => { if (!cond) { failed++; console.log('FAIL', label); } };
@@ -43,7 +43,7 @@ async function page(template, scripts) {
     await sleep(50);
     const send = async (f) => { listeners[f.event]?.({ data: JSON.stringify(f.data) }); await sleep(5); };
     const $t = s => w.document.querySelector(s)?.textContent.trim().replace(/\s+/g, ' ');
-    const vis = s => { const e = w.document.querySelector(s); return e && e.style.display !== 'none' && !e.hidden; };
+    const vis = s => { for (let e = w.document.querySelector(s); e; e = e.parentElement) if (e.hidden || e.style.display === 'none') return false; return !!w.document.querySelector(s); };   // shown = no hidden ancestor
     return { w, send, $t, vis, posts, log, setReply: r => reply = r, click: async s => { w.document.querySelector(s).click(); await sleep(30); } };
 }
 
@@ -82,37 +82,49 @@ async function page(template, scripts) {
     const p = await page('game.html', GAME);
     const snap = { ...frames[0], data: { ...frames[0].data, matches: { [frames[3].data.match.id]: frames[3].data.match } } };
     await p.send(snap);
-    console.log('game names', p.$t('#player1-name'), '/', p.$t('#player2-name'), '| msg', p.$t('#game-message'));
+    console.log('game names', p.$t('#player1-name'), '/', p.$t('#player2-name'), '| msg', p.$t('#game-message'), '| buttons', p.vis('#move-buttons'));
+    must(p.$t('#player1-name') === 'Alice' && p.$t('#player2-name') === 'You' && p.vis('#move-buttons'), 'game: the perspective from the snapshot');
     await p.send(frames[5]);
     console.log('after a plays:', p.$t('#game-message'));
+    must(/Alice has played/.test(p.$t('#game-message')), 'opponent played: the fold says so');
     await p.click('[data-move="paper"]');
     console.log('play posted', JSON.stringify(p.posts.at(-1)));
+    must(p.posts.at(-1).type === 'play' && p.posts.at(-1).move === 'paper', 'play: the move posted');
     await p.send(frames[6]);
-    console.log('after my play:', p.$t('#game-message'), '| take-back', p.vis('#take-back'), '| disabled', [...p.w.document.querySelectorAll('.move-btn')].map(b => b.disabled).join(), '| selected', p.w.document.querySelector('.move-btn.selected')?.dataset.move);
+    console.log('after my play:', p.$t('#game-message'), '| played', p.$t('#played'), '| take-back', p.vis('#take-back'), '| buttons', p.vis('#move-buttons'));
+    must(p.vis('#take-back') && !p.vis('#move-buttons') && /📄/.test(p.$t('#played')), 'waiting: my move shown, the buttons gone');
     await p.send(frames[7]);
-    console.log('round:', p.$t('#round-message'), '|', p.$t('#round-verdict'), '| scores', p.$t('#player1-score'), p.$t('#player2-score'), '| moves', p.$t('#your-move .emoji'), p.$t('#opponent-move .emoji'));
-    must(p.$t('#round-verdict') === 'Paper covers the rock.' && p.$t('#player2-score') === '1', 'round: the verdict and the score');
+    console.log('round:', p.$t('#round-message'), '|', p.$t('#round-verdict'), '| scores', p.$t('#player1-score'), p.$t('#player2-score'), '| moves', p.$t('#your-move .emoji'), p.$t('#opponent-move .emoji'), '| indicator', p.$t('.result-indicator'));
+    must(p.vis('#round-result') && p.$t('#round-verdict') === 'Paper covers the rock.' && p.$t('#player2-score') === '1' && p.$t('#your-move .emoji') === '📄', 'round: the reveal, the verdict and the score');
     await sleep(2100);
-    console.log('next round:', p.$t('#game-message'), '| buttons', p.vis('#move-buttons'), '| round', p.$t('#round-num'));
+    console.log('next round:', p.$t('#game-message'), '| buttons', p.vis('#move-buttons'), '| reveal', p.vis('#round-result'), '| round', p.$t('#round-num'));
+    must(p.vis('#move-buttons') && !p.vis('#round-result') && p.$t('#round-num') === '2', 'after the reveal: round 2, the buttons back');
     await p.send(frames[8]);
     await p.click('#take-back');
     console.log('take back posted', JSON.stringify(p.posts.at(-1)));
+    must(p.posts.at(-1).type === 'cancel' && p.posts.at(-1).intent === 'play', 'take back: cancel of play posted');
     await p.send(frames[9]);
-    console.log('after take back:', p.$t('#game-message'), '| take-back', p.vis('#take-back'), '| disabled', [...p.w.document.querySelectorAll('.move-btn')].map(b => b.disabled).join());
+    console.log('after take back:', p.$t('#game-message'), '| take-back', p.vis('#take-back'), '| buttons', p.vis('#move-buttons'));
+    must(p.vis('#move-buttons') && !p.vis('#take-back'), 'after take back: choosing again');
+    await p.send({ event: 'play', data: { player: 'a' } });
     await p.send({ event: 'cancel', data: { intent: 'play', user: 'a' } });
     console.log('opponent took back:', p.$t('#game-message'));
+    must(/Alice took their move back/.test(p.$t('#game-message')), 'opponent took back: the note');
     for (const f of frames.slice(10, 13)) await p.send(f);
     await sleep(2100);
     await p.send(frames[13]);
     await p.send(frames[14]);
-    console.log('forfeit:', p.$t('#match-result-title'), '|', p.$t('#match-result-message'), '| result', p.vis('#match-result'), '| play again', p.vis('#play-again-btn'));
-    must(p.vis('#match-result') && p.$t('#match-result-message').includes('Alice'), 'forfeit: victory over the leaver');
+    const title = [...p.w.document.querySelectorAll('#match-result h2')].find(h => !h.hidden);
+    console.log('forfeit:', title?.textContent, title?.className, '|', p.$t('#match-result-message'), '| result', p.vis('#match-result'), '| play again', p.vis('#play-again-btn'));
+    must(p.vis('#match-result') && title?.className === 'winner' && p.$t('#match-result-message').includes('Alice') && p.vis('#play-again-btn'), 'forfeit: victory over the leaver');
     p.setReply({ pending: true });
     await p.click('#play-again-btn');
     await p.send({ event: 'match', data: { player: 'b' } });
     console.log('play again posted', JSON.stringify(p.posts.at(-1)), '| searching', p.vis('#again-searching'), '| play again', p.vis('#play-again-btn'));
-    await p.send({ event: 'match', data: { player: 'b', match: { ...frames[3].data.match, id: 'new1' } } });
-    console.log('new match:', p.log.join(' / ') || 'nothing logged');
+    must(p.vis('#again-searching') && !p.vis('#play-again-btn'), 'play again: searching');
+    await p.send({ event: 'match', data: { player: 'b', match: { ...frames[3].data.match, id: 'new1', score1: 0, score2: 0, round: 1 } } });
+    console.log('new match:', p.$t('#game-message'), '| buttons', p.vis('#move-buttons'), '| result', p.vis('#match-result'), '| round', p.$t('#round-num'), '|', p.log.join(' / ') || 'no navigation');
+    must(p.vis('#move-buttons') && !p.vis('#match-result') && p.$t('#round-num') === '1' && !p.log.some(l => /navigation/.test(l)), 'new match: the page turns over, no reload');
 }
 console.log(failed ? `${failed} check(s) failed` : 'all checks passed');
 process.exit(failed ? 1 : 0);

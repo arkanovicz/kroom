@@ -7,41 +7,37 @@
     <link rel="stylesheet" href="/lib/pico/pico.min.css">
     <link rel="stylesheet" href="/css/chifoumi.css">
 </head>
-<body>
+<body data-k-room="chifoumi-lobby">
     <header class="container">
         <nav>
             <ul>
                 <li><a href="/$lang/index.html"><strong>Chifoumi Arena</strong></a></li>
             </ul>
             <ul>
-                <li id="match-info">Round <span id="round-num">1</span></li>
-                <li>First to <span id="target">5</span></li>
+                <li id="match-info">Round <span id="round-num" data-k-field="game.round">1</span></li>
+                <li>First to <span id="target" data-k-field="game.target">5</span></li>
             </ul>
         </nav>
     </header>
 
+    <!-- The page is the viewer's match (`game`, derived from the viewer's side); without one, the lobby -->
     <main class="container">
         <article id="game-area">
-            <!-- Score display -->
             <div class="score-board">
                 <div class="player player-1">
-                    <span class="player-name" id="player1-name">Player 1</span>
-                    <span class="player-score" id="player1-score">0</span>
+                    <span class="player-name" id="player1-name" data-k-field="game.name1">Player 1</span>
+                    <span class="player-score" id="player1-score" data-k-field="game.score1">0</span>
                 </div>
                 <div class="vs">VS</div>
                 <div class="player player-2">
-                    <span class="player-name" id="player2-name">Player 2</span>
-                    <span class="player-score" id="player2-score">0</span>
+                    <span class="player-name" id="player2-name" data-k-field="game.name2">Player 2</span>
+                    <span class="player-score" id="player2-score" data-k-field="game.score2">0</span>
                 </div>
             </div>
 
-            <!-- Game state messages -->
-            <div id="game-message" class="game-message">
-                Choose your move!
-            </div>
+            <div id="game-message" class="game-message" data-k-field="game.message"></div>
 
-            <!-- Move buttons -->
-            <div id="move-buttons" class="move-buttons">
+            <div id="move-buttons" class="move-buttons" data-k-show="game.phase=choose" hidden>
                 <button class="move-btn" data-intent="play" data-move="rock" title="Rock">
                     <span class="emoji">🪨</span>
                     <span class="label">Rock</span>
@@ -59,23 +55,42 @@
                     <span class="label">Well</span>
                 </button>
             </div>
-            <button id="take-back" data-intent="cancel" data-intent-of="play" class="secondary outline" style="display: none;">Take it back</button>
 
-            <!-- Round result display -->
-            <div id="round-result" class="round-result" style="display: none;">
+            <div id="played" data-k-show="game.phase=waiting" hidden>
+                <p data-k-show="game.mine">You played <span class="emoji" data-k-field="game.mine"></span></p>
+                <button id="take-back" data-intent="cancel" data-intent-of="play" class="secondary outline">Take it back</button>
+            </div>
+
+            <div id="round-result" class="round-result" data-k-show="game.phase=reveal" hidden>
                 <div class="moves-reveal">
                     <div class="revealed-move" id="your-move">
-                        <span class="emoji"></span>
+                        <span class="emoji" data-k-field="game.reveal.yours"></span>
                         <span class="label">You</span>
                     </div>
-                    <div class="result-indicator" id="result-indicator">VS</div>
+                    <div class="result-indicator">
+                        <span class="win" data-k-show="game.reveal.outcome=win">✓</span>
+                        <span class="lose" data-k-show="game.reveal.outcome=lose">✓</span>
+                        <span class="draw" data-k-show="game.reveal.outcome=draw">=</span>
+                    </div>
                     <div class="revealed-move" id="opponent-move">
-                        <span class="emoji"></span>
+                        <span class="emoji" data-k-field="game.reveal.theirs"></span>
                         <span class="label">Opponent</span>
                     </div>
                 </div>
-                <p id="round-message"></p>
-                <p id="round-verdict"></p>
+                <p id="round-message" data-k-field="game.reveal.message"></p>
+                <p id="round-verdict" data-k-field="game.reveal.verdict"></p>
+            </div>
+
+            <div id="match-result" class="match-result" data-k-show="game.phase=over" hidden>
+                <h2 class="winner" data-k-show="game.won" data-k-field="game.title">Match Over!</h2>
+                <h2 class="loser" data-k-show="!game.won" data-k-field="game.title">Match Over!</h2>
+                <p id="match-result-message" data-k-field="game.result"></p>
+                <button id="play-again-btn" data-intent="match" class="primary" data-k-show="!queue∋@me">Play Again</button>
+                <div id="again-searching" data-k-show="queue∋@me" hidden>
+                    <p aria-busy="true">Searching for opponent...</p>
+                    <button data-intent="cancel" data-intent-of="match" class="secondary">Cancel</button>
+                </div>
+                <a href="/$lang/index.html" role="button" class="secondary">Back to Lobby</a>
             </div>
 
             <!-- Why a move wins, winner-loser; held here so l10n translates them -->
@@ -104,26 +119,15 @@
                 <li data-msg="defeated">You defeated {name}!</li>
                 <li data-msg="wins">{name} wins. Better luck next time!</li>
             </ul>
-
-            <!-- Match result -->
-            <div id="match-result" class="match-result" style="display: none;">
-                <h2 id="match-result-title">Match Over!</h2>
-                <p id="match-result-message"></p>
-                <button id="play-again-btn" data-intent="match" class="primary">Play Again</button>
-                <div id="again-searching" style="display: none;">
-                    <p aria-busy="true">Searching for opponent...</p>
-                    <button data-intent="cancel" data-intent-of="match" class="secondary">Cancel</button>
-                </div>
-                <a href="/$lang/index.html" role="button" class="secondary">Back to Lobby</a>
-            </div>
         </article>
+
+        <!-- No match of the viewer's: back to the lobby -->
+        <a href="/$lang/index.html" data-k-show="!game" data-k-follow hidden></a>
     </main>
 
     <script src="#versioned('/js/domhelper.js')"></script>
     <script src="#versioned('/js/api.js')"></script>
-    <script src="#versioned('/js/sse.js')"></script>
-    <script src="#versioned('/js/intents.js')"></script>
-    <script src="#versioned('/js/state.js')"></script>
+    <script src="#versioned('/js/arena.js')"></script>
     <script src="#versioned('/js/game.js')"></script>
 </body>
 </html>

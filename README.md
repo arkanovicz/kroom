@@ -162,9 +162,10 @@ event: play   id: 42   data: {"move":"rock"}
   stats, "who is waiting" are derived from `match`, `round`, `join`, `leave`, not events of their
   own. `LobbyTest` records a whole match's frames and checks their fold is the snapshot the room
   would serve; the recording is the golden `FoldTest` replays on the JVM and on node, and the
-  pages' jsdom harness replays through the pages. The lobby page is `data-k-*` markup over the
-  room's JSON, bound by `kroom-client` from the app bundle (`chifoumi-common`'s js target):
-  the page's only script of its own is login and language.
+  pages' jsdom harness replays through the pages. Both pages are `data-k-*` markup over the
+  room's JSON, bound by `kroom-client` from the app bundle (`chifoumi-common`'s js target); the
+  game page binds to `game`, the viewer's perspective derived in the bundle's `main`. The pages'
+  own scripts are login, language and opening the stream.
 - **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
   stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
   permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`
