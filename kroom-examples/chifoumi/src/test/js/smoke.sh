@@ -1,5 +1,5 @@
 #!/bin/sh
-# The chifoumi pages over a recorded match (the golden in chifoumi-common/src/commonTest/resources, refreshed by LobbyTest);
+# The chifoumi pages over a recorded match (the golden in chifoumi-common/src/commonTest/resources, refreshed by LobbyTest); the lobby runs on the bundle: ./gradlew :kroom-examples:chifoumi-common:jsBrowserDistribution first.
 # node lives in docker here (house rule: no node on the host), jsdom installed beside the stock scripts' tests.
 cd "$(dirname "$0")" || exit 1
 exec docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/../../../../..":/home/app -w /home/app/kroom-webapp-assets/src/test/js node:24 \

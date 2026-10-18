@@ -12,8 +12,8 @@ const has = (match, user) => match.player1 === user || match.player2 === user;
 function reduce(state, { event, data }) {
     const me = state.me;
     switch (event) {
-        case 'state':   // the snapshot leaves out what is empty
-            return { ...initialState(me), ...data };
+        case 'state':   // the snapshot leaves out what is empty; `me` is the viewer's presence entry, the page keeps the id
+            return { ...initialState(me), ...data, me: data.me?.id ?? me };
         case 'join': {
             const i = state.users.findIndex(u => u.id === data.user.id);
             if (i < 0) state.users.push(data.user); else state.users[i] = data.user;

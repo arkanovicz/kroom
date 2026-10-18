@@ -30,6 +30,7 @@ dependencies {
     runtimeOnly(libs.velocity.engine.scripting) // the example renders its templates interpreted
     implementation(libs.slf4j.simple)
 
+    testImplementation(project(":kroom-client")) // the template check
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
@@ -37,4 +38,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// The browser's bundle (chifoumi-common's js executable) ships under /js/ with the other static files
+val bundle = tasks.getByPath(":kroom-examples:chifoumi-common:jsBrowserDistribution")
+tasks.processResources {
+    dependsOn(bundle)
+    from(bundle.outputs.files) { into("static/js"); include("arena.js", "arena.js.map") }
 }

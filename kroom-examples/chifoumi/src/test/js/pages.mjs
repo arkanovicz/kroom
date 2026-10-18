@@ -7,12 +7,17 @@ const require = createRequire('/home/app/kroom-webapp-assets/src/test/js/');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const R = '/home/app/kroom-examples/chifoumi/src/main/resources';
 const A = '/home/app/kroom-webapp-assets/src/main/resources/static/js';
+// the lobby runs on the bundle (chifoumi-common's js executable: the fold, the binder, the app's main — build it first); the game page still on the JS fold
+const BUNDLE = process.env.BUNDLE || '/home/app/kroom-examples/chifoumi-common/build/dist/js/productionExecutable/arena.js';
+for (const kind of ['uncaughtException', 'unhandledRejection']) process.on(kind, e => { failed++; console.log(kind.toUpperCase(), e?.message ?? e, '|', String(e?.stack ?? '').split('\n').slice(1, 5).join(' | ')); });
+const LOBBY = ['domhelper', 'api', 'status'].map(n => `${A}/${n}.js`).concat([BUNDLE, `${R}/static/js/chifoumi.js`]);
+const GAME = ['domhelper', 'api', 'sse', 'intents', 'status'].map(n => `${A}/${n}.js`).concat([`${R}/static/js/state.js`, `${R}/static/js/game.js`]);
 const frames = fs.readFileSync('/home/app/kroom-examples/chifoumi-common/src/commonTest/resources/frames.jsonl', 'utf8').split('\n').filter(Boolean).map(JSON.parse).filter(f => f.event !== 'final');
 let failed = 0;
 const must = (cond, label) => { if (!cond) { failed++; console.log('FAIL', label); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function page(template, script) {
+async function page(template, scripts) {
     let html = fs.readFileSync(`${R}/templates/${template}`, 'utf8')
         .replace(/<script[^>]*><\/script>/g, '').replace(/#foreach[\s\S]*?#end/g, '').replace(/\$lang/g, 'en');
     const vc = new VirtualConsole();
@@ -32,8 +37,7 @@ async function page(template, script) {
     const listeners = {};
     w.EventSource = class { constructor(u) { this.url = u; w.__es = this; } addEventListener(n, f) { listeners[n] = f; } close() {} };
     const src = [];
-    for (const f of ['domhelper', 'api', 'sse', 'intents', 'status'].map(n => `${A}/${n}.js`).concat([`${R}/static/js/state.js`, `${R}/static/js/${script}`]))
-        src.push(fs.readFileSync(f, "utf8"));
+    for (const f of scripts) src.push(fs.readFileSync(f, "utf8"));
     w.eval(src.join("\n;\n"));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
     await sleep(50);
@@ -45,9 +49,11 @@ async function page(template, script) {
 
 // lobby
 {
-    const p = await page('index.html', 'chifoumi.js');
+    const p = await page('index.html', LOBBY);
     for (const f of frames.slice(0, 3)) await p.send(f);
-    console.log('lobby online', p.$t('#online-num'), '| queue', p.$t('#queue-count'), '| feed', p.$t('#activity-feed'));
+    console.log('lobby online', p.$t('#online-num'), '| me', p.$t('#player-display'), '| queue', p.$t('#queue-count'), '| feed', p.$t('#activity-feed'));
+    must(p.$t('#online-num') === '2' && p.$t('#player-display') === 'Bob', 'lobby: online count and the viewer from the snapshot');
+    must(p.vis('#queue-count') && /1 waiting/.test(p.$t('#queue-count')), 'lobby: alice waits');
     p.setReply({ pending: true });
     await p.click('[data-intent="match"]');
     await p.send({ event: 'match', data: { player: 'b' } });
@@ -66,12 +72,14 @@ async function page(template, script) {
     console.log('chat log', p.$t('#chat-log'));
     await p.send({ event: 'round', data: { match: { ...frames[3].data.match, player1: 'x', player2: 'y', name1: 'X', name2: 'Y', id: 'm2', finished: true, winner: 'y', score1: 3, score2: 5 }, round: { move1: 'rock', move2: 'well' } } });
     console.log('stats', p.$t('.stats-grid'), '| feed', p.$t('#activity-feed'));
+    must(p.$t('#stat-matches') === '1' && p.$t('#stat-rock') === '1' && p.$t('#stat-well') === '1' && /X beat|Y beat/.test(p.$t('#activity-feed')), 'stats and feed after a round');
     await p.send(frames[3]);
     console.log('after pairing:', p.log.join(' / ') || 'no navigation logged');
+    must(p.log.some(l => /navigation/.test(l)), 'pairing: the page follows to the game');
 }
 // game
 {
-    const p = await page('game.html', 'game.js');
+    const p = await page('game.html', GAME);
     const snap = { ...frames[0], data: { ...frames[0].data, matches: { [frames[3].data.match.id]: frames[3].data.match } } };
     await p.send(snap);
     console.log('game names', p.$t('#player1-name'), '/', p.$t('#player2-name'), '| msg', p.$t('#game-message'));

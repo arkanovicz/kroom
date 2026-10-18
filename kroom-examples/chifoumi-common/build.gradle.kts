@@ -10,12 +10,19 @@ kotlin {
         testRuns["test"].executionTask.configure { useJUnitPlatform() }
     }
     js {
-        browser { testTask { enabled = false } } // the golden is a file: node reads it, a browser cannot
+        browser {
+            testTask { enabled = false } // the golden is a file: node reads it, a browser cannot
+            commonWebpackConfig { outputFileName = "arena.js" } // the pages' one script: the fold, the binder, the app's main
+        }
         nodejs()
+        binaries.executable()
     }
     sourceSets {
         commonMain.dependencies {
             api(project(":kroom-common"))
+        }
+        jsMain.dependencies {
+            implementation(project(":kroom-client"))
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

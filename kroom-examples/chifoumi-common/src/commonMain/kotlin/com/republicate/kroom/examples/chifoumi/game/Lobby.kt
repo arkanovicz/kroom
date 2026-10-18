@@ -91,6 +91,9 @@ class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(js
 
     init { if (json["stats"] == null) json["stats"] = Json.MutableObject() }
 
+    /** The viewer's running match, if any: the page's perspective, not a key of the marking. */
+    fun myMatch(me: String?): MatchView? = me?.let { matches.values.firstOrNull { m -> m.finished != true && (m.player1 == it || m.player2 == it) } }
+
     override fun reduce(frame: Event) {
         super.reduce(frame)
         when (frame) {

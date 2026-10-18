@@ -145,8 +145,8 @@ msgstr "Retour au salon"
 msgid "Built with"
 msgstr "Construit avec"
 
-msgid "({n} waiting)"
-msgstr "({n} en attente)"
+msgid "waiting)"
+msgstr "en attente)"
 
 msgid "{name} joined"
 msgstr "{name} est arrivé"

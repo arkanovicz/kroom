@@ -96,6 +96,14 @@ All notable changes to kroom will be documented in this file.
   the snapshot the room would serve (commutation); the recording is the golden in
   `chifoumi-common/src/commonTest/resources/frames.jsonl` (the test says when to refresh it),
   replayed by `FoldTest` on the JVM and on node and by the pages' jsdom harness.
+- The lobby page runs on the Kotlin binder: `chifoumi-common`'s js target is the app bundle
+  (`arena.js`, the fold, `kroom-client` and `Main.kt` = the `match` derive + the feed reactions;
+  copied into `static/js` by `processResources`), `index.html` is `data-k-*` markup over the room's
+  JSON (`users.length`, `me.name`, `queue∋@me`, `history` as a `<template>`, `stats.*`, a
+  `data-k-follow` link to the game when the viewer's match is on), `chifoumi.js` keeps only login
+  and language. `PagesTest` checks the template's bindings against `LobbyState` and the registry;
+  `pages.mjs` runs the lobby on the bundle (`BUNDLE=` for a dev build). The game page still runs
+  `state.js` (its fold reads the id out of the snapshot's `me` object) until its own port.
 - `kroom-examples/chifoumi-common` (multiplatform, JVM + JS): the lobby's declarations, fold and
   typed layer (`Lobby.kt`, `LobbyLogic`, `Move`) moved out of the server module, one class for
   both runtimes (`LobbyLogic.registry` is the alphabet, the browser's too).
