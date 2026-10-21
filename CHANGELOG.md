@@ -203,6 +203,11 @@ All notable changes to kroom will be documented in this file.
   `@JsExport` facade `kroom` (`on`, `act`, `say`, `connect`, `frame`) for plain-JS pages.
 
 #### kroom-common
+- `html.Segmentizer`, the HTML reader shared by l10n and the page compiler to come: a state machine
+  over strings fed in document order, so a tag, an attribute value or a `<script>` opened in one
+  string (before a reference) and closed in a later one reads right; every byte lands in exactly one
+  segment (`Text`, `Open`, `Attr`, `End`, `Close`, `Other`), `position` says where the reader stands
+  between two strings. `script`, `style`, `textarea` and `pre` are raw. Tested on jvm and node.
 - `event.Event`, the one thing that goes through E, the same class on every target: a name, a
   payload (a `JsonView` over the kson object — `val move by enum<Move>().required`, the property
   name is the key, declaring a field records it) and metadata under the reserved `_` key. Its life
@@ -402,6 +407,13 @@ All notable changes to kroom will be documented in this file.
 ### Fixed
 
 #### kroom-webapp-l10n
+- `HtmlFragmentTranslator` reads HTML through kroom-common's `Segmentizer` instead of two regexes: a
+  tag with several translatable attributes (`title` and `aria-label`) had only the last one
+  translated; a text run between two references was a phrase or not depending on where the tags
+  happened to fall. A phrase now needs a letter (a lone dash, emoji or number is no token to
+  translate). `TemplateTranslator` parses with informal navigation on: with the pure 3.0 config,
+  `$site.name` is `$site` + the text `.name`, which the reader then offered for translation. Every
+  template of the repo translates byte-identically; the missing-token report loses its artefacts.
 - A skip prefix names a segment: `/events/` also spares `/events` itself (the bare path was
   redirected to `/en/events`, which no `EventSource` follows usefully).
 

@@ -8,6 +8,7 @@ import org.apache.velocity.engine.ASTInclude
 import org.apache.velocity.engine.ASTMacro
 import org.apache.velocity.engine.ASTParse
 import org.apache.velocity.engine.ASTText
+import org.apache.velocity.engine.Config
 import org.apache.velocity.engine.Expr
 import org.apache.velocity.engine.Node
 import org.apache.velocity.engine.parse
@@ -45,7 +46,9 @@ class TemplateTranslator(
         if (!translateText && includePathRewrite == null) return templateSource
         val diagnostics = parseDiagnostics(templateSource)
         require(diagnostics.isEmpty()) { "Velocity parse error(s): ${diagnostics.joinToString("; ")}" }
-        val ast = parse(templateSource)
+        // Informal navigation on whatever the consumer's pipeline: a reader of text must take `$a.b` whole,
+        // or `.b` becomes a phrase to translate. A formal template parses the same either way.
+        val ast = parse(templateSource, Config(informalNavigation = true))
 
         // One fragment translator per template: carries <script>/<style> ignore state across nodes,
         // which are visited in document order.

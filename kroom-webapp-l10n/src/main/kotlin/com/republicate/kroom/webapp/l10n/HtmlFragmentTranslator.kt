@@ -1,112 +1,72 @@
 package com.republicate.kroom.webapp.l10n
 
-import java.io.PrintWriter
-import java.io.StringWriter
-import java.util.NavigableMap
-import java.util.TreeMap
+import com.republicate.kroom.html.Segment
+import com.republicate.kroom.html.Segmentizer
 
 /**
  * Translates the human-readable text inside an HTML fragment, leaving markup, scripts and styles
  * untouched. The unit of translation is a *token* — a normalized run of visible text, or the value
  * of a translatable attribute (`placeholder`/`title`/`alt`/`aria-label`); [translateToken] does the
- * actual lookup. Both the runtime AST walk and the build-time source splice feed fragments in
- * document order, so an unclosed `<script>`/`<style>` carries its "ignore" state across calls —
- * hence the per-instance [ignoring] state.
- *
- * Attribute caveat: one translatable attribute per element (the common case); a tag bearing several
- * (e.g. `title=` and `aria-label=`) only has the last one picked up.
+ * actual lookup. The HTML is read by kroom-common's [Segmentizer]: both the runtime AST walk and the
+ * build-time source splice feed fragments in document order, and the reader carries an unclosed tag,
+ * attribute or `<script>` across calls — hence one instance per template.
  */
 internal class HtmlFragmentTranslator(private val translateToken: (String) -> String) {
 
     companion object {
-        private const val sep = "(?:[ \\r\\n\\t /–-]|&nbsp;|&dash;)*"
-        private val textExtractor = Regex(
-            """<[^>]+\s(?:placeholder|title|alt|aria-label)="(?<attr>[^"]*)"[^>]*>|(?<=>)$sep(?<text>[^<>]+?)$sep(?=<|${'$'})|(?<=>|^)$sep(?<text2>[^<>]+?)$sep(?=<)""",
-            RegexOption.DOT_MATCHES_ALL
-        )
-        private val ignoreExp = Regex("(<script)|(</script>)|(<style)|(</style)")
+        private val translatable = setOf("placeholder", "title", "alt", "aria-label")
+        // Separators around a phrase: whitespace, slashes, dashes, the entities spelling them.
+        private const val sep = "(?:[ \\r\\n\\t /–-]|&nbsp;|&dash;)*"
+        private val leadingSep = Regex("^$sep")
+        private val trailingSep = Regex("$sep$")
     }
 
-    private var ignoring = false
+    private val reader = Segmentizer()
 
     fun translate(text: String): String {
-        val ignoreMap = buildIgnoreMap(text)
-        val sw = StringWriter()
-        val output = PrintWriter(sw)
-        var pos = 0
-        while (true) {
-            val match = textExtractor.find(text, pos) ?: break
-            val start = match.range.first
-            val end = match.range.last + 1
-            if (start > pos) output.print(text.substring(pos, start))
-            val ignore: Boolean = ignoreMap.floorEntry(start)?.value ?: false
-            if (ignore) {
-                output.print(text.substring(start, end))
-            } else {
-                val (_, group) = match.firstValidGroup()
-                val groupStart = group.range.first
-                if (groupStart > start) output.print(text.substring(start, groupStart))
-                val decoration = leadingDecoration.find(group.value)?.value ?: ""
-                output.print(decoration)
-                val raw = group.value.substring(decoration.length)
-                var token = unescapeHtml(raw)
-                if (containsOnlyIgnorable(token)) {
-                    output.print(raw)
-                } else {
-                    token = normalize(token)
-                    val translated = translateToken(token)
-                    // Untranslated must be byte-identical: unescape/normalize/escape is lossy
-                    // (numeric entities like &#x25B6; re-escape to &amp;#…, whitespace collapses),
-                    // so only re-encode when a translation actually replaced the token.
-                    output.print(if (translated == token) raw else escapeHtml(translated))
-                }
-                val groupEnd = group.range.last + 1
-                if (groupEnd < end) output.print(text.substring(groupEnd, end))
+        val out = StringBuilder(text.length)
+        for (segment in reader.segment(text)) {
+            val range = segment.range
+            when {
+                segment is Segment.Text -> translateRun(text, range, out)
+                segment is Segment.Attr && segment.name in translatable -> translateRun(text, range, out)
+                else -> out.append(text, range.first, range.last + 1)
             }
-            pos = end
         }
-        if (pos < text.length) output.print(text.substring(pos))
-        return sw.toString()
+        return out.toString()
     }
 
-    private fun MatchResult.firstValidGroup(): Pair<Int, MatchGroup> {
-        val groups = this.groups
-        var i = 1
-        val last = groups.size - 1
-        while (i <= last && groups[i]?.range?.first == null) i++
-        return i to (groups[i] ?: error("unexpected case"))
+    // A run of text: the separators around it and a leading character reference come back verbatim,
+    // the phrase between them is the token. Untranslated must be byte-identical: unescape/normalize/
+    // escape is lossy (numeric entities re-escape to &amp;#…, whitespace collapses), so only re-encode
+    // when a translation actually replaced the token.
+    private fun translateRun(text: String, range: IntRange, out: StringBuilder) {
+        val run = text.substring(range.first, range.last + 1)
+        val lead = leadingSep.find(run)?.value ?: ""
+        val trail = if (lead.length == run.length) "" else trailingSep.find(run, lead.length)?.value ?: ""
+        out.append(lead)
+        val body = run.substring(lead.length, run.length - trail.length)
+        val decoration = leadingDecoration.find(body)?.value ?: ""
+        out.append(decoration)
+        val raw = body.substring(decoration.length)
+        val token = unescapeHtml(raw)
+        if (token.none { it.isLetter() }) {   // no phrase without a letter: punctuation, numbers, dashes stay
+            out.append(raw)
+        } else {
+            val normalized = normalize(token)
+            val translated = translateToken(normalized)
+            out.append(if (translated == normalized) raw else escapeHtml(translated))
+        }
+        out.append(trail)
     }
 
     private fun normalize(str: String) = str.replace("\\s+".toRegex(), " ")
-
-    private fun containsOnlyIgnorable(s: String) = s.all { it in "\r\n\t -;:.\"/<> 0123456789€!&" }
 
     // A character reference — whole, or the ';' left when the velocity parser cuts one at its '#'
     // (`&#x25B6;` lexes as a macro call named x25B6, splitting the text node) — is decoration, not
     // phrase: out of the lookup key, back into the output verbatim. Leading side only; most keys
     // legitimately end on punctuation.
     private val leadingDecoration = Regex("^(?:&#(?:[0-9]+|[xX][0-9a-fA-F]+);|[;\\s])+")
-
-    private fun buildIgnoreMap(text: String): NavigableMap<Int, Boolean> {
-        val ret: NavigableMap<Int, Boolean> = TreeMap()
-        var pos = 0
-        var ignore = ignoring
-        while (true) {
-            val match = ignoreExp.find(text, pos) ?: break
-            val start = match.range.first
-            val end = match.range.last + 1
-            val (groupIndex, group) = match.firstValidGroup()
-            val groupStart = group.range.first
-            ignore = (groupIndex % 2 != 0)
-            if (ret.isEmpty() && start > 0) ret[0] = !ignore
-            val groupEnd = group.range.last + 1
-            ret[if (ignore) groupStart else groupEnd] = ignore
-            pos = end
-        }
-        if (ret.isEmpty()) ret[0] = ignoring
-        else ignoring = ignore
-        return ret
-    }
 
     // `&` escapes unless it opens a numeric character reference (&#182; / &#x25B6;), which must
     // survive the unescape→translate→escape round-trip untouched.
@@ -119,7 +79,7 @@ internal class HtmlFragmentTranslator(private val translateToken: (String) -> St
         .replace("\"", "&quot;")
 
     private fun unescapeHtml(s: String) = s
-        .replace("&nbsp;", " ")
+        .replace("&nbsp;", " ")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
