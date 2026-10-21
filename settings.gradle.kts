@@ -6,6 +6,7 @@ include("kroom-common")
 include("kroom-view")
 include("kroom-server")
 include("kroom-client")
+include("kroom-spike") // events v3 spike (private/eventsv3.md §9.2): removed when the real module lands
 
 // Build tooling
 include("kroom-velocity-l10n")
