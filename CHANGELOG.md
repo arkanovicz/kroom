@@ -139,6 +139,10 @@ All notable changes to kroom will be documented in this file.
   (defaults to `stateToJson()`): `sendStateTo` is gone, `Table` overrides the former instead; a hook
   that used to resend the joiner its own context moves that into the snapshot.
 
+#### velocity 3.0.0-BETA-20261024-01
+- Bumped; the beta's dynamic escaping (the reference insertion seam told the output mode) is not used by
+  kroom. Every module's tests pass on it.
+
 #### velocity 3.0.0-BETA-20261007-01
 - One resource manager serves every named resource, root or `#parse`d child, kept as its loader's `cache` /
   `modification_check_interval` say: a computed `#parse($name)` is re-read when its file changes (a dev-edited
