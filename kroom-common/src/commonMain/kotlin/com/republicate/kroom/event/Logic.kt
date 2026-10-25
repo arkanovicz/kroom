@@ -12,6 +12,10 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
     /** One frame into the marking: the arrows of the grammar, read right to left. */
     abstract fun reduce(frame: Event)
 
+    /** The room's presence as the viewer's snapshot carries it, kept by [Store] from the presence frames; a page
+     *  reads `$state.users`. The room's own State holds none: on the server, membership is the source. */
+    val users: List<UserPresence> get() = (json["users"] as? Json.Array)?.map { UserPresence(it as Json.MutableObject) } ?: emptyList()
+
     fun describe(): Json.Array = Json.Array(fields.map { it.toJson() })
 }
 

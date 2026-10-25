@@ -36,12 +36,11 @@ class Client<S : State>(
     private val onState = mutableListOf<(S) -> Unit>()
     private val flashing = HashMap<Element, Int>()
     private var source: EventSource? = null
-    val intents = Intents(this)
-
     init {
         root.querySelectorAll("[${Attr.ON.attr}]").asList().forEach { (it as Element).setAttribute("hidden", "") }
-        intents.attach()
     }
+
+    val intents = Intents(root, "data-intent") { type, payload -> act(type, payload) }
 
     /** An effect after a frame of that name (the frame typed by the registry). */
     fun on(name: String, fn: (Event) -> Unit) = apply { reactions.getOrPut(name) { mutableListOf() } += fn }

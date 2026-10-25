@@ -1,4 +1,4 @@
-description = "Kroom client - the fold bound to a page: data-k-* attributes over the room's state"
+description = "Kroom client - a page on a room: the stream folded into the State, the page merged into the DOM after every frame (v2's data-k-* binder until chifoumi moves)"
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -17,6 +17,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":kroom-common"))
+            api(libs.velocity.engine.common)
+            api(libs.velocity.engine.dom)   // the DOM sink: the Binding is the engine's, built while the page merges
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

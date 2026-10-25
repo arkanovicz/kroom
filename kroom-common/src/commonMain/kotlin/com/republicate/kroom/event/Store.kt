@@ -15,7 +15,7 @@ import com.republicate.kson.Json
 class Store<S : State>(val state: S, val registry: Registry) {
     val json: Json.MutableObject get() = state.json
 
-    val users: List<UserPresence> get() = array("users").map { UserPresence(it as Json.MutableObject) }
+    val users: List<UserPresence> get() = state.users
 
     /** One frame of the stream: the event it was, or null for `state` and for a name the registry does not know. */
     fun fold(name: String, data: Json.Object): Event? {

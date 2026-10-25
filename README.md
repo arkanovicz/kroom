@@ -6,7 +6,7 @@ Kotlin multiplatform library for real-time collaborative applications using Serv
 
 ```
 kroom-common          multiplatform core types
-kroom-client          the fold bound to a page: data-k-* attributes over the room's state (KMP jvm+js)
+kroom-client          a page on a room: the stream folded into the State, the page merged into the DOM by the engine's sink (KMP jvm+js; v2's data-k-* binder until chifoumi moves)
 kroom-view            client-side SSE handling (JS/Wasm)
 kroom-server          server-side Room/Lobby/Actor abstractions
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)

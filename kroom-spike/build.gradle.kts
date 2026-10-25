@@ -1,4 +1,4 @@
-description = "Events v3 spike 2 - the Binding built by a DOM sink while velocity merges (private/eventsv3.md §9)"
+description = "Events v4 spike 2 - kroom-client's Room over a compiled page, on the JVM and on node over jsdom (private/eventsv4.md §9): an app's shape, since a module compiling pages owns the templates registry"
 
 // the velocity gradle plugin comes from maven-local like the engine; a spike takes it on its own buildscript
 buildscript {
@@ -27,9 +27,7 @@ kotlin {
     }
     sourceSets {
         commonMain.dependencies {
-            api(project(":kroom-common"))
-            api(libs.velocity.engine.common)
-            api(libs.velocity.engine.dom)      // the DOM sink and its Tree: the browser half of the Binding is the engine's
+            api(project(":kroom-client"))
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

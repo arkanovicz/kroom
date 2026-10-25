@@ -227,8 +227,17 @@ All notable changes to kroom will be documented in this file.
   after the trigger, a form's fields and `data-intent-of` in the payload) through `api.js`,
   which stays the one owner of the tab id; `say(key, vars)` reads the page's `#messages`. A
   `@JsExport` facade `kroom` (`on`, `act`, `say`, `connect`, `frame`) for plain-JS pages.
+- `Room(name, state, registry, engine)`, the v4 client (`private/eventsv4.md` §5): `attach(template, tree, root)`
+  hands the page to the engine's `HtmlDomSink`, `frame(name, data)` folds through `Store` then merges the page
+  again (only what differs is written), `merge()` after the page memory changed; roots `state`, `me`, `page`.
+  `key(value, index)`, the sink's item identity from the declarations: a view's `id`, a logged event's `seq`,
+  else the position. `jsMain`: `attach(template, root)` over `JsTree` with `[data-kroom-intent]` triggers,
+  `connect(events)` (the stream, `api.js`'s tab id), `act`. `Intents` takes its root, its attribute and the
+  post: v2's pages keep `data-intent` until chifoumi moves. Depends on `velocity-engine-common` and
+  `velocity-engine-dom`; a page is compiled by the app, the module that owns the templates registry.
 
 #### kroom-common
+- `State.users`: the viewer's presence as the snapshot carries it (`$state.users` in a page); `Store.users` reads it.
 - `html.Segmentizer`, the HTML reader shared by l10n and the page compiler to come: a state machine
   over strings fed in document order, so a tag, an attribute value or a `<script>` opened in one
   string (before a reference) and closed in a later one reads right; every byte lands in exactly one

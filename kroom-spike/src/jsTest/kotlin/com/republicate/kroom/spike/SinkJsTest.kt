@@ -29,12 +29,10 @@ class SinkJsTest {
         val body = document.body!!
         val config = Config(informalNavigation = true, referenceInsertionEventClasses = listOf("org.apache.velocity.engine.sink.DynamicEscaper"))
         val engine = VelocityEngine(NoCompiler, config).apply { addResourceLoader("stock", StockResourceLoader(VelocityTemplates::resolve)) }
-        Scenario<Node>(JsTree(document), body,
+        Scenario<Node>(engine, JsTree(document), body,
             html = { body.innerHTML },
             items = { (body.querySelector("ul#users") as Element).children.asList() },
             attribute = { n, a -> (n as Element).getAttribute(a) },
-            text = { engine.getTemplate("page.vtl").merge(it) },
-            render = { c, out -> engine.getTemplate("page.vtl").merge(c, out) },
         ).run()
     }
 }

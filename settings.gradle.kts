@@ -6,7 +6,7 @@ include("kroom-common")
 include("kroom-view")
 include("kroom-server")
 include("kroom-client")
-include("kroom-spike") // events v3 spike (private/eventsv3.md §9.2): removed when the real module lands
+include("kroom-spike") // events v4 (private/eventsv4.md §9): kroom-client's Room over a compiled page, JVM + jsdom; goes when chifoumi's pages run on Room (step 4)
 
 // Build tooling
 include("kroom-velocity-l10n")

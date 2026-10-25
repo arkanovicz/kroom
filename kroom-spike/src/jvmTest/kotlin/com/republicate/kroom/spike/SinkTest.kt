@@ -2,7 +2,6 @@ package com.republicate.kroom.spike
 
 import org.apache.velocity.engine.Compiler
 import org.apache.velocity.engine.Config
-import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.Evaluable
 import org.apache.velocity.engine.Expr
 import org.apache.velocity.engine.VelocityEngine
@@ -23,12 +22,10 @@ class SinkTest {
         val tree = TreeDouble()
         val root = tree.element("body")
         val logs = HashMap<String, List<String>>()
-        val s = Scenario(tree, root,
+        val s = Scenario(engine, tree, root,
             html = { html(root.children) },
             items = { (root.children.first { it is DElement && it.tag == "ul" } as DElement).children.filterIsInstance<DElement>() },
             attribute = { n, a -> (n as DElement).attributes[a] },
-            text = { engine.getTemplate("page.vtl").merge(it) },
-            render = { c: Context, out: Appendable -> engine.getTemplate("page.vtl").merge(c, out) },
             afterFrame = { name -> logs[name] = tree.log.toList(); tree.clearLog() })
         tree.clearLog()
         return s to tree.also { it.asDynamicLogs = logs }

@@ -1,23 +1,22 @@
 package com.republicate.kroom.spike
 
+import com.republicate.kroom.client.Room
 import com.republicate.kroom.event.Chat
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Registry
-import com.republicate.kroom.event.Store
-import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.VelocityContext
-import org.apache.velocity.engine.dom.HtmlDomSink
+import org.apache.velocity.engine.VelocityEngine
 import org.apache.velocity.engine.dom.Tree
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 /**
- * The §6.2 page over the client's fold, merged once into a tree through the engine's DOM sink, then merged
- * again after each frame. The same story on every tree and pipeline: the tree always serializes to the text
- * render of the same state (escaped by the engine, the sink raw), an item's node survives its own change and
- * its neighbours' arrivals and departures.
+ * The §6.2 page on a [Room]: every frame folded and merged into the tree, which must then read as the text render
+ * of the same State (escaped by the engine, the sink raw). An item's node survives its own change and its
+ * neighbours' arrivals and departures.
  */
 class Scenario<N : Any>(
+    private val engine: VelocityEngine,
     tree: Tree<N>,
     root: N,
     /** The root's children serialized as HTML. */
@@ -25,27 +24,19 @@ class Scenario<N : Any>(
     /** The root's `<ul id="users">` items. */
     private val items: () -> List<N>,
     private val attribute: (N, String) -> String?,
-    /** The page as text, no sink; the oracle. */
-    private val text: (Context) -> String,
-    private val render: (Context, Appendable) -> Unit,
     /** After each frame: the tree's writes since the frame, for the tree that logs them. */
     private val afterFrame: (name: String) -> Unit = {},
 ) {
-    private val store = Store(ChatState(), Registry(::Chat))
-    private val sink = HtmlDomSink(tree, root, ::keyOf)
+    private val room = Room("chat", ChatState(), Registry(::Chat), engine).attach("page.vtl", tree, root)
 
-    private fun context() = VelocityContext(mutableMapOf("state" to ChatView(store)))
-
-    private fun pass() {
-        render(context(), sink)
-        assertEquals(text(context()), html())
+    private fun frame(name: String, json: String) {
+        room.frame(name, json)
+        assertEquals(engine.getTemplate("page.vtl").merge(VelocityContext(mutableMapOf("state" to room.state))), html(), "the tree is the text render")
+        afterFrame(name)
     }
 
-    private fun frame(name: String, json: String) { store.fold(name, json); pass(); afterFrame(name) }
-
     fun run() {
-        store.fold("state", """{"users":[{"id":"a","name":"alice","status":"ONLINE"}],"history":[]}""")
-        pass(); afterFrame("state")
+        frame("state", """{"users":[{"id":"a","name":"alice","status":"ONLINE"}],"history":[]}""")
         val alice = items().single()
         assertEquals("users.a", attribute(alice, "id"))
 
