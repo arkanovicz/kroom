@@ -1,15 +1,15 @@
 package com.republicate.kroom.webapp.l10n
 
-import com.republicate.kroom.html.Segment
-import com.republicate.kroom.html.Segmentizer
+import org.apache.velocity.engine.sink.HtmlReader
+import org.apache.velocity.engine.sink.Segment
 
 /**
  * Translates the human-readable text inside an HTML fragment, leaving markup, scripts and styles
  * untouched. The unit of translation is a *token* — a normalized run of visible text, or the value
  * of a translatable attribute (`placeholder`/`title`/`alt`/`aria-label`); [translateToken] does the
- * actual lookup. The HTML is read by kroom-common's [Segmentizer]: both the runtime AST walk and the
+ * actual lookup. The HTML is read by the engine's [HtmlReader]: both the runtime AST walk and the
  * build-time source splice feed fragments in document order, and the reader carries an unclosed tag,
- * attribute or `<script>` across calls — hence one instance per template.
+ * attribute or `<script>` across calls — hence one instance per template. `<pre>` text stays verbatim.
  */
 internal class HtmlFragmentTranslator(private val translateToken: (String) -> String) {
 
@@ -21,16 +21,26 @@ internal class HtmlFragmentTranslator(private val translateToken: (String) -> St
         private val trailingSep = Regex("$sep$")
     }
 
-    private val reader = Segmentizer()
+    private val reader = HtmlReader()
+
+    // Open `<pre>` elements: their text is the author's alignment; the reader sees ordinary text there.
+    private var pre = 0
 
     fun translate(text: String): String {
         val out = StringBuilder(text.length)
         for (segment in reader.segment(text)) {
             val range = segment.range
             when {
-                segment is Segment.Text -> translateRun(text, range, out)
+                segment is Segment.Text && pre == 0 -> translateRun(text, range, out)
                 segment is Segment.Attr && segment.name in translatable -> translateRun(text, range, out)
+                // raw to the HTML reader, yet the page's name to its human one
+                segment is Segment.Raw && segment.tag == "title" -> translateRun(text, range, out)
                 else -> out.append(text, range.first, range.last + 1)
+            }
+            // counted on the tag's `>`: a tag split across fragments reports a segment in each
+            when {
+                segment is Segment.End && segment.tag.equals("pre", ignoreCase = true) -> pre++
+                segment is Segment.Close && segment.tag.equals("pre", ignoreCase = true) && text[range.last] == '>' && pre > 0 -> pre--
             }
         }
         return out.toString()

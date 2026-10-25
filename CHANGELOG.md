@@ -142,8 +142,9 @@ All notable changes to kroom will be documented in this file.
 #### velocity 3.0.0-BETA-20261025-03
 - Bumped: the engine's `HtmlReader` (kroom's segmentizer rebuilt over the escaper's automaton) and
   `velocity-engine-dom` (`Tree`, `HtmlDomSink`, `JsTree`); the classic facade's `DynamicEscaper` escapes again;
-  a build-time compiled class carries its `##@` meta. Kroom still reads through its own segmentizer: the move
-  to the engine's reader is the next step.
+  a build-time compiled class carries its `##@` meta. The segmentizer left `kroom-common`: l10n's fragment
+  translator reads through the engine's `HtmlReader`, skips `<pre>` text by tag (ordinary text to the engine)
+  and still translates `<title>` (raw text to it).
 
 #### velocity 3.0.0-BETA-20261025-02
 - Bumped: the compiled pipeline asks for the insertion seam at render time (a handler set as an instance sees every

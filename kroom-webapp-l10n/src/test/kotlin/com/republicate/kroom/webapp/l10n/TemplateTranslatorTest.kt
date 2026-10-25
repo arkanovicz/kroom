@@ -123,6 +123,33 @@ class TemplateTranslatorTest {
         assertEquals(emptyList(), missing)
     }
 
+    // `<pre>` is ordinary text to the engine's reader: the translator skips it by tag, nested tags included.
+    @Test
+    fun `text inside pre stays byte-identical`() {
+        val t = translator("Hello" to "Bonjour", "Bye" to "Au revoir")
+        assertEquals(
+            "<p>Bonjour</p><pre>  Hello\n<b>Hello</b>  Bye</pre><p>Au revoir</p>",
+            t.translate("<p>Hello</p><pre>  Hello\n<b>Hello</b>  Bye</pre><p>Bye</p>", "fr")
+        )
+    }
+
+    @Test
+    fun `a value-less attribute stays and the next one still translates`() {
+        assertEquals(
+            "<input disabled placeholder=\"Nom\">",
+            translator("Name" to "Nom").translate("<input disabled placeholder=\"Name\">", "fr")
+        )
+    }
+
+    // `<title>` is raw text to the reader, still a phrase to translate.
+    @Test
+    fun `translates the title element`() {
+        assertEquals(
+            "<head><title>Accueil</title></head>",
+            translator("Home" to "Accueil").translate("<head><title>Home</title></head>", "fr")
+        )
+    }
+
     @Test
     fun `untranslated text is left in place`() {
         // "World" has no entry → stays; only "Hello" flips.
