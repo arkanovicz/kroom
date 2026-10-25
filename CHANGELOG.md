@@ -139,6 +139,12 @@ All notable changes to kroom will be documented in this file.
   (defaults to `stateToJson()`): `sendStateTo` is gone, `Table` overrides the former instead; a hook
   that used to resend the joiner its own context moves that into the snapshot.
 
+#### velocity 3.0.0-BETA-20261025-03
+- Bumped: the engine's `HtmlReader` (kroom's segmentizer rebuilt over the escaper's automaton) and
+  `velocity-engine-dom` (`Tree`, `HtmlDomSink`, `JsTree`); the classic facade's `DynamicEscaper` escapes again;
+  a build-time compiled class carries its `##@` meta. Kroom still reads through its own segmentizer: the move
+  to the engine's reader is the next step.
+
 #### velocity 3.0.0-BETA-20261025-02
 - Bumped: the compiled pipeline asks for the insertion seam at render time (a handler set as an instance sees every
   typed reference), the `OutputSink` contract with block and item boundaries on `#if` / `#foreach` / dynamic `#parse`,
