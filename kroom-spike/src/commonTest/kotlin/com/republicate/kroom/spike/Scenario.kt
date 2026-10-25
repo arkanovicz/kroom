@@ -34,7 +34,7 @@ class Scenario<N : Any>(
     private val sink = DomSink(tree, root)
 
     init {
-        engine.referenceInsertionEvents = Insertions()
+        engine.referenceInsertionEvents = Insertions
         engine.addMacro("each", Each({ Insertions.sink }, ::keyOf))
         engine.addMacro("when", When { Insertions.sink })
     }

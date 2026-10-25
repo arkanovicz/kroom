@@ -14,9 +14,6 @@ apply(plugin = "org.apache.velocity.engine")
 configure<org.apache.velocity.engine.gradle.VelocityExtension> {
     property("resource.loader.stock.sources", "src/commonMain/resources/vtl")
     property("compat.informal_navigation", true)   // `$state.users` is one reference in the spike's templates
-    // the compiled emitter routes a non-null typed reference through the insertion seam only when the BUILD names a
-    // handler; the engine gets the same object as an instance at run time (no reflection on JS)
-    property("event_handler.reference_insertion.class", "com.republicate.kroom.spike.Insertions")
     compileTemplates()                              // page.vtl → velocity.templates.page_vtl, common Kotlin: the browser has no runtime compiler
 }
 

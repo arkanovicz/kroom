@@ -21,12 +21,9 @@ class Line(val chat: Chat) {
     val text get() = chat.text
 }
 
-/** The insertion handler: tells the sink in force that a value follows. A class with a no-arg constructor,
- *  since the build's generated registry writes `Insertions()` for a configured handler; the sink is shared. */
-class Insertions : ReferenceInsertionEvents {
-    companion object {
-        var sink: DomSink<*>? = null
-    }
+/** The insertion handler: tells the sink in force that a value follows. Handed to the engine as an instance. */
+object Insertions : ReferenceInsertionEvents {
+    var sink: DomSink<*>? = null
     override fun referenceInsert(context: Context, reference: String, value: Any?, site: RefSite): Any? {
         sink?.expect(reference)
         return value ?: ""   // a null takes the null-reference path and may append nothing: the sink wants one append per value

@@ -139,6 +139,12 @@ All notable changes to kroom will be documented in this file.
   (defaults to `stateToJson()`): `sendStateTo` is gone, `Table` overrides the former instead; a hook
   that used to resend the joiner its own context moves that into the snapshot.
 
+#### velocity 3.0.0-BETA-20261025-02
+- Bumped: the compiled pipeline asks for the insertion seam at render time (a handler set as an instance sees every
+  typed reference), the `OutputSink` contract with block and item boundaries on `#if` / `#foreach` / dynamic `#parse`,
+  `RefSite.tag` / `.attribute`, the render cache replaying a structured stream. The spike drops its two workarounds:
+  the handler is no longer named in the build and is a Kotlin `object` again.
+
 #### velocity 3.0.0-BETA-20261025-01
 - Bumped: the common facade takes event-seam instances, lazy native macros get their authored argument text on
   the compiled pipeline, a bare operator between macro arguments is a parse error, Map implementers navigate by key.
