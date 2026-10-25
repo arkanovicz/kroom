@@ -213,6 +213,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-l10n
+- `translateTree(templates, i18n, source, languages, out)`: a template tree translated into `<out>/<lang>/<rel>`,
+  literal `#parse` targets relocated; the velocity-l10n plugin's task runs on it, and its `main` serves a build
+  that cannot apply a plugin of its own repository (chifoumi-common's pages).
+
 #### kroom-client (new, KMP jvm+js)
 - The binder: a page is a function of the room's JSON. `commonMain`, tested on the JVM and on
   node: `Path` (`stats.played`, `users.length`, `@me` = the snapshot's `me.id`; keys and indices,

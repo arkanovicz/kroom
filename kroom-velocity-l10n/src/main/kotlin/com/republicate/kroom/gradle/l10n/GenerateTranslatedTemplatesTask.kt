@@ -1,8 +1,6 @@
 package com.republicate.kroom.gradle.l10n
 
-import com.republicate.kroom.webapp.l10n.PoParser
-import com.republicate.kroom.webapp.l10n.TemplateTranslator
-import com.republicate.kroom.webapp.l10n.TranslationSource
+import com.republicate.kroom.webapp.l10n.translateTree
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
@@ -56,29 +54,8 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
         out.deleteRecursively()
         templatesOut.mkdirs(); kotlinOut.mkdirs()
 
-        val source = sourceLanguage.get()
-        val templatesDir = templates.get().asFile
-        val i18nDir = i18n.orNull?.asFile
-        val templateFiles = templatesDir.walkTopDown()
-            .filter { it.isFile && (it.extension == "html" || it.extension == "vm") }
-            .toList()
-
-        val stubs = ArrayList<Stub>()
-        for (lang in languages.get()) {
-            val translator = TemplateTranslator(translationSource(lang, source, i18nDir), source)
-            for (file in templateFiles) {
-                val rel = file.relativeTo(templatesDir).invariantSeparatorsPath
-                // Translate text (non-source langs) and prefix literal #parse/#include targets with the
-                // language, so they resolve within the relocated <lang>/ tree.
-                val translated = translator.translate(file.readText(), lang) { "$lang/$it" }
-                File(templatesOut, "$lang/$rel").apply { parentFile.mkdirs(); writeText(translated) }
-                stubs += Stub(
-                    funName = "page_${rel.replace(Regex("[^A-Za-z0-9]"), "_")}_$lang",
-                    key = "$lang/$rel",
-                    vtlPath = "$lang/$rel"
-                )
-            }
-        }
+        val stubs = translateTree(templates.get().asFile, i18n.orNull?.asFile, sourceLanguage.get(), languages.get(), templatesOut)
+            .map { (lang, rel) -> Stub(funName = "page_${rel.replace(Regex("[^A-Za-z0-9]"), "_")}_$lang", key = "$lang/$rel", vtlPath = "$lang/$rel") }
 
         copyMacroLibraries(templatesOut)
 
@@ -95,18 +72,6 @@ abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
         for (path in macroLibraries.getOrElse(emptyList())) {
             val file = File(path)
             if (file.isFile) file.copyTo(File(templatesOut, file.name), overwrite = true)
-        }
-    }
-
-    /** A [TranslationSource] backed by `<i18nDir>/<lang>.po`; empty for the source language. */
-    private fun translationSource(lang: String, source: String, i18nDir: File?): TranslationSource {
-        val map: Map<String, String> =
-            if (lang == source || i18nDir == null) emptyMap()
-            else File(i18nDir, "$lang.po").takeIf { it.isFile }?.inputStream()?.use { PoParser.parse(it) } ?: emptyMap()
-        return object : TranslationSource {
-            override fun getTranslation(en: String, iso: String): String? = if (iso == lang) map[en] else null
-            override fun getAllTranslations(iso: String): Map<String, String> = if (iso == lang) map else emptyMap()
-            override fun isLoaded(iso: String): Boolean = true
         }
     }
 
