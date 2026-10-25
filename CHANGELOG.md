@@ -233,8 +233,10 @@ All notable changes to kroom will be documented in this file.
   which stays the one owner of the tab id; `say(key, vars)` reads the page's `#messages`. A
   `@JsExport` facade `kroom` (`on`, `act`, `say`, `connect`, `frame`) for plain-JS pages.
 - `Room(name, state, registry, engine)`, the v4 client (`private/eventsv4.md` §5): `attach(template, tree, root)`
-  hands the page to the engine's `HtmlDomSink`, `frame(name, data)` folds through `Store` then merges the page
-  again (only what differs is written), `merge()` after the page memory changed; roots `state`, `me`, `page`.
+  adds a region, a page handed to the engine's `HtmlDomSink`; `frame(name, data)` folds through `Store`, then into
+  the `page` memory (a `State` of the page's own), merges every region again (only what differs is written), then
+  runs the reactions (`react { name, event -> }`, effects after the merge); `merge()` after a page event; roots
+  `state`, `me`, `page`.
   `key(value, index)`, the sink's item identity from the declarations: a view's `id`, a logged event's `seq`,
   else the position. `jsMain`: `attach(template, root)` over `JsTree` with `[data-kroom-intent]` triggers,
   `connect(events)` (the stream, `api.js`'s tab id), `act`. `Intents` takes its root, its attribute and the
