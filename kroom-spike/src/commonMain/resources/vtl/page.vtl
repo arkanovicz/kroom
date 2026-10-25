@@ -1,5 +1,6 @@
-##@ state: com.republicate.kroom.spike.ChatView, user: com.republicate.kroom.event.UserPresence, c: com.republicate.kroom.spike.Line
+##@ state: com.republicate.kroom.spike.ChatView
+##@ output: web
 <span>$state.users.size</span> online
-<ul id="users">#@each($state.users, $user)<li id="users.$user.id" class="user $user.status">$user.name ($user.status)</li>#end</ul>
-<ul id="chat">#@each($state.history, $c)<li>$c.author: $c.text</li>#end</ul>
-#set($many = $state.users.size > 1)#@when($many)<p>company</p>#end
+<ul id="users">#foreach($user in $state.users)<li id="users.$user.id" class="user $user.status">$user.name ($user.status)</li>#end</ul>
+<ul id="chat">#foreach($c in $state.history)<li>$c.author: $c.text</li>#end</ul>
+#if($state.users.size > 1)<p>company</p>#end

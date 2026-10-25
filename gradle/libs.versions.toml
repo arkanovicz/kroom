@@ -83,6 +83,7 @@ slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 velocity-engine-core = { module = "org.apache.velocity:velocity-engine-core", version.ref = "velocity" }
 velocity-engine-common = { module = "org.apache.velocity:velocity-engine-common", version.ref = "velocity" }
+velocity-engine-dom = { module = "org.apache.velocity:velocity-engine-dom", version.ref = "velocity" }
 velocity-engine-scripting = { module = "org.apache.velocity:velocity-engine-scripting", version.ref = "velocity" }
 velocity-engine-gradle-plugin = { module = "org.apache.velocity:velocity-engine-gradle-plugin", version.ref = "velocity" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

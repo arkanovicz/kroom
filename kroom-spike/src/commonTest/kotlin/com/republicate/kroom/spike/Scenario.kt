@@ -6,19 +6,20 @@ import com.republicate.kroom.event.Registry
 import com.republicate.kroom.event.Store
 import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.VelocityContext
-import org.apache.velocity.engine.VelocityEngine
+import org.apache.velocity.engine.dom.HtmlDomSink
+import org.apache.velocity.engine.dom.Tree
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 /**
- * The §6.2 page over the client's fold, rendered once into a tree through the sink, then re-rendered after
- * each frame. The same story on every tree and pipeline: the tree always serializes to the text render of
- * the same state, an item's node survives its own change and its neighbours' arrivals and departures.
+ * The §6.2 page over the client's fold, merged once into a tree through the engine's DOM sink, then merged
+ * again after each frame. The same story on every tree and pipeline: the tree always serializes to the text
+ * render of the same state (escaped by the engine, the sink raw), an item's node survives its own change and
+ * its neighbours' arrivals and departures.
  */
 class Scenario<N : Any>(
-    private val engine: VelocityEngine,
-    private val tree: Tree<N>,
-    private val root: N,
+    tree: Tree<N>,
+    root: N,
     /** The root's children serialized as HTML. */
     private val html: () -> String,
     /** The root's `<ul id="users">` items. */
@@ -31,19 +32,12 @@ class Scenario<N : Any>(
     private val afterFrame: (name: String) -> Unit = {},
 ) {
     private val store = Store(ChatState(), Registry(::Chat))
-    private val sink = DomSink(tree, root)
-
-    init {
-        engine.referenceInsertionEvents = Insertions
-        engine.addMacro("each", Each({ Insertions.sink }, ::keyOf))
-        engine.addMacro("when", When { Insertions.sink })
-    }
+    private val sink = HtmlDomSink(tree, root, ::keyOf)
 
     private fun context() = VelocityContext(mutableMapOf("state" to ChatView(store)))
 
     private fun pass() {
-        Insertions.sink = sink
-        try { sink.pass { render(context(), sink) } } finally { Insertions.sink = null }
+        render(context(), sink)
         assertEquals(text(context()), html())
     }
 
@@ -63,8 +57,8 @@ class Scenario<N : Any>(
         assertSame(alice, items()[0])
         assertEquals("users.b", attribute(items()[1], "id"))
 
-        frame("chat", """{"text":"hi all","seq":1,"from":"b","author":{"id":"b","name":"bob"},"timestamp":"t"}""")
-        check("<li>bob: hi all</li>" in html())
+        frame("chat", """{"text":"hi <all> & co","seq":1,"from":"b","author":{"id":"b","name":"bob"},"timestamp":"t"}""")
+        check("<li>bob: hi &lt;all&gt; &amp; co</li>" in html())
 
         val bob = items()[1]
         frame("leave", """{"user":{"id":"a","name":"alice","status":"AWAY"},"last":true,"count":1}""")

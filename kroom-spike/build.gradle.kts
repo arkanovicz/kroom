@@ -28,7 +28,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":kroom-common"))
-            api(libs.velocity.engine.common)   // the sink hangs on the engine's seams: insertion handler, native block macros
+            api(libs.velocity.engine.common)
+            api(libs.velocity.engine.dom)      // the DOM sink and its Tree: the browser half of the Binding is the engine's
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

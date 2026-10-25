@@ -1,5 +1,6 @@
 package com.republicate.kroom.spike
 
+import org.apache.velocity.engine.dom.Tree
 import java.util.IdentityHashMap
 
 /** A DOM subtree in memory: what a sink builds on the JVM, inspectable and serializable. */
@@ -16,8 +17,8 @@ class DElement(val tag: String) : DNode() {
 class DText(var data: String) : DNode()
 
 /**
- * The [Tree] over [DNode]s, logging every write so a test can pin how many mutations a frame costs,
- * not only the tree it leaves.
+ * The engine's [Tree] over [DNode]s, logging every write so a test can pin how many mutations a frame costs,
+ * not only the tree it leaves. Reads the sink never asks for ([getAttribute], [parent]) serve the tests.
  */
 class TreeDouble : Tree<DNode> {
     val log: MutableList<String> = mutableListOf()
@@ -40,7 +41,7 @@ class TreeDouble : Tree<DNode> {
         log += "setText(${num(text)}, ${quote(data)})"
     }
 
-    override fun getAttribute(element: DNode, name: String) = asElement(element).attributes[name]
+    fun getAttribute(element: DNode, name: String) = asElement(element).attributes[name]
 
     override fun setAttribute(element: DNode, name: String, value: String) {
         asElement(element).attributes[name] = value
@@ -74,7 +75,7 @@ class TreeDouble : Tree<DNode> {
         log += "remove(${num(node)})"
     }
 
-    override fun parent(node: DNode): DNode? = node.parent
+    fun parent(node: DNode): DNode? = node.parent
 
     override fun nextSibling(node: DNode): DNode? {
         val siblings = node.parent?.children ?: return null
