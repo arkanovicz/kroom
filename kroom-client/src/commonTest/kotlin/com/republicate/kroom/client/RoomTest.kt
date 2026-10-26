@@ -5,18 +5,11 @@ import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Registry
 import com.republicate.kroom.event.State
-import org.apache.velocity.engine.Compiler
-import org.apache.velocity.engine.Evaluable
-import org.apache.velocity.engine.Expr
 import org.apache.velocity.engine.VelocityEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class RoomTest {
-    private object NoCompiler : Compiler {
-        override fun compile(expr: Expr): Evaluable = throw IllegalStateException(expr.source)
-    }
-
     /** Page memory: what the room's frames left behind, as a page remembers them. */
     private class Seen(private val room: () -> Room<ChatState>) : State() {
         val lines = ArrayList<String>()
@@ -27,7 +20,7 @@ class RoomTest {
         lateinit var room: Room<ChatState>
         val seen = Seen { room }
         val reacted = ArrayList<String>()
-        room = Room("chat", ChatState(), Registry(::Chat), VelocityEngine(NoCompiler)).apply { page = seen }
+        room = Room("chat", ChatState(), Registry(::Chat), VelocityEngine(null)).apply { page = seen }
             .react { name, event -> reacted += "$name:${event?.name}:${seen.lines.size}" }
         room.frame("state", """{"history":[]}""")
         room.frame("chat", """{"text":"hi","seq":1}""")

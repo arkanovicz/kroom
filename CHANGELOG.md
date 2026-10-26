@@ -139,6 +139,11 @@ All notable changes to kroom will be documented in this file.
   (defaults to `stateToJson()`): `sendStateTo` is gone, `Table` overrides the former instead; a hook
   that used to resend the joiner its own context moves that into the snapshot.
 
+#### velocity 3.0.0-BETA-20261026-01
+- Bumped: an engine built with no interpreter (`VelocityEngine(null, …)`) renders compiled templates only and
+  ships no parser; chifoumi's browser engine is one, its bundle down to 132 KB gz (242 before). The output
+  syntax header is now `##@output web` (with a colon it declares a variable).
+
 #### velocity 3.0.0-BETA-20261025-04
 - Bumped: a performance fix, no API change.
 

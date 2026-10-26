@@ -8,10 +8,7 @@ import com.republicate.kroom.examples.chifoumi.game.LobbyLogic
 import com.republicate.kroom.examples.chifoumi.game.LobbyState
 import kotlinx.browser.document
 import kotlinx.browser.window
-import org.apache.velocity.engine.Compiler
 import org.apache.velocity.engine.Config
-import org.apache.velocity.engine.Evaluable
-import org.apache.velocity.engine.Expr
 import org.apache.velocity.engine.VelocityEngine
 import org.apache.velocity.engine.resource.StockResourceLoader
 import velocity.templates.VelocityTemplates
@@ -51,8 +48,6 @@ fun main() {
     window.asDynamic().kroom = kroom   // the page's handle (`kroom.connect()` once logged in)
 }
 
-/** The pages, compiled at build: no expression is left for run time, and the browser has no compiler. */
-private val engine = VelocityEngine(object : Compiler {
-    override fun compile(expr: Expr): Evaluable = throw IllegalStateException("a compiled page asked for an expression: ${expr.source}")
-}, Config(informalNavigation = true)).apply { addResourceLoader("stock", StockResourceLoader(VelocityTemplates::resolve)) }
+/** The pages, compiled at build: an engine without an interpreter, so no parser ships. */
+private val engine = VelocityEngine(null, Config(informalNavigation = true)).apply { addResourceLoader("stock", StockResourceLoader(VelocityTemplates::resolve)) }
 

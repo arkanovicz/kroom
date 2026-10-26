@@ -6,10 +6,7 @@ import com.republicate.kroom.examples.chifoumi.game.FoldTest
 import com.republicate.kroom.examples.chifoumi.game.LobbyLogic
 import com.republicate.kroom.examples.chifoumi.game.LobbyState
 import com.republicate.kson.Json
-import org.apache.velocity.engine.Compiler
 import org.apache.velocity.engine.Config
-import org.apache.velocity.engine.Evaluable
-import org.apache.velocity.engine.Expr
 import org.apache.velocity.engine.VelocityContext
 import org.apache.velocity.engine.VelocityEngine
 import org.apache.velocity.engine.resource.StockResourceLoader
@@ -25,9 +22,7 @@ import kotlin.test.assertTrue
  * not change keeps its node. The browser's DOM run is `pages.mjs`.
  */
 class RegionsTest {
-    private val engine = VelocityEngine(object : Compiler {
-        override fun compile(expr: Expr): Evaluable = throw IllegalStateException("a compiled page asked for an expression: ${expr.source}")
-    }, Config(informalNavigation = true, referenceInsertionEventClasses = listOf("org.apache.velocity.engine.sink.DynamicEscaper")))
+    private val engine = VelocityEngine(null, Config(informalNavigation = true, referenceInsertionEventClasses = listOf("org.apache.velocity.engine.sink.DynamicEscaper")))
         .apply { addResourceLoader("stock", StockResourceLoader(VelocityTemplates::resolve)) }
 
     private val frames = FoldTest::class.java.getResource("/frames.jsonl")!!.readText().lines().filter { it.isNotBlank() }
