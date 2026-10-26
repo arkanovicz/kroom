@@ -7,7 +7,7 @@ const require = createRequire('/home/app/kroom-webapp-assets/src/test/js/');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const R = '/home/app/kroom-examples/chifoumi/src/main/resources';
 const A = '/home/app/kroom-webapp-assets/src/main/resources/static/js';
-// both pages run on the bundle (chifoumi-common's js executable: the fold, the binder, the app's main — build it first)
+// both pages run on the bundle (chifoumi-common's js executable: the fold, the compiled pages, the app's main — build it first)
 const BUNDLE = process.env.BUNDLE || '/home/app/kroom-examples/chifoumi-common/build/dist/js/productionExecutable/arena.js';
 for (const kind of ['uncaughtException', 'unhandledRejection']) process.on(kind, e => { failed++; console.log(kind.toUpperCase(), e?.message ?? e, '|', String(e?.stack ?? '').split('\n').slice(1, 5).join(' | ')); });
 const LOBBY = ['domhelper', 'api', 'status'].map(n => `${A}/${n}.js`).concat([BUNDLE, `${R}/static/js/chifoumi.js`]);
@@ -55,17 +55,17 @@ async function page(template, scripts) {
     must(p.$t('#online-num') === '2' && p.$t('#player-display') === 'Bob', 'lobby: online count and the viewer from the snapshot');
     must(p.vis('#queue-count') && /1 waiting/.test(p.$t('#queue-count')), 'lobby: alice waits');
     p.setReply({ pending: true });
-    await p.click('[data-intent="match"]');
+    await p.click('[data-kroom-intent="match"]');
     await p.send({ event: 'match', data: { player: 'b' } });
     console.log('find match posted', JSON.stringify(p.posts.at(-1)), '| searching', p.vis('#searching'), '| queue-status', p.vis('#queue-status'));
     must(p.posts.at(-1).type === 'match' && p.vis('#searching') && !p.vis('#queue-status'), 'find match: searching');
     p.setReply({});
-    await p.click('#searching [data-intent="cancel"]');
+    await p.click('#searching [data-kroom-intent="cancel"]');
     await p.send({ event: 'cancel', data: { intent: 'match', user: 'b' } });
     console.log('cancel posted', JSON.stringify(p.posts.at(-1)), '| searching', p.vis('#searching'), '| queue', JSON.stringify(p.$t('#queue-count')));
     must(p.posts.at(-1).intent === 'match' && !p.vis('#searching'), 'cancel: back to the button');
     p.w.document.querySelector('#chat-form [name="text"]').value = 'hello';
-    await p.click('[data-intent="chat"]');
+    await p.click('[data-kroom-intent="chat"]');
     console.log('chat posted', JSON.stringify(p.posts.at(-1)), '| input now', JSON.stringify(p.w.document.querySelector('#chat-form [name="text"]').value));
     must(p.posts.at(-1).text === 'hello' && p.w.document.querySelector('#chat-form [name="text"]').value === '', 'chat: posted and cleared');
     await p.send(frames[4]);
@@ -87,7 +87,7 @@ async function page(template, scripts) {
     await p.send(frames[5]);
     console.log('after a plays:', p.$t('#game-message'));
     must(/Alice has played/.test(p.$t('#game-message')), 'opponent played: the fold says so');
-    await p.click('[data-move="paper"]');
+    await p.click('[data-kroom-move="paper"]');
     console.log('play posted', JSON.stringify(p.posts.at(-1)));
     must(p.posts.at(-1).type === 'play' && p.posts.at(-1).move === 'paper', 'play: the move posted');
     await p.send(frames[6]);

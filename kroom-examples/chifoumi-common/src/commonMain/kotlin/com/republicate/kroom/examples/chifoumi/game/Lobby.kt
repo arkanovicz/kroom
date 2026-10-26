@@ -92,7 +92,7 @@ class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(js
         private set
     val stats by obj(::Stats)
 
-    init { if (json["stats"] == null) json["stats"] = Json.MutableObject() }
+    init { if (json["stats"] == null) json["stats"] = Json.MutableObject("played" to 0, "rock" to 0, "paper" to 0, "scissors" to 0, "well" to 0) }
 
     /** The running match of a user, if any; the page's perspective (`me`), not a key of the marking. */
     fun myMatch(user: String?): MatchView? = user?.let { u -> matches.values.firstOrNull { m -> m.finished != true && m.has(u) } }

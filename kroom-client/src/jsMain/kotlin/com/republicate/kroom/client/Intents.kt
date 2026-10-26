@@ -13,18 +13,16 @@ import org.w3c.xhr.FormData
 import kotlin.js.Promise
 
 /**
- * `[data-kroom-intent]` triggers (`[data-intent]` on v2's pages): a click posts the intent and leaves the trigger
- * busy until the reply, the verdict: accepted frees it, rejected frees it and shows the reason right after it.
- * The payload is the trigger's `data-kroom-<field>` values (`data-<field>` on v2's), plus its form's fields when
- * in a form; a `cancel` names what it withdraws with `…-intent-of`. Call sites hold no code.
+ * `[data-kroom-intent]` triggers: a click posts the intent and leaves the trigger busy until the reply, the
+ * verdict: accepted frees it (and resets its form), rejected frees it and shows the reason right after it. The
+ * payload is the trigger's `data-kroom-<field>` values, plus its form's fields when in a form; a `cancel` names
+ * what it withdraws with `data-kroom-intent-of`. Call sites hold no code. Triggers inside a region may be rebuilt
+ * by a merge while their POST runs: they are found again by name when the reply comes.
  */
-class Intents(
-    private val root: Element,
-    private val attribute: String,
-    private val act: (String, Json.Object) -> Promise<dynamic>,
-) {
+class Intents(private val root: Element, private val act: (String, Json.Object) -> Promise<dynamic>) {
     private val pending = HashSet<String>()
-    private val fieldPrefix = attribute.removeSuffix("intent")
+    private val attribute = "data-kroom-intent"
+    private val fieldPrefix = "data-kroom-"
 
     init {
         root.addEventListener("click", { e ->
@@ -48,7 +46,7 @@ class Intents(
         if (el.getAttribute(attribute) == "cancel" && intentOf != null) return out.also { it["intent"] = intentOf }
         for (i in 0 until el.attributes.length) {
             val a = el.attributes[i] ?: continue
-            if (a.name.startsWith(fieldPrefix) && !a.name.startsWith(attribute) && !a.name.startsWith("data-k-")) out[camel(a.name.removePrefix(fieldPrefix))] = a.value
+            if (a.name.startsWith(fieldPrefix) && !a.name.startsWith(attribute)) out[camel(a.name.removePrefix(fieldPrefix))] = a.value
         }
         val form = formOf(el)
         if (form != null) {
@@ -79,7 +77,7 @@ class Intents(
     private fun clearReason(intent: String) =
         root.querySelectorAll("[$attribute-reason=\"$intent\"]").asList().forEach { (it as Element).remove() }
 
-    /** The reason is a key the page may hold a sentence for (`#messages [data-msg="play:already_played"]`), else shown raw with its args. */
+    /** The reason is a key the page may hold a sentence for (`#messages [data-kroom-msg="play:already_played"]`), else shown raw with its args. */
     private fun showReason(intent: String, reason: String) {
         clearReason(intent)
         triggers(intent).firstOrNull()?.let { el ->
@@ -100,4 +98,10 @@ class Intents(
         val keys = js("Object.keys(args)") as Array<String>
         return if (keys.isEmpty()) reason else "$reason (${keys.joinToString(", ") { "$it: ${args[it]}" }})"
     }
+}
+
+/** A sentence held by the page (`#messages [data-kroom-msg=key]`, so l10n translates it), `{k}` filled from [vars]; the key when absent. */
+fun say(key: String, vars: Map<String, Any?> = emptyMap()): String {
+    val text = document.querySelector("#messages [data-kroom-msg=\"$key\"]")?.textContent ?: key
+    return Regex("""\{(\w+)\}""").replace(text) { m -> vars[m.groupValues[1]]?.toString() ?: "" }
 }

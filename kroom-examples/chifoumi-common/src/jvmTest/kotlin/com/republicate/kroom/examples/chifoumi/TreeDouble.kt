@@ -1,4 +1,4 @@
-package com.republicate.kroom.spike
+package com.republicate.kroom.examples.chifoumi
 
 import org.apache.velocity.engine.dom.Tree
 import java.util.IdentityHashMap
@@ -22,7 +22,7 @@ class DText(var data: String) : DNode()
  */
 class TreeDouble : Tree<DNode> {
     val log: MutableList<String> = mutableListOf()
-    var asDynamicLogs: Map<String, List<String>> = emptyMap()   // per-frame logs a scenario leaves for its checks
+
     private val numbers = IdentityHashMap<DNode, Int>()
 
     fun clearLog() = log.clear()

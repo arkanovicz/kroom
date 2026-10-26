@@ -30,7 +30,6 @@ dependencies {
     runtimeOnly(libs.velocity.engine.scripting) // the example renders its templates interpreted
     implementation(libs.slf4j.simple)
 
-    testImplementation(project(":kroom-client")) // the template check
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

@@ -7,122 +7,46 @@
     <link rel="stylesheet" href="/lib/pico/pico.min.css">
     <link rel="stylesheet" href="/css/chifoumi.css">
 </head>
-<body data-k-room="chifoumi-lobby">
+<body>
     <header class="container">
         <nav>
             <ul>
                 <li><a href="/$lang/index.html"><strong>Chifoumi Arena</strong></a></li>
             </ul>
-            <ul>
-                <li id="match-info">Round <span id="round-num" data-k-field="game.round">1</span></li>
-                <li>First to <span id="target" data-k-field="game.target">5</span></li>
-            </ul>
+            <ul id="match-nav"></ul>
         </nav>
     </header>
 
-    <!-- The page is the viewer's match (`game`, derived from the viewer's side); without one, the lobby -->
+    <!-- The viewer's match, from the viewer's side: the room's region, merged in the browser from the stream -->
     <main class="container">
-        <article id="game-area">
-            <div class="score-board">
-                <div class="player player-1">
-                    <span class="player-name" id="player1-name" data-k-field="game.name1">Player 1</span>
-                    <span class="player-score" id="player1-score" data-k-field="game.score1">0</span>
-                </div>
-                <div class="vs">VS</div>
-                <div class="player player-2">
-                    <span class="player-name" id="player2-name" data-k-field="game.name2">Player 2</span>
-                    <span class="player-score" id="player2-score" data-k-field="game.score2">0</span>
-                </div>
-            </div>
+        <article id="game-area"></article>
 
-            <div id="game-message" class="game-message" data-k-field="game.message"></div>
+        <!-- Why a move wins, winner-loser; held here so l10n translates them -->
+        <ul id="verdicts" hidden>
+            <li data-kroom-verdict="rock-scissors">Rock blunts the scissors.</li>
+            <li data-kroom-verdict="paper-rock">Paper covers the rock.</li>
+            <li data-kroom-verdict="paper-well">Paper covers the well.</li>
+            <li data-kroom-verdict="scissors-paper">Scissors cut the paper.</li>
+            <li data-kroom-verdict="well-rock">The rock falls into the well.</li>
+            <li data-kroom-verdict="well-scissors">The scissors fall into the well.</li>
+            <li data-kroom-verdict="draw">Same move, nobody scores.</li>
+        </ul>
 
-            <div id="move-buttons" class="move-buttons" data-k-show="game.phase=choose" hidden>
-                <button class="move-btn" data-intent="play" data-move="rock" title="Rock">
-                    <span class="emoji">🪨</span>
-                    <span class="label">Rock</span>
-                </button>
-                <button class="move-btn" data-intent="play" data-move="paper" title="Paper">
-                    <span class="emoji">📄</span>
-                    <span class="label">Paper</span>
-                </button>
-                <button class="move-btn" data-intent="play" data-move="scissors" title="Scissors">
-                    <span class="emoji">✂️</span>
-                    <span class="label">Scissors</span>
-                </button>
-                <button class="move-btn" data-intent="play" data-move="well" title="Well">
-                    <span class="emoji">🕳️</span>
-                    <span class="label">Well</span>
-                </button>
-            </div>
-
-            <div id="played" data-k-show="game.phase=waiting" hidden>
-                <p data-k-show="game.mine">You played <span class="emoji" data-k-field="game.mine"></span></p>
-                <button id="take-back" data-intent="cancel" data-intent-of="play" class="secondary outline">Take it back</button>
-            </div>
-
-            <div id="round-result" class="round-result" data-k-show="game.phase=reveal" hidden>
-                <div class="moves-reveal">
-                    <div class="revealed-move" id="your-move">
-                        <span class="emoji" data-k-field="game.reveal.yours"></span>
-                        <span class="label">You</span>
-                    </div>
-                    <div class="result-indicator">
-                        <span class="win" data-k-show="game.reveal.outcome=win">✓</span>
-                        <span class="lose" data-k-show="game.reveal.outcome=lose">✓</span>
-                        <span class="draw" data-k-show="game.reveal.outcome=draw">=</span>
-                    </div>
-                    <div class="revealed-move" id="opponent-move">
-                        <span class="emoji" data-k-field="game.reveal.theirs"></span>
-                        <span class="label">Opponent</span>
-                    </div>
-                </div>
-                <p id="round-message" data-k-field="game.reveal.message"></p>
-                <p id="round-verdict" data-k-field="game.reveal.verdict"></p>
-            </div>
-
-            <div id="match-result" class="match-result" data-k-show="game.phase=over" hidden>
-                <h2 class="winner" data-k-show="game.won" data-k-field="game.title">Match Over!</h2>
-                <h2 class="loser" data-k-show="!game.won" data-k-field="game.title">Match Over!</h2>
-                <p id="match-result-message" data-k-field="game.result"></p>
-                <button id="play-again-btn" data-intent="match" class="primary" data-k-show="!queue∋@me">Play Again</button>
-                <div id="again-searching" data-k-show="queue∋@me" hidden>
-                    <p aria-busy="true">Searching for opponent...</p>
-                    <button data-intent="cancel" data-intent-of="match" class="secondary">Cancel</button>
-                </div>
-                <a href="/$lang/index.html" role="button" class="secondary">Back to Lobby</a>
-            </div>
-
-            <!-- Why a move wins, winner-loser; held here so l10n translates them -->
-            <ul id="verdicts" hidden>
-                <li data-verdict="rock-scissors">Rock blunts the scissors.</li>
-                <li data-verdict="paper-rock">Paper covers the rock.</li>
-                <li data-verdict="paper-well">Paper covers the well.</li>
-                <li data-verdict="scissors-paper">Scissors cut the paper.</li>
-                <li data-verdict="well-rock">The rock falls into the well.</li>
-                <li data-verdict="well-scissors">The scissors fall into the well.</li>
-                <li data-verdict="draw">Same move, nobody scores.</li>
-            </ul>
-
-            <!-- Sentences the script composes, same reason -->
-            <ul id="messages" hidden>
-                <li data-msg="you">You</li>
-                <li data-msg="choose">Choose your move!</li>
-                <li data-msg="waiting">Waiting for opponent...</li>
-                <li data-msg="opponent-played">{name} has played. Your turn!</li>
-                <li data-msg="took-back">{name} took their move back.</li>
-                <li data-msg="round-win">You win this round!</li>
-                <li data-msg="round-lose">You lose this round!</li>
-                <li data-msg="round-draw">Draw!</li>
-                <li data-msg="victory">Victory!</li>
-                <li data-msg="defeat">Defeat</li>
-                <li data-msg="defeated">You defeated {name}!</li>
-                <li data-msg="wins">{name} wins. Better luck next time!</li>
-            </ul>
-        </article>
-
-        <!-- No match of the viewer's: back to the lobby -->
-        <a href="/$lang/index.html" data-k-show="!game" data-k-follow hidden></a>
+        <!-- Sentences the script composes, same reason -->
+        <ul id="messages" hidden>
+            <li data-kroom-msg="you">You</li>
+            <li data-kroom-msg="choose">Choose your move!</li>
+            <li data-kroom-msg="waiting">Waiting for opponent...</li>
+            <li data-kroom-msg="opponent-played">{name} has played. Your turn!</li>
+            <li data-kroom-msg="took-back">{name} took their move back.</li>
+            <li data-kroom-msg="round-win">You win this round!</li>
+            <li data-kroom-msg="round-lose">You lose this round!</li>
+            <li data-kroom-msg="round-draw">Draw!</li>
+            <li data-kroom-msg="victory">Victory!</li>
+            <li data-kroom-msg="defeat">Defeat</li>
+            <li data-kroom-msg="defeated">You defeated {name}!</li>
+            <li data-kroom-msg="wins">{name} wins. Better luck next time!</li>
+        </ul>
     </main>
 
     <script src="#versioned('/js/domhelper.js')"></script>

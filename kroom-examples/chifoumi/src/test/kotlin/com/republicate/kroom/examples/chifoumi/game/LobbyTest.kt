@@ -65,7 +65,7 @@ class LobbyTest {
         val round = out.events.single() as Round
         assertEquals("b", round.round.getString("winner")); assertEquals(1, round.match.score2); assertEquals(2, round.match.round)
         state.fold(rock, paper, round)
-        assertEquals(1, state.stats!!.rock); assertEquals(1, state.stats!!.paper); assertNull(state.stats!!.played)
+        assertEquals(1, state.stats!!.rock); assertEquals(1, state.stats!!.paper); assertEquals(0, state.stats!!.played)
         assertEquals(1, state.matches.values.single().score2)
         assertEquals("not_in_match", (ChifoumiLogic.fire(state, Who("c"), Play(json("move" to "ROCK"))) as Reason).key)
     }

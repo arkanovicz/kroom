@@ -1,4 +1,4 @@
-description = "Kroom client - a page on a room: the stream folded into the State, the page merged into the DOM after every frame (v2's data-k-* binder until chifoumi moves)"
+description = "Kroom client - a page on a room: the stream folded into the State, the page merged into the DOM by the engine's sink after every frame"
 
 plugins {
     alias(libs.plugins.multiplatform)

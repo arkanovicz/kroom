@@ -213,6 +213,18 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### chifoumi
+- The pages on `Room`: the server renders the chrome (head, nav, login, the sentences `say` reads, now
+  `data-kroom-msg` / `data-kroom-verdict`), the room's parts are regions — `online.html`, `lobby.html`,
+  `round.html`, `match.html` in `chifoumi-common/src/commonMain/pages`, translated per language at build
+  (`fr.po` moved to `chifoumi-common`, the server reads it from the jar) and compiled to common classes
+  (`velocity.templates.<lang>.*`) merged in the browser. `LobbyPage` (the feed, the viewer's perspective) and
+  `GamePage` (the kept match, this tab's move, the reveal) are page memory in common code; navigation and the
+  chat's scroll are reactions; intents on `data-kroom-intent`. Stats start at zero. `RegionsTest` (JVM): each
+  region's tree is its text render after every recorded frame, the counter and the chat line keep their nodes;
+  `pages.mjs` runs both pages on the real bundle. `PagesTest` (the `data-k-*` check) goes: the typed headers
+  make an unknown name a compile error. The bundle carries the engine: 242 KB gz (77 KB before).
+
 #### kroom-webapp-l10n
 - `translateTree(templates, i18n, source, languages, out)`: a template tree translated into `<out>/<lang>/<rel>`,
   literal `#parse` targets relocated; the velocity-l10n plugin's task runs on it, and its `main` serves a build
@@ -240,8 +252,11 @@ All notable changes to kroom will be documented in this file.
   `key(value, index)`, the sink's item identity from the declarations: a view's `id`, a logged event's `seq`,
   else the position. `jsMain`: `attach(template, root)` over `JsTree` with `[data-kroom-intent]` triggers,
   `connect(events)` (the stream, `api.js`'s tab id), `act`. `Intents` takes its root, its attribute and the
-  post: v2's pages keep `data-intent` until chifoumi moves. Depends on `velocity-engine-common` and
-  `velocity-engine-dom`; a page is compiled by the app, the module that owns the templates registry.
+  post. Depends on `velocity-engine-common` and `velocity-engine-dom`; a page is compiled by the app, the
+  module that owns the templates registry. v2's binder left with chifoumi's move (the `data-k-*` grammar,
+  `Path`, `Show`, `Bindings`, `Client`, `Projector`, `derive`); `Intents` takes `data-kroom-intent` alone,
+  `say` reads `data-kroom-msg`, the `kroom` facade (`connect`, `on`, `act`, `frame`, `say`) sits on `Room`.
+  `kroom-spike` is gone: its tree double and its oracle run in chifoumi-common over the real pages.
 
 #### kroom-common
 - `State.users`: the viewer's presence as the snapshot carries it (`$state.users` in a page); `Store.users` reads it.

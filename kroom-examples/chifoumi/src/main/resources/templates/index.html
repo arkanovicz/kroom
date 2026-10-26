@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/lib/pico/pico.min.css">
     <link rel="stylesheet" href="/css/chifoumi.css">
 </head>
-<body data-k-room="chifoumi-lobby">
+<body>
     <header class="container">
         <nav>
             <ul>
@@ -23,7 +23,7 @@
                 </li>
                 <li id="online-count">
                     <span class="online-dot"></span>
-                    <span id="online-num" data-k-field="users.length">0</span> online
+                    <span id="online-num"></span> online
                 </li>
             </ul>
         </nav>
@@ -61,86 +61,15 @@
             </article>
         </section>
 
-        <!-- Lobby section (after login) -->
-        <section id="lobby-section" style="display: none;">
-            <div class="grid">
-                <article>
-                    <header>
-                        <h3>Ready to play, <span id="player-display" data-k-field="me.name"></span>?</h3>
-                    </header>
-                    <div id="queue-status" data-k-show="!queue∋@me">
-                        <button data-intent="match" class="primary">Find Match</button>
-                        <small id="queue-count" data-k-show="queue.length" hidden>(<span data-k-field="queue.length"></span> waiting)</small>
-                    </div>
-                    <div id="searching" data-k-show="queue∋@me" hidden>
-                        <p aria-busy="true">Searching for opponent...</p>
-                        <button data-intent="cancel" data-intent-of="match" class="secondary">Cancel</button>
-                    </div>
-                </article>
-
-                <article>
-                    <header>
-                        <h3>Live Activity</h3>
-                    </header>
-                    <ul id="activity-feed" class="activity-list">
-                        <li class="empty">Waiting for activity...</li>
-                    </ul>
-                </article>
-            </div>
-
-            <article>
-                <header>
-                    <h3>Chat</h3>
-                </header>
-                <ul id="chat-log" class="activity-list" data-k-each="history">
-                    <template><li><span data-k-field="author.name"></span>: <span data-k-field="text"></span></li></template>
-                </ul>
-                <form id="chat-form">
-                    <fieldset role="group">
-                        <input type="text" name="text" placeholder="Say something" maxlength="500" autocomplete="off">
-                        <button data-intent="chat">Send</button>
-                    </fieldset>
-                </form>
-            </article>
-
-            <article>
-                <header>
-                    <h3>Stats</h3>
-                </header>
-                <div class="grid stats-grid">
-                    <div>
-                        <strong id="stat-matches" data-k-field="stats.played">0</strong>
-                        <small>Matches played</small>
-                    </div>
-                    <div>
-                        <strong id="stat-rock" data-k-field="stats.rock">0</strong>
-                        <small>🪨 Rock</small>
-                    </div>
-                    <div>
-                        <strong id="stat-paper" data-k-field="stats.paper">0</strong>
-                        <small>📄 Paper</small>
-                    </div>
-                    <div>
-                        <strong id="stat-scissors" data-k-field="stats.scissors">0</strong>
-                        <small>✂️ Scissors</small>
-                    </div>
-                    <div>
-                        <strong id="stat-well" data-k-field="stats.well">0</strong>
-                        <small>🕳️ Well</small>
-                    </div>
-                </div>
-            </article>
-        </section>
-
-        <!-- The viewer's match is on: the game page (a reconnect lands there too) -->
-        <a href="/$lang/game.html" data-k-show="match" data-k-follow hidden></a>
+        <!-- Lobby section (after login): the room's region, merged in the browser from the stream -->
+        <section id="lobby-section" style="display: none;"></section>
 
         <!-- Sentences the script composes; held here so l10n translates them -->
         <ul id="messages" hidden>
-            <li data-msg="joined">{name} joined</li>
-            <li data-msg="left">{name} left</li>
-            <li data-msg="started">{a} vs {b} started</li>
-            <li data-msg="beat">{winner} beat {loser} ({score})</li>
+            <li data-kroom-msg="joined">{name} joined</li>
+            <li data-kroom-msg="left">{name} left</li>
+            <li data-kroom-msg="started">{a} vs {b} started</li>
+            <li data-kroom-msg="beat">{winner} beat {loser} ({score})</li>
         </ul>
     </main>
 

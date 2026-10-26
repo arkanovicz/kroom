@@ -1,0 +1,82 @@
+##@ state: com.republicate.kroom.examples.chifoumi.game.LobbyState
+##@ page: com.republicate.kroom.examples.chifoumi.GamePage
+##@ output: web
+<div class="score-board">
+    <div class="player player-1">
+        <span class="player-name" id="player1-name">$!page.name1</span>
+        <span class="player-score" id="player1-score">$!page.score1</span>
+    </div>
+    <div class="vs">VS</div>
+    <div class="player player-2">
+        <span class="player-name" id="player2-name">$!page.name2</span>
+        <span class="player-score" id="player2-score">$!page.score2</span>
+    </div>
+</div>
+
+<div id="game-message" class="game-message">$page.message</div>
+
+#if($page.phase == "choose")
+<div id="move-buttons" class="move-buttons">
+    <button class="move-btn" data-kroom-intent="play" data-kroom-move="rock" title="Rock">
+        <span class="emoji">🪨</span>
+        <span class="label">Rock</span>
+    </button>
+    <button class="move-btn" data-kroom-intent="play" data-kroom-move="paper" title="Paper">
+        <span class="emoji">📄</span>
+        <span class="label">Paper</span>
+    </button>
+    <button class="move-btn" data-kroom-intent="play" data-kroom-move="scissors" title="Scissors">
+        <span class="emoji">✂️</span>
+        <span class="label">Scissors</span>
+    </button>
+    <button class="move-btn" data-kroom-intent="play" data-kroom-move="well" title="Well">
+        <span class="emoji">🕳️</span>
+        <span class="label">Well</span>
+    </button>
+</div>
+#elseif($page.phase == "waiting")
+<div id="played">
+#if($page.move)
+    <p>You played <span class="emoji">$page.move</span></p>
+#end
+    <button id="take-back" data-kroom-intent="cancel" data-kroom-intent-of="play" class="secondary outline">Take it back</button>
+</div>
+#elseif($page.phase == "reveal")
+<div id="round-result" class="round-result">
+    <div class="moves-reveal">
+        <div class="revealed-move" id="your-move">
+            <span class="emoji">$!page.reveal.yours</span>
+            <span class="label">You</span>
+        </div>
+        <div class="result-indicator">
+#if($page.reveal.outcome == "win")
+            <span class="win">✓</span>
+#elseif($page.reveal.outcome == "lose")
+            <span class="lose">✓</span>
+#else
+            <span class="draw">=</span>
+#end
+        </div>
+        <div class="revealed-move" id="opponent-move">
+            <span class="emoji">$!page.reveal.theirs</span>
+            <span class="label">Opponent</span>
+        </div>
+    </div>
+    <p id="round-message">$!page.reveal.message</p>
+    <p id="round-verdict">$!page.reveal.verdict</p>
+</div>
+#elseif($page.phase == "over")
+<div id="match-result" class="match-result">
+    <h2 class="#if($page.won)winner#{else}loser#end">$page.title</h2>
+    <p id="match-result-message">$page.result</p>
+#if($page.searching)
+    <div id="again-searching">
+        <p aria-busy="true">Searching for opponent...</p>
+        <button data-kroom-intent="cancel" data-kroom-intent-of="match" class="secondary">Cancel</button>
+    </div>
+#else
+    <button id="play-again-btn" data-kroom-intent="match" class="primary">Play Again</button>
+#end
+    <a href="index.html" role="button" class="secondary">Back to Lobby</a>
+</div>
+#end

@@ -6,7 +6,7 @@ Kotlin multiplatform library for real-time collaborative applications using Serv
 
 ```
 kroom-common          multiplatform core types
-kroom-client          a page on a room: the stream folded into the State, the page merged into the DOM by the engine's sink (KMP jvm+js; v2's data-k-* binder until chifoumi moves)
+kroom-client          a page on a room: the stream folded into the State, its regions merged into the DOM by the engine's sink after every frame (KMP jvm+js)
 kroom-view            client-side SSE handling (JS/Wasm)
 kroom-server          server-side Room/Lobby/Actor abstractions
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
@@ -162,10 +162,12 @@ event: play   id: 42   data: {"move":"rock"}
   stats, "who is waiting" are derived from `match`, `round`, `join`, `leave`, not events of their
   own. `LobbyTest` records a whole match's frames and checks their fold is the snapshot the room
   would serve; the recording is the golden `FoldTest` replays on the JVM and on node, and the
-  pages' jsdom harness replays through the pages. Both pages are `data-k-*` markup over the
-  room's JSON, bound by `kroom-client` from the app bundle (`chifoumi-common`'s js target); the
-  game page binds to `game`, the viewer's perspective derived in the bundle's `main`. The pages'
-  own scripts are login, language and opening the stream.
+  pages' jsdom harness replays through the pages. The server renders each page's chrome; the room's
+  parts are regions, velocity pages in `chifoumi-common` translated per language and compiled at build,
+  merged by `kroom-client`'s `Room` into the document after every frame (the engine's DOM sink writes only
+  what differs); the viewer's perspective and the feed are page memory (`LobbyPage`, `GamePage`).
+  `RegionsTest` checks each region's tree against its text render over the recording. The pages' own
+  scripts are login, language and opening the stream.
 - **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
   stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
   permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`

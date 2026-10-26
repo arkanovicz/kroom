@@ -1,4 +1,4 @@
-package com.republicate.kroom.spike
+package com.republicate.kroom.examples.chifoumi
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,0 +1,81 @@
+##@ state: com.republicate.kroom.examples.chifoumi.game.LobbyState
+##@ page: com.republicate.kroom.examples.chifoumi.LobbyPage
+##@ output: web
+<div class="grid">
+    <article>
+        <header>
+            <h3>Ready to play, <span id="player-display">$!page.name</span>?</h3>
+        </header>
+#if($page.searching)
+        <div id="searching">
+            <p aria-busy="true">Searching for opponent...</p>
+            <button data-kroom-intent="cancel" data-kroom-intent-of="match" class="secondary">Cancel</button>
+        </div>
+#else
+        <div id="queue-status">
+            <button data-kroom-intent="match" class="primary">Find Match</button>
+#if($state.queue.size > 0)
+            <small id="queue-count">($state.queue.size waiting)</small>
+#end
+        </div>
+#end
+    </article>
+
+    <article>
+        <header>
+            <h3>Live Activity</h3>
+        </header>
+        <ul id="activity-feed" class="activity-list">
+#foreach($line in $page.feed)
+            <li>$line.text<span class="time">$line.time</span></li>
+#else
+            <li class="empty">Waiting for activity...</li>
+#end
+        </ul>
+    </article>
+</div>
+
+<article>
+    <header>
+        <h3>Chat</h3>
+    </header>
+    <ul id="chat-log" class="activity-list">
+#foreach($c in $state.history)
+        <li>$!c.author.name: $c.text</li>
+#end
+    </ul>
+    <form id="chat-form">
+        <fieldset role="group">
+            <input type="text" name="text" placeholder="Say something" maxlength="500" autocomplete="off">
+            <button data-kroom-intent="chat">Send</button>
+        </fieldset>
+    </form>
+</article>
+
+<article>
+    <header>
+        <h3>Stats</h3>
+    </header>
+    <div class="grid stats-grid">
+        <div>
+            <strong id="stat-matches">$!state.stats.played</strong>
+            <small>Matches played</small>
+        </div>
+        <div>
+            <strong id="stat-rock">$!state.stats.rock</strong>
+            <small>🪨 Rock</small>
+        </div>
+        <div>
+            <strong id="stat-paper">$!state.stats.paper</strong>
+            <small>📄 Paper</small>
+        </div>
+        <div>
+            <strong id="stat-scissors">$!state.stats.scissors</strong>
+            <small>✂️ Scissors</small>
+        </div>
+        <div>
+            <strong id="stat-well">$!state.stats.well</strong>
+            <small>🕳️ Well</small>
+        </div>
+    </div>
+</article>
