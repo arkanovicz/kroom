@@ -56,7 +56,7 @@ async function page(template, scripts) {
     must(p.vis('#queue-count') && /1 waiting/.test(p.$t('#queue-count')), 'lobby: alice waits');
     p.setReply({ pending: true });
     await p.click('[data-kroom-intent="match"]');
-    await p.send({ event: 'match', data: { player: 'b' } });
+    await p.send({ event: 'match', data: { player: { id: 'b', name: 'Bob' } } });
     console.log('find match posted', JSON.stringify(p.posts.at(-1)), '| searching', p.vis('#searching'), '| queue-status', p.vis('#queue-status'));
     must(p.posts.at(-1).type === 'match' && p.vis('#searching') && !p.vis('#queue-status'), 'find match: searching');
     p.setReply({});
@@ -119,7 +119,7 @@ async function page(template, scripts) {
     must(p.vis('#match-result') && title?.className === 'winner' && p.$t('#match-result-message').includes('Alice') && p.vis('#play-again-btn'), 'forfeit: victory over the leaver');
     p.setReply({ pending: true });
     await p.click('#play-again-btn');
-    await p.send({ event: 'match', data: { player: 'b' } });
+    await p.send({ event: 'match', data: { player: { id: 'b', name: 'Bob' } } });
     console.log('play again posted', JSON.stringify(p.posts.at(-1)), '| searching', p.vis('#again-searching'), '| play again', p.vis('#play-again-btn'));
     must(p.vis('#again-searching') && !p.vis('#play-again-btn'), 'play again: searching');
     await p.send({ event: 'match', data: { player: 'b', match: { ...frames[3].data.match, id: 'new1', score1: 0, score2: 0, round: 1 } } });

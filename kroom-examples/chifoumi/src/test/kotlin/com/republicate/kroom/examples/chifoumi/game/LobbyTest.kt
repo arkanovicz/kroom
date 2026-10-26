@@ -36,9 +36,9 @@ class LobbyTest {
         val wantA = Match()
         val first = ChifoumiLogic.fire(state, alice, wantA)
         assertIs<Fired<Event>>(first); assertTrue(first.held)
-        assertEquals("a", wantA.player); assertNull(wantA.match)
+        assertEquals("a", wantA.player?.id); assertNull(wantA.match)
         state.fold(wantA)
-        assertEquals(listOf("a"), state.queue)
+        assertEquals(listOf("a"), state.queue.map { it.id })
 
         val wantB = Match()
         val second = ChifoumiLogic.fire(state, bob, wantB)
@@ -46,8 +46,8 @@ class LobbyTest {
         val m = wantB.match!!
         assertEquals("a", m.player1); assertEquals("b", m.player2); assertEquals("Alice", m.name1); assertEquals("Bob", m.name2)
         state.fold(wantB)
-        assertEquals(emptyList(), state.queue)
-        assertEquals(setOf(m.id), state.matches.keys)
+        assertTrue(state.queue.isEmpty())
+        assertEquals(listOf(m.id), state.matches.map { it.id })
         assertEquals("in_match", (ChifoumiLogic.fire(state, bob, Match()) as Reason).key)
     }
 
@@ -66,7 +66,7 @@ class LobbyTest {
         assertEquals("b", round.round.getString("winner")); assertEquals(1, round.match.score2); assertEquals(2, round.match.round)
         state.fold(rock, paper, round)
         assertEquals(1, state.stats!!.rock); assertEquals(1, state.stats!!.paper); assertEquals(0, state.stats!!.played)
-        assertEquals(1, state.matches.values.single().score2)
+        assertEquals(1, state.matches.single().score2)
         assertEquals("not_in_match", (ChifoumiLogic.fire(state, Who("c"), Play(json("move" to "ROCK"))) as Reason).key)
     }
 
@@ -84,7 +84,7 @@ class LobbyTest {
         val ended = (gone.events.single() as Match).match!!
         assertEquals(true, ended.finished); assertEquals("a", ended.winner); assertNull((gone.events.single() as Match).player)
         state.fold(gone.events.single())
-        assertEquals(emptyMap(), state.matches)
+        assertTrue(state.matches.isEmpty())
         assertEquals(1, state.stats!!.played)   // forfeited, still a match played
         assertEquals("not_in_match", (ChifoumiLogic.fire(state, alice, Play(json("move" to "ROCK"))) as Reason).key)
     }

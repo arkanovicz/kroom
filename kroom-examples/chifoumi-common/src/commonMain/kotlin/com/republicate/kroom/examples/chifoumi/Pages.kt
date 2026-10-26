@@ -120,12 +120,12 @@ class GamePage(
 
     val phase: String? get() {
         val m = match ?: return null
-        return when { reveal != null -> "reveal"; m.finished == true -> "over"; me != null && me in m.played -> "waiting"; else -> "choose" }
+        return when { reveal != null -> "reveal"; m.finished == true -> "over"; me?.let { it in m.played } == true -> "waiting"; else -> "choose" }
     }
 
     val message: String get() = when (phase) {
         "waiting" -> say("waiting", emptyMap())
-        "choose" -> if (match?.played?.any { it != me } == true) say("opponent-played", mapOf("name" to them))
+        "choose" -> if (match?.played?.any { it.id != me } == true) say("opponent-played", mapOf("name" to them))
                     else note?.let { say(it, mapOf("name" to them)) } ?: say("choose", emptyMap())
         else -> ""
     }

@@ -113,4 +113,29 @@ class EventTest {
         assertNull(json["_"])
         assertNull(play.validate())
     }
+
+    class Seat(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
+        val id by string().required
+        val name by string()
+    }
+
+    class Table(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
+        val seats by keyed(::Seat)
+    }
+
+    @Test fun `a keyed list is an object by id, iterated in insertion order, updated in place`() {
+        val table = Table()
+        table.seats.add(Seat(Json.MutableObject("id" to "a", "name" to "Alice")))
+        table.seats.add(Seat(Json.MutableObject("id" to "b", "name" to "Bob")))
+        table.seats.add(Seat(Json.MutableObject("id" to "a", "name" to "Alicia")))   // a present id keeps its rank
+        assertEquals("""{"seats":{"a":{"id":"a","name":"Alicia"},"b":{"id":"b","name":"Bob"}}}""", table.json.toString())
+        assertEquals(listOf("Alicia", "Bob"), table.seats.map { it.name })
+        assertEquals(2, table.seats.size)
+        assertEquals("Bob", table.seats["b"]?.name)
+        assertTrue("a" in table.seats)
+        table.seats.remove("a")
+        assertFalse("a" in table.seats)
+        assertEquals("Bob", table.seats[0].name)
+        assertFailsWith<IllegalArgumentException> { table.seats.add(Seat(Json.MutableObject("name" to "nobody"))) }
+    }
 }

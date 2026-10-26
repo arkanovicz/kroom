@@ -42,13 +42,12 @@ abstract class JsonView(val json: Json.MutableObject) {
     protected fun <V : JsonView> obj(view: (Json.MutableObject) -> V) =
         Field<V?>(Kind.OBJECT, { j, k -> j.getObject(k)?.let { view(it as Json.MutableObject) } }, { it?.json })
 
-    /** A list of plain values; absent reads empty, written whole. */
-    protected fun <T> list() = Field<List<T>>(Kind.ARRAY, { j, k -> @Suppress("UNCHECKED_CAST") (j.getArray(k)?.toList() as List<T>?) ?: emptyList() }, { Json.MutableArray(it) })
-
-    /** Views by key, over the object under the key; absent reads empty, written whole (`matches + (id to m)`, `matches - id`). */
-    protected fun <V : JsonView> map(view: (Json.MutableObject) -> V) =
-        Field<Map<String, V>>(Kind.OBJECT, { j, k -> j.getObject(k)?.entries?.associate { (id, v) -> id to view(v as Json.MutableObject) } ?: emptyMap() },
-            { m -> Json.MutableObject(m.mapValues { it.value.json }) })
+    /** Views by their `id`, in insertion order; on the wire an object keyed by id. Absent reads empty. */
+    protected fun <V : JsonView> keyed(view: (Json.MutableObject) -> V) =
+        Field<Keyed<V>>(Kind.OBJECT, { j, k ->
+            val obj = j.getObject(k) as Json.MutableObject? ?: Json.MutableObject().also { (j as Json.MutableObject)[k] = it }
+            Keyed(obj, view)
+        }, { it.obj })
 
     /** An append-only list of views, the last [max] when bounded: a frame named like it appends. */
     protected fun <V : JsonView> log(view: (Json.MutableObject) -> V, max: Int = 0) =
@@ -104,5 +103,16 @@ abstract class JsonView(val json: Json.MutableObject) {
             array.add(v.json)
             if (max > 0) while (array.size > max) array.removeAt(0)
         }
+    }
+
+    /** The views of an object keyed by id, iterated in insertion order: [add] on a present id updates in place, keeping its rank. */
+    class Keyed<V : JsonView>(val obj: Json.MutableObject, private val view: (Json.MutableObject) -> V) : AbstractList<V>() {
+        override val size: Int get() = obj.size
+        override fun get(index: Int): V = view(obj.values.elementAt(index) as Json.MutableObject)
+        override fun iterator(): Iterator<V> = obj.values.asSequence().map { view(it as Json.MutableObject) }.iterator()
+        operator fun get(id: String): V? = (obj[id] as? Json.MutableObject)?.let(view)
+        operator fun contains(id: String): Boolean = obj.containsKey(id)
+        fun add(item: V) { obj[item.json.getString("id") ?: throw IllegalArgumentException("no id: ${item.json}")] = item.json }
+        fun remove(id: String) { obj.remove(id) }
     }
 }

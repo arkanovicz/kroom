@@ -4,6 +4,7 @@ import com.republicate.kroom.event.Store
 import com.republicate.kson.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** The recording a room made (LobbyTest, bob's tab): `frames.jsonl`, as the platform reads it. */
 expect fun golden(): String
@@ -21,7 +22,7 @@ class FoldTest {
         assertEquals(true, checked)
         assertEquals(listOf("b"), store.users.map { it.id })   // alice left
         assertEquals(1, store.state.history.size)
-        assertEquals(emptyMap(), store.state.matches)
+        assertTrue(store.state.matches.isEmpty())
         assertEquals(1, store.state.stats!!.played)
     }
 }

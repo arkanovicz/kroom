@@ -13,27 +13,25 @@ import com.republicate.kson.Json
 /**
  * The rule of the arena. The marking is read, never written: who waits is `state.queue`, the fold
  * of the `match` deposits, cancels and leaves. What the wire must not carry is here: the live
- * matches, with the move of a round in progress, and the names of those who asked for a match.
+ * matches, with the move of a round in progress.
  */
 object ChifoumiLogic : LobbyLogic() {
     private val chat = ChatLogic()
     private val live = HashMap<String, Game>()          // by match id
     private val playing = HashMap<String, String>()    // user → match id
-    private val names = HashMap<String, String>()
 
     override fun chat(state: LobbyState, actor: Actor, chat: Chat): Outcome<Nothing> { this.chat.fire(state, actor, chat); return done }
 
     override fun match(state: LobbyState, actor: Actor, match: Match): Outcome<Nothing> {
         if (playing.containsKey(actor.id)) return Reason("in_match")
-        match.player = actor.id
-        names[actor.id] = actor.name
-        val other = state.queue.firstOrNull { it != actor.id } ?: return held()
-        val started = Game(other, actor.id, names[other] ?: other, actor.name)
+        match.player = Player(Json.MutableObject("id" to actor.id, "name" to actor.name))
+        val other = state.queue.firstOrNull { it.id != actor.id } ?: return held()
+        val started = Game(other.id, actor.id, other.name ?: other.id, actor.name)
         live[started.id] = started
-        playing[other] = started.id
+        playing[other.id] = started.id
         playing[actor.id] = started.id
         match.match = MatchView(started.toJson())
-        return done.releasing(other)
+        return done.releasing(other.id)
     }
 
     override fun play(state: LobbyState, actor: Actor, play: Play): Outcome<Round> {
@@ -65,5 +63,5 @@ object ChifoumiLogic : LobbyLogic() {
     }
 
     /** A test's reset. */
-    fun clear() { live.clear(); playing.clear(); names.clear() }
+    fun clear() { live.clear(); playing.clear() }
 }

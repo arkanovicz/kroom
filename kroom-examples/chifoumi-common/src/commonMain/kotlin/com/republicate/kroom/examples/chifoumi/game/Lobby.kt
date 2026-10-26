@@ -13,7 +13,7 @@ import com.republicate.kson.Json
  * The lobby's grammar — what a generator will write this file from:
  *
  *   room chifoumi-lobby {
- *     state(history: log<Chat>, queue: [User], matches: map<Match>, stats: Stats)
+ *     state(history: log<Chat>, queue: keyed<Player>, matches: keyed<Match>, stats: Stats)
  *     event chat(text: String)
  *     event match pending -> match(player: User, match?: Match)
  *     event play(move: Move @mine) pending -> play(player: User) | round(match: Match, round: Round)
@@ -23,6 +23,12 @@ import com.republicate.kson.Json
  * A name on both sides is the intent's own frame with its `out` fields; a right-hand name of its
  * own is an event nobody posts. `cancel`, `join`, `leave`, `status` are kroom's.
  */
+
+/** A user as the lobby lists one: who waits, who has played the round. */
+class Player(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
+    val id by string().required
+    val name by string()
+}
 
 /** A match as the wire sees it: scores, round, winner; never a move in progress. */
 class MatchView(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
@@ -38,8 +44,7 @@ class MatchView(json: Json.MutableObject = Json.MutableObject()) : JsonView(json
     val finished by bool()
     val winner by string()
     /** Who has played the round in progress, never which move: the fold of `play` and its `cancel`; the `round` frame's match starts afresh. */
-    var played by list<String>()
-        internal set
+    val played by keyed(::Player)
     fun has(user: String) = user == player1 || user == player2
 }
 
@@ -68,7 +73,7 @@ class Stats(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
 
 /** Wanting a match: held while nobody else does, paired with the first who does. `leave` ends a match the same way, forfeited. */
 class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", pending = true, json = json) {
-    var player by string().out          // who wants one (a deposit); absent when the room ends a match
+    var player by obj(::Player).out     // who wants one (a deposit); absent when the room ends a match
     var match by obj(::MatchView).out   // the match, when one starts or ends
 }
 
@@ -86,34 +91,32 @@ class Round(json: Json.MutableObject = Json.MutableObject()) : Event("round", js
 
 /** The lobby's marking: the chat's tail, who waits, the matches running, the totals. */
 class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(json) {
-    var queue by list<String>()
-        private set
-    var matches by map(::MatchView)
-        private set
+    val queue by keyed(::Player)
+    val matches by keyed(::MatchView)
     val stats by obj(::Stats)
 
     init { if (json["stats"] == null) json["stats"] = Json.MutableObject("played" to 0, "rock" to 0, "paper" to 0, "scissors" to 0, "well" to 0) }
 
     /** The running match of a user, if any; the page's perspective (`me`), not a key of the marking. */
-    fun myMatch(user: String?): MatchView? = user?.let { u -> matches.values.firstOrNull { m -> m.finished != true && m.has(u) } }
+    fun myMatch(user: String?): MatchView? = user?.let { u -> matches.firstOrNull { m -> m.finished != true && m.has(u) } }
 
     override fun reduce(frame: Event) {
         super.reduce(frame)
         when (frame) {
-            is Match -> frame.match?.let { m -> record(m); queue = queue - listOf(m.player1, m.player2) }
-                ?: frame.player?.let { queue = queue + it }
-            is Play -> frame.player?.let { p -> myMatch(p)?.let { it.played = it.played + p } }
+            is Match -> frame.match?.let { m -> record(m); queue.remove(m.player1); queue.remove(m.player2) }
+                ?: frame.player?.let { queue.add(it) }
+            is Play -> frame.player?.let { p -> myMatch(p)?.played?.add(Player(Json.MutableObject("id" to p))) }
             is Round -> { record(frame.match); stats!!.count(frame.round) }
             is Cancel -> when (frame.intent) {
-                "match" -> queue = queue - listOfNotNull(frame.user)
-                "play" -> frame.user?.let { u -> myMatch(u)?.let { it.played = it.played - u } }
+                "match" -> frame.user?.let { queue.remove(it) }
+                "play" -> frame.user?.let { u -> myMatch(u)?.played?.remove(u) }
             }
-            is Leave -> queue = queue - listOfNotNull(frame.user?.id)
+            is Leave -> frame.user?.id?.let { queue.remove(it) }
             else -> {}
         }
     }
 
     private fun record(m: MatchView) {
-        if (m.finished == true) { matches = matches - m.id; stats!!.ended() } else matches = matches + (m.id to m)
+        if (m.finished == true) { matches.remove(m.id); stats!!.ended() } else matches.add(m)
     }
 }

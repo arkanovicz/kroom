@@ -6,6 +6,13 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-common — events v4, the State side (step 5)
+- Field kind `keyed(::V)`: views by their `id`, in insertion order, on the wire an object keyed by id;
+  `add` on a present id updates in place, `remove(id)`, `id in`, `[id]`, iterated as values (a page's
+  `#foreach`, `.size`). `list<T>()` and `map(::V)` are gone. Chifoumi: `queue` and `MatchView.played` are
+  `keyed(::Player)` (`{id, name}`: the queue carries names, the logic's name table is gone), `matches` is
+  `keyed(::MatchView)`, `match` frames carry `player: {id, name}`.
+
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler
   together, `on(::Play) { actor, play -> Reason? }` (null = applied); the class goes in the room's
