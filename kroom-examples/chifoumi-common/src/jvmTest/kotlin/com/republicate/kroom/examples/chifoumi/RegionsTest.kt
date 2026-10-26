@@ -59,7 +59,9 @@ class RegionsTest {
             if (lobby.byId("chat-log")!!.children.any { it is DElement }) line = line ?: lobby.byId("chat-log")!!.children.filterIsInstance<DElement>().single()
             assertSame(stat, lobby.byId("stat-matches"), "frame $i: the counter keeps its node")
             line?.let { assertSame(it, lobby.byId("chat-log")!!.children.filterIsInstance<DElement>().single(), "frame $i: the chat line keeps its node") }
-            if (i == 0) assertEquals("2", html(roots[0].children).trim())
+            // the joiner comes with its own join, after the snapshot
+            if (i == 0) assertEquals("1", html(roots[0].children).trim())
+            if (i == 1) assertEquals("2", html(roots[0].children).trim())
             if (i == frames.lastIndex) html(lobby.children).let { assertTrue("Ready to play, <span id=\"player-display\">Bob</span>" in it && "Alice: gl hf" in it && "<strong id=\"stat-matches\">1</strong>" in it, it) }
         }
         assertTrue(line != null, "the chat line came")

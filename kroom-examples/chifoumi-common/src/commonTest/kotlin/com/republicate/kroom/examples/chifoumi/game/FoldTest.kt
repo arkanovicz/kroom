@@ -20,7 +20,7 @@ class FoldTest {
             else store.fold(event, line.getObject("data")!!)
         }
         assertEquals(true, checked)
-        assertEquals(listOf("b"), store.users.map { it.id })   // alice left
+        assertEquals(listOf("b"), store.state.users.map { it.id })   // alice left
         assertEquals(1, store.state.history.size)
         assertTrue(store.state.matches.isEmpty())
         assertEquals(1, store.state.stats!!.played)

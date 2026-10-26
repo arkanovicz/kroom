@@ -12,6 +12,11 @@ All notable changes to kroom will be documented in this file.
   `#foreach`, `.size`). `list<T>()` and `map(::V)` are gone. Chifoumi: `queue` and `MatchView.played` are
   `keyed(::Player)` (`{id, name}`: the queue carries names, the logic's name table is gone), `matches` is
   `keyed(::MatchView)`, `match` frames carry `player: {id, name}`.
+- Presence is a field: `State.users` is `keyed(::UserPresence)` on the base class, and `State.reduce` (now
+  `open`, a room's State calls `super` first) applies `join` / `leave` / `status`; `Store` folds through it
+  alone and loses `users`. The server keeps `users` by folding the same frames, so a snapshot is the State
+  at its position: a joiner is not in its own snapshot, its `join` follows (it used to be added from
+  membership). `reduce`'s parameter is `event`.
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler

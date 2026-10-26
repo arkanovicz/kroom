@@ -32,12 +32,12 @@ class LobbyPage(private val room: Room<LobbyState>, private val say: Say, privat
     /** The viewer's running match, if any: the page follows it to the game. */
     val match: MatchView? get() = room.state.myMatch(room.me?.id)
 
-    override fun reduce(frame: Event) {
-        when (frame) {
-            is Join -> tell(say("joined", mapOf("name" to frame.user?.name)))
-            is Leave -> tell(say("left", mapOf("name" to frame.user?.name)))
-            is Match -> frame.match?.let { m -> tell(if (m.finished == true) ended(m, say) else say("started", mapOf("a" to m.name1, "b" to m.name2))) }
-            is Round -> if (frame.match.finished == true) tell(ended(frame.match, say))
+    override fun reduce(event: Event) {
+        when (event) {
+            is Join -> tell(say("joined", mapOf("name" to event.user?.name)))
+            is Leave -> tell(say("left", mapOf("name" to event.user?.name)))
+            is Match -> event.match?.let { m -> tell(if (m.finished == true) ended(m, say) else say("started", mapOf("a" to m.name1, "b" to m.name2))) }
+            is Round -> if (event.match.finished == true) tell(ended(event.match, say))
             else -> {}
         }
     }
@@ -75,12 +75,12 @@ class GamePage(
     private val live: MatchView? get() = room.state.myMatch(me)
     private val match: MatchView? get() = live ?: last
 
-    override fun reduce(frame: Event) {
-        when (frame) {
-            is Match -> frame.match?.let { m -> if (ours(m)) { last = if (m.finished == true) m else null } }
-            is Play -> if (frame.player == me) move = frame.json.getString("move")?.lowercase()?.let { EMOJI[it] } else note = null
-            is Cancel -> if (frame.intent == "play") { if (frame.user == me) move = null else if (frame.user?.let { live?.has(it) } == true) note = "took-back" }
-            is Round -> if (ours(frame.match)) { last = if (frame.match.finished == true) frame.match else null; show(frame) }
+    override fun reduce(event: Event) {
+        when (event) {
+            is Match -> event.match?.let { m -> if (ours(m)) { last = if (m.finished == true) m else null } }
+            is Play -> if (event.player == me) move = event.json.getString("move")?.lowercase()?.let { EMOJI[it] } else note = null
+            is Cancel -> if (event.intent == "play") { if (event.user == me) move = null else if (event.user?.let { live?.has(it) } == true) note = "took-back" }
+            is Round -> if (ours(event.match)) { last = if (event.match.finished == true) event.match else null; show(event) }
             else -> {}
         }
     }

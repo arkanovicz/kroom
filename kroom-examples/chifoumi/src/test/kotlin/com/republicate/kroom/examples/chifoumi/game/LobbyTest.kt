@@ -132,8 +132,8 @@ class LobbyTest {
         assertTrue(golden.exists(), refresh)
         assertEquals(seen.map { it.event }, golden.readLines().filter { it.isNotBlank() }.map { (Json.parse(it) as Json.Object).getString("event") }.filter { it != "final" }, refresh)
         val snapshot = Json.parse(seen[0].data!!) as Json.Object
-        // the joiner is in its own snapshot, and its `join` follows: presence folds by id, so both agree
-        assertEquals(listOf("a", "b"), snapshot.getArray("users")!!.map { (it as Json.Object).getString("id") })
+        // presence is the fold of its frames: the joiner is not in its own snapshot, its `join` follows
+        assertEquals(listOf("a"), snapshot.getObject("users")!!.keys.toList())
         // the deposit is visible, the move is the author's
         assertEquals("a", (Json.parse(seen[5].data!!) as Json.Object).getString("player"))
         assertNull((Json.parse(seen[5].data!!) as Json.Object)["move"])

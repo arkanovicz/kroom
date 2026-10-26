@@ -100,18 +100,18 @@ class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(js
     /** The running match of a user, if any; the page's perspective (`me`), not a key of the marking. */
     fun myMatch(user: String?): MatchView? = user?.let { u -> matches.firstOrNull { m -> m.finished != true && m.has(u) } }
 
-    override fun reduce(frame: Event) {
-        super.reduce(frame)
-        when (frame) {
-            is Match -> frame.match?.let { m -> record(m); queue.remove(m.player1); queue.remove(m.player2) }
-                ?: frame.player?.let { queue.add(it) }
-            is Play -> frame.player?.let { p -> myMatch(p)?.played?.add(Player(Json.MutableObject("id" to p))) }
-            is Round -> { record(frame.match); stats!!.count(frame.round) }
-            is Cancel -> when (frame.intent) {
-                "match" -> frame.user?.let { queue.remove(it) }
-                "play" -> frame.user?.let { u -> myMatch(u)?.played?.remove(u) }
+    override fun reduce(event: Event) {
+        super.reduce(event)
+        when (event) {
+            is Match -> event.match?.let { m -> record(m); queue.remove(m.player1); queue.remove(m.player2) }
+                ?: event.player?.let { queue.add(it) }
+            is Play -> event.player?.let { p -> myMatch(p)?.played?.add(Player(Json.MutableObject("id" to p))) }
+            is Round -> { record(event.match); stats!!.count(event.round) }
+            is Cancel -> when (event.intent) {
+                "match" -> event.user?.let { queue.remove(it) }
+                "play" -> event.user?.let { u -> myMatch(u)?.played?.remove(u) }
             }
-            is Leave -> frame.user?.id?.let { queue.remove(it) }
+            is Leave -> event.user?.id?.let { queue.remove(it) }
             else -> {}
         }
     }

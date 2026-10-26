@@ -5,7 +5,10 @@ import com.republicate.kson.Json
 /** The RAM tail, what a snapshot carries: the last [max] lines, the fold of the `chat` frames. A room with more extends it. */
 open class ChatState(json: Json.MutableObject = Json.MutableObject(), val max: Int = 50) : State(json) {
     val history by log(::Chat, max)
-    override fun reduce(frame: Event) { if (frame is Chat) history += frame }
+    override fun reduce(event: Event) {
+        super.reduce(event)
+        if (event is Chat) history += event
+    }
 }
 
 /** A line of chat: the text comes in, the rule adds who, when and the message's seq. */

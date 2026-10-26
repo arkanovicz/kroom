@@ -9,12 +9,18 @@ import com.republicate.kson.Json
  * the browser. What is not on the wire is not here: a secret is a field of the logic.
  */
 abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
-    /** One frame into the marking: the arrows of the grammar, read right to left. */
-    abstract fun reduce(frame: Event)
+    /** kroom's presence, a field like any other: who is in the room, kept from `join`, `leave` and `status`. */
+    val users by keyed(::UserPresence)
 
-    /** The room's presence as the viewer's snapshot carries it, kept by [Store] from the presence frames; a page
-     *  reads `$state.users`. The room's own State holds none: on the server, membership is the source. */
-    val users: List<UserPresence> get() = (json["users"] as? Json.Array)?.map { UserPresence(it as Json.MutableObject) } ?: emptyList()
+    /** One frame into the marking: the arrows of the grammar, read right to left. A room's State calls `super` first, for presence. */
+    open fun reduce(event: Event) {
+        when (event) {
+            is Join -> event.user?.let { users.add(it) }
+            is Leave -> event.user?.let { users.remove(it.id) }
+            is Status -> event.user?.let { users[it] }?.status = event.status
+            else -> {}
+        }
+    }
 
     fun describe(): Json.Array = Json.Array(fields.map { it.toJson() })
 }

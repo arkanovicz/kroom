@@ -39,10 +39,13 @@ class LogicRoomTest {
         var n by int()
             private set
         val notes by log(::Note)
-        override fun reduce(frame: Event) = when (frame) {
-            is Set -> n = frame.n
-            is Note -> notes += frame
-            else -> {}
+        override fun reduce(event: Event) {
+            super.reduce(event)
+            when (event) {
+                is Set -> n = event.n
+                is Note -> notes += event
+                else -> {}
+            }
         }
     }
 
@@ -98,8 +101,9 @@ class LogicRoomTest {
         }
         val snapshot = room.join(actor(user("bob"), "t1")).state()
         assertEquals(3, snapshot.getInt("n"))
-        val users = snapshot.objects("users").associateBy { it.getString("id") }
-        assertEquals(setOf("alice", "bob"), users.keys)
+        // presence is the fold of its frames: the joiner is not in its own snapshot, its `join` follows
+        val users = snapshot.getObject("users")!!.values.map { it as Json.Object }.associateBy { it.getString("id") }
+        assertEquals(setOf("alice"), users.keys)
         users.values.forEach { u ->
             assertEquals("ONLINE", u.getString("status"))
             assertEquals(listOf("t1"), u.objects("clients").map { it.getString("id") })
@@ -226,7 +230,7 @@ class LogicRoomTest {
 
     @Test fun `the registry describes the state and the alphabet`() {
         val d = room().describe()
-        assertEquals(listOf("n", "notes"), d.objects("state").map { it.getString("name") })
+        assertEquals(listOf("users", "n", "notes"), d.objects("state").map { it.getString("name") })
         val events = d.objects("events").associateBy { it.getString("name")!! }
         assertEquals(false, events["set"]!!.getBoolean("postable"))
         assertEquals(listOf("set"), events["add"]!!.getArray("fires")!!.toList())

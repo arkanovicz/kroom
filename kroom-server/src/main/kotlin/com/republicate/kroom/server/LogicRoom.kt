@@ -20,7 +20,7 @@ import com.republicate.kson.Json
  * nothing framed, nothing changed; a [Fired] frames the intent, then each event, each reduced into
  * the state as it goes, then moves the tokens (held, released). Presence (`join`, `leave`,
  * `status`) and `cancel` are the room's: it builds them and hands them to the rule like intents.
- * Every snapshot carries `users` (presence) and `pending` (the viewer's held intents, by name).
+ * Every snapshot carries `pending` (the viewer's held intents, by name) and `me`.
  */
 open class LogicRoom<S : State>(id: String, override var state: S, val logic: Logic<S>) : Room<S>(id, logic.registry) {
     // loop-confined: the tokens, by user then intent name; the current step's firing
@@ -93,9 +93,9 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
 
     override fun stateToJson(): Json.Object = state.json
 
-    /** The marking, plus what presence knows, what the viewer holds, and who the viewer is (`me`, absent for a spectator). */
+    /** The marking (presence included: `users` is the fold of the presence frames), plus what the viewer holds and who
+     *  the viewer is (`me`, absent for a spectator: a joiner is not in `users` before its own `join`, which follows). */
     override fun stateToJson(actor: Actor): Json.Object = Json.MutableObject(state.json).also {
-        it["users"] = Json.Array(users.values.map { u -> presence(u).json })
         it["pending"] = Json.Array(held[actor.id]?.keys?.toList() ?: emptyList<String>())
         actor.user?.let { u -> it["me"] = presence(u).json }
     }

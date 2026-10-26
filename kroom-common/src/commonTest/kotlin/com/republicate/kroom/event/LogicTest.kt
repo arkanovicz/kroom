@@ -15,10 +15,13 @@ class LogicTest {
         var n by int()
             private set
         val notes by log(::Note, max = 2)
-        override fun reduce(frame: Event) = when (frame) {
-            is Set -> n = frame.n
-            is Note -> notes += frame
-            else -> {}
+        override fun reduce(event: Event) {
+            super.reduce(event)
+            when (event) {
+                is Set -> n = event.n
+                is Note -> notes += event
+                else -> {}
+            }
         }
     }
 
@@ -59,7 +62,7 @@ class LogicTest {
         listOf("a", "b", "c").forEach { counter.reduce(Note(Json.MutableObject("text" to it))) }
         assertEquals(listOf("b", "c"), counter.notes.map { it.text })
         assertEquals("""{"n":7,"notes":[{"text":"b"},{"text":"c"}]}""", counter.json.toString()) // the snapshot is the json
-        assertEquals(listOf("n", "notes"), counter.describe().map { (it as Json.Object).getString("name") })
+        assertEquals(listOf("users", "n", "notes"), counter.describe().map { (it as Json.Object).getString("name") })
     }
 
     @Test fun `the registry is the alphabet, postable names apart`() {
