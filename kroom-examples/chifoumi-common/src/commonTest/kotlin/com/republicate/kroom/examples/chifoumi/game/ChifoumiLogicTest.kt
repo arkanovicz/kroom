@@ -11,7 +11,7 @@ import com.republicate.kroom.event.done
 import com.republicate.kson.Json
 import kotlin.test.*
 
-/** Pins the arena's decisions as a function of the State, the deposits in it, without a room. */
+/** Pins the arena's checks and decisions as functions of the State, the deposits in it, without a room. */
 class ChifoumiLogicTest {
 
     private class Who(override val id: String, override val name: String = id, override val client: String? = "t1") : Actor
@@ -22,10 +22,10 @@ class ChifoumiLogicTest {
 
     private fun json(vararg pairs: Pair<String, Any?>) = Json.MutableObject(*pairs)
     private fun LobbyState.fold(vararg frames: Event) = frames.forEach { reduce(it) }
-    /** As the room does: the decision, then the intent's frame and what it emits, folded. */
+    /** As the room does: the check, the decision, then the intent's frame and what it emits, folded. */
     private fun LobbyState.act(actor: Who, intent: Event): Outcome<Event> {
         if (intent is Cancel) intent.user = actor.id   // the room's
-        return logic.decide(this, actor, intent).also { if (it is Emit) { fold(intent); it.events.forEach { e -> fold(e) } } }
+        return (intent.check(this, actor) ?: logic.decide(this, actor, intent)).also { if (it is Emit) { fold(intent); it.events.forEach { e -> fold(e) } } }
     }
 
     @Test fun `wanting a match is a deposit, the second one pairs, and the queue is the fold`() {
@@ -35,7 +35,7 @@ class ChifoumiLogicTest {
         assertEquals("a", wantA.player?.id); assertNull(wantA.match)
         state.fold(wantA)
         assertEquals(listOf("a"), state.queue.map { it.id })
-        assertEquals("in_queue", (logic.decide(state, alice, Match()) as Reason).key)
+        assertEquals("in_queue", Match().check(state, alice)?.key)
 
         val wantB = Match()
         assertSame(done, logic.decide(state, bob, wantB))
@@ -45,7 +45,7 @@ class ChifoumiLogicTest {
         state.fold(wantB)
         assertTrue(state.queue.isEmpty())
         assertEquals(listOf(m.id), state.matches.map { it.id })
-        assertEquals("in_match", (logic.decide(state, bob, Match()) as Reason).key)
+        assertEquals("in_match", Match().check(state, bob)?.key)
     }
 
     @Test fun `a move is a deposit, the second resolves the round, and the stats are the fold`() {
@@ -67,7 +67,7 @@ class ChifoumiLogicTest {
         assertEquals("nothing_to_cancel", (state.act(alice, Cancel(json("intent" to "play"))) as Reason).key)   // the round took it
         assertEquals(1, state.stats!!.rock); assertEquals(1, state.stats!!.paper); assertEquals(0, state.stats!!.played)
         assertEquals(1, state.matches.single().score2)
-        assertEquals("not_in_match", (logic.decide(state, Who("c"), Play(json("move" to "ROCK"))) as Reason).key)
+        assertEquals("not_in_match", Play(json("move" to "ROCK")).check(state, Who("c"))?.key)
     }
 
     @Test fun `a withdrawn move frees the round, a leave forfeits the match`() {
@@ -89,6 +89,6 @@ class ChifoumiLogicTest {
         state.fold(gone.events.single())
         assertTrue(state.matches.isEmpty())   // alice's move went with it
         assertEquals(1, state.stats!!.played)   // forfeited, still a match played
-        assertEquals("not_in_match", (logic.decide(state, alice, Play(json("move" to "ROCK"))) as Reason).key)
+        assertEquals("not_in_match", Play(json("move" to "ROCK")).check(state, alice)?.key)
     }
 }

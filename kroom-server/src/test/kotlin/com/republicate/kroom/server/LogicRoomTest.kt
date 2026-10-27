@@ -1,6 +1,7 @@
 package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Cancel
+import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Emits
 import com.republicate.kroom.event.JsonView
@@ -33,7 +34,11 @@ class LogicRoomTest {
         var author by string().out
         val text by string().required.visibleTo { it == author }
     }
-    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) { val by by int().required }
+    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) {
+        val by by int().required
+        init { check { state: Counter, _ -> if (state.n == 10) Reason("full") else null } }
+    }
+    class Odd(json: Json.MutableObject = Json.MutableObject()) : Event("odd", json = json) { init { check { _: ChatState, _ -> null } } }
     class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", emits = Emits(::Set), cancellable = true, json = json) { var user by string().out }
     class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", emits = Emits(::Set), json = json) { val who by string().required }
     class Waiter(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { val id by string().required }
@@ -117,6 +122,21 @@ class LogicRoomTest {
         }
         assertNull(snapshot["pending"])   // nothing held by the room
         assertEquals("bob", snapshot.getObject("me")!!.getString("id"))   // the viewer, as its users entry
+    }
+
+    @Test fun `the check refuses first, on the loop, and a room refuses an event checked on another State`() = runBlocking {
+        val room = room()
+        val alice = actor(user("alice"), "t1")
+        val ca = room.join(alice).also { it.state(); it.joined() }
+        room.act(alice, Add(json("by" to 10))).await()
+        ca.next(); ca.next()   // add, set
+        room.act(alice, Add(json("by" to 1))).await().let { assertEquals(Stage.REJECTED, it.stage); assertEquals("full", it.meta.reason) }   // not the logic's too_big
+        ca.silent()
+        val odd = object : Logic<Counter> {
+            override val registry = Registry(::Odd)
+            override fun decide(state: Counter, actor: Who, intent: Event): Outcome<Event> = done
+        }
+        assertFailsWith<IllegalArgumentException> { LogicRoom("odd-${n++}", Counter(), odd) }
     }
 
     @Test fun `a reason is the verdict alone, nothing framed, nothing changed`() = runBlocking {

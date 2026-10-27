@@ -1,6 +1,7 @@
 package com.republicate.kroom.event
 
 import com.republicate.kson.Json
+import kotlin.reflect.KClass
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -31,7 +32,8 @@ class Emits(internal val factories: List<(Json.MutableObject) -> Event>) {
  * a frame is `{...payload}`, its position on the room's channel is the SSE id. The metadata
  * (who, when, the stage, a reason) is the object's, server-side; a `_` key a client sends is
  * dropped at birth. A subclass is a declaration — name, fields, what it [emits], whether it is
- * [cancellable] — all data, what a registry hands to a browser without Kotlin.
+ * [cancellable], its [check] — all data, what a registry hands to a browser without Kotlin (the check
+ * aside: code, common, run by the browser before posting and by the room first on its loop).
  *
  * The stages are the lifecycle, walked in order on this very object; a step out of order is an
  * error of the object, not a rule of a room. Who steps: validation [accept]s (stateless: a
@@ -55,6 +57,28 @@ abstract class Event(
 
     val stage: Stage get() = meta.stage ?: Stage.BORN
 
+    /**
+     * The stateful half of validation, declared in the event's body, typed on the State it reads:
+     * `init { check { state: LobbyState, actor -> … } }`. It reads the `in` fields and the State, never an
+     * `out` field (the logic fills those later); no I/O. Null: the logic may decide.
+     */
+    protected inline fun <reified S : State> check(noinline body: (state: S, actor: Actor) -> Reason?) {
+        checker = Checker(S::class) { state, actor -> body(state as S, actor) }
+    }
+
+    @PublishedApi internal var checker: Checker? = null
+
+    @PublishedApi internal class Checker(val state: KClass<out State>, val body: (State, Actor) -> Reason?)
+
+    /** The State class the check reads, null without one: a room refuses at construction an event checked on another State. */
+    val checkState: KClass<out State>? get() = checker?.state
+
+    /** The check on that State, by that actor: a refusal, or null. */
+    fun check(state: State, actor: Actor): Reason? = checker?.let { c ->
+        kotlin.check(c.state.isInstance(state)) { "$name: checked on ${c.state.simpleName}, not ${state::class.simpleName}" }
+        c.body(state, actor)
+    }
+
     /** Validation's half: who, from which tab, and a payload of the declared shape, nothing else. */
     fun accept(from: String, tab: String? = null): Event = step(Stage.ACCEPTED, Stage.BORN) {
         validate()?.let { throw Rejected(it) }
@@ -75,18 +99,18 @@ abstract class Event(
 
     /** Numbered and on the wire, once; only an applied event is. */
     fun sequence(seq: Long): Event {
-        check(stage == Stage.APPLIED) { "$name: $stage → sequence" }
-        check(meta.seq == null) { "$name: sequenced twice" }
+        kotlin.check(stage == Stage.APPLIED) { "$name: $stage → sequence" }
+        kotlin.check(meta.seq == null) { "$name: sequenced twice" }
         meta.seq = seq
         return this
     }
 
     val sequenced: Boolean get() = meta.seq != null
 
-    fun persist(): Event = step(Stage.PERSISTED, Stage.APPLIED) { check(sequenced) { "$name: persisted before sequenced" } }
+    fun persist(): Event = step(Stage.PERSISTED, Stage.APPLIED) { kotlin.check(sequenced) { "$name: persisted before sequenced" } }
 
     private inline fun step(to: Stage, vararg from: Stage, stamp: () -> Unit): Event {
-        check(stage in from) { "$name: $stage → $to" }
+        kotlin.check(stage in from) { "$name: $stage → $to" }
         stamp()
         meta.stage = to
         return this

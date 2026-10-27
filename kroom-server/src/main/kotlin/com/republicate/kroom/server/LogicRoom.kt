@@ -15,8 +15,8 @@ import com.republicate.kroom.event.UserPresence
 import com.republicate.kson.Json
 
 /**
- * A room run by a [Logic]: the data is a [State], the fold of the frames; an intent is one call of
- * the logic on the loop, and its [Outcome] is what the step does — a [Reason] is the reply, nothing
+ * A room run by a [Logic]: the data is a [State], the fold of the frames; an intent is its check,
+ * then one call of the logic, on the loop, and its [Outcome] is what the step does — a [Reason] is the reply, nothing
  * framed, nothing changed; an [Emit] frames the intent, then each event, each reduced into the State
  * as it goes. Presence (`join`, `leave`, `status`) and `cancel` are the room's: it builds them and
  * hands them to the logic like intents. Nothing is held here: a deposit is the State's.
@@ -27,7 +27,11 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
     private var outcome: Emit<Event>? = null
 
     init {
-        registry.names.forEach { name -> on(registry.factory(name)!!) { actor, intent -> settle(intent, logic.decide(state, actor, intent), intent.emits.names) } }
+        registry.all.forEach { name ->
+            registry.factory(name)!!(Json.MutableObject()).checkState?.let { require(it.isInstance(state)) { "'$name' is checked on ${it.simpleName}, room '$id' holds ${state::class.simpleName}" } }
+        }
+        // the check first, on the loop: the State it read is the one the logic decides on
+        registry.names.forEach { name -> on(registry.factory(name)!!) { actor, intent -> intent.check(state, actor) ?: settle(intent, logic.decide(state, actor, intent), intent.emits.names) } }
         on(::Status) { actor, status -> status(actor, status) }
         on(::Cancel) { actor, cancel -> cancel(actor, cancel) }
         // the logic hears a user, not a connection

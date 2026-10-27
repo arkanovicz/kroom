@@ -16,6 +16,7 @@ open class ChatState(json: Json.MutableObject = Json.MutableObject(), val max: I
 /** A line of chat: the text comes in, the logic adds who, when and the line's seq. */
 class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", json = json) {
     val text by string().required
+    init { check { _: ChatState, _ -> if (text.isBlank()) Reason("blank") else null } }
     var seq by long().out
     var from by string().out
     var author by obj().out

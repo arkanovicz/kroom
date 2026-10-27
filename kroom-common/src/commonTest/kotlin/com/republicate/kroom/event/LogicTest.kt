@@ -11,7 +11,10 @@ class LogicTest {
         var author by string().out
         val text by string().required.visibleTo { it == author }
     }
-    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) { val by by int().required }
+    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) {
+        val by by int().required
+        init { check { state: Counter, _ -> if (state.n == 10) Reason("full") else null } }
+    }
     class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", emits = Emits(::Set), cancellable = true, json = json) { var user by string().out }
     class Waiter(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { val id by string().required }
 
@@ -63,6 +66,15 @@ class LogicTest {
         assertIs<Reason>(refused)
         assertEquals("too_big {\"max\":10}", refused.toString())
         assertEquals(4, counter.n) // a function: the State is read, never written
+    }
+
+    @Test fun `a check is declared on the State it reads, and refuses before the logic`() {
+        assertEquals(Counter::class, Add().checkState)
+        assertNull(Set().checkState)
+        assertEquals("full", Add(Json.MutableObject("by" to 1)).check(Counter(Json.MutableObject("n" to 10)), alice)?.key)
+        assertNull(Add(Json.MutableObject("by" to 1)).check(Counter(Json.MutableObject("n" to 9)), alice))
+        assertNull(Set().check(Counter(), alice))   // no check, nothing refused
+        assertFailsWith<IllegalStateException> { Add().check(ChatState(), alice) }   // another State
     }
 
     @Test fun `a deposit is the State's, and cancel reads it there`() {

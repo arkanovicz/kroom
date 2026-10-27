@@ -51,8 +51,9 @@ val done: Emit<Nothing> = Emit(emptyList())
  * The room's decisions: the alphabet it speaks, and what one intent answers on one State. Common
  * code, pure and stateless — a function of its arguments and of what the platform hands its
  * constructor (a clock, ids) — the loop's business (framing, numbering) kept out: it runs the same
- * in a test, on the server, in a browser. Presence (`join`, `leave`, `status`) and `cancel` arrive
- * here as events too; a `cancel` reads the State for the deposit it withdraws.
+ * in a test, on the server, in a browser. It decides once the intent's [Event.check] passed: what
+ * the check refuses, the logic need not test again. Presence (`join`, `leave`, `status`) and
+ * `cancel` arrive here as events too; a `cancel` reads the State for the deposit it withdraws.
  */
 interface Logic<S : State> {
     val registry: Registry

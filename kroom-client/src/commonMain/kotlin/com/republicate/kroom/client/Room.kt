@@ -1,7 +1,9 @@
 package com.republicate.kroom.client
 
+import com.republicate.kroom.event.Actor
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.JsonView
+import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Registry
 import com.republicate.kroom.event.State
 import com.republicate.kroom.event.Store
@@ -35,6 +37,17 @@ class Room<S : State>(val name: String, val state: S, registry: Registry, privat
 
     /** A region: [template] merged under [root]; its first merge, at the snapshot, builds the tree. */
     fun <N : Any> attach(template: String, tree: Tree<N>, root: N): Room<S> = apply { regions += template to HtmlDomSink(tree, root, ::key) }
+
+    /**
+     * What the room would refuse first, on this view, before the POST: the declared shape, then the intent's check, by
+     * the viewer from [client]. Null: post it (a spectator, or a name the registry does not know, is the server's to refuse).
+     */
+    fun check(type: String, payload: Json.Object, client: String? = null): Reason? {
+        val me = me ?: return null
+        val intent = store.registry.of(type, Json.MutableObject(payload)) ?: return null
+        val actor = object : Actor { override val id = me.id; override val name = me.name ?: me.id; override val client = client }
+        return intent.validate() ?: intent.check(state, actor)
+    }
 
     /** An effect after each frame's merge, with the frame's name and the event it was (null for `state`, or a name the registry does not know). */
     fun react(reaction: (name: String, event: Event?) -> Unit): Room<S> = apply { reactions += reaction }

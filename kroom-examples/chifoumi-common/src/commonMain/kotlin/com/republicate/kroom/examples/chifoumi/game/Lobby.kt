@@ -6,6 +6,7 @@ import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Emits
 import com.republicate.kroom.event.JsonView
+import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Leave
 import com.republicate.kson.Json
 
@@ -115,12 +116,31 @@ class Stats(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
 class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", cancellable = true, json = json) {
     var player by obj(::Player).out     // who wants one (a deposit); absent when the room ends a match
     var match by obj(::MatchView).out   // the match, when one starts or ends
+    init {
+        check { state: LobbyState, actor ->
+            when {
+                state.myMatch(actor.id) != null -> Reason("in_match")
+                actor.id in state.queue -> Reason("in_queue")
+                else -> null
+            }
+        }
+    }
 }
 
 /** A move: its player alone sees which (it goes into the match so); everyone sees who played. A deposit until the other plays. */
 class Play(json: Json.MutableObject = Json.MutableObject()) : Event("play", cancellable = true, emits = Emits(::Round), json = json) {
     val move by enum<Move>().required.visibleTo { it == player }
     var player by string().out
+    init {
+        check { state: LobbyState, actor ->
+            val match = state.myMatch(actor.id)
+            when {
+                match == null -> Reason("not_in_match")
+                actor.id in match.played -> Reason("already_played")
+                else -> null
+            }
+        }
+    }
 }
 
 /** Both have played: the round, resolved, and the match as it stands. */

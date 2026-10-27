@@ -77,7 +77,10 @@ class Intents(private val root: Element, private val act: (String, Json.Object) 
     private fun clearReason(intent: String) =
         root.querySelectorAll("[$attribute-reason=\"$intent\"]").asList().forEach { (it as Element).remove() }
 
-    /** The reason is a key the page may hold a sentence for (`#messages [data-kroom-msg="play:already_played"]`), else shown raw with its args. */
+    /**
+     * The reason is a key the page may hold a sentence for (`#messages [data-kroom-msg="play:already_played"]`), else shown raw with its args.
+     * TODO: sentences no page holds (reasons, informative messages, outputs the server decides) need one generic, localized home.
+     */
     private fun showReason(intent: String, reason: String) {
         clearReason(intent)
         triggers(intent).firstOrNull()?.let { el ->

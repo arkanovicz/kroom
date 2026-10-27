@@ -68,6 +68,12 @@ async function page(template, scripts) {
     await p.click('[data-kroom-intent="chat"]');
     console.log('chat posted', JSON.stringify(p.posts.at(-1)), '| input now', JSON.stringify(p.w.document.querySelector('#chat-form [name="text"]').value));
     must(p.posts.at(-1).text === 'hello' && p.w.document.querySelector('#chat-form [name="text"]').value === '', 'chat: posted and cleared');
+    const before = p.posts.length;
+    p.w.document.querySelector('#chat-form [name="text"]').value = '   ';
+    await p.click('[data-kroom-intent="chat"]');
+    const refused = p.w.document.querySelector('[data-kroom-intent-reason="chat"]');
+    console.log('blank chat: posts', p.posts.length - before, '| reason', refused && refused.textContent);
+    must(p.posts.length === before && refused && refused.textContent === 'blank', 'blank chat: refused by its check, no POST');
     await p.send(frames[4]);
     console.log('chat log', p.$t('#chat-log'));
     await p.send({ event: 'round', data: { match: { ...frames[3].data.match, player1: 'x', player2: 'y', name1: 'X', name2: 'Y', id: 'm2', finished: true, winner: 'y', score1: 3, score2: 5 }, round: { move1: 'rock', move2: 'well' } } });

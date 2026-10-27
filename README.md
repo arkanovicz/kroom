@@ -145,6 +145,10 @@ event: play   id: 42   data: {"move":"rock"}
   }
   ```
 
+  An event may declare a check, common, typed on the State it reads (`init { check { state:
+  Counter, actor -> … } }`): the room runs it first on its loop, before `decide`, and refuses at
+  construction an event checked on another State; the browser runs it with the declared shape on
+  its view before posting, and a refusal there is rejected like a reply, without a request.
   A `Reason` is the reply, nothing framed, nothing changed. An `Emit` frames the intent, then each
   event (`emit(…)`, each name checked against the class's `emits`), each reduced into the state.
   Nothing is held by the room: a cancellable intent (`cancellable = true`) leaves its deposit in

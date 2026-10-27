@@ -25,9 +25,18 @@ fun Room<*>.connect(events: String = "/events"): EventSource {
     return source
 }
 
-/** Post an intent to the room; the reply is the verdict (a rejected promise carries `data.reason`). */
-fun Room<*>.act(type: String, payload: Json.Object = Json.Object()): Promise<dynamic> =
-    api.act(name, type, JSON.parse(payload.toString())).unsafeCast<Promise<dynamic>>()   // a promise of another realm (a harness) is one too
+/**
+ * Post an intent to the room; the reply is the verdict (a rejected promise carries `data.reason`). What the room would
+ * refuse first, its check on this view, is refused here the same way, without a POST.
+ */
+fun Room<*>.act(type: String, payload: Json.Object = Json.Object()): Promise<dynamic> {
+    check(type, payload, api.tabId() as String?)?.let { reason ->
+        val err: dynamic = Error(reason.key)
+        err.data = JSON.parse(Json.Object("reason" to reason.key, "args" to reason.args).toString())
+        return Promise.reject(err.unsafeCast<Throwable>())
+    }
+    return api.act(name, type, JSON.parse(payload.toString())).unsafeCast<Promise<dynamic>>()   // a promise of another realm (a harness) is one too
+}
 
 /** `api.js`, the stock script: the one owner of the tab id and of the POST. */
 internal val api: dynamic get() = js("api")

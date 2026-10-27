@@ -5,9 +5,11 @@ import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Registry
 import com.republicate.kroom.event.State
+import com.republicate.kson.Json
 import org.apache.velocity.engine.VelocityEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class RoomTest {
     /** Page memory: what the room's frames left behind, as a page remembers them. */
@@ -27,5 +29,16 @@ class RoomTest {
         room.frame("unknown", "{}")
         assertEquals(listOf("hi (1 in history)"), seen.lines)
         assertEquals(listOf("state:null:0", "chat:chat:1", "unknown:null:1"), reacted)
+    }
+
+    @Test fun `an intent is checked on the viewer's view before its POST`() {
+        val room = Room("chat", ChatState(), Registry(::Chat), VelocityEngine(null))
+        room.frame("state", """{"history":[]}""")
+        assertNull(room.check("chat", Json.Object("text" to " ")))   // a spectator: the server's to refuse
+        room.frame("state", """{"history":[],"me":{"id":"a","name":"Alice"}}""")
+        assertEquals("blank", room.check("chat", Json.Object("text" to " "))?.key)
+        assertEquals("missing", room.check("chat", Json.Object())?.key)   // the shape first
+        assertNull(room.check("chat", Json.Object("text" to "hi")))
+        assertNull(room.check("nope", Json.Object()))
     }
 }

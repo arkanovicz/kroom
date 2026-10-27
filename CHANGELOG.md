@@ -35,6 +35,13 @@ All notable changes to kroom will be documented in this file.
   ids handed in), `cancelMatch` / `cancelPlay` typed members, `in_queue` / `nothing_to_cancel`; its pure
   tests are `ChifoumiLogicTest` (JVM + node); `LobbyTest` records with fixed ids and clock, so the
   golden is the same at every run.
+- `check` on events, common: declared in the event's body typed on the State it reads (`init { check
+  { state: LobbyState, actor -> … } }`), `checkState` the class; a `LogicRoom` refuses at construction
+  an event checked on another State, runs the check first on the loop, then `decide` (which need not
+  test again). In the browser, kroom-client's `Room.check(type, payload, client)` runs the declared
+  shape then the check on the viewer's view (`me` as the actor, null for a spectator), and `act`
+  rejects without a POST, shaped like the reply (`data.reason`). `Chat` refuses a `blank` line.
+  Chifoumi: `in_match` / `in_queue` on `Match`, `not_in_match` / `already_played` on `Play`.
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler
