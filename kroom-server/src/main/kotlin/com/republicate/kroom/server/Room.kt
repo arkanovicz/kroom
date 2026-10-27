@@ -355,7 +355,7 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
      * connection gets its user's view: one frame for all, unless a field is selective.
      */
     private fun frame(event: Event, to: List<String>) {
-        val emitted = event.emit(seq.incrementAndGet())
+        val emitted = event.sequence(seq.incrementAndGet())
         trace(emitted)
         val frame = views(emitted)
         val targets = to.ifEmpty { emitted.to }

@@ -17,8 +17,8 @@ private fun refusal(reason: String, args: Json.Object = Json.Object()) = Json.Ob
 
 /**
  * Intents, `POST /rooms/{room}/act` with `{type, …}`: the event of that name over that JSON goes
- * to the room; the reply is the verdict and nothing else — `200` `{}` applied (`{pending: true}`
- * when the intent stays held), `400` `{reason, args}` rejected. The effects come down the stream,
+ * to the room; the reply is the verdict and nothing else — `200` `{}` applied, `400` `{reason, args}`
+ * rejected. The effects come down the stream,
  * to the emitter like to everyone.
  * [principal] names the acting user from the call (its session); null refuses.
  */
@@ -32,7 +32,7 @@ fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
         val event = room.act(user, call.tabId, name, json)
         // a store may have moved it on to PERSISTED already: the verdict is rejected or not
         if (event.stage == Stage.REJECTED) call.json(HttpStatusCode.BadRequest, refusal(event.meta.reason ?: "rejected", event.meta.args ?: Json.Object()))
-        else call.json(HttpStatusCode.OK, if (event.meta.held == true) """{"pending":true}""" else "{}")
+        else call.json(HttpStatusCode.OK, "{}")
     }
 }
 

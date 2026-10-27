@@ -41,7 +41,7 @@ class Status(json: Json.MutableObject = Json.MutableObject()) : Event("status", 
     var client by obj(::Client).out
 }
 
-/** Withdraws a held intent of the author's, by name. */
+/** Withdraws the author's deposit of a cancellable intent, by name: the logic reads the State for it, `reduce` removes it. */
 class Cancel(json: Json.MutableObject = Json.MutableObject()) : Event("cancel", json = json) {
     val intent by string().required
     var user by string().out

@@ -7,9 +7,8 @@ import com.republicate.kson.Json
  * through the same [State.reduce] the server runs (presence included). One stream in order, one
  * fold: a snapshot at a position equals the fold up to it.
  *
- * What the viewer holds is the app's to know: the release rule is its logic's, and every release
- * is a frame its `reduce` already sees (its own `cancel`, a firing, a `leave`). The snapshot's
- * `pending` says what was held at join, nothing more.
+ * What the viewer deposited is the State's (`queue ∋ me`): a deposit and its withdrawal are frames
+ * its `reduce` sees (the intent, its `cancel`, what the logic emits, a `leave`).
  */
 class Store<S : State>(val state: S, val registry: Registry) {
     val json: Json.MutableObject get() = state.json

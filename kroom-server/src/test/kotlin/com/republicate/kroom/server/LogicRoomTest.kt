@@ -2,7 +2,8 @@ package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.Event
-import com.republicate.kroom.event.Fires
+import com.republicate.kroom.event.Emits
+import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Logic
@@ -13,8 +14,7 @@ import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.State
 import com.republicate.kroom.event.Status
 import com.republicate.kroom.event.done
-import com.republicate.kroom.event.fired
-import com.republicate.kroom.event.held
+import com.republicate.kroom.event.emit
 import com.republicate.kroom.event.to
 import com.republicate.kson.Json
 import io.ktor.sse.*
@@ -25,7 +25,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.*
 import com.republicate.kroom.event.Actor as Who
 
-/** Pins a room run by a rule: the outcome is the step, the state the fold, presence and tokens the room's. */
+/** Pins a room run by a logic: the outcome is the step, the State the fold (deposits included), presence the room's. */
 class LogicRoomTest {
 
     class Set(json: Json.MutableObject = Json.MutableObject()) : Event("set", json = json) { var n by int().required.out }
@@ -33,38 +33,42 @@ class LogicRoomTest {
         var author by string().out
         val text by string().required.visibleTo { it == author }
     }
-    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", fires = Fires(::Set), json = json) { val by by int().required }
-    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", fires = Fires(::Set), pending = true, json = json)
-    class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", fires = Fires(::Set), json = json) { val who by string().required }
-    class Oops(json: Json.MutableObject = Json.MutableObject()) : Event("oops", json = json)
+    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) { val by by int().required }
+    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", emits = Emits(::Set), cancellable = true, json = json) { var user by string().out }
+    class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", emits = Emits(::Set), json = json) { val who by string().required }
+    class Waiter(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { val id by string().required }
 
     class Counter(json: Json.MutableObject = Json.MutableObject()) : State(json) {
         var n by int()
             private set
         val notes by log(::Note)
+        val waiting by keyed(::Waiter)
         override fun reduce(event: Event) {
             super.reduce(event)
             when (event) {
                 is Set -> n = event.n
                 is Note -> notes += event
+                is Wait -> waiting.add(Waiter(Json.MutableObject("id" to event.user)))
+                is Cancel -> if (event.intent == "wait") event.user?.let { waiting.remove(it) }
+                is Leave -> event.user?.let { waiting.remove(it.id) }
                 else -> {}
             }
         }
     }
 
     object Rule : Logic<Counter> {
-        override val registry = Registry(listOf(::Add, ::Note, ::Wait, ::Whisper, ::Oops), leave = Fires(::Set))
-        override fun fire(state: Counter, actor: Who, intent: Event): Outcome<Event> = when (intent) {
+        override val registry = Registry(listOf(::Add, ::Note, ::Wait, ::Whisper), leave = Emits(::Set))
+        override fun decide(state: Counter, actor: Who, intent: Event): Outcome<Event> = when (intent) {
             is Add -> when {
-                intent.by == 7 -> fired(Note(Json.MutableObject("text" to "seven"))) // not among add's fires
+                intent.by == 7 -> emit(Note(Json.MutableObject("text" to "seven"))) // not among add's emits
                 (state.n ?: 0) + intent.by > 10 -> Reason("too_big", Json.Object("max" to 10))
-                else -> fired(Set().also { it.n = (state.n ?: 0) + intent.by })
+                else -> emit(Set().also { it.n = (state.n ?: 0) + intent.by })
             }
             is Note -> done.also { intent.author = actor.id }
-            is Wait -> held()
-            is Whisper -> fired(Set().also { it.n = 99 }.to(intent.who))
-            is Oops -> held() // not declared pending
-            is Leave -> fired(Set().also { it.n = 0 })
+            is Wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { intent.user = actor.id }
+            is Cancel -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel")
+            is Whisper -> emit(Set().also { it.n = 99 }.to(intent.who))
+            is Leave -> emit(Set().also { it.n = 0 })
             is Join, is Status -> done
             else -> Reason("unknown")
         }
@@ -90,7 +94,7 @@ class LogicRoomTest {
 
     @BeforeTest fun clean() = Users.clear()
 
-    @Test fun `an outcome frames the intent, then what it fired, each folded into the snapshot`() = runBlocking {
+    @Test fun `an outcome frames the intent, then what it emits, each folded into the snapshot`() = runBlocking {
         val room = room()
         val alice = actor(user("alice"), "t1")
         val ca = room.join(alice).also { it.state(); it.joined() }
@@ -111,7 +115,7 @@ class LogicRoomTest {
             assertEquals("ONLINE", u.getString("status"))
             assertEquals(listOf("t1"), u.objects("clients").map { it.getString("id") })
         }
-        assertEquals(emptyList(), snapshot.getArray("pending")!!.toList())
+        assertNull(snapshot["pending"])   // nothing held by the room
         assertEquals("bob", snapshot.getObject("me")!!.getString("id"))   // the viewer, as its users entry
     }
 
@@ -127,18 +131,18 @@ class LogicRoomTest {
         assertNull(room.join(actor(user("bob"), "t1")).state().getInt("n"))
     }
 
-    @Test fun `a held intent stays pending until cancelled`() = runBlocking {
+    @Test fun `a cancellable intent's deposit is the State's, cancel withdraws it`() = runBlocking {
         val room = room()
         val alice = user("alice")
         val t1 = actor(alice, "t1")
         val c1 = room.join(t1).also { it.state(); it.joined() }
         val wait = room.act(t1, Wait()).await()
         assertEquals(Stage.APPLIED, wait.stage)
-        assertEquals(true, wait.meta.held)
         assertEquals("wait", c1.next().event)
-        // the token is the user's: another tab of theirs sees it
-        assertEquals(listOf("wait"), room.join(actor(alice, "t2")).state().getArray("pending")!!.toList())
-        assertEquals("already_pending", room.act(t1, Wait()).await().meta.reason)
+        // the deposit is the user's, in the State: another tab of theirs sees it
+        assertEquals(setOf("alice"), room.join(actor(alice, "t2")).state().getObject("waiting")!!.keys)
+        assertEquals("already_waiting", room.act(t1, Wait()).await().meta.reason)
+        assertEquals("not_cancellable", room.act(t1, Cancel(json("intent" to "add"))).await().meta.reason)
         val cancel = room.act(t1, Cancel(json("intent" to "wait"))).await()
         assertEquals(Stage.APPLIED, cancel.stage)
         c1.next().let {
@@ -146,17 +150,16 @@ class LogicRoomTest {
             assertEquals("wait", it.json().getString("intent"))
             assertEquals("alice", it.json().getString("user"))
         }
-        assertEquals("not_pending", room.act(t1, Cancel(json("intent" to "wait"))).await().meta.reason)
-        assertEquals(emptyList(), room.join(actor(alice, "t3")).state().getArray("pending")!!.toList())
+        assertEquals("nothing_to_cancel", room.act(t1, Cancel(json("intent" to "wait"))).await().meta.reason)
+        assertEquals(emptySet(), room.join(actor(alice, "t3")).state().getObject("waiting")!!.keys)
         c1.silent()
     }
 
-    @Test fun `the rule's errors are refused, not framed`() = runBlocking {
+    @Test fun `the logic's errors are refused, not framed`() = runBlocking {
         val room = room()
         val alice = actor(user("alice"), "t1")
         val ca = room.join(alice).also { it.state(); it.joined() }
         room.act(alice, Add(json("by" to 7))).await().let { assertEquals(Stage.REJECTED, it.stage); assertEquals("error", it.meta.reason) }
-        room.act(alice, Oops()).await().let { assertEquals(Stage.REJECTED, it.stage); assertEquals("error", it.meta.reason) }
         ca.silent()
     }
 
@@ -218,7 +221,7 @@ class LogicRoomTest {
         assertEquals("IDLE", post(t1, "AWAY").getString("status")) // t2 still idle
     }
 
-    @Test fun `a leave is framed, then what the rule fired on it`() = runBlocking {
+    @Test fun `a leave is framed, then what the logic emits on it`() = runBlocking {
         val room = room()
         val alice = actor(user("alice"), "t1")
         room.join(alice).also { it.state(); it.joined() }
@@ -236,11 +239,11 @@ class LogicRoomTest {
 
     @Test fun `the registry describes the state and the alphabet`() {
         val d = room().describe()
-        assertEquals(listOf("users", "n", "notes"), d.objects("state").map { it.getString("name") })
+        assertEquals(listOf("users", "n", "notes", "waiting"), d.objects("state").map { it.getString("name") })
         val events = d.objects("events").associateBy { it.getString("name")!! }
         assertEquals(false, events["set"]!!.getBoolean("postable"))
-        assertEquals(listOf("set"), events["add"]!!.getArray("fires")!!.toList())
-        assertEquals(true, events["wait"]!!.getBoolean("pending"))
+        assertEquals(listOf("set"), events["add"]!!.getArray("emits")!!.toList())
+        assertEquals(true, events["wait"]!!.getBoolean("cancellable"))
         assertEquals(true, events["status"]!!.getBoolean("postable"))
         assertEquals(true, events["cancel"]!!.getBoolean("postable"))
         assertEquals(listOf(false, true), events["note"]!!.objects("fields").map { it.getBoolean("selective") })

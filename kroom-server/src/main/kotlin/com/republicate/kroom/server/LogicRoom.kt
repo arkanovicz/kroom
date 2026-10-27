@@ -3,7 +3,7 @@ package com.republicate.kroom.server
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.Client
 import com.republicate.kroom.event.Event
-import com.republicate.kroom.event.Fired
+import com.republicate.kroom.event.Emit
 import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Logic
@@ -15,39 +15,29 @@ import com.republicate.kroom.event.UserPresence
 import com.republicate.kson.Json
 
 /**
- * A room run by a [Logic]: the marking is a [State], the fold of the frames; an intent is one
- * call of the rule on the loop, and its [Outcome] is what the step does — a [Reason] is the reply,
- * nothing framed, nothing changed; a [Fired] frames the intent, then each event, each reduced into
- * the state as it goes, then moves the tokens (held, released). Presence (`join`, `leave`,
- * `status`) and `cancel` are the room's: it builds them and hands them to the rule like intents.
- * Every snapshot carries `pending` (the viewer's held intents, by name) and `me`.
+ * A room run by a [Logic]: the data is a [State], the fold of the frames; an intent is one call of
+ * the logic on the loop, and its [Outcome] is what the step does — a [Reason] is the reply, nothing
+ * framed, nothing changed; an [Emit] frames the intent, then each event, each reduced into the State
+ * as it goes. Presence (`join`, `leave`, `status`) and `cancel` are the room's: it builds them and
+ * hands them to the logic like intents. Nothing is held here: a deposit is the State's.
+ * Every snapshot carries `me`.
  */
 open class LogicRoom<S : State>(id: String, override var state: S, val logic: Logic<S>) : Room<S>(id, logic.registry) {
-    // loop-confined: the tokens, by user then intent name; the current step's firing
-    private val held = HashMap<String, MutableMap<String, Event>>()
-    private var outcome: Fired<Event>? = null
+    // loop-confined: the current step's emission, kept until the intent itself is framed
+    private var outcome: Emit<Event>? = null
 
     init {
-        registry.names.forEach { name -> on(registry.factory(name)!!) { actor, intent -> run(actor, intent) } }
+        registry.names.forEach { name -> on(registry.factory(name)!!) { actor, intent -> settle(intent, logic.decide(state, actor, intent), intent.emits.names) } }
         on(::Status) { actor, status -> status(actor, status) }
         on(::Cancel) { actor, cancel -> cancel(actor, cancel) }
-        // the rule hears a user, not a connection
+        // the logic hears a user, not a connection
         on(::Join) { actor, join -> if (join.first == true) hook(actor, join, registry.join.names) else null }
-        on(::Leave) { actor, leave ->
-            if (leave.last != true) return@on null
-            held.remove(actor.id)   // a departure withdraws what the user held
-            hook(actor, leave, registry.leave.names)
-        }
+        on(::Leave) { actor, leave -> if (leave.last == true) hook(actor, leave, registry.leave.names) else null }
     }
 
-    private fun run(actor: Actor, intent: Event): Reason? {
-        if (intent.pending && held[actor.id]?.containsKey(intent.name) == true) return Reason("already_pending")
-        return settle(intent, logic.fire(state, actor, intent), intent.fires.names)
-    }
-
-    /** A presence event: the rule's answer cannot refuse it, a reason there is the rule's error. */
+    /** A presence event: the logic cannot refuse it, a reason there is the logic's error. */
     private fun hook(actor: Actor, event: Event, allowed: Set<String>): Reason? {
-        settle(event, logic.fire(state, actor, event), allowed)?.let { logger.error("'${event.name}' refused by the rule in room '$id': $it") }
+        settle(event, logic.decide(state, actor, event), allowed)?.let { logger.error("'${event.name}' refused by the logic in room '$id': $it") }
         return null
     }
 
@@ -57,46 +47,39 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
         status.user = user.userId
         status.client = Client().also { it.id = actor.tab; it.kind = actor.kind; it.status = actor.status }
         status.status = presence(user).status!!
-        return settle(status, logic.fire(state, actor, status), registry.status.names)
+        return settle(status, logic.decide(state, actor, status), registry.status.names)
     }
 
+    /** A cancel names a cancellable intent; what there is to withdraw, the logic reads in the State. It may emit what that intent emits. */
     private fun cancel(actor: Actor, cancel: Cancel): Reason? {
-        val intent = held[actor.id]?.get(cancel.intent) ?: return Reason("not_pending")
+        val intent = registry.of(cancel.intent)?.takeIf { it.cancellable } ?: return Reason("not_cancellable")
         cancel.user = actor.id
-        return settle(cancel, logic.cancel(state, actor, intent), intent.fires.names)
-            ?: null.also { held[actor.id]?.remove(cancel.intent) }
+        return settle(cancel, logic.decide(state, actor, cancel), intent.emits.names)
     }
 
-    /** The verdict of an outcome; a firing is kept for [follow], once the intent itself is framed. */
+    /** The verdict of an outcome; an emission is kept for [follow], once the intent itself is framed. */
     private fun settle(intent: Event, outcome: Outcome<Event>, allowed: Set<String>): Reason? = when (outcome) {
         is Reason -> outcome
-        is Fired -> {
+        is Emit -> {
             val stray = outcome.events.firstOrNull { it.name !in allowed }
-            when {
-                stray != null -> Reason("error").also { logger.error("'${intent.name}' fires '${stray.name}', undeclared, in room '$id'") }
-                outcome.held && !intent.pending -> Reason("error").also { logger.error("'${intent.name}' held, not declared pending, in room '$id'") }
-                else -> { this.outcome = outcome; null }
-            }
+            if (stray != null) Reason("error").also { logger.error("'${intent.name}' emits '${stray.name}', undeclared, in room '$id'") }
+            else { this.outcome = outcome; null }
         }
     }
 
     override fun follow(intent: Event) {
-        val fired = outcome ?: return
+        val emitted = outcome ?: return
         outcome = null
-        val user = intent.meta.from
-        if (fired.held && user != null) { held.getOrPut(user) { HashMap() }[intent.name] = intent; intent.meta.held = true }
-        fired.released.forEach { held[it]?.remove(intent.name) }
-        fired.events.forEach { emit(it) }
+        emitted.events.forEach { emit(it) }
     }
 
     override fun fold(frame: Event) = state.reduce(frame)
 
     override fun stateToJson(): Json.Object = state.view(null)
 
-    /** The marking as the viewer's user sees it (presence included: `users` is the fold of the presence frames), plus what
-     *  the viewer holds and who it is (`me`, absent for a spectator: a joiner is not in `users` before its own `join`, which follows). */
+    /** The State as the viewer's user sees it (presence included: `users` is the fold of the presence frames), plus who
+     *  the viewer is (`me`, absent for a spectator: a joiner is not in `users` before its own `join`, which follows). */
     override fun stateToJson(actor: Actor): Json.Object = Json.MutableObject(state.view(actor.user?.userId)).also {
-        it["pending"] = Json.Array(held[actor.id]?.keys?.toList() ?: emptyList<String>())
         actor.user?.let { u -> it["me"] = presence(u).json }
     }
 

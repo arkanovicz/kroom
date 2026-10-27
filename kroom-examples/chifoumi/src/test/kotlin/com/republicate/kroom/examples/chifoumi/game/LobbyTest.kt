@@ -2,8 +2,6 @@ package com.republicate.kroom.examples.chifoumi.game
 
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.Event
-import com.republicate.kroom.event.Fired
-import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.Store
 import com.republicate.kroom.server.Actor
@@ -17,88 +15,23 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.File
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.test.*
 
-/** Pins the arena's rule as a function, and its frames as a room plays them (the pages' golden). */
+/** Pins the arena's frames as a room plays them (the pages' golden); its decisions alone: chifoumi-common's `ChifoumiLogicTest`. */
 class LobbyTest {
 
-    private class Who(override val id: String, override val name: String = id, override val client: String? = "t1") : com.republicate.kroom.event.Actor
-    private val alice = Who("a", "Alice")
-    private val bob = Who("b", "Bob")
-
     private fun json(vararg pairs: Pair<String, Any?>) = Json.MutableObject(*pairs)
-    private fun LobbyState.fold(vararg frames: Event) = frames.forEach { reduce(it) }
-    /** As the room does: the rule, then the intent's frame and what it fired, folded. */
-    private fun LobbyState.fire(actor: Who, intent: Event) = ChifoumiLogic.fire(this, actor, intent).also { if (it is Fired) { fold(intent); it.events.forEach { e -> fold(e) } } }
 
     @BeforeTest fun clean() { Users.clear() }
 
-    @Test fun `wanting a match is a deposit, the second one pairs, and the queue is the fold`() {
-        val state = LobbyState()
-        val wantA = Match()
-        val first = ChifoumiLogic.fire(state, alice, wantA)
-        assertIs<Fired<Event>>(first); assertTrue(first.held)
-        assertEquals("a", wantA.player?.id); assertNull(wantA.match)
-        state.fold(wantA)
-        assertEquals(listOf("a"), state.queue.map { it.id })
 
-        val wantB = Match()
-        val second = ChifoumiLogic.fire(state, bob, wantB)
-        assertIs<Fired<Event>>(second); assertFalse(second.held); assertEquals(setOf("a"), second.released)
-        val m = wantB.match!!
-        assertEquals("a", m.player1); assertEquals("b", m.player2); assertEquals("Alice", m.name1); assertEquals("Bob", m.name2)
-        state.fold(wantB)
-        assertTrue(state.queue.isEmpty())
-        assertEquals(listOf(m.id), state.matches.map { it.id })
-        assertEquals("in_match", (ChifoumiLogic.fire(state, bob, Match()) as Reason).key)
-    }
-
-    @Test fun `a move is held, the second resolves the round, and the stats are the fold`() {
-        val state = LobbyState()
-        state.fire(alice, Match())
-        state.fire(bob, Match())
-        val rock = Play(json("move" to "ROCK"))
-        assertTrue((state.fire(alice, rock) as Fired).held)
-        assertEquals("a", rock.player)
-        assertEquals(Move.ROCK, state.myMatch("a")!!.move1)   // the fold put it in the match
-        fun move1(viewer: String?) = (state.view(viewer).getObject("matches")!!.values.single() as Json.Object).getString("move1")
-        assertEquals(listOf("ROCK", null, null), listOf(move1("a"), move1("b"), move1(null)))   // alice's view alone has it
-        assertEquals("already_played", (state.fire(alice, Play(json("move" to "WELL"))) as Reason).key)
-        val paper = Play(json("move" to "PAPER"))
-        val out = state.fire(bob, paper)
-        assertIs<Fired<Event>>(out); assertEquals(setOf("a"), out.released)
-        val round = out.events.single() as Round
-        assertEquals("b", round.round.getString("winner")); assertEquals(1, round.match.score2); assertEquals(2, round.match.round)
-        assertNull(state.myMatch("a")!!.move1)   // the round's match starts afresh
-        assertEquals(1, state.stats!!.rock); assertEquals(1, state.stats!!.paper); assertEquals(0, state.stats!!.played)
-        assertEquals(1, state.matches.single().score2)
-        assertEquals("not_in_match", (ChifoumiLogic.fire(state, Who("c"), Play(json("move" to "ROCK"))) as Reason).key)
-    }
-
-    @Test fun `a withdrawn move frees the round, a leave forfeits the match`() {
-        val state = LobbyState()
-        state.fire(alice, Match())
-        state.fire(bob, Match())
-        val rock = Play(json("move" to "ROCK"))
-        state.fire(alice, rock)
-        ChifoumiLogic.cancel(state, alice, rock)
-        state.fold(Cancel(json("intent" to "play")).also { it.user = "a" })
-        assertNull(state.myMatch("a")!!.move1)
-        assertTrue((state.fire(alice, Play(json("move" to "WELL"))) as Fired).held)   // not already_played
-        val gone = ChifoumiLogic.fire(state, bob, com.republicate.kroom.event.Leave())
-        assertIs<Fired<Event>>(gone)
-        assertEquals(setOf("a"), gone.released)   // alice's move of the round in progress goes with the match
-        val ended = (gone.events.single() as Match).match!!
-        assertEquals(true, ended.finished); assertEquals("a", ended.winner); assertNull((gone.events.single() as Match).player)
-        state.fold(gone.events.single())
-        assertTrue(state.matches.isEmpty())   // alice's move went with it
-        assertEquals(1, state.stats!!.played)   // forfeited, still a match played
-        assertEquals("not_in_match", (ChifoumiLogic.fire(state, alice, Play(json("move" to "ROCK"))) as Reason).key)
-    }
-
-    // ---- the room: what the pages will see, recorded
-
-    private class Arena(id: String) : ChatRoom<LobbyState>(id, MemoryChatHistory(), LobbyState(), ChifoumiLogic) {
+    /** Ids and the clock fixed: the recording is the same at every run. */
+    @OptIn(ExperimentalTime::class)
+    private class Arena(id: String) : ChatRoom<LobbyState>(id, MemoryChatHistory(), LobbyState(),
+        ChifoumiLogic(object : Clock { override fun now() = Instant.parse("2026-10-27T12:00:00Z") }, ids = { "m1" })) {
         override val leaveGrace = 0L
         override fun shouldCloseWhenEmpty() = false
     }

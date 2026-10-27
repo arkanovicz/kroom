@@ -24,6 +24,17 @@ All notable changes to kroom will be documented in this file.
   Chifoumi: the rule holds no state (`Game` gone): a round's moves are `MatchView.move1/move2`, each its
   player's, written by the fold of `play` (`Play.move` visible to its player); `GamePage.move` reads the
   marking, so a reconnect shows the move played.
+- The logic without tokens: `Logic.decide(state, actor, intent)` answers a `Reason` or an `Emit`
+  (`emit(…)`, `done`); `Fired`, `fired`, `held()`, `releasing`, `Logic.cancel` and the room's held map
+  are gone. An event declares what it `emits` (was `fires`, `Fires` → `Emits`) and whether it is
+  `cancellable` (was `pending`): its deposit is the State's, `cancel` reaches `decide` like any intent
+  and reads the State (`not_cancellable` from the room otherwise). The snapshot loses `pending`, the
+  reply `{pending: true}`, `Meta.held`. `Event.emit(seq)` / `emitted` → `sequence(seq)` / `sequenced`.
+  `ChatLogic` moves to kroom-common, pure: a line's seq follows the State's last, the clock comes
+  through its constructor. Chifoumi: `ChifoumiLogic` is common (`chifoumi-common`, its clock and match
+  ids handed in), `cancelMatch` / `cancelPlay` typed members, `in_queue` / `nothing_to_cancel`; its pure
+  tests are `ChifoumiLogicTest` (JVM + node); `LobbyTest` records with fixed ids and clock, so the
+  golden is the same at every run.
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler

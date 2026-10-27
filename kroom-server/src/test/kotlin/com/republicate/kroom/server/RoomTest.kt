@@ -92,7 +92,7 @@ class RoomTest {
         assertEquals(Stage.REJECTED, bad.stage)
         assertEquals("not_your_turn", bad.meta.reason)
         assertEquals("bob", bad.meta.args!!.getString("turn"))
-        assertFalse(bad.emitted)
+        assertFalse(bad.sequenced)
         kotlinx.coroutines.delay(50)
         listOf(c1, c2, cv).forEach { assertNull(it.tryReceive().getOrNull()) }
     }

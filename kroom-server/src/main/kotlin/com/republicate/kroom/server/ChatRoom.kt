@@ -1,40 +1,20 @@
 package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Chat
+import com.republicate.kroom.event.ChatLogic
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Logic
-import com.republicate.kroom.event.Outcome
-import com.republicate.kroom.event.Registry
 import com.republicate.kroom.event.Stage
-import com.republicate.kroom.event.State
-import com.republicate.kroom.event.done
 import com.republicate.kson.Json
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.time.Instant
-import java.util.concurrent.atomic.AtomicLong
-
-/** The rule: a line is numbered and signed. The sequence continues the tail's, the store's. A composing rule delegates its `Chat` here. */
-class ChatLogic : Logic<ChatState> {
-    private var seq: AtomicLong? = null
-    override val registry = Registry(::Chat)
-    override fun fire(state: ChatState, actor: com.republicate.kroom.event.Actor, intent: Event): Outcome<Event> {
-        if (intent is Chat) {
-            val seq = seq ?: AtomicLong(state.history.lastOrNull()?.seq ?: 0).also { seq = it }
-            intent.seq = seq.incrementAndGet()
-            intent.from = actor.name
-            intent.author = Author(actor.id, actor.name).toJson()
-            intent.timestamp = Instant.now().toString()
-        }
-        return done
-    }
-}
 
 /**
  * A chat room: a `chat` event is numbered, framed, folded into the RAM tail, then persisted in the
- * background by [history] ([MemoryChatHistory] by default). A join gets the tail in its `state`;
+ * background by [history] ([MemoryChatHistory] by default); its seq continues the tail's (the
+ * logic numbers from the State, loaded from the store). A join gets the tail in its `state`;
  * older messages come from [before].
  */
 open class ChatRoom<S : ChatState>(id: String, private val history: ChatHistory, state: S, logic: Logic<S>) : LogicRoom<S>(id, state, logic) {

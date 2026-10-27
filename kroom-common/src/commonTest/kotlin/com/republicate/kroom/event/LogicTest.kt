@@ -3,7 +3,7 @@ package com.republicate.kroom.event
 import com.republicate.kson.Json
 import kotlin.test.*
 
-/** Pins the contract: a transition is a function, the state is the fold, the registry is the alphabet. */
+/** Pins the contract: the logic is a function, the State is the fold, a deposit is the State's, the registry is the alphabet. */
 class LogicTest {
 
     class Set(json: Json.MutableObject = Json.MutableObject()) : Event("set", json = json) { var n by int().required.out }
@@ -11,8 +11,9 @@ class LogicTest {
         var author by string().out
         val text by string().required.visibleTo { it == author }
     }
-    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", fires = Fires(::Set), json = json) { val by by int().required }
-    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", fires = Fires(::Set), pending = true, json = json)
+    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) { val by by int().required }
+    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", emits = Emits(::Set), cancellable = true, json = json) { var user by string().out }
+    class Waiter(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { val id by string().required }
 
     class Deck(json: Json.MutableObject) : JsonView(json) {
         val seed by long().hidden
@@ -23,11 +24,14 @@ class LogicTest {
         var n by int()
             private set
         val notes by log(::Note, max = 2)
+        val waiting by keyed(::Waiter)
         override fun reduce(event: Event) {
             super.reduce(event)
             when (event) {
                 is Set -> n = event.n
                 is Note -> notes += event
+                is Wait -> waiting.add(Waiter(Json.MutableObject("id" to event.user)))
+                is Cancel -> if (event.intent == "wait") event.user?.let { waiting.remove(it) }
                 else -> {}
             }
         }
@@ -35,31 +39,45 @@ class LogicTest {
 
     object Rule : Logic<Counter> {
         override val registry = Registry(::Add, ::Note, ::Wait)
-        override fun fire(state: Counter, actor: Actor, intent: Event): Outcome<Event> = when (intent) {
+        override fun decide(state: Counter, actor: Actor, intent: Event): Outcome<Event> = when (intent) {
             is Add -> add(state, intent)
             is Note -> done
-            is Wait -> held()
+            is Wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { intent.user = actor.id }
+            is Cancel -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel")
             else -> Reason("unknown")
         }
         fun add(state: Counter, add: Add): Outcome<Set> {
             val n = (state.n ?: 0) + add.by
-            return if (n > 10) Reason("too_big", Json.Object("max" to 10)) else fired(Set().also { it.n = n })
+            return if (n > 10) Reason("too_big", Json.Object("max" to 10)) else emit(Set().also { it.n = n })
         }
     }
 
     private val alice = object : Actor { override val id = "alice"; override val name = "Alice"; override val client = "t1" }
 
-    @Test fun `a transition is a function of the marking and the intent`() {
+    @Test fun `the logic is a function of the State and the intent`() {
         val counter = Counter(Json.MutableObject("n" to 4))
-        val out = Rule.fire(counter, alice, Add(Json.MutableObject("by" to 3)))
-        assertIs<Fired<Event>>(out)
+        val out = Rule.decide(counter, alice, Add(Json.MutableObject("by" to 3)))
+        assertIs<Emit<Event>>(out)
         assertEquals(7, (out.events.single() as Set).n)
-        assertFalse(out.held)
-        val refused = Rule.fire(counter, alice, Add(Json.MutableObject("by" to 9)))
+        val refused = Rule.decide(counter, alice, Add(Json.MutableObject("by" to 9)))
         assertIs<Reason>(refused)
         assertEquals("too_big {\"max\":10}", refused.toString())
-        assertEquals(4, counter.n) // a function: the marking is read, never written
-        assertTrue((Rule.fire(counter, alice, Wait()) as Fired).held)
+        assertEquals(4, counter.n) // a function: the State is read, never written
+    }
+
+    @Test fun `a deposit is the State's, and cancel reads it there`() {
+        val counter = Counter()
+        val wait = Wait()
+        assertSame(done, Rule.decide(counter, alice, wait))
+        assertEquals("nothing_to_cancel", (Rule.decide(counter, alice, Cancel(Json.MutableObject("intent" to "wait"))) as Reason).key)   // not yet folded
+        counter.reduce(wait)
+        assertEquals(listOf("alice"), counter.waiting.map { it.id })
+        assertEquals("already_waiting", (Rule.decide(counter, alice, Wait()) as Reason).key)
+        val cancel = Cancel(Json.MutableObject("intent" to "wait"))
+        assertSame(done, Rule.decide(counter, alice, cancel))
+        cancel.user = "alice"   // the room's
+        counter.reduce(cancel)
+        assertTrue(counter.waiting.isEmpty())
     }
 
     @Test fun `the state is the fold of the frames, bounded logs included`() {
@@ -70,19 +88,19 @@ class LogicTest {
         listOf("a", "b", "c").forEach { counter.reduce(Note(Json.MutableObject("text" to it))) }
         assertEquals(listOf("b", "c"), counter.notes.map { it.text })
         assertEquals("""{"n":7,"notes":[{"text":"b"},{"text":"c"}]}""", counter.json.toString()) // the snapshot is the json
-        assertEquals(listOf("users", "n", "notes"), counter.describe().map { (it as Json.Object).getString("name") })
+        assertEquals(listOf("users", "n", "notes", "waiting"), counter.describe().map { (it as Json.Object).getString("name") })
     }
 
     @Test fun `the registry is the alphabet, postable names apart`() {
         val r = Rule.registry
         assertEquals(setOf("status", "cancel", "add", "note", "wait"), r.names)
         assertEquals(setOf("join", "leave", "status", "cancel", "add", "set", "note", "wait"), r.all)   // the room's own first: on every wire
-        assertNull(r.of("set"))                      // nobody posts what is only fired
+        assertNull(r.of("set"))                      // nobody posts what is only emitted
         assertNotNull(r.frame("set", Json.MutableObject("n" to 1)))
         val d = r.describe().map { it as Json.Object }.associateBy { it.getString("name")!! }
         assertEquals(false, d["set"]!!.getBoolean("postable"))
-        assertEquals(listOf("set"), d["add"]!!.getArray("fires")!!.toList())
-        assertEquals(true, d["wait"]!!.getBoolean("pending"))
+        assertEquals(listOf("set"), d["add"]!!.getArray("emits")!!.toList())
+        assertEquals(true, d["wait"]!!.getBoolean("cancellable"))
         val n = d["set"]!!.getArray("fields")!!.map { it as Json.Object }.single()
         assertEquals(true, n.getBoolean("out"))
         assertEquals(listOf(false, true), d["note"]!!.getArray("fields")!!.map { (it as Json.Object).getBoolean("selective") })

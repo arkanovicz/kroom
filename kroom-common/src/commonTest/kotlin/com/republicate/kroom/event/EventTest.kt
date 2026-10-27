@@ -59,10 +59,10 @@ class EventTest {
         assertEquals("t1", play.meta.tab)
         play.apply()
         assertNotNull(play.meta.at)
-        play.emit(42)
+        play.sequence(42)
         assertEquals(42L, play.meta.seq)
         assertEquals(Stage.APPLIED, play.stage) // the wire says the verdict
-        assertFailsWith<IllegalStateException> { play.emit(43) }
+        assertFailsWith<IllegalStateException> { play.sequence(43) }
         play.persist()
         assertEquals(Stage.PERSISTED, play.stage)
         assertEquals("""{"move":"PAPER"}""", play.json.toString()) // the metadata is the object's, never the wire's
@@ -70,7 +70,7 @@ class EventTest {
 
     @Test fun `a step out of order is the object's error`() {
         val play = Play(Json.MutableObject("move" to "PAPER"))
-        assertFailsWith<IllegalStateException> { play.emit(1) }
+        assertFailsWith<IllegalStateException> { play.sequence(1) }
         play.accept("alice").apply()
         assertFailsWith<IllegalStateException> { play.accept("bob") }
         assertFailsWith<IllegalStateException> { play.reject(Reason("late")) }
@@ -80,15 +80,15 @@ class EventTest {
         val play = Play(Json.MutableObject("move" to "PAPER")).accept("alice")
         play.reject(Reason("not_your_turn", Json.Object("turn" to "bob")))
         assertEquals(Stage.REJECTED, play.stage)
-        assertFailsWith<IllegalStateException> { play.emit(7) }
-        assertFalse(play.emitted)
+        assertFailsWith<IllegalStateException> { play.sequence(7) }
+        assertFalse(play.sequenced)
         assertFailsWith<IllegalStateException> { play.persist() }
         assertEquals("not_your_turn", play.meta.reason)
         assertEquals("bob", play.meta.args!!.getString("turn"))
     }
 
     @Test fun `a room-born event applies from birth`() {
-        val match = Match(Json.MutableObject("player1" to "a", "player2" to "b")).apply().emit(1)
+        val match = Match(Json.MutableObject("player1" to "a", "player2" to "b")).apply().sequence(1)
         assertEquals(Stage.APPLIED, match.stage)
         assertFailsWith<IllegalStateException> { Match(Json.MutableObject("player1" to "a", "player2" to "b")).persist() }
         assertNull(match.meta.from)
