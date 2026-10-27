@@ -29,7 +29,10 @@ import com.republicate.kroom.event.Actor as Who
 class LogicRoomTest {
 
     class Set(json: Json.MutableObject = Json.MutableObject()) : Event("set", json = json) { var n by int().required.out }
-    class Note(json: Json.MutableObject = Json.MutableObject()) : Event("note", json = json) { val text by string().required.mine }
+    class Note(json: Json.MutableObject = Json.MutableObject()) : Event("note", json = json) {
+        var author by string().out
+        val text by string().required.visibleTo { it == author }
+    }
     class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", fires = Fires(::Set), json = json) { val by by int().required }
     class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", fires = Fires(::Set), pending = true, json = json)
     class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", fires = Fires(::Set), json = json) { val who by string().required }
@@ -57,7 +60,7 @@ class LogicRoomTest {
                 (state.n ?: 0) + intent.by > 10 -> Reason("too_big", Json.Object("max" to 10))
                 else -> fired(Set().also { it.n = (state.n ?: 0) + intent.by })
             }
-            is Note -> done
+            is Note -> done.also { intent.author = actor.id }
             is Wait -> held()
             is Whisper -> fired(Set().also { it.n = 99 }.to(intent.who))
             is Oops -> held() // not declared pending
@@ -157,7 +160,7 @@ class LogicRoomTest {
         ca.silent()
     }
 
-    @Test fun `mine reaches the author whole, the others stripped`() = runBlocking {
+    @Test fun `a selective field reaches the users its rule names, all their tabs, in one frame per user`() = runBlocking {
         val room = room()
         val alice = user("alice")
         val t1 = actor(alice, "t1")
@@ -168,10 +171,13 @@ class LogicRoomTest {
         room.act(t1, Note(json("text" to "secret"))).await()
         val frames = listOf(c1, c2, cb).map { it.next() }
         frames.forEach { assertEquals("note", it.event) }
-        assertEquals("secret", frames[0].json().getString("text"))
-        assertEquals("secret", frames[1].json().getString("text"))
-        assertEquals("{}", frames[2].data)
+        assertEquals(listOf("secret", "secret", null), frames.map { it.json().getString("text") })
+        frames.forEach { assertEquals("alice", it.json().getString("author")) }
+        assertSame(frames[0], frames[1])   // serialized once for alice's tabs
         assertEquals(1, frames.map { it.id }.toSet().size)
+        assertEquals("secret", room.state.notes.single().text)   // the room's fold has it
+        assertEquals(null, room.stateToJson(actor(user("bob"), "t1")).getArray("notes")!!.getObject(0)!!.getString("text"))   // so does alice's snapshot, not bob's
+        assertEquals("secret", room.stateToJson(t1).getArray("notes")!!.getObject(0)!!.getString("text"))
     }
 
     @Test fun `to names the users, and such a frame is not folded`() = runBlocking {
@@ -237,7 +243,7 @@ class LogicRoomTest {
         assertEquals(true, events["wait"]!!.getBoolean("pending"))
         assertEquals(true, events["status"]!!.getBoolean("postable"))
         assertEquals(true, events["cancel"]!!.getBoolean("postable"))
-        assertEquals(true, events["note"]!!.objects("fields").single().getBoolean("mine"))
+        assertEquals(listOf(false, true), events["note"]!!.objects("fields").map { it.getBoolean("selective") })
     }
 
     @Test fun `a spectator is refused at the door`() = runBlocking {

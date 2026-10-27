@@ -91,11 +91,11 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
 
     override fun fold(frame: Event) = state.reduce(frame)
 
-    override fun stateToJson(): Json.Object = state.json
+    override fun stateToJson(): Json.Object = state.view(null)
 
-    /** The marking (presence included: `users` is the fold of the presence frames), plus what the viewer holds and who
-     *  the viewer is (`me`, absent for a spectator: a joiner is not in `users` before its own `join`, which follows). */
-    override fun stateToJson(actor: Actor): Json.Object = Json.MutableObject(state.json).also {
+    /** The marking as the viewer's user sees it (presence included: `users` is the fold of the presence frames), plus what
+     *  the viewer holds and who it is (`me`, absent for a spectator: a joiner is not in `users` before its own `join`, which follows). */
+    override fun stateToJson(actor: Actor): Json.Object = Json.MutableObject(state.view(actor.user?.userId)).also {
         it["pending"] = Json.Array(held[actor.id]?.keys?.toList() ?: emptyList<String>())
         actor.user?.let { u -> it["me"] = presence(u).json }
     }

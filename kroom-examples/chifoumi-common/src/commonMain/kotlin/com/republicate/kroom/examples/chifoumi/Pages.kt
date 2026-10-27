@@ -49,9 +49,8 @@ class LobbyPage(private val room: Room<LobbyState>, private val say: Say, privat
 }
 
 /**
- * The game page's page memory: the viewer's match, kept once the marking dropped it, the move this tab played (the
- * frame's `mine` field, lost on a reconnect), the round just resolved (on screen for two seconds), what the
- * opponent last did. Phases: `choose`, `waiting` (the viewer has played), `reveal`, `over`.
+ * The game page's page memory: the viewer's match, kept once the marking dropped it, the round just resolved (on
+ * screen for two seconds), what the opponent last did. Phases: `choose`, `waiting` (the viewer has played), `reveal`, `over`.
  */
 class GamePage(
     private val room: Room<LobbyState>,
@@ -64,8 +63,6 @@ class GamePage(
     class Reveal(val yours: String?, val theirs: String?, val outcome: String, val message: String, val verdict: String)
 
     private var last: MatchView? = null
-    var move: String? = null
-        private set
     var reveal: Reveal? = null
         private set
     private var note: String? = null
@@ -78,8 +75,8 @@ class GamePage(
     override fun reduce(event: Event) {
         when (event) {
             is Match -> event.match?.let { m -> if (ours(m)) { last = if (m.finished == true) m else null } }
-            is Play -> if (event.player == me) move = event.json.getString("move")?.lowercase()?.let { EMOJI[it] } else note = null
-            is Cancel -> if (event.intent == "play") { if (event.user == me) move = null else if (event.user?.let { live?.has(it) } == true) note = "took-back" }
+            is Play -> if (event.player != me) note = null
+            is Cancel -> if (event.intent == "play" && event.user != me && event.user?.let { live?.has(it) } == true) note = "took-back"
             is Round -> if (ours(event.match)) { last = if (event.match.finished == true) event.match else null; show(event) }
             else -> {}
         }
@@ -89,7 +86,7 @@ class GamePage(
 
     /** The round from the viewer's side, kept on screen for a while; then the match as it stands. */
     private fun show(r: Round) {
-        move = null; note = null
+        note = null
         val first = r.match.player1 == me
         val round = r.round
         val winner = round.getString("winner")
@@ -109,6 +106,9 @@ class GamePage(
     val present: Boolean get() = match != null
 
     private val first: Boolean get() = match?.player1 == me
+
+    /** The viewer's move of the round in progress: the marking's, its own to see. */
+    val move: String? get() = live?.let { if (first) it.move1 else it.move2 }?.name?.lowercase()?.let { EMOJI[it] }
     private val them: String? get() = match?.let { if (first) it.name2 else it.name1 }
 
     val name1: String? get() = match?.let { if (first) say("you", emptyMap()) else it.name1 }

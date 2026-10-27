@@ -7,9 +7,17 @@ import kotlin.test.*
 class LogicTest {
 
     class Set(json: Json.MutableObject = Json.MutableObject()) : Event("set", json = json) { var n by int().required.out }
-    class Note(json: Json.MutableObject = Json.MutableObject()) : Event("note", json = json) { val text by string().required.mine }
+    class Note(json: Json.MutableObject = Json.MutableObject()) : Event("note", json = json) {
+        var author by string().out
+        val text by string().required.visibleTo { it == author }
+    }
     class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", fires = Fires(::Set), json = json) { val by by int().required }
     class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", fires = Fires(::Set), pending = true, json = json)
+
+    class Deck(json: Json.MutableObject) : JsonView(json) {
+        val seed by long().hidden
+        val left by int()
+    }
 
     class Counter(json: Json.MutableObject = Json.MutableObject()) : State(json) {
         var n by int()
@@ -77,7 +85,7 @@ class LogicTest {
         assertEquals(true, d["wait"]!!.getBoolean("pending"))
         val n = d["set"]!!.getArray("fields")!!.map { it as Json.Object }.single()
         assertEquals(true, n.getBoolean("out"))
-        assertEquals(true, d["note"]!!.getArray("fields")!!.map { it as Json.Object }.single().getBoolean("mine"))
+        assertEquals(listOf(false, true), d["note"]!!.getArray("fields")!!.map { (it as Json.Object).getBoolean("selective") })
     }
 
     @Test fun `an out field is the loop's, undeclared when sent and never missing`() {
@@ -86,11 +94,22 @@ class LogicTest {
         assertFailsWith<IllegalStateException> { Set().n } // required: the loop must fill it before the wire
     }
 
-    @Test fun `mine is for the author, to is for the named`() {
-        val note = Note(Json.MutableObject("text" to "secret"))
-        assertEquals("""{"text":"secret"}""", note.payload(true).toString())
-        assertEquals("{}", note.payload(false).toString())
-        assertEquals(listOf("mine"), note.mine.map { "mine" }) // one such field
+    @Test fun `a selective field is seen by whom its rule names at any depth, to is for the named`() {
+        val note = Note(Json.MutableObject("author" to "alice", "text" to "secret"))
+        assertEquals("secret", note.text)   // the server reads it
+        assertEquals("""{"author":"alice","text":"secret"}""", note.view("alice").toString())
+        assertEquals("""{"author":"alice"}""", note.view("bob").toString())
+        assertEquals("""{"author":"alice"}""", note.view(null).toString())   // nobody in particular
+        val counter = Counter().also { it.reduce(note) }
+        assertEquals("""{"notes":[{"author":"alice"}]}""", counter.view("bob").toString())   // through a log of views
+        assertEquals("""{"notes":[{"author":"alice","text":"secret"}]}""", counter.view("alice").toString())
+        assertEquals("secret", counter.notes.single().text)
+        assertNull(Note(Json.MutableObject("author" to "alice")).text)   // absent from some views, so it reads nullable
+        Set().let { assertSame(it.json, it.view("bob")) }   // nothing selective: the json itself, one frame for everyone
+        Deck(Json.MutableObject("seed" to 42L, "left" to 52)).let {
+            assertEquals(42L, it.seed)   // the server reads it
+            assertEquals(listOf("""{"left":52}""", """{"left":52}"""), listOf(it.view("alice"), it.view(null)).map { v -> v.toString() })   // nobody sees it
+        }
         val set: Set = Set().to("a", "b")   // keeps its type
         assertEquals(listOf("a", "b"), set.to)
         assertEquals(emptyList(), Set().to)

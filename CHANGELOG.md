@@ -17,6 +17,13 @@ All notable changes to kroom will be documented in this file.
   alone and loses `users`. The server keeps `users` by folding the same frames, so a snapshot is the State
   at its position: a joiner is not in its own snapshot, its `join` follows (it used to be added from
   membership). `reduce`'s parameter is `event`.
+- Selective fields: `.visibleTo { viewer -> … }` (a rule over the viewer's user id, read on the instance)
+  replaces `.mine`, `.hidden` = `visibleTo { false }` (the server's alone); `view(viewer)` drops what the rule refuses at any depth (`obj`, `keyed`, `log`), and
+  a frame carrying a selective field is serialized once per user (once for all otherwise); a snapshot is
+  `view` of its viewer's user. `describe()` says `selective`. A setter given null removes the key.
+  Chifoumi: the rule holds no state (`Game` gone): a round's moves are `MatchView.move1/move2`, each its
+  player's, written by the fold of `play` (`Play.move` visible to its player); `GamePage.move` reads the
+  marking, so a reconnect shows the move played.
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler

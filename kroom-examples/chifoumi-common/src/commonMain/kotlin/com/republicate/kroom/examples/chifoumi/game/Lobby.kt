@@ -13,10 +13,10 @@ import com.republicate.kson.Json
  * The lobby's grammar — what a generator will write this file from:
  *
  *   room chifoumi-lobby {
- *     state(history: log<Chat>, queue: keyed<Player>, matches: keyed<Match>, stats: Stats)
+ *     state(history: log<Chat>, queue: keyed<Player>, matches: keyed<Match{…, move1: Move visibleTo player1, move2: Move visibleTo player2}>, stats: Stats)
  *     event chat(text: String)
  *     event match pending -> match(player: User, match?: Match)
- *     event play(move: Move @mine) pending -> play(player: User) | round(match: Match, round: Round)
+ *     event play(move: Move visibleTo player) pending -> play(player: User) | round(match: Match, round: Round)
  *     event leave -> match
  *   }
  *
@@ -30,7 +30,7 @@ class Player(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     val name by string()
 }
 
-/** A match as the wire sees it: scores, round, winner; never a move in progress. */
+/** A match: scores, round, winner, and the moves of the round in progress, each seen by its player alone. */
 class MatchView(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     val id by string().required
     val player1 by string().required
@@ -45,7 +45,47 @@ class MatchView(json: Json.MutableObject = Json.MutableObject()) : JsonView(json
     val winner by string()
     /** Who has played the round in progress, never which move: the fold of `play` and its `cancel`; the `round` frame's match starts afresh. */
     val played by keyed(::Player)
+    var move1 by enum<Move>().visibleTo { it == player1 }
+        internal set
+    var move2 by enum<Move>().visibleTo { it == player2 }
+        internal set
+
     fun has(user: String) = user == player1 || user == player2
+    fun opponentOf(user: String) = if (user == player1) player2 else player1
+    fun moveOf(user: String): Move? = if (user == player1) move1 else move2
+
+    /** The round [user] completes by playing [move] against the move awaiting it, and the match after it; null while the other has not played. */
+    fun resolve(user: String, move: Move): Pair<MatchView, Json.Object>? {
+        val other = moveOf(opponentOf(user)) ?: return null
+        val (m1, m2) = if (user == player1) move to other else other to move
+        val result = m1.against(m2)
+        val winner = when (result) { 1 -> player1; -1 -> player2; else -> null }
+        val s1 = (score1 ?: 0) + if (result == 1) 1 else 0
+        val s2 = (score2 ?: 0) + if (result == -1) 1 else 0
+        val number = round ?: 1
+        val over = s1 >= (target ?: TARGET) || s2 >= (target ?: TARGET)
+        val next = next(s1, s2, number + 1, over, if (over) (if (s1 > s2) player1 else player2) else null)
+        val played = Json.MutableObject("number" to number, "result" to result, "move1" to m1.name.lowercase(), "move2" to m2.name.lowercase())
+        winner?.let { played["winner"] = it }
+        return next to played
+    }
+
+    /** The match ended by [user]'s departure: the other wins. */
+    fun forfeit(user: String): MatchView = next(score1 ?: 0, score2 ?: 0, round ?: 1, true, opponentOf(user))
+
+    private fun next(s1: Int, s2: Int, round: Int, finished: Boolean, winner: String?) = MatchView(Json.MutableObject(
+        "id" to id, "player1" to player1, "player2" to player2, "name1" to name1, "name2" to name2,
+        "score1" to s1, "score2" to s2, "round" to round, "target" to (target ?: TARGET), "finished" to finished
+    ).also { j -> winner?.let { j["winner"] = it } })
+
+    companion object {
+        const val TARGET = 5
+
+        /** A match starting between two players, first to [target] won rounds; draws count for nobody. */
+        fun start(id: String, p1: Player, p2: Player, target: Int = TARGET) = MatchView(Json.MutableObject(
+            "id" to id, "player1" to p1.id, "player2" to p2.id, "name1" to (p1.name ?: p1.id), "name2" to (p2.name ?: p2.id),
+            "score1" to 0, "score2" to 0, "round" to 1, "target" to target, "finished" to false))
+    }
 }
 
 /** What the rounds add up to: the fold's own view, counted from `round` frames. */
@@ -77,9 +117,9 @@ class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", pe
     var match by obj(::MatchView).out   // the match, when one starts or ends
 }
 
-/** A move: the author's tabs alone see which; everyone sees who played. Held until the other plays. */
+/** A move: its player alone sees which (it goes into the match so); everyone sees who played. Held until the other plays. */
 class Play(json: Json.MutableObject = Json.MutableObject()) : Event("play", pending = true, fires = Fires(::Round), json = json) {
-    val move by enum<Move>().required.mine
+    val move by enum<Move>().required.visibleTo { it == player }
     var player by string().out
 }
 
@@ -105,11 +145,17 @@ class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(js
         when (event) {
             is Match -> event.match?.let { m -> record(m); queue.remove(m.player1); queue.remove(m.player2) }
                 ?: event.player?.let { queue.add(it) }
-            is Play -> event.player?.let { p -> myMatch(p)?.played?.add(Player(Json.MutableObject("id" to p))) }
+            is Play -> event.player?.let { p -> myMatch(p)?.let { m ->
+                m.played.add(Player(Json.MutableObject("id" to p)))
+                if (p == m.player1) m.move1 = event.move else m.move2 = event.move   // null where the frame did not carry it
+            } }
             is Round -> { record(event.match); stats!!.count(event.round) }
             is Cancel -> when (event.intent) {
                 "match" -> event.user?.let { queue.remove(it) }
-                "play" -> event.user?.let { u -> myMatch(u)?.played?.remove(u) }
+                "play" -> event.user?.let { u -> myMatch(u)?.let { m ->
+                    m.played.remove(u)
+                    if (u == m.player1) m.move1 = null else m.move2 = null
+                } }
             }
             is Leave -> event.user?.id?.let { queue.remove(it) }
             else -> {}

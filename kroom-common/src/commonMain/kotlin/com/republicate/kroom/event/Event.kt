@@ -94,10 +94,6 @@ abstract class Event(
     /** The users this frame is for; none means the room. */
     val to: List<String> get() = meta.to?.map { it as String } ?: emptyList()
 
-    /** The payload a viewer gets: the author's tabs see it whole, the others without the `mine` fields. */
-    fun payload(author: Boolean): Json.Object =
-        if (author || mine.isEmpty()) json else Json.MutableObject(json).also { j -> mine.forEach { j.remove(it) } }
-
     /** The declaration as data: what a registry serves, what a browser without Kotlin reads. */
     fun describe(): Json.Object = Json.Object(
         "name" to name,

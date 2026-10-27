@@ -351,16 +351,13 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
 
     /**
      * Numbers the event at the channel's next position, folds it, and writes it: to the users it
-     * names (`to`), else to the room — or, a `USERS` event of the `on()` path, to its emitter. The
-     * author's tabs get the payload whole, the others without its `mine` fields.
+     * names (`to`), else to the room — or, a `USERS` event of the `on()` path, to its emitter. Each
+     * connection gets its user's view: one frame for all, unless a field is selective.
      */
     private fun frame(event: Event, to: List<String>) {
         val emitted = event.emit(seq.incrementAndGet())
         trace(emitted)
-        val id = emitted.meta.seq.toString()
-        val whole = ServerSentEvent(data = emitted.json.toString(), event = emitted.name, id = id)
-        val others = if (emitted.mine.isEmpty()) whole else ServerSentEvent(data = emitted.payload(false).toString(), event = emitted.name, id = id)
-        val frame = { actor: Actor -> if (actor.user?.userId == emitted.meta.from) whole else others }
+        val frame = views(emitted)
         val targets = to.ifEmpty { emitted.to }
         when {
             targets.isNotEmpty() -> toUsers(targets, frame)
@@ -368,6 +365,14 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
             else -> { fold(emitted); toAll(frame) }
         }
         emitted(emitted)
+    }
+
+    /** The frame a connection gets, serialized once per user (or once, when the event is the same for everyone). */
+    private fun views(event: Event): (Actor) -> ServerSentEvent {
+        fun of(viewer: String?) = ServerSentEvent(data = event.view(viewer).toString(), event = event.name, id = event.meta.seq.toString())
+        if (!event.selective) return of(null).let { all -> { all } }
+        val byUser = HashMap<String?, ServerSentEvent>()
+        return { actor -> actor.user?.userId.let { byUser.getOrPut(it) { of(it) } } }
     }
 
     private fun toAll(frame: (Actor) -> ServerSentEvent) {
