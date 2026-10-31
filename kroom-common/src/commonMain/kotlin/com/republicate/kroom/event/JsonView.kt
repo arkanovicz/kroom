@@ -7,7 +7,7 @@ import kotlin.reflect.KProperty
 /**
  * A typed view over a JSON object: the JSON stays the truth, on every target, and a property
  * declared `by string()` reads and writes the key of its own name. Declaring a field records it,
- * so a view knows its own shape at runtime without reflection — that is the registry.
+ * so a view knows its own shape at runtime without reflection — that is the catalog.
  *
  * A field is `in` (a client may send it, validated) or `out` (the loop fills it, a client may
  * not); public, or selective (`visibleTo`: a rule over the viewer, so it reads nullable; `hidden`: nobody);

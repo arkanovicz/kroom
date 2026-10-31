@@ -7,7 +7,7 @@ import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Presence
 import com.republicate.kroom.event.Reason
-import com.republicate.kroom.event.Registry
+import com.republicate.kroom.event.RoomEvents
 import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.UserPresence
 import com.republicate.kson.Json
@@ -36,7 +36,7 @@ class Generic(name: String, json: Json.MutableObject = Json.MutableObject(), aud
  * A join is an event too: the room births [Join] at a connect; the joiner gets its `state`
  * snapshot ([stateToJson]) first, then its own `join` like everyone, the handler's emissions before it.
  */
-abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()) {
+abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents()) {
     protected val logger = LoggerFactory.getLogger("kroom.room")
     // the thread inside a step: what a handler emits is framed at once, nothing a step produces is re-enqueued
     @Volatile private var loopThread: Thread? = null
@@ -65,7 +65,7 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
     private val system = setOf("join", "leave")
 
     /**
-     * One declaration: the class (its factory, for the door; the [registry] has it as postable) and its handler (for the loop).
+     * One declaration: the class (its factory, for the door; its [events] have it as postable) and its handler (for the loop).
      * The handler applies the event to the state and answers null, or a [Reason] to reject it;
      * a thrown [Event.Rejected] is the same, any other exception is `error`, logged. It runs on
      * the loop: no awaited I/O. What it [emit]s lands before the event's own frame.
@@ -73,7 +73,7 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
     @Suppress("UNCHECKED_CAST")
     protected fun <E : Event> on(factory: (Json.MutableObject) -> E, handler: (Actor, E) -> Reason?) {
         val name = factory(Json.MutableObject()).name
-        if (name !in system) registry.register(factory)
+        if (name !in system) events.register(factory)
         handlers[name] = { actor, event -> handler(actor, event as E) }
     }
 
@@ -99,7 +99,7 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
     protected open fun follow(intent: Event) {}
 
     /** The alphabet as data: what `GET /rooms/{room}/events` serves. */
-    open fun describe(): Json.Object = Json.Object("events" to registry.describe())
+    open fun describe(): Json.Object = Json.Object("events" to events.describe())
 
     init {
         on(::Join) { _, _ -> null }
@@ -168,7 +168,7 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
     suspend fun act(user: User, tab: String?, name: String, json: Json.MutableObject): Event {
         val connectionId = Actor.connectionId(user, tab)
         val actor = getActor(connectionId) ?: Actor(connectionId, user)
-        val event = registry.of(name, json) ?: return Generic(name, json).reject(Reason("unknown")).also(::trace)
+        val event = events.of(name, json) ?: return Generic(name, json).reject(Reason("unknown")).also(::trace)
         return act(actor, event).await()
     }
 
@@ -423,7 +423,7 @@ abstract class Room<S : Any>(val id: String, val registry: Registry = Registry()
         "connectionCount" to actors.size,
         "spectatorCount" to spectators.size,
         "users" to Json.Array(users.values.map { Json.Object("userId" to it.userId, "name" to it.displayName) }),
-        "events" to registry.describe()
+        "events" to events.describe()
     )
 
     private sealed class Op {

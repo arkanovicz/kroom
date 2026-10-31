@@ -4,7 +4,7 @@ import com.republicate.kroom.client.Room
 import com.republicate.kroom.client.attach
 import com.republicate.kroom.client.kroom
 import com.republicate.kroom.client.say
-import com.republicate.kroom.examples.chifoumi.game.LobbyLogic
+import com.republicate.kroom.examples.chifoumi.game.LobbyEvents
 import com.republicate.kroom.examples.chifoumi.game.LobbyState
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -20,7 +20,7 @@ import kotlin.js.Date
  * document's language. What stays in code is the page memory ([LobbyPage], [GamePage]) and the reactions.
  */
 fun main() {
-    val room = Room("chifoumi-lobby", LobbyState(), LobbyLogic.registry, engine)
+    val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
     val lang = document.documentElement?.getAttribute("lang") ?: "en"
     fun region(id: String, template: String) = document.getElementById(id)?.let { room.attach("$lang/$template", it) }
     val say: Say = { key, vars -> say(key, vars) }

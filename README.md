@@ -91,17 +91,18 @@ event: play   id: 42   data: {"move":"rock"}
 
 - **The contract** (`kroom-common`, the same on every target): a `State` is the room's data, a
   view over its JSON whose fields are written in one place, `reduce(event)`, from a frame (declare
-  them `private set`: the logic can only read them); a `Logic` is the room's decisions, one
-  function of the state, the actor and the intent, answering an `Outcome`, pure and stateless
-  (what it needs from the platform, a clock, ids, comes through its constructor); a `Registry` is
-  the alphabet, the intents (what a door may bring) and, through what each `emits`, every other
-  name on the wire. The room (`LogicRoom(id, state, logic)`) is the machine: it runs the logic on
+  them `private set`: the logic can only read them); `RoomEvents` is the alphabet, an object of
+  typed entries, every name on the wire, an `intent` (a client may post it) or an `event` (born by
+  the room), kroom's `join` / `leave` / `status` / `cancel` in every one; a `Logic` is the room's
+  decisions, one typed handler per intent declared on its entry, answering an `Outcome`, pure and
+  stateless (what it needs from the platform, a clock, ids, comes through its constructor; a
+  missing handler is refused when the room is built). Nothing is generated: the Kotlin is the
+  declaration. The room (`LogicRoom(id, state, logic)`) is the machine: it runs the logic on
   its loop, frames the intent and what it emits, folds every frame into the state as it goes, so
   the server's state is the fold it serves and `reduce*(snapshot@N, frames) == snapshot@M` by
   construction, per viewer. A client folds the stream with the same class: `Store(state,
-  registry)` replaces on `state` and hands every other frame to the same `reduce` (presence
-  included: `users` is a field of the base `State`). The registry lists `join` and `leave` with
-  the rest: every name on the wire, posted by nobody.
+  events)` replaces on `state` and hands every other frame to the same `reduce` (presence
+  included: `users` is a field of the base `State`).
 
   ```kotlin
   class Counter : State() {
@@ -121,38 +122,43 @@ event: play   id: 42   data: {"move":"rock"}
       }
   }
   class Set(json) : Event("set", json = json) { var n by int().required.out }            // the loop fills it, a client may not send it
-  class Add(json) : Event("add", emits = Emits(::Set), json = json) { val by by int().required }
+  class Add(json) : Event("add", json = json) { val by by int().required }
   class Note(json) : Event("note", json = json) {
       var author by string().out
       val text by string().required.visibleTo { it == author }                         // its author's tabs alone see it
   }
-  class Wait(json) : Event("wait", cancellable = true, json = json) { var user by string().out }
+  class Wait(json) : Event("wait", json = json) { var user by string().out }
 
-  object Rule : Logic<Counter> {
-      override val registry = Registry(listOf(::Add, ::Note, ::Wait), leave = Emits(::Set))
-      override fun decide(state: Counter, actor: Actor, intent: Event): Outcome<Event> = when (intent) {
-          is Add  -> add(state, intent)
-          is Note -> done.also { intent.author = actor.id }   // the intent's own frame and nothing more
-          is Wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { intent.user = actor.id }
-          is Cancel -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel")
-          is Leave -> emit(Set().also { it.n = 0 })
-          else -> Reason("unknown")
-      }
-      fun add(state: Counter, add: Add): Outcome<Set> {       // `Outcome<Set>` reads as the grammar's `add -> set`
-          val n = (state.n ?: 0) + add.by
-          return if (n > 10) Reason("too_big", Json.Object("max" to 10)) else emit(Set().also { it.n = n })
+  object Events : RoomEvents() {                              // join, leave, status, cancel: kroom's
+      val add  = intent(::Add)
+      val note = intent(::Note)
+      val wait = intent(::Wait, cancellable = true)
+      val set  = event(::Set)                                 // nobody posts it
+  }
+
+  object Rule : Logic<Counter>(Events) {
+      init {
+          on(Events.add) { state, _, add ->                   // add: Add, typed
+              val n = (state.n ?: 0) + add.by
+              if (n > 10) Reason("too_big", Json.Object("max" to 10)) else emit(Set().also { it.n = n })
+          }
+          on(Events.note) { _, actor, note -> done.also { note.author = actor.id } }   // the intent's own frame and nothing more
+          on(Events.wait) { state, actor, wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { wait.user = actor.id } }
+          cancel(Events.wait) { state, actor, _ -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel") }
+          on(Events.leave) { _, _, _ -> emit(Set().also { it.n = 0 }) }               // kroom's, handled when declared
       }
   }
   ```
 
   An event may declare a check, common, typed on the State it reads (`init { check { state:
-  Counter, actor -> … } }`): the room runs it first on its loop, before `decide`, and refuses at
+  Counter, actor -> … } }`): the room runs it first on its loop, before the handler, and refuses at
   construction an event checked on another State; the browser runs it with the declared shape on
   its view before posting, and a refusal there is rejected like a reply, without a request.
   A `Reason` is the reply, nothing framed, nothing changed. An `Emit` frames the intent, then each
-  event (`emit(…)`, each name checked against the class's `emits`), each reduced into the state.
-  Nothing is held by the room: a cancellable intent (`cancellable = true`) leaves its deposit in
-  the State through `reduce`, and `cancel {intent}` reaches the logic like any intent, which reads
+  event (`emit(…)`, each a name of the room's events, else refused as the logic's error), each
+  reduced into the state. Nothing is held by the room: a cancellable intent (`cancellable = true`
+  on its entry) leaves its deposit in the State through `reduce`, and `cancel {intent}` reaches the
+  logic's `cancel(entry)` handler, which reads
   the State for what there is to withdraw (`not_cancellable` from the room when the name is not
   cancellable). `Event.to(users…)` on an emitted event names its viewers: a message, not a
   transition, it is not folded into the state. A field is public, or selective
@@ -165,16 +171,15 @@ event: play   id: 42   data: {"move":"rock"}
   `IDLE`, else `AWAY`), and `me`, the viewer's own entry (absent for a spectator): the page knows
   who it is from the frame it already gets, no session call; `join` carries the user's presence and the count, `leave` the same, a
   client posting `status {status}` frames the user's composed status and the client that changed.
-  The logic hears `Join` / `Leave` / `Status` as events, a user's (first connection, last one), and
-  emits what the registry declares for them (`leave = Emits(::Match)`).
+  The logic hears `Join` / `Leave` / `Status` as events, a user's (first connection, last one), when
+  it declares a handler for them (`on(LobbyEvents.leave) { … }`).
 - **The `on()` path** (`on(::Play) { actor, play -> Reason? }`, class and handler together, the
   handler mutating the room's state and emitting itself) still runs underneath: `Table` is on it
   until its port.
 - **The chifoumi example is the contract's proof** (`kroom-examples/chifoumi`): one room, a
   `ChatRoom` whose logic is the game's (`ChatRoom<LobbyState>(id, history, state, logic)`, chat
-  composed through `ChatLogic`). Its grammar heads `game/Lobby.kt`; `LobbyLogic` is the typed
-  layer a generator will write (one member per arrow, `play(…): Outcome<Round>`, one per
-  cancellable intent's `cancel`, and the `when`), `ChifoumiLogic` the hand part; a round's moves
+  composed through `ChatLogic`). `LobbyEvents` (in `game/Lobby.kt`, extending `ChatEvents`) is its
+  alphabet, `ChifoumiLogic` its handlers; a round's moves
   are fields of its match, each its player's. The declarations, the logic and the fold are common
   code compiled for the JVM and the browser (`kroom-examples/chifoumi-common`, multiplatform;
   `ChifoumiLogicTest` runs the decisions on both); the activity feed, the

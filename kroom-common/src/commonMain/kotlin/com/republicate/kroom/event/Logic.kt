@@ -48,14 +48,49 @@ fun <E : Event> emit(vararg events: E): Emit<E> = Emit(events.toList())
 val done: Emit<Nothing> = Emit(emptyList())
 
 /**
- * The room's decisions: the alphabet it speaks, and what one intent answers on one State. Common
+ * The room's decisions: one handler per intent of its [events], declared on the entry
+ * (`on(LobbyEvents.play) { state, actor, play -> … }`), one per cancellable intent's `cancel`. Common
  * code, pure and stateless — a function of its arguments and of what the platform hands its
  * constructor (a clock, ids) — the loop's business (framing, numbering) kept out: it runs the same
  * in a test, on the server, in a browser. It decides once the intent's [Event.check] passed: what
- * the check refuses, the logic need not test again. Presence (`join`, `leave`, `status`) and
- * `cancel` arrive here as events too; a `cancel` reads the State for the deposit it withdraws.
+ * the check refuses, a handler need not test again. kroom's events (`join`, `leave`, `status`) reach
+ * a handler when the logic declares one, nothing otherwise; a `cancel` reads the State for the
+ * deposit it withdraws.
  */
-interface Logic<S : State> {
-    val registry: Registry
-    fun decide(state: S, actor: Actor, intent: Event): Outcome<Event>
+abstract class Logic<S : State>(val events: RoomEvents) {
+    private val handlers = HashMap<String, (S, Actor, Event) -> Outcome<Event>>()
+    private val withdrawals = HashMap<String, (S, Actor, Cancel) -> Outcome<Event>>()
+
+    /** The handler of [entry]'s events: typed on its class, answering a Reason or what it emits. */
+    @Suppress("UNCHECKED_CAST")
+    protected fun <E : Event> on(entry: RoomEvents.Entry<E>, handler: (state: S, actor: Actor, event: E) -> Outcome<Event>) {
+        require(events.entry(entry.name) === entry) { "'${entry.name}' is not an entry of this logic's events" }
+        require(entry.name !in handlers) { "'${entry.name}' handled twice" }
+        handlers[entry.name] = { state, actor, event -> handler(state, actor, event as E) }   // built by the entry's factory: an E
+    }
+
+    /** The withdrawal of [entry]'s deposit: the handler reads the State for it, `reduce` removes it from the `cancel` frame. */
+    protected fun cancel(entry: RoomEvents.Entry<*>, handler: (state: S, actor: Actor, cancel: Cancel) -> Outcome<Event>) {
+        require(events.entry(entry.name) === entry && entry.cancellable) { "'${entry.name}' is not a cancellable entry of this logic's events" }
+        require(entry.name !in withdrawals) { "'${entry.name}' withdrawn twice" }
+        withdrawals[entry.name] = handler
+    }
+
+    /** Every intent of the app handled, every cancellable one withdrawn: checked once, when the room is built or at the first decision. */
+    fun checkCoverage() = coverage
+
+    private val coverage: Unit by lazy {
+        val kroom = setOf(events.status.name, events.cancel.name)
+        val unhandled = events.names.filter { it !in kroom && it !in handlers }
+        val unwithdrawn = events.names.filter { events.entry(it)!!.cancellable && it !in withdrawals }
+        require(unhandled.isEmpty() && unwithdrawn.isEmpty()) {
+            "${this::class.simpleName}: no handler for ${unhandled}, no cancel for ${unwithdrawn}"
+        }
+    }
+
+    fun decide(state: S, actor: Actor, intent: Event): Outcome<Event> {
+        coverage
+        return if (intent is Cancel) withdrawals[intent.intent]?.invoke(state, actor, intent) ?: Reason("not_cancellable")
+        else handlers[intent.name]?.invoke(state, actor, intent) ?: done
+    }
 }

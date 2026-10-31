@@ -2,28 +2,20 @@ package com.republicate.kroom.examples.chifoumi.game
 
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.Chat
+import com.republicate.kroom.event.ChatEvents
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
-import com.republicate.kroom.event.Emits
 import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Leave
 import com.republicate.kson.Json
 
-/*
- * The lobby's grammar — what a generator will write this file from:
- *
- *   room chifoumi-lobby {
- *     state(history: log<Chat>, queue: keyed<Player>, matches: keyed<Match{…, move1: Move visibleTo player1, move2: Move visibleTo player2}>, stats: Stats)
- *     event chat(text: String)
- *     event match cancellable -> match(player: User, match?: Match)
- *     event play(move: Move visibleTo player) cancellable -> play(player: User) | round(match: Match, round: Round)
- *     event leave -> match
- *   }
- *
- * A name on both sides is the intent's own frame with its `out` fields; a right-hand name of its
- * own is an event nobody posts. `cancel`, `join`, `leave`, `status` are kroom's.
- */
+/** The lobby's alphabet: the chat's, the game's intents, the round the logic emits; kroom's beside. */
+object LobbyEvents : ChatEvents() {
+    val match = intent(::Match, cancellable = true)
+    val play = intent(::Play, cancellable = true)
+    val round = event(::Round)
+}
 
 /** A user as the lobby lists one: who waits, who has played the round. */
 class Player(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
@@ -113,7 +105,7 @@ class Stats(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
 }
 
 /** Wanting a match: a deposit in the queue while nobody else waits, paired with the first who does. `leave` ends a match the same way, forfeited. */
-class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", cancellable = true, json = json) {
+class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", json = json) {
     var player by obj(::Player).out     // who wants one (a deposit); absent when the room ends a match
     var match by obj(::MatchView).out   // the match, when one starts or ends
     init {
@@ -128,7 +120,7 @@ class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", ca
 }
 
 /** A move: its player alone sees which (it goes into the match so); everyone sees who played. A deposit until the other plays. */
-class Play(json: Json.MutableObject = Json.MutableObject()) : Event("play", cancellable = true, emits = Emits(::Round), json = json) {
+class Play(json: Json.MutableObject = Json.MutableObject()) : Event("play", json = json) {
     val move by enum<Move>().required.visibleTo { it == player }
     var player by string().out
     init {

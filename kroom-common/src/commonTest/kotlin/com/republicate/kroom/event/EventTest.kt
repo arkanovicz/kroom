@@ -94,8 +94,8 @@ class EventTest {
         assertNull(match.meta.from)
     }
 
-    @Test fun `a registry rebuilds an intent from a frame and describes the alphabet`() {
-        val catalog = Registry(::Play, ::Match)
+    @Test fun `a room's events rebuild an intent from a frame and describe the alphabet`() {
+        val catalog = object : RoomEvents() { val play = intent(::Play); val match = intent(::Match) }
         assertEquals(setOf("status", "cancel", "play", "match"), catalog.names)   // kroom's two intents are postable in every room
         val e = catalog.of("play", """{"move":"SCISSORS"}""")
         assertIs<Play>(e)

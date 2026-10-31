@@ -250,8 +250,8 @@ class RoomTest {
         room.leave(a) // returns
     }
 
-    @Test fun `the registry is the door's events, as data`() {
-        val d = room().registry.describe().map { (it as Json.Object).getString("name") }
+    @Test fun `the room's events are the door's, as data`() {
+        val d = room().events.describe().map { (it as Json.Object).getString("name") }
         assertEquals(listOf("join", "leave", "status", "cancel", "slow", "ok", "loud", "bad", "boom", "shaped", "vip"), d)
     }
 

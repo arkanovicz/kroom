@@ -23,12 +23,15 @@ class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", json
     var timestamp by string().out
 }
 
-/** A line is numbered after the State's last and signed. A composing logic delegates its `chat` here. */
-@OptIn(ExperimentalTime::class)
-class ChatLogic(private val clock: Clock = Clock.System) : Logic<ChatState> {
-    override val registry = Registry(::Chat)
+/** The chat's alphabet: `chat`, beside kroom's. A room composing a chat extends it. */
+open class ChatEvents : RoomEvents() {
+    val chat = intent(::Chat)
+}
 
-    override fun decide(state: ChatState, actor: Actor, intent: Event): Outcome<Event> = if (intent is Chat) chat(state, actor, intent) else done
+/** A line is numbered after the State's last and signed. A composing logic delegates its `chat` handler to [chat]. */
+@OptIn(ExperimentalTime::class)
+class ChatLogic(private val clock: Clock = Clock.System, events: ChatEvents = ChatEvents()) : Logic<ChatState>(events) {
+    init { on(events.chat) { state, actor, line -> chat(state, actor, line) } }
 
     fun chat(state: ChatState, actor: Actor, chat: Chat): Outcome<Nothing> {
         chat.seq = (state.history.lastOrNull()?.seq ?: 0) + 1

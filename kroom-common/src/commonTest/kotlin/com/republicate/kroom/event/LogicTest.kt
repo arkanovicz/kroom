@@ -3,7 +3,7 @@ package com.republicate.kroom.event
 import com.republicate.kson.Json
 import kotlin.test.*
 
-/** Pins the contract: the logic is a function, the State is the fold, a deposit is the State's, the registry is the alphabet. */
+/** Pins the contract: the logic is a function, the State is the fold, a deposit is the State's, the room's events are the alphabet. */
 class LogicTest {
 
     class Set(json: Json.MutableObject = Json.MutableObject()) : Event("set", json = json) { var n by int().required.out }
@@ -11,11 +11,11 @@ class LogicTest {
         var author by string().out
         val text by string().required.visibleTo { it == author }
     }
-    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) {
+    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", json = json) {
         val by by int().required
         init { check { state: Counter, _ -> if (state.n == 10) Reason("full") else null } }
     }
-    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", emits = Emits(::Set), cancellable = true, json = json) { var user by string().out }
+    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", json = json) { var user by string().out }
     class Waiter(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { val id by string().required }
 
     class Deck(json: Json.MutableObject) : JsonView(json) {
@@ -40,18 +40,22 @@ class LogicTest {
         }
     }
 
-    object Rule : Logic<Counter> {
-        override val registry = Registry(::Add, ::Note, ::Wait)
-        override fun decide(state: Counter, actor: Actor, intent: Event): Outcome<Event> = when (intent) {
-            is Add -> add(state, intent)
-            is Note -> done
-            is Wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { intent.user = actor.id }
-            is Cancel -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel")
-            else -> Reason("unknown")
-        }
-        fun add(state: Counter, add: Add): Outcome<Set> {
-            val n = (state.n ?: 0) + add.by
-            return if (n > 10) Reason("too_big", Json.Object("max" to 10)) else emit(Set().also { it.n = n })
+    object Events : RoomEvents() {
+        val add = intent(::Add)
+        val note = intent(::Note)
+        val wait = intent(::Wait, cancellable = true)
+        val set = event(::Set)
+    }
+
+    object Rule : Logic<Counter>(Events) {
+        init {
+            on(Events.add) { state, _, add ->
+                val n = (state.n ?: 0) + add.by
+                if (n > 10) Reason("too_big", Json.Object("max" to 10)) else emit(Set().also { it.n = n })
+            }
+            on(Events.note) { _, _, _ -> done }
+            on(Events.wait) { state, actor, wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { wait.user = actor.id } }
+            cancel(Events.wait) { state, actor, _ -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel") }
         }
     }
 
@@ -66,6 +70,16 @@ class LogicTest {
         assertIs<Reason>(refused)
         assertEquals("too_big {\"max\":10}", refused.toString())
         assertEquals(4, counter.n) // a function: the State is read, never written
+    }
+
+    @Test fun `a handler per intent, a cancel per cancellable one, checked when first needed`() {
+        val partial = object : Logic<Counter>(Events) { init { on(Events.add) { _, _, _ -> done } } }
+        assertFailsWith<IllegalArgumentException> { partial.decide(Counter(), alice, Add(Json.MutableObject("by" to 1))) }   // note, wait unhandled
+        assertFailsWith<IllegalArgumentException> { partial.checkCoverage() }
+        assertFailsWith<IllegalArgumentException> { object : Logic<Counter>(Events) { init { cancel(Events.add) { _, _, _ -> done } } } }   // not cancellable
+        assertFailsWith<IllegalArgumentException> { object : Logic<Counter>(Events) { init { on(ChatEvents().chat) { _, _, _ -> done } } } }   // another room's
+        assertSame(done, Rule.decide(Counter(), alice, Join()))   // kroom's own, unhandled: nothing to do
+        assertEquals("not_cancellable", (Rule.decide(Counter(), alice, Cancel(Json.MutableObject("intent" to "add"))) as Reason).key)
     }
 
     @Test fun `a check is declared on the State it reads, and refuses before the logic`() {
@@ -103,16 +117,17 @@ class LogicTest {
         assertEquals(listOf("users", "n", "notes", "waiting"), counter.describe().map { (it as Json.Object).getString("name") })
     }
 
-    @Test fun `the registry is the alphabet, postable names apart`() {
-        val r = Rule.registry
+    @Test fun `the room's events are the alphabet, postable names apart`() {
+        val r = Rule.events
         assertEquals(setOf("status", "cancel", "add", "note", "wait"), r.names)
-        assertEquals(setOf("join", "leave", "status", "cancel", "add", "set", "note", "wait"), r.all)   // the room's own first: on every wire
+        assertEquals(listOf("join", "leave", "status", "cancel", "add", "note", "wait", "set"), r.all.toList())   // the room's own first: on every wire
         assertNull(r.of("set"))                      // nobody posts what is only emitted
         assertNotNull(r.frame("set", Json.MutableObject("n" to 1)))
         val d = r.describe().map { it as Json.Object }.associateBy { it.getString("name")!! }
         assertEquals(false, d["set"]!!.getBoolean("postable"))
-        assertEquals(listOf("set"), d["add"]!!.getArray("emits")!!.toList())
         assertEquals(true, d["wait"]!!.getBoolean("cancellable"))
+        assertEquals(false, d["add"]!!.getBoolean("cancellable"))
+        assertFailsWith<IllegalArgumentException> { object : RoomEvents() { val again = intent(::Status) } }   // declared twice
         val n = d["set"]!!.getArray("fields")!!.map { it as Json.Object }.single()
         assertEquals(true, n.getBoolean("out"))
         assertEquals(listOf(false, true), d["note"]!!.getArray("fields")!!.map { (it as Json.Object).getBoolean("selective") })

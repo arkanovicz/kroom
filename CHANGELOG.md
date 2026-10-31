@@ -42,6 +42,16 @@ All notable changes to kroom will be documented in this file.
   shape then the check on the viewer's view (`me` as the actor, null for a spectator), and `act`
   rejects without a POST, shaped like the reply (`data.reason`). `Chat` refuses a `blank` line.
   Chifoumi: `in_match` / `in_queue` on `Match`, `not_in_match` / `already_played` on `Play`.
+- The declaration, no generator (step 6, 2026-10-31): `RoomEvents` replaces `Registry` — a room's
+  alphabet as an object of typed entries (`object LobbyEvents : ChatEvents() { val play = intent(::Play,
+  cancellable = true); val round = event(::Round) }`), kroom's `join` / `leave` / `status` / `cancel`
+  inherited, `register` kept for the `on()` path; `Emits` and the event's `emits` / `cancellable` are
+  gone (`cancellable` is the entry's, an emitted name must be one of the room's). `Logic` is an abstract
+  class over its events: `on(entry) { state, actor, event -> … }` (typed, no `when`, the one cast
+  kroom's), `cancel(entry) { … }`, coverage checked when the room is built (`checkCoverage`) or at the
+  first decision. `ChatEvents` composes; `Room.events`, `Store(state, events)`, kroom-client's
+  `Room(name, state, events, engine)`. Chifoumi: `LobbyLogic` and the grammar comment gone,
+  `LobbyEvents` + `ChifoumiLogic`'s handlers.
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler

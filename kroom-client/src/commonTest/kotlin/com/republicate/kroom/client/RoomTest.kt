@@ -3,7 +3,7 @@ package com.republicate.kroom.client
 import com.republicate.kroom.event.Chat
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
-import com.republicate.kroom.event.Registry
+import com.republicate.kroom.event.ChatEvents
 import com.republicate.kroom.event.State
 import com.republicate.kson.Json
 import org.apache.velocity.engine.VelocityEngine
@@ -22,7 +22,7 @@ class RoomTest {
         lateinit var room: Room<ChatState>
         val seen = Seen { room }
         val reacted = ArrayList<String>()
-        room = Room("chat", ChatState(), Registry(::Chat), VelocityEngine(null)).apply { page = seen }
+        room = Room("chat", ChatState(), ChatEvents(), VelocityEngine(null)).apply { page = seen }
             .react { name, event -> reacted += "$name:${event?.name}:${seen.lines.size}" }
         room.frame("state", """{"history":[]}""")
         room.frame("chat", """{"text":"hi","seq":1}""")
@@ -32,7 +32,7 @@ class RoomTest {
     }
 
     @Test fun `an intent is checked on the viewer's view before its POST`() {
-        val room = Room("chat", ChatState(), Registry(::Chat), VelocityEngine(null))
+        val room = Room("chat", ChatState(), ChatEvents(), VelocityEngine(null))
         room.frame("state", """{"history":[]}""")
         assertNull(room.check("chat", Json.Object("text" to " ")))   // a spectator: the server's to refuse
         room.frame("state", """{"history":[],"me":{"id":"a","name":"Alice"}}""")

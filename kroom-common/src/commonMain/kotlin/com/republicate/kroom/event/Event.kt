@@ -19,21 +19,14 @@ class Reason(val key: String, val args: Json.Object = Json.Object()) : Outcome<N
     override fun toString() = if (args.isEmpty()) key else "$key $args"
 }
 
-/** The names an event's logic may emit after it: its arrow in the grammar, checked when it emits, served by the registry. */
-class Emits(internal val factories: List<(Json.MutableObject) -> Event>) {
-    constructor(vararg factories: (Json.MutableObject) -> Event) : this(factories.toList())
-    val names: Set<String> by lazy { factories.map { it(Json.MutableObject()).name }.toSet() }
-    companion object { val none = Emits() }
-}
-
 /**
  * The one thing that goes through E, from a gesture to a row: a name, a payload, metadata.
  * The payload is the JSON, the class is a typed view over it, and the payload alone is the wire:
  * a frame is `{...payload}`, its position on the room's channel is the SSE id. The metadata
  * (who, when, the stage, a reason) is the object's, server-side; a `_` key a client sends is
- * dropped at birth. A subclass is a declaration — name, fields, what it [emits], whether it is
- * [cancellable], its [check] — all data, what a registry hands to a browser without Kotlin (the check
- * aside: code, common, run by the browser before posting and by the room first on its loop).
+ * dropped at birth. A subclass is a declaration — name, fields, its [check] — data a room's
+ * [RoomEvents] hands to a browser without Kotlin (the check aside: code, common, run by the browser
+ * before posting and by the room first on its loop).
  *
  * The stages are the lifecycle, walked in order on this very object; a step out of order is an
  * error of the object, not a rule of a room. Who steps: validation [accept]s (stateless: a
@@ -45,9 +38,6 @@ abstract class Event(
     val name: String,
     val audience: Audience = Audience.ROOM,
     val permission: String? = null,
-    val emits: Emits = Emits.none,
-    /** Its deposit in the State may be withdrawn by `cancel`. */
-    val cancellable: Boolean = false,
     json: Json.MutableObject = Json.MutableObject()
 ) : JsonView(json) {
 
@@ -119,13 +109,11 @@ abstract class Event(
     /** The users this frame is for; none means the room. */
     val to: List<String> get() = meta.to?.map { it as String } ?: emptyList()
 
-    /** The declaration as data: what a registry serves, what a browser without Kotlin reads. */
+    /** The declaration as data: what a room's [RoomEvents] serves, what a browser without Kotlin reads. */
     fun describe(): Json.Object = Json.Object(
         "name" to name,
         "audience" to audience.name,
         "permission" to permission,
-        "cancellable" to cancellable,
-        "emits" to Json.Array(emits.names.toList()),
         "fields" to Json.Array(fields.map { it.toJson() })
     )
 
@@ -153,58 +141,3 @@ abstract class Event(
 
 /** This frame for these users (every client of theirs), not the room. */
 fun <E : Event> E.to(vararg users: String): E = apply { meta.to = Json.Array(users.toList()) }
-
-/**
- * The alphabet of a room, as declared: the intents (what a door may bring, by name) and, through
- * what they emit, every other name on the wire; the presence hooks' arrows beside. A door builds
- * the right class from a frame, a browser without Kotlin reads it as JSON.
- */
-class Registry(
-    intents: List<(Json.MutableObject) -> Event> = emptyList(),
-    val join: Emits = Emits.none,
-    val leave: Emits = Emits.none,
-    val status: Emits = Emits.none
-) {
-    constructor(vararg intents: (Json.MutableObject) -> Event) : this(intents.toList())
-
-    private val factories = LinkedHashMap<String, (Json.MutableObject) -> Event>()
-    private val postable = LinkedHashSet<String>()
-
-    // the room's own first: join and leave on every wire, posted by nobody; status and cancel, kroom's intents, posted by any client
-    init { emitted(::Join); emitted(::Leave); register(::Status); register(::Cancel); intents.forEach { register(it) } }
-
-    /** An intent: a name a door may bring. What it emits is registered with it, as emitted only. */
-    fun <E : Event> register(factory: (Json.MutableObject) -> E): Registry = apply {
-        val sample = factory(Json.MutableObject())
-        factories[sample.name] = factory
-        postable += sample.name
-        sample.emits.factories.forEach { emitted(it) }
-    }
-
-    /** A name on the wire that nobody posts: emitted by a logic, by presence, by a clock. */
-    fun emitted(factory: (Json.MutableObject) -> Event): Registry = apply {
-        val sample = factory(Json.MutableObject())
-        if (sample.name !in factories) { factories[sample.name] = factory; sample.emits.factories.forEach { emitted(it) } }
-    }
-
-    /** The postable names. */
-    val names: Set<String> get() = postable
-
-    /** Every name on the wire. */
-    val all: Set<String> get() = factories.keys
-
-    /** The intent of that name over that JSON, or null when nobody may post it. */
-    fun of(name: String, json: Json.MutableObject = Json.MutableObject()): Event? = if (name in postable) factories[name]?.invoke(json) else null
-
-    /** A frame as received: the name is the SSE event name, the data its JSON. */
-    fun of(name: String, data: String): Event? = of(name, Json.parse(data) as? Json.MutableObject ?: return null)
-
-    /** Any name's class, for a fold: a frame is rebuilt whether posted or emitted. */
-    fun frame(name: String, json: Json.MutableObject): Event? = factories[name]?.invoke(json)
-
-    fun factory(name: String): ((Json.MutableObject) -> Event)? = factories[name]
-
-    fun describe(): Json.Array = Json.Array(factories.map { (name, f) ->
-        Json.MutableObject(f(Json.MutableObject()).describe()).also { it["postable"] = name in postable }
-    })
-}

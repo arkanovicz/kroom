@@ -36,7 +36,7 @@ fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
     }
 }
 
-/** The registry as data, `GET /rooms/{room}/events`: the state's fields and the alphabet, what a browser without Kotlin reads. */
+/** The room's events as data, `GET /rooms/{room}/events`: the state's fields and the alphabet, what a browser without Kotlin reads. */
 fun Route.events() {
     get("/rooms/{room}/events") {
         val room = Lobby.get<Any>(call.parameters["room"]!!) ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))

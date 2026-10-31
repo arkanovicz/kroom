@@ -4,7 +4,7 @@ import com.republicate.kroom.event.Actor
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Reason
-import com.republicate.kroom.event.Registry
+import com.republicate.kroom.event.RoomEvents
 import com.republicate.kroom.event.State
 import com.republicate.kroom.event.Store
 import com.republicate.kroom.event.UserPresence
@@ -21,10 +21,10 @@ import org.apache.velocity.engine.sink.OutputSink
  * differs; then the reactions. The DOM is the merges' output, never read back; a page's roots are `state` (the
  * viewer's view), `me` (its presence entry, null for a spectator) and `page`.
  *
- * [engine] knows the pages: on the browser, the app's compiled classes behind its registry.
+ * [engine] knows the pages: on the browser, the app's compiled classes behind its template registry.
  */
-class Room<S : State>(val name: String, val state: S, registry: Registry, private val engine: VelocityEngine) {
-    val store = Store(state, registry)
+class Room<S : State>(val name: String, val state: S, events: RoomEvents, private val engine: VelocityEngine) {
+    val store = Store(state, events)
 
     val me: UserPresence? get() = (state.json["me"] as? Json.MutableObject)?.let(::UserPresence)
 
@@ -40,16 +40,16 @@ class Room<S : State>(val name: String, val state: S, registry: Registry, privat
 
     /**
      * What the room would refuse first, on this view, before the POST: the declared shape, then the intent's check, by
-     * the viewer from [client]. Null: post it (a spectator, or a name the registry does not know, is the server's to refuse).
+     * the viewer from [client]. Null: post it (a spectator, or a name the room does not speak, is the server's to refuse).
      */
     fun check(type: String, payload: Json.Object, client: String? = null): Reason? {
         val me = me ?: return null
-        val intent = store.registry.of(type, Json.MutableObject(payload)) ?: return null
+        val intent = store.events.of(type, Json.MutableObject(payload)) ?: return null
         val actor = object : Actor { override val id = me.id; override val name = me.name ?: me.id; override val client = client }
         return intent.validate() ?: intent.check(state, actor)
     }
 
-    /** An effect after each frame's merge, with the frame's name and the event it was (null for `state`, or a name the registry does not know). */
+    /** An effect after each frame's merge, with the frame's name and the event it was (null for `state`, or a name the room does not speak). */
     fun react(reaction: (name: String, event: Event?) -> Unit): Room<S> = apply { reactions += reaction }
 
     /** One frame of the stream: folded, merged, reacted to. */

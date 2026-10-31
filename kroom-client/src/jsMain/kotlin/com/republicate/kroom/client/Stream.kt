@@ -21,7 +21,7 @@ fun Room<*>.connect(events: String = "/events"): EventSource {
     val tab = api.tabId() as String?
     val url = if (tab == null) events else events + (if ('?' in events) "&" else "?") + "tabId=" + encodeURIComponent(tab)
     val source = EventSource(url)
-    for (name in store.registry.all + "state") source.addEventListener(name, { e: org.w3c.dom.events.Event -> frame(name, e.asDynamic().data as String) })
+    for (name in store.events.all + "state") source.addEventListener(name, { e: org.w3c.dom.events.Event -> frame(name, e.asDynamic().data as String) })
     return source
 }
 

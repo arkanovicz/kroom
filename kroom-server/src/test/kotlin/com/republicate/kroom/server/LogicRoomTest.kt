@@ -3,14 +3,12 @@ package com.republicate.kroom.server
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
-import com.republicate.kroom.event.Emits
 import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Logic
-import com.republicate.kroom.event.Outcome
 import com.republicate.kroom.event.Reason
-import com.republicate.kroom.event.Registry
+import com.republicate.kroom.event.RoomEvents
 import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.State
 import com.republicate.kroom.event.Status
@@ -34,13 +32,14 @@ class LogicRoomTest {
         var author by string().out
         val text by string().required.visibleTo { it == author }
     }
-    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", emits = Emits(::Set), json = json) {
+    class Add(json: Json.MutableObject = Json.MutableObject()) : Event("add", json = json) {
         val by by int().required
         init { check { state: Counter, _ -> if (state.n == 10) Reason("full") else null } }
     }
     class Odd(json: Json.MutableObject = Json.MutableObject()) : Event("odd", json = json) { init { check { _: ChatState, _ -> null } } }
-    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", emits = Emits(::Set), cancellable = true, json = json) { var user by string().out }
-    class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", emits = Emits(::Set), json = json) { val who by string().required }
+    class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", json = json) { var user by string().out }
+    class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", json = json) { val who by string().required }
+    class Stray(json: Json.MutableObject = Json.MutableObject()) : Event("stray", json = json)
     class Waiter(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { val id by string().required }
 
     class Counter(json: Json.MutableObject = Json.MutableObject()) : State(json) {
@@ -61,21 +60,28 @@ class LogicRoomTest {
         }
     }
 
-    object Rule : Logic<Counter> {
-        override val registry = Registry(listOf(::Add, ::Note, ::Wait, ::Whisper), leave = Emits(::Set))
-        override fun decide(state: Counter, actor: Who, intent: Event): Outcome<Event> = when (intent) {
-            is Add -> when {
-                intent.by == 7 -> emit(Note(Json.MutableObject("text" to "seven"))) // not among add's emits
-                (state.n ?: 0) + intent.by > 10 -> Reason("too_big", Json.Object("max" to 10))
-                else -> emit(Set().also { it.n = (state.n ?: 0) + intent.by })
+    object Events : RoomEvents() {
+        val add = intent(::Add)
+        val note = intent(::Note)
+        val wait = intent(::Wait, cancellable = true)
+        val whisper = intent(::Whisper)
+        val set = event(::Set)
+    }
+
+    object Rule : Logic<Counter>(Events) {
+        init {
+            on(Events.add) { state, _, add ->
+                when {
+                    add.by == 7 -> emit(Stray())   // not a name of the room
+                    (state.n ?: 0) + add.by > 10 -> Reason("too_big", Json.Object("max" to 10))
+                    else -> emit(Set().also { it.n = (state.n ?: 0) + add.by })
+                }
             }
-            is Note -> done.also { intent.author = actor.id }
-            is Wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { intent.user = actor.id }
-            is Cancel -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel")
-            is Whisper -> emit(Set().also { it.n = 99 }.to(intent.who))
-            is Leave -> emit(Set().also { it.n = 0 })
-            is Join, is Status -> done
-            else -> Reason("unknown")
+            on(Events.note) { _, actor, note -> done.also { note.author = actor.id } }
+            on(Events.wait) { state, actor, wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { wait.user = actor.id } }
+            cancel(Events.wait) { state, actor, _ -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel") }
+            on(Events.whisper) { _, _, whisper -> emit(Set().also { it.n = 99 }.to(whisper.who)) }
+            on(Events.leave) { _, _, _ -> emit(Set().also { it.n = 0 }) }
         }
     }
 
@@ -132,11 +138,11 @@ class LogicRoomTest {
         ca.next(); ca.next()   // add, set
         room.act(alice, Add(json("by" to 1))).await().let { assertEquals(Stage.REJECTED, it.stage); assertEquals("full", it.meta.reason) }   // not the logic's too_big
         ca.silent()
-        val odd = object : Logic<Counter> {
-            override val registry = Registry(::Odd)
-            override fun decide(state: Counter, actor: Who, intent: Event): Outcome<Event> = done
-        }
+        val oddEvents = object : RoomEvents() { val odd = intent(::Odd) }
+        val odd = object : Logic<Counter>(oddEvents) { init { on(oddEvents.odd) { _, _, _ -> done } } }
         assertFailsWith<IllegalArgumentException> { LogicRoom("odd-${n++}", Counter(), odd) }
+        val partial = object : Logic<Counter>(Events) { init { on(Events.add) { _, _, _ -> done } } }
+        assertFailsWith<IllegalArgumentException> { LogicRoom("partial-${n++}", Counter(), partial) }   // a room is built covered or not at all
     }
 
     @Test fun `a reason is the verdict alone, nothing framed, nothing changed`() = runBlocking {
@@ -257,12 +263,11 @@ class LogicRoomTest {
         cb.silent()
     }
 
-    @Test fun `the registry describes the state and the alphabet`() {
+    @Test fun `the room describes the state and the alphabet`() {
         val d = room().describe()
         assertEquals(listOf("users", "n", "notes", "waiting"), d.objects("state").map { it.getString("name") })
         val events = d.objects("events").associateBy { it.getString("name")!! }
         assertEquals(false, events["set"]!!.getBoolean("postable"))
-        assertEquals(listOf("set"), events["add"]!!.getArray("emits")!!.toList())
         assertEquals(true, events["wait"]!!.getBoolean("cancellable"))
         assertEquals(true, events["status"]!!.getBoolean("postable"))
         assertEquals(true, events["cancel"]!!.getBoolean("postable"))

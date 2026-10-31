@@ -10,13 +10,13 @@ import com.republicate.kson.Json
  * What the viewer deposited is the State's (`queue ∋ me`): a deposit and its withdrawal are frames
  * its `reduce` sees (the intent, its `cancel`, what the logic emits, a `leave`).
  */
-class Store<S : State>(val state: S, val registry: Registry) {
+class Store<S : State>(val state: S, val events: RoomEvents) {
     val json: Json.MutableObject get() = state.json
 
-    /** One frame of the stream: the event it was, or null for `state` and for a name the registry does not know. */
+    /** One frame of the stream: the event it was, or null for `state` and for a name the room does not speak. */
     fun fold(name: String, data: Json.Object): Event? {
         if (name == "state") { json.clear(); json.putAll(data); return null }
-        val frame = registry.frame(name, data as? Json.MutableObject ?: Json.MutableObject(data)) ?: return null
+        val frame = events.frame(name, data as? Json.MutableObject ?: Json.MutableObject(data)) ?: return null
         state.reduce(frame)
         return frame
     }

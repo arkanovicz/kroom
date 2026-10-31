@@ -22,26 +22,27 @@ import com.republicate.kson.Json
  * hands them to the logic like intents. Nothing is held here: a deposit is the State's.
  * Every snapshot carries `me`.
  */
-open class LogicRoom<S : State>(id: String, override var state: S, val logic: Logic<S>) : Room<S>(id, logic.registry) {
+open class LogicRoom<S : State>(id: String, override var state: S, val logic: Logic<S>) : Room<S>(id, logic.events) {
     // loop-confined: the current step's emission, kept until the intent itself is framed
     private var outcome: Emit<Event>? = null
 
     init {
-        registry.all.forEach { name ->
-            registry.factory(name)!!(Json.MutableObject()).checkState?.let { require(it.isInstance(state)) { "'$name' is checked on ${it.simpleName}, room '$id' holds ${state::class.simpleName}" } }
+        events.all.forEach { name ->
+            events.frame(name, Json.MutableObject())!!.checkState?.let { require(it.isInstance(state)) { "'$name' is checked on ${it.simpleName}, room '$id' holds ${state::class.simpleName}" } }
         }
+        logic.checkCoverage()
         // the check first, on the loop: the State it read is the one the logic decides on
-        registry.names.forEach { name -> on(registry.factory(name)!!) { actor, intent -> intent.check(state, actor) ?: settle(intent, logic.decide(state, actor, intent), intent.emits.names) } }
+        events.names.forEach { name -> on(events.entry(name)!!.factory) { actor, intent -> intent.check(state, actor) ?: settle(intent, logic.decide(state, actor, intent)) } }
         on(::Status) { actor, status -> status(actor, status) }
         on(::Cancel) { actor, cancel -> cancel(actor, cancel) }
         // the logic hears a user, not a connection
-        on(::Join) { actor, join -> if (join.first == true) hook(actor, join, registry.join.names) else null }
-        on(::Leave) { actor, leave -> if (leave.last == true) hook(actor, leave, registry.leave.names) else null }
+        on(::Join) { actor, join -> if (join.first == true) hook(actor, join) else null }
+        on(::Leave) { actor, leave -> if (leave.last == true) hook(actor, leave) else null }
     }
 
     /** A presence event: the logic cannot refuse it, a reason there is the logic's error. */
-    private fun hook(actor: Actor, event: Event, allowed: Set<String>): Reason? {
-        settle(event, logic.decide(state, actor, event), allowed)?.let { logger.error("'${event.name}' refused by the logic in room '$id': $it") }
+    private fun hook(actor: Actor, event: Event): Reason? {
+        settle(event, logic.decide(state, actor, event))?.let { logger.error("'${event.name}' refused by the logic in room '$id': $it") }
         return null
     }
 
@@ -51,21 +52,21 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
         status.user = user.userId
         status.client = Client().also { it.id = actor.tab; it.kind = actor.kind; it.status = actor.status }
         status.status = presence(user).status!!
-        return settle(status, logic.decide(state, actor, status), registry.status.names)
+        return settle(status, logic.decide(state, actor, status))
     }
 
-    /** A cancel names a cancellable intent; what there is to withdraw, the logic reads in the State. It may emit what that intent emits. */
+    /** A cancel names a cancellable intent; what there is to withdraw, the logic reads in the State. */
     private fun cancel(actor: Actor, cancel: Cancel): Reason? {
-        val intent = registry.of(cancel.intent)?.takeIf { it.cancellable } ?: return Reason("not_cancellable")
+        if (events.entry(cancel.intent)?.cancellable != true) return Reason("not_cancellable")
         cancel.user = actor.id
-        return settle(cancel, logic.decide(state, actor, cancel), intent.emits.names)
+        return settle(cancel, logic.decide(state, actor, cancel))
     }
 
     /** The verdict of an outcome; an emission is kept for [follow], once the intent itself is framed. */
-    private fun settle(intent: Event, outcome: Outcome<Event>, allowed: Set<String>): Reason? = when (outcome) {
+    private fun settle(intent: Event, outcome: Outcome<Event>): Reason? = when (outcome) {
         is Reason -> outcome
         is Emit -> {
-            val stray = outcome.events.firstOrNull { it.name !in allowed }
+            val stray = outcome.events.firstOrNull { it.name !in events.all }
             if (stray != null) Reason("error").also { logger.error("'${intent.name}' emits '${stray.name}', undeclared, in room '$id'") }
             else { this.outcome = outcome; null }
         }
@@ -87,7 +88,7 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
         actor.user?.let { u -> it["me"] = presence(u).json }
     }
 
-    override fun describe(): Json.Object = Json.Object("state" to state.describe(), "events" to registry.describe())
+    override fun describe(): Json.Object = Json.Object("state" to state.describe(), "events" to events.describe())
 
     /** A presence entry, for a test or a lobby. */
     fun presenceOf(userId: String): UserPresence? = users[userId]?.let(::presence)

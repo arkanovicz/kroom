@@ -3,7 +3,7 @@ package com.republicate.kroom.examples.chifoumi
 import com.republicate.kroom.client.Room
 import com.republicate.kroom.event.State
 import com.republicate.kroom.examples.chifoumi.game.FoldTest
-import com.republicate.kroom.examples.chifoumi.game.LobbyLogic
+import com.republicate.kroom.examples.chifoumi.game.LobbyEvents
 import com.republicate.kroom.examples.chifoumi.game.LobbyState
 import com.republicate.kson.Json
 import org.apache.velocity.engine.Config
@@ -49,7 +49,7 @@ class RegionsTest {
     }
 
     @Test fun `the lobby's regions over the match`() {
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyLogic.registry, engine)
+        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
         val page = LobbyPage(room, say) { "t" }
         var stat: DElement? = null
         var line: DElement? = null
@@ -72,7 +72,7 @@ class RegionsTest {
     @Test fun `the game's regions over the match`() {
         val match = frames[3].getObject("data")!!.getObject("match")!!
         val snapshot = Json.MutableObject(frames[0]).also { it["data"] = Json.MutableObject(frames[0].getObject("data")!!).also { d -> d["matches"] = Json.MutableObject(match.getString("id")!! to match) } }
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyLogic.registry, engine)
+        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
         var pending: (() -> Unit)? = null
         val page = GamePage(room, say, verdict = { "verdict $it" }, later = { _, fn -> pending = fn; { pending = null } })
         val shown = ArrayList<String>()
