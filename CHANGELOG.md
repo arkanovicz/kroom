@@ -52,6 +52,14 @@ All notable changes to kroom will be documented in this file.
   first decision. `ChatEvents` composes; `Room.events`, `Store(state, events)`, kroom-client's
   `Room(name, state, events, engine)`. Chifoumi: `LobbyLogic` and the grammar comment gone,
   `LobbyEvents` + `ChifoumiLogic`'s handlers.
+- Routes from the room's events (kroom-server): `Route.room(room) { call -> user }` mounts the stream
+  (`GET /rooms/{id}/stream`), one `POST /rooms/{id}/{name}` per intent, the catalog and, for a chat, the
+  history, installing ktor's SSE when absent; `Route.intents` is now `POST /rooms/{room}/{name}` too (the
+  payload is the body, no `type`), `/act` is gone. kroom-webapp-assets: `api.act(room, type, payload)` posts to
+  `rooms/<room>/<type>` (an app's own path keeps `{type, …}`), `api.base`. kroom-client: `connect()` defaults to
+  `<api>/rooms/<name>/stream`, `act(event)` typed, `on(entry) { event -> }` typed beside `react`. Chifoumi:
+  its stream block, the three principals and `Lobby.register` give way to one `room(ChifoumiLobby) { … }`;
+  the lobby's chat scroll on `on(LobbyEvents.chat)`. `RouteTest` pins the routes.
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler

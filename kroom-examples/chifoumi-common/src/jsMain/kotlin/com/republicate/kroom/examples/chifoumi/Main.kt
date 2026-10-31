@@ -30,10 +30,8 @@ fun main() {
         room.page = page
         region("online-num", "online.html")
         region("lobby-section", "lobby.html")
-        room.react { name, _ ->
-            if (name == "chat") document.getElementById("chat-log")?.let { it.scrollTop = it.scrollHeight.toDouble() }
-            if (page.match != null) window.location.href = "/$lang/game.html"   // the viewer's match is on (a reconnect lands there too)
-        }
+        room.on(LobbyEvents.chat) { document.getElementById("chat-log")?.let { it.scrollTop = it.scrollHeight.toDouble() } }
+        room.react { _, _ -> if (page.match != null) window.location.href = "/$lang/game.html" }   // the viewer's match is on (a reconnect lands there too)
     }
     if (document.getElementById("game-area") != null) {
         val page = GamePage(room, say,

@@ -123,12 +123,18 @@ const api = (function() {
 
         tabId,
 
+        // where the API answers, for the URLs a caller builds itself (a room's stream)
+        base,
+
         // The reply is the verdict: 200 accepted, 4xx rejects with `.data` = {reason, args}; the
-        // effects come down the stream. `target` is a room name, or a path of the app's own when it holds a slash.
+        // effects come down the stream. `target` is a room name (the intent has its own path,
+        // `rooms/<room>/<type>`, the payload its body), or a path of the app's own when it holds a slash
+        // (the body carries the name as `type`).
         act: (target, type, payload) => {
-            const path = target.includes('/') ? target : `rooms/${encodeURIComponent(target)}/act`;
-            // the intent's name wins over a payload key: it keys the verdict
-            return send('POST', path, { ...payload, type }, { 'X-Kroom-Tab': tabId() })
+            const own = target.includes('/');
+            const path = own ? target : `rooms/${encodeURIComponent(target)}/${encodeURIComponent(type)}`;
+            // on an app's own path the intent's name wins over a payload key: it keys the verdict
+            return send('POST', path, own ? { ...payload, type } : payload, { 'X-Kroom-Tab': tabId() })
                 .then(resp => resp.ok ? (resp.body ? resp.json() : Promise.resolve({})) : Promise.reject(resp))
                 .catch(err => error(err));
         }

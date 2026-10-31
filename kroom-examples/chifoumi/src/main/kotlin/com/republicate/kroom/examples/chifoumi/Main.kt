@@ -1,7 +1,5 @@
 package com.republicate.kroom.examples.chifoumi
 
-import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
-import com.republicate.kroom.server.Lobby
 import com.republicate.kroom.examples.chifoumi.routes.PlayerSession
 import com.republicate.kroom.examples.chifoumi.routes.chifoumiPages
 import com.republicate.kroom.examples.chifoumi.routes.chifoumiRoutes
@@ -12,7 +10,6 @@ import com.republicate.kroom.webapp.velocity.installVelocity
 import io.ktor.server.application.*
 import java.io.File
 import io.ktor.server.engine.*
-import io.ktor.server.sse.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
@@ -30,8 +27,6 @@ fun Application.module() {
             devDir = File("src/main/resources/static")
         }
     }
-
-    install(SSE)
 
     // Install sessions
     install(Sessions) {
@@ -52,9 +47,6 @@ fun Application.module() {
         language("fr", "Français")
         i18nPath = "/i18n"
     }
-
-    // the lobby answers to its name on the intent door
-    Lobby.register(ChifoumiLobby)
 
     // Configure routes
     routing {

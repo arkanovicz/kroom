@@ -65,7 +65,7 @@ const buttons = `
     const replies = {};
     const hold = (intent) => new Promise(resolve => { replies[intent] = { release: resolve }; });
     const { calls, click, $, window, api, intents } = page(buttons, (url, body) => {
-        const reply = replies[body?.type];
+        const reply = replies[url.split('/').pop()];
         if (reply?.release) return new Promise(resolve => { reply.answer = resolve; });
         if (reply?.throws) throw new Error(reply.throws);
         return reply;
@@ -79,8 +79,8 @@ const buttons = `
     check('a click marks its trigger busy', [rock.getAttribute('aria-busy'), rock.disabled], ['true', true]);
     check('the intent is in flight', intents.busy('play'), true);
     await sleep(10);
-    check('the intent is posted to the room', [calls.length, calls[0]?.url, calls[0]?.method], [1, '/api/rooms/chifoumi/act', 'POST']);
-    check('its body is the type plus the other data-*', calls[0]?.body, { move: 'rock', type: 'play' });
+    check('the intent is posted to its own path in the room', [calls.length, calls[0]?.url, calls[0]?.method], [1, '/api/rooms/chifoumi/play', 'POST']);
+    check('its body is the other data-*', calls[0]?.body, { move: 'rock' });
     check('it names its tab', calls[0]?.headers['X-Kroom-Tab'], api.tabId());
     check('busy spans the post', [rock.getAttribute('aria-busy'), intents.busy('play')], ['true', true]);
 
@@ -91,7 +91,7 @@ const buttons = `
     replies.leave = { status: 200, payload: {} };
     click('[data-intent="leave"]');
     await sleep(10);
-    check('another intent is not blocked', [calls.length, calls[1]?.body], [2, { type: 'leave' }]);
+    check('another intent is not blocked', [calls.length, calls[1]?.url], [2, '/api/rooms/chifoumi/leave']);
     dispatched.length = 0;
 
     replies.play.answer({ status: 200, payload: {} });

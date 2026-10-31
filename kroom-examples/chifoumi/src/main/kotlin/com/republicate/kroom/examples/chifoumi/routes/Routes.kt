@@ -1,12 +1,8 @@
 package com.republicate.kroom.examples.chifoumi.routes
 
 import com.republicate.kroom.examples.chifoumi.sse.ChifoumiLobby
-import com.republicate.kroom.server.Actor
 import com.republicate.kroom.server.Users
-import com.republicate.kroom.server.chatHistory
-import com.republicate.kroom.server.events
-import com.republicate.kroom.server.intents
-import com.republicate.kroom.server.tabId
+import com.republicate.kroom.server.room
 import com.republicate.kroom.webapp.core.respondError
 import com.republicate.kroom.webapp.core.respondJson
 import com.republicate.kroom.webapp.core.respondSuccess
@@ -17,9 +13,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
-import io.ktor.server.sse.*
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Simple session for anonymous players.
@@ -31,29 +24,6 @@ data class PlayerSession(val identifier: String, val playerName: String)
  * Configure all routes for Chifoumi.
  */
 fun Route.chifoumiRoutes() {
-    // SSE endpoint for real-time updates
-    sse("/events") {
-        heartbeat { period = 15.seconds }
-        val session = call.sessions.get<PlayerSession>()
-        if (session == null) {
-            call.respond(HttpStatusCode.Unauthorized, "Not logged in")
-            return@sse
-        }
-
-        // identity = the session; the tab id keeps a reconnecting tab the same connection
-        val user = Users.getOrCreate(session.identifier, session.playerName)
-        val actor = Actor(Actor.connectionId(user, call.tabId), user, session.playerName)
-        val channel = ChifoumiLobby.join(actor)
-
-        try {
-            channel.consumeAsFlow().collect { event ->
-                send(event)
-            }
-        } finally {
-            ChifoumiLobby.leave(actor)
-        }
-    }
-
     // API routes
     route("/api") {
         // Join game (create/get session)
@@ -102,17 +72,8 @@ fun Route.chifoumiRoutes() {
             respondSuccess("Goodbye!")
         }
 
-        // Every move of a player: POST /api/rooms/chifoumi-lobby/act {type, ...}
-        intents { call ->
-            call.sessions.get<PlayerSession>()?.let { Users.getOrCreate(it.identifier, it.playerName) }
-        }
-        // What the room accepts: GET /api/rooms/chifoumi-lobby/events
-        events()
-
-        // Scroll-back of the lobby's chat: GET /api/rooms/chifoumi-lobby/history?before=
-        chatHistory { call ->
-            call.sessions.get<PlayerSession>()?.let { Users.getOrCreate(it.identifier, it.playerName) }
-        }
+        // the lobby, read from its events: the stream, a route per intent, the catalog, the chat's scroll-back
+        room(ChifoumiLobby) { call -> call.sessions.get<PlayerSession>()?.let { Users.getOrCreate(it.identifier, it.playerName) } }
     }
 }
 

@@ -82,7 +82,7 @@ The payload alone is the wire; the metadata (who, when, the stage, a reason) is 
 server-side, and a `_` a client sends is dropped at birth:
 
 ```
-browser  click [data-intent=play] ──POST /api/rooms/<room>/act {type, …}──▶ act: validation (declared shape, permission), stateless
+browser  click [data-kroom-intent=play] ──POST /api/rooms/<room>/play {…}──▶ act: validation (declared shape, permission), stateless
          trigger freed / reason shown  ◀── 200 {} | 400 {reason, args} ───┤  on the loop: the handler applies or rejects
          store.dispatch  ◀──────────────── SSE ───────────────────────────┘  the handler's own emissions, then the event, to their audience
 
@@ -192,7 +192,14 @@ event: play   id: 42   data: {"move":"rock"}
   what differs); the viewer's perspective and the feed are page memory (`LobbyPage`, `GamePage`).
   `RegionsTest` checks each region's tree against its text render over the recording. The pages' own
   scripts are login, language and opening the stream.
-- **Validation** (`Room.act`, `Route.intents { call -> user }` on `POST /rooms/{room}/act`) is
+- **Routes, from the room's events**: `room(room) { call -> user }` (kroom-server) mounts the stream
+  (`GET /rooms/{id}/stream`: the viewer's snapshot, then every frame), one `POST /rooms/{id}/{name}`
+  per intent, the catalog (`GET /rooms/{id}/events`) and, for a chat, the scroll-back
+  (`GET /rooms/{id}/history`); it installs ktor's SSE if the app has not. `Route.intents` is the
+  same door for every room the `Lobby` knows. In the browser, kroom-client's `connect()` opens
+  `<api>/rooms/<name>/stream`, `act(Play(…))` posts typed, `on(LobbyEvents.round) { round -> … }`
+  reacts typed.
+- **Validation** (`Room.act`, the intent routes above) is
   stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
   permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`
   before the loop, never queued.
@@ -408,8 +415,9 @@ api.putJson('users/1', data)   // PUT -> JSON
 api.deleteJson('users/1')      // DELETE -> JSON
 
 // Intents (see above): fire and forget, the verdict comes down the stream
-api.act('lobby', 'play', { move: 'rock' })   // POST rooms/lobby/act {type:'play', move:'rock'}, X-Kroom-Tab
-api.act('game/7/act', 'play', { move })      // a path of the app's own (holds a slash)
+api.act('lobby', 'play', { move: 'rock' })   // POST rooms/lobby/play {move:'rock'}, X-Kroom-Tab
+api.act('game/7/act', 'play', { move })      // a path of the app's own (holds a slash): {type:'play', move}
+api.base                                     // where the API answers ('/api/', or kroomApiBase + '/api/')
 api.tabId()                                  // this tab's id (sessionStorage)
 ```
 

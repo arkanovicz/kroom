@@ -31,7 +31,9 @@ async function page(template, scripts) {
     w.fetch = async (url, opts = {}) => {
         const body = opts.body ? JSON.parse(opts.body) : null;
         if (url.endsWith('/session')) return new Response(JSON.stringify({ id: 'b', name: 'Bob' }), { headers: { 'content-type': 'application/json' } });
-        posts.push(body);
+        // an intent's name is its path: kept beside its body, as the checks read it
+        const m = url.match(/\/api\/rooms\/chifoumi-lobby\/(\w+)$/);
+        posts.push(m ? { ...body, type: m[1] } : { ...body, url });
         return new Response(JSON.stringify(reply), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     const listeners = {};
@@ -53,6 +55,7 @@ async function page(template, scripts) {
     for (const f of frames.slice(0, 3)) await p.send(f);
     console.log('lobby online', p.$t('#online-num'), '| me', p.$t('#player-display'), '| queue', p.$t('#queue-count'), '| feed', p.$t('#activity-feed'));
     must(p.$t('#online-num') === '2' && p.$t('#player-display') === 'Bob', 'lobby: online count and the viewer from the snapshot');
+    must(/^\/api\/rooms\/chifoumi-lobby\/stream\?tabId=/.test(p.w.__es?.url), 'lobby: the room\'s stream, by its name');
     must(p.vis('#queue-count') && /1 waiting/.test(p.$t('#queue-count')), 'lobby: alice waits');
     p.setReply({ pending: true });
     await p.click('[data-kroom-intent="match"]');
