@@ -5,10 +5,10 @@ Kotlin multiplatform library for real-time collaborative applications using Serv
 ## Modules
 
 ```
-kroom-common          multiplatform core types
+kroom-common          the common declaration of a room: State, events, RoomEvents, Logic (KMP)
 kroom-client          a page on a room: the stream folded into the State, its regions merged into the DOM by the engine's sink after every frame (KMP jvm+js)
 kroom-view            client-side SSE handling (JS/Wasm)
-kroom-server          server-side Room/Lobby/Actor abstractions
+kroom-server          rooms on the JVM: the loop, presence, Route.room (stream, intents, catalog)
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
 kroom-webapp-assets   shared client-side JS/CSS
 kroom-webapp-velocity Velocity template integration
@@ -25,13 +25,13 @@ kroom-webapp-authoring-demo  the authoring stack as a thing you can click (kroom
 
 ## Features
 
-- Room-based real-time sessions with SSE
-- Actor presence and reconnection handling
-- Last-Event-ID replay for selective event types (e.g., chat)
-- Table abstraction for seat-based games with player status tracking
-- Multi-tab support via User-centric identity model
-- Per-connection heartbeat via Ktor SSE (dead connection detection)
-- Coroutine-based async processing
+- Rooms over events: HTTP intents up, the verdict as the reply, SSE frames down
+- One declaration in common Kotlin (State, events, logic) for the server and the browser
+- Per-viewer visibility (selective and hidden fields), presence as a State field
+- Server-rendered chrome, room regions merged into the DOM by the engine's sink
+- Multi-tab support via a user-centric identity model
+- Per-connection heartbeat (dead connection detection)
+- Table abstraction for seat-based games (the older `on()` path)
 
 ## Quick Start
 
@@ -44,247 +44,227 @@ dependencies {
 ```
 
 ```kotlin
-// Define a room
-class Chat(json: Json.MutableObject = Json.MutableObject()) : Event("chat", json = json) {
-    val text by string().required          // the declaration: a typed view over the JSON, data for the catalog
-}
-class ChatRoom(id: String) : Room<ChatState>(id) {
-    override var state = ChatState()
-    override fun stateToJson() = state.toJson()
-    init { on(::Chat) { actor, chat -> state.add(actor.name, chat.text); null } }   // null = applied
-}
+// common code: the State, the events, the alphabet, the logic (see Events below)
+val chatRoom = ChatRoom("lobby")   // a chat room: ChatState, ChatEvents, ChatLogic
 
 // Setup Ktor
-Lobby.register(ChatRoom("lobby"))
 routing {
     kroomAssets()  // serve shared JS/CSS
-    sse("/events/{room}") {
-        val user = call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } ?: return@sse
-        val actor = Actor(Actor.connectionId(user, call.tabId), user)
-        val channel = Lobby.get<ChatState>(call.parameters["room"]!!)!!.join(actor)
-        try { for (event in channel) send(event) } finally { room.leave(actor) }
-    }
     route("/api") {
-        intents { call -> call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } }
+        room(chatRoom) { call -> call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } }
     }
 }
 ```
 
 ## Events
 
-One class goes through E, from a gesture to a row: an `Event` (kroom-common, the same class on the
-JVM and in Kotlin/JS) — a name, a payload, metadata. The payload is JSON, the class a typed view
-over it (`val move by enum<Move>().required`, the property name is the key); declaring a field
-records it, so the declaration is data (`describe()`, served as `GET /api/rooms/<room>/events`:
-the state's fields and the alphabet, each name with its fields, what it `emits`, whether it is
-`cancellable`, whether a client may post it).
-The payload alone is the wire; the metadata (who, when, the stage, a reason) is the object's,
-server-side, and a `_` a client sends is dropped at birth:
+A room is a **State**, an **alphabet of events**, a **logic**, one loop and one stream. The browser
+posts an intent over HTTP and gets the verdict as the reply; every fact comes down the room's SSE
+stream as a frame. The State, the events and the logic are common Kotlin: the same classes run on
+the server and, compiled to JS, in the browser.
 
 ```
-browser  click [data-kroom-intent=play] ──POST /api/rooms/<room>/play {…}──▶ act: validation (declared shape, permission), stateless
-         trigger freed / reason shown  ◀── 200 {} | 400 {reason, args} ───┤  on the loop: the handler applies or rejects
-         store.dispatch  ◀──────────────── SSE ───────────────────────────┘  the handler's own emissions, then the event, to their audience
+browser  click [data-kroom-intent=play] ──POST /api/rooms/<room>/play {move}──▶ door: shape, permission (stateless)
+         trigger freed / reason shown  ◀─── 200 {} | 400 {reason, args} ────┤ loop: check, then the logic decides
+         fold + merge into the DOM     ◀──────── SSE: the frames ───────────┘ the intent's frame, then what it emits
 
-event: play   id: 42   data: {"move":"rock"}
+event: play   id: 42   data: {"player":"a"}
 ```
 
-- **The contract** (`kroom-common`, the same on every target): a `State` is the room's data, a
-  view over its JSON whose fields are written in one place, `reduce(event)`, from a frame (declare
-  them `private set`: the logic can only read them); `RoomEvents` is the alphabet, an object of
-  typed entries, every name on the wire, an `intent` (a client may post it) or an `event` (born by
-  the room), kroom's `join` / `leave` / `status` / `cancel` in every one; a `Logic` is the room's
-  decisions, one typed handler per intent declared on its entry, answering an `Outcome`, pure and
-  stateless (what it needs from the platform, a clock, ids, comes through its constructor; a
-  missing handler is refused when the room is built). Nothing is generated: the Kotlin is the
-  declaration. The room (`LogicRoom(id, state, logic)`) is the machine: it runs the logic on
-  its loop, frames the intent and what it emits, folds every frame into the state as it goes, so
-  the server's state is the fold it serves and `reduce*(snapshot@N, frames) == snapshot@M` by
-  construction, per viewer. A client folds the stream with the same class: `Store(state,
-  events)` replaces on `state` and hands every other frame to the same `reduce` (presence
-  included: `users` is a field of the base `State`).
+### Declaring a room (common code)
 
-  ```kotlin
-  class Counter : State() {
-      var n by int()                                          // `set {n}` replaces it
-          private set
-      val notes by log(::Note, max = 50)                      // a `note` frame appends
-      val waiting by keyed(::Waiter)                          // the `wait` deposits
-      override fun reduce(event: Event) {
-          super.reduce(event)                                 // presence
-          when (event) {
-              is Set -> n = event.n
-              is Note -> notes += event
-              is Wait -> waiting.add(Waiter(Json.MutableObject("id" to event.user)))
-              is Cancel -> if (event.intent == "wait") event.user?.let { waiting.remove(it) }
-              else -> {}
-          }
-      }
-  }
-  class Set(json) : Event("set", json = json) { var n by int().required.out }            // the loop fills it, a client may not send it
-  class Add(json) : Event("add", json = json) { val by by int().required }
-  class Note(json) : Event("note", json = json) {
-      var author by string().out
-      val text by string().required.visibleTo { it == author }                         // its author's tabs alone see it
-  }
-  class Wait(json) : Event("wait", json = json) { var user by string().out }
-
-  object Events : RoomEvents() {                              // join, leave, status, cancel: kroom's
-      val add  = intent(::Add)
-      val note = intent(::Note)
-      val wait = intent(::Wait, cancellable = true)
-      val set  = event(::Set)                                 // nobody posts it
-  }
-
-  object Rule : Logic<Counter>(Events) {
-      init {
-          on(Events.add) { state, _, add ->                   // add: Add, typed
-              val n = (state.n ?: 0) + add.by
-              if (n > 10) Reason("too_big", Json.Object("max" to 10)) else emit(Set().also { it.n = n })
-          }
-          on(Events.note) { _, actor, note -> done.also { note.author = actor.id } }   // the intent's own frame and nothing more
-          on(Events.wait) { state, actor, wait -> if (actor.id in state.waiting) Reason("already_waiting") else done.also { wait.user = actor.id } }
-          cancel(Events.wait) { state, actor, _ -> if (actor.id in state.waiting) done else Reason("nothing_to_cancel") }
-          on(Events.leave) { _, _, _ -> emit(Set().also { it.n = 0 }) }               // kroom's, handled when declared
-      }
-  }
-  ```
-
-  An event may declare a check, common, typed on the State it reads (`init { check { state:
-  Counter, actor -> … } }`): the room runs it first on its loop, before the handler, and refuses at
-  construction an event checked on another State; the browser runs it with the declared shape on
-  its view before posting, and a refusal there is rejected like a reply, without a request.
-  A `Reason` is the reply, nothing framed, nothing changed. An `Emit` frames the intent, then each
-  event (`emit(…)`, each a name of the room's events, else refused as the logic's error), each
-  reduced into the state. Nothing is held by the room: a cancellable intent (`cancellable = true`
-  on its entry) leaves its deposit in the State through `reduce`, and `cancel {intent}` reaches the
-  logic's `cancel(entry)` handler, which reads
-  the State for what there is to withdraw (`not_cancellable` from the room when the name is not
-  cancellable). `Event.to(users…)` on an emitted event names its viewers: a message, not a
-  transition, it is not folded into the state. A field is public, or selective
-  (`.visibleTo { viewer -> … }`, by user; `.hidden` = nobody): a frame carrying one is serialized
-  once per user, a snapshot is its viewer's view. The logic is a value: `Rule.decide(state, alice,
-  Add(…))` in a test, no room, no loop. Nothing lives beside the State: a secret is a field of it,
-  selective or hidden.
-- **Presence is kroom's layer**: every snapshot carries `users: [{id, name, status, clients:
-  [{id, kind, status}]}]`, a user's status composed from its clients' (`ONLINE` if any, else
-  `IDLE`, else `AWAY`), and `me`, the viewer's own entry (absent for a spectator): the page knows
-  who it is from the frame it already gets, no session call; `join` carries the user's presence and the count, `leave` the same, a
-  client posting `status {status}` frames the user's composed status and the client that changed.
-  The logic hears `Join` / `Leave` / `Status` as events, a user's (first connection, last one), when
-  it declares a handler for them (`on(LobbyEvents.leave) { … }`).
-- **The `on()` path** (`on(::Play) { actor, play -> Reason? }`, class and handler together, the
-  handler mutating the room's state and emitting itself) still runs underneath: `Table` is on it
-  until its port.
-- **The chifoumi example is the contract's proof** (`kroom-examples/chifoumi`): one room, a
-  `ChatRoom` whose logic is the game's (`ChatRoom<LobbyState>(id, history, state, logic)`, chat
-  composed through `ChatLogic`). `LobbyEvents` (in `game/Lobby.kt`, extending `ChatEvents`) is its
-  alphabet, `ChifoumiLogic` its handlers; a round's moves
-  are fields of its match, each its player's. The declarations, the logic and the fold are common
-  code compiled for the JVM and the browser (`kroom-examples/chifoumi-common`, multiplatform;
-  `ChifoumiLogicTest` runs the decisions on both); the activity feed, the
-  stats, "who is waiting" are derived from `match`, `round`, `join`, `leave`, not events of their
-  own. `LobbyTest` records a whole match's frames and checks their fold is the snapshot the room
-  would serve; the recording is the golden `FoldTest` replays on the JVM and on node, and the
-  pages' jsdom harness replays through the pages. The server renders each page's chrome; the room's
-  parts are regions, velocity pages in `chifoumi-common` translated per language and compiled at build,
-  merged by `kroom-client`'s `Room` into the document after every frame (the engine's DOM sink writes only
-  what differs); the viewer's perspective and the feed are page memory (`LobbyPage`, `GamePage`).
-  `RegionsTest` checks each region's tree against its text render over the recording. The pages' own
-  scripts are login, language and opening the stream.
-- **Routes, from the room's events**: `room(room) { call -> user }` (kroom-server) mounts the stream
-  (`GET /rooms/{id}/stream`: the viewer's snapshot, then every frame), one `POST /rooms/{id}/{name}`
-  per intent, the catalog (`GET /rooms/{id}/events`) and, for a chat, the scroll-back
-  (`GET /rooms/{id}/history`); it installs ktor's SSE if the app has not. `Route.intents` is the
-  same door for every room the `Lobby` knows. In the browser, kroom-client's `connect()` opens
-  `<api>/rooms/<name>/stream`, `act(Play(…))` posts typed, `on(LobbyEvents.round) { round -> … }`
-  reacts typed.
-- **Validation** (`Room.act`, the intent routes above) is
-  stateless: an unknown name, a bad shape, a field beyond the declared (`undeclared`), a missing
-  permission (`permits(user, permission)`, the host's call), a spectator — refused with `400`
-  before the loop, never queued.
-- **The reply is the verdict**, nothing else: `200` `{}` applied, `400` `{reason, args}` rejected
-  (by validation or by the handler). A rejection is framed to nobody. The effects come down the
-  stream, to the emitter like to everyone: a page handles `play` on one path, author or not.
-  `[data-intent=play]` is busy for the span of its POST; a `4xx` shows its reason after it.
-- **Who sees a frame**: the users it names (`Event.to(…)`), else the room; each user gets its
-  view, its selective fields kept where their rule accepts it. On the `on()` path the class's
-  `Audience` (`ROOM` / `USERS`, the emitter when none named) still applies. Nothing crosses rooms:
-  what every page must hear is a lobby room's frame.
-- **A join is an event**: the room births `Join` at a connect and `Leave` at a disconnect,
-  handled like any other (`Table` seats there, on the `on()` path, hearing every connection with
-  `first` / `last`). The wire hears a user's first `join` and last `leave`, the leave after a
-  grace (`leaveGrace`, 1 s) so a reload or a blip is no departure. The joiner gets `state`
-  — its own snapshot, `stateToJson(actor)` — first, then its own `join` like everyone. Catch-up is the
-  snapshot's job alone, so an event only ever means a transition: a step of the loop numbers and
-  writes everything it produces before it returns, and a snapshot taken at a position holds
-  exactly the transitions up to it.
-- **Every frame's `id` is its position on the room's channel.** No replay: a reconnect is a join,
-  the snapshot is the truth; one stream in order needs no dedupe. `broadcast(name, data)` /
-  `sendToUser` birth room-born `Generic` events.
-- **Tab id**: taken out of `sessionStorage` (`kroom.tabId`) at load and put back on `pagehide`, so
-  a reload finds it and a duplicated tab makes its own; `?tabId=` on the stream, `X-Kroom-Tab` on
-  an intent; the server composes `connectionId = <userId>/<tabId>` (`Actor.connectionId`), so a
-  tab id lands under its own user and is never a credential. The same tab back replaces its
-  connection; a detached tab (no open stream) still acts, its frame reaches the user's other tabs.
-- **The loop never waits on a consumer**: a tab that stops draining is dropped, its stream ends,
-  the browser reconnects and joins again.
-- `trace(event)` is called at every stage change: the operator's line. `emitted(event)` is where a
-  store persists, off the loop (`ChatRoom` → `ChatHistory`, then `persist()`).
-
-Browser side, convention over configuration, no code per call site:
-
-```html
-<button data-intent="play" data-move="rock">Rock</button>   <!-- payload = the other data-* -->
-<script src="/js/intents.js"></script>
-```
-```javascript
-const conn = sse('/events/lobby').into(store, 'state', 'chat').connect();  // event name = store slot
-intents.attach({ room: 'lobby', sse: conn, store });  // store optional
-```
-
-A click sets `aria-busy` (pico shows the spinner) and `disabled`, posts the intent and forgets it;
-a second click meanwhile is ignored. The event back with `_.stage` `APPLIED` frees the trigger;
-`REJECTED` frees it and shows `_.reason` in a `<small class="intent-reason">` right after it. The
-HTTP failure (offline, refused at the door) and the stream's `open` are the safety nets: nothing
-stays busy for ever. Nothing a call site wants to do on success may depend on the HTTP answer: it
-reacts to the event. Reactions never emit: only a gesture, a clock or a room's handler births an
-event, which is what makes feedback loops impossible.
-
-## Heartbeat and Dead Connection Detection
-
-SSE connections can die silently — browser killed, network dropped without TCP FIN. Without heartbeat, the server blocks forever on `channel.receive()`, never discovering the failure.
-
-Ktor's SSE heartbeat solves this: it periodically writes a comment line to the socket. When the write fails on a dead connection, the exception propagates and terminates the SSE handler, triggering cleanup.
-
-**This must be configured on each SSE route**, not on the Room:
+Four declarations, the matchmaking part of the chifoumi example:
 
 ```kotlin
-sse("/events/{room}") {
-    heartbeat { period = 15.seconds }
-
-    val actor = Actor(connectionId = "...", name = login)
-    val channel = room.join(actor)
-
-    try {
-        for (event in channel) {
-            send(event)
+// the data: a view over the room's JSON, reduce its only writer
+class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(json) {
+    val queue by keyed(::Player)                     // who waits, by id, in order
+    override fun reduce(event: Event) {
+        super.reduce(event)                           // the chat's, then presence (users)
+        when (event) {
+            is Match -> event.player?.let { queue.add(it) }
+            is Cancel -> if (event.intent == "match") event.user?.let { queue.remove(it) }
+            is Leave -> event.user?.let { queue.remove(it.id) }
+            else -> {}
         }
-    } finally {
-        room.leave(actor)
+    }
+}
+
+// an event: one name, one class, both directions; fields are declared, so the class is also data
+class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", json = json) {
+    var player by obj(::Player).out                   // the logic fills it; a client sending it is refused
+    init { check { state: LobbyState, actor -> if (actor.id in state.queue) Reason("in_queue") else null } }
+}
+
+// the alphabet: every name on the wire; join, leave, status, cancel are kroom's, in every room
+object LobbyEvents : ChatEvents() {
+    val match = intent(::Match, cancellable = true)   // a client may post it, and withdraw its deposit
+    val round = event(::Round)                        // only the logic emits it
+}
+
+// the decisions: one typed handler per intent, pure; the platform's pieces come in by the constructor
+class MatchmakingLogic(private val ids: () -> String) : Logic<LobbyState>(LobbyEvents) {
+    init {
+        on(LobbyEvents.match) { state, actor, match ->
+            match.player = Player(Json.MutableObject("id" to actor.id, "name" to actor.name))
+            done                                       // the intent's own frame: the fold queues the player
+        }
+        cancel(LobbyEvents.match) { state, actor, _ -> if (actor.id in state.queue) done else Reason("nothing_to_cancel") }
     }
 }
 ```
 
-The `heartbeat` block is Ktor's built-in per-connection heartbeat (since Ktor 3.1). It sends SSE comment lines at the configured interval regardless of room activity. A shorter period detects dead connections faster but generates more traffic.
+- **State.** Fields are delegates over the JSON (declare them `private set`): the logic reads,
+  `reduce` writes, on the server for its own frames and in the browser for the same frames, so
+  `reduce*(snapshot@N, frames]N,M]) == snapshot@M` for every viewer. Nothing lives beside the State:
+  a secret is a field of it, visible to nobody or to some (below).
+- **Events.** A field is `in` (a client sends it, validated) or `.out` (the logic fills it);
+  `.required` refuses its absence. `check { state: S, actor -> Reason? }` is the stateful half of
+  validation, typed on the State it reads: the browser runs it before posting, the room first on its
+  loop, and a room refuses at construction an event checked on another State.
+- **RoomEvents** is the alphabet as an object of typed entries: `intent(::E, cancellable)` (postable)
+  or `event(::E)` (born by the room). It feeds the door, the routes, the browser's fold, posts and
+  stream, and the catalog (`describe()`, served as `GET …/events`). Composition is inheritance:
+  `ChatEvents` brings `chat`.
+- **Logic.** `on(entry) { state, actor, event -> Outcome }` per intent, typed on the entry's class;
+  a `Reason` is the reply (nothing framed), an `Emit` (`emit(…)`, `done`) frames the intent then each
+  event it emits, each folded as it goes, each a name of the room's events. kroom's `join`, `leave`
+  and `status` reach a handler when the logic declares one. A missing handler, or a cancellable intent
+  without its `cancel`, is refused when the room is built.
+- **Cancellable.** A cancellable intent leaves a deposit in the State through `reduce` (the queue
+  above); `cancel {intent}` reaches the logic's `cancel(entry)`, which reads the State for what there
+  is to withdraw. The room holds no token; the viewer knows what it deposited from the State.
+
+**Field kinds**: `string()`, `int()`, `long()`, `double()`, `bool()`, `enum<E>()` (read whatever the
+case), `obj()` (plain JSON), `array()`, `obj(::V)` (a typed view), `keyed(::V)` (views by `id`, in
+insertion order, an object on the wire: what a page lists whose rows change in place), `log(::V, max)`
+(append-only, capped). A setter given null removes the key.
+
+**Visibility** is a field's: public, or selective with `.visibleTo { viewer -> … }`, a rule over the
+viewer's user id read on the instance (`var move1 by enum<Move>().visibleTo { it == player1 }`);
+`.hidden` is `visibleTo { false }`, the server's alone (a deck not dealt yet). A frame carrying a
+selective field is serialized once per user, any other once for all; a snapshot is the viewer's view.
+A State field fed by a selective event field carries the same rule, so each viewer's fold is its
+snapshot. `Event.to(users…)` addresses a frame to some users: a message, not folded.
+
+### Serving it (kroom-server)
+
+```kotlin
+object Arena : ChatRoom<LobbyState>("lobby", MemoryChatHistory(), LobbyState(), MatchmakingLogic(ids))
+
+routing {
+    route("/api") {
+        room(Arena) { call -> call.sessions.get<MySession>()?.let { Users.getOrCreate(it.id, it.name) } }
+    }
+}
+```
+
+`room(room) { call -> user }` reads the room's events and mounts everything it serves: the stream
+(`GET /rooms/{id}/stream`, with a 15 s heartbeat), one `POST /rooms/{id}/{name}` per intent, the
+catalog (`GET /rooms/{id}/events`) and, for a chat, the scroll-back (`GET /rooms/{id}/history`). The
+lambda names the user from the call; null refuses. `LogicRoom(id, state, logic)` is the room for a
+logic; `ChatRoom` adds the chat's history store.
+
+- **The door is stateless**: an unknown name, a bad shape, a field beyond the declared
+  (`undeclared`), a missing permission (`permits(user, permission)`, the host's call), a spectator —
+  refused with `400` before the loop, never queued.
+- **The reply is the verdict**, nothing else: `200 {}` applied, `400 {reason, args}` rejected. A
+  rejection is framed to nobody; the effects come down the stream, to the author like to everyone.
+- **The instant.** A step of the loop numbers and writes everything it produces before it returns:
+  a snapshot taken at a position holds exactly the frames up to it. Every frame's SSE `id` is its
+  position on the room's channel.
+- **No replay.** A reconnect is a join; the snapshot is the truth, first on every stream; an event
+  only ever means a transition.
+- **Presence is kroom's layer.** `users` is a keyed field of the base `State` (`{id, name, status,
+  clients}`), kept by `reduce` from `join`, `leave` and `status`; a user's status composes its
+  clients' (`ONLINE`, else `IDLE`, else `AWAY`). The wire hears a user's first `join` and last
+  `leave`, the leave after `leaveGrace` (1 s) so a reload is no departure. A joiner is not in its
+  own snapshot: its `join`, the same frame everyone gets, follows it. The snapshot also carries `me`,
+  the viewer's own entry (absent for a spectator).
+- **Tabs.** A tab id is taken from `sessionStorage` at load and put back on `pagehide` (a duplicated
+  tab makes its own); `?tabId=` on the stream, `X-Kroom-Tab` on an intent; the connection is
+  `<userId>/<tabId>`, never a credential. A user's tabs see the same thing.
+- **The loop never waits on a consumer**: a tab that stops draining is dropped and reconnects.
+  `trace(event)` is the operator's line at every stage; `emitted(event)` is where a store persists,
+  off the loop (`ChatRoom` → `ChatHistory`).
+
+### In the browser (kroom-client)
+
+The app compiles its common module to JS (one bundle) with its pages: velocity templates with typed
+roots, compiled at build by the velocity gradle plugin, translated per language by kroom's l10n.
+
+```
+##@ state: LobbyState
+##@ page: LobbyPage
+##@output web
+<p>$state.queue.size waiting</p>
+#if($page.searching)<button data-kroom-intent="cancel" data-kroom-intent-of="match">Cancel</button>
+#else<button data-kroom-intent="match">Find a match</button>#end
+```
+```kotlin
+fun main() {
+    val room = Room("lobby", LobbyState(), LobbyEvents, engine)
+    room.page = LobbyPage(room)                                // what the page knows and no room does
+    room.attach("en/lobby.html", document.getElementById("lobby")!!)
+    room.on(LobbyEvents.chat) { scrollChatToBottom() }         // typed reaction to one name
+    room.connect()                                             // <api>/rooms/lobby/stream
+}
+```
+
+- **One path down**: each frame is folded into the State by the same `reduce`, then into the page
+  memory, then every region is merged again; the engine's DOM sink touches only what differs (a
+  value's text node, a dynamic tag's attributes, an item added, moved or removed by its key).
+- **Roots**: `state` (the viewer's view), `me` (its presence entry), `page` (page memory: a `State`
+  of the page's own, folding every frame after the room's, with derived getters like `$page.phase`).
+- **Intents in the markup**: `data-kroom-intent="play"` posts the event with the trigger's
+  `data-kroom-<field>` values and its form's fields; the trigger is busy for the span of the POST.
+  The intent's shape and its check run on the viewer's view first: a refusal there is shown like a
+  reply's, without a request. A reason is a key a page may hold a sentence for
+  (`#messages [data-kroom-msg="play:already_played"]`).
+- From code: `room.act(Play(…))` (typed) or `act(type, payload)`; `on(entry) { event -> }` reacts to
+  one name, `react { name, event -> }` to every frame (navigation, say). Reactions never emit.
+- A plain-JS page gets the `kroom` facade: `kroom.connect()`, `kroom.act('status', {status})`,
+  `kroom.on('state', fn)`, `kroom.say(key, vars)`.
+
+### The example
+
+`kroom-examples/chifoumi` is the proof: one `ChatRoom` lobby, matchmaking and rounds of
+rock-paper-scissors-well, a round's moves selective fields of its match. `chifoumi-common` holds the
+State, the events, `LobbyEvents`, `ChifoumiLogic` and the pages, compiled for the JVM and the browser.
+`ChifoumiLogicTest` runs the decisions on both; `LobbyTest` records a whole match as one tab sees it
+and checks the fold of it is the snapshot the room would serve; the recording is the golden that
+`FoldTest` (JVM, node), `RegionsTest` (each region's DOM against its text render) and the pages' jsdom
+harness replay.
+
+### The `on()` path
+
+`Room.on(::Play) { actor, play -> Reason? }`, a class and a handler that mutates the room's state and
+emits itself, still runs underneath (`Table` is on it); its events register into the room's
+`RoomEvents` as they are declared, and the class's `Audience` (`ROOM` / `USERS`) still applies.
+`Route.intents { call -> user }` is the intent door for every room the `Lobby` knows.
+
+## Heartbeat and Dead Connection Detection
+
+SSE connections can die silently — browser killed, network dropped without TCP FIN. Ktor's SSE
+heartbeat periodically writes a comment line to the socket; the write fails on a dead connection,
+the handler ends and the room's `leave` runs. `room(…)` sets it on its stream (15 s). A stream route
+written by hand must set it itself:
+
+```kotlin
+sse("/my/stream") {
+    heartbeat { period = 15.seconds }
+    val channel = room.join(actor)
+    try { for (event in channel) send(event) } finally { room.leave(actor) }
+}
+```
 
 | Period | Detection | Notes |
 |--------|-----------|-------|
 | 2-5s | Fast | Good for interactive apps (games, chat) |
-| 15s | Moderate | Default in kroom examples |
+| 15s | Moderate | kroom's default |
 | 30s | Ktor default | Sufficient for low-frequency updates |
 
-**Without heartbeat, dead connections are never detected** unless the room happens to send an event that fails. Always configure it.
+A tab closed while a frame is on its way ends the stream with one line in the log, no trace.
 
 ## kroom-webapp-core
 
@@ -329,8 +309,11 @@ Shared client-side libraries for Ktor webapps:
 | `domhelper.js` | Lightweight jQuery-like DOM manipulation |
 | `api.js` | Fetch wrapper for REST APIs, `api.act` for intents |
 | `sse.js` | EventSource wrapper: named events, reconnect, `into(store)` |
-| `intents.js` | `[data-intent]` triggers, busy until the verdict comes down the stream |
+| `intents.js` | `[data-intent]` triggers, busy until the verdict (the reply) |
 | `store.js` | Minimal Redux-like state management |
+
+A page on a room built with kroom-client needs only `domhelper.js` and `api.js` (the tab id, the POST): the
+stream, the intents and the State are the bundle's. `sse.js`, `intents.js` and `store.js` serve plain-JS pages.
 
 ### Usage
 
@@ -873,19 +856,18 @@ The `Table` class:
 
 ## Reconnect
 
-`EventSource` reconnects on its own; after a `CLOSED` (non-200: expired session, restart window,
-room gone) sse.js opens a fresh one. Either way the server sees a join and answers with the
-snapshot: there is no replay buffer, anything a client must not miss belongs in `stateToJson(actor)`,
-and a store dedupes by the seq every frame carries as its `id`.
+`EventSource` reconnects on its own; a page can also close its source and `connect()` again. Either
+way the server sees a join and answers with the snapshot: there is no replay buffer, anything a
+client must not miss belongs in the State, and one stream in order needs no dedupe.
 
 ## Chat history
 
-`ChatRoom(id, history: ChatHistory = MemoryChatHistory())` keeps a chat beyond the replay buffer. The room
-numbers a message (`seq`, monotonic), keeps the last 50 in RAM — what a `state` frame carries —, broadcasts
-it, then hands it to the store in the background: the loop never waits on a store. The store is asked twice
-on its own terms: `tail(n)` when the room starts, to seed the sequence and the tail, and `before(seq, n)` for
-scroll-back, which `Route.chatHistory { call -> user }` serves as `GET /rooms/{room}/history?before=&n=`
-(`{messages: [...]}`, oldest first). Catch-up over a short gap is the stream's replay, not the store's. A
+`ChatRoom(id, history: ChatHistory = MemoryChatHistory())` keeps a chat beyond the State's tail. The logic
+numbers a line (`seq`, following the State's last), the State keeps the last 50 — what a snapshot carries —,
+the room frames it, then hands it to the store in the background: the loop never waits on a store. The store
+is asked twice on its own terms: `tail(n)` when the room starts, to seed the tail, and `before(seq, n)` for
+scroll-back, which `room(…)` serves as `GET /rooms/{room}/history?before=&n=` (`{messages: [...]}`, oldest
+first; `Route.chatHistory { call -> user }` does it for every room the `Lobby` knows). A
 message carries its `Author(id, name, avatar)`: the user's id, or an external one once a bridge speaks for
 someone else. Write a `ChatHistory` over your database and hand it to the room; `MemoryChatHistory` keeps
 the last 1000 and dies with the process.
