@@ -5,10 +5,13 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 
@@ -22,11 +25,12 @@ import java.io.File
  * The translated trees feed the velocity `templateRoot`; the stubs compile through the velocity K2
  * plugin into typed, per-language render functions — no runtime translation.
  */
+@CacheableTask
 abstract class GenerateTranslatedTemplatesTask : DefaultTask() {
 
-    @get:InputDirectory abstract val templates: DirectoryProperty
+    @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE) abstract val templates: DirectoryProperty
 
-    @get:InputDirectory @get:Optional abstract val i18n: DirectoryProperty
+    @get:InputDirectory @get:Optional @get:PathSensitive(PathSensitivity.RELATIVE) abstract val i18n: DirectoryProperty
 
     @get:Input abstract val sourceLanguage: Property<String>
 

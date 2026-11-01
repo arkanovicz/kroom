@@ -1,8 +1,8 @@
 [versions]
-agp = "8.13.2"
+agp = "9.2.1"
 kotlin = "2.4.21"
 dokka = "2.2.0"
-maven-publish = "0.35.0"
+maven-publish = "0.37.0"
 # velocity 3.0 pins the antlr-kotlin runtime at 1.0.10; the generated `%` lexer in kroom-markdown must match it
 antlr-kotlin = "1.0.10"
 bouncycastle = "1.81"
@@ -32,7 +32,7 @@ mockito-junit-jupiter = "5.18.0"
 # TODO migrate to ksoup
 jsoup = "1.20.1"
 web-push = "5.1.1"
-versionsPlugin = "0.66.0"
+versionsPlugin = "0.67.0"
 
 [libraries]
 antlr-kotlin = { module = "com.strumenta:antlr-kotlin-runtime", version.ref = "antlr-kotlin" }

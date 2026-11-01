@@ -55,7 +55,7 @@ class StarterTest {
             val env = root.resolve(".env").readText()
             assertContains(env, "UID=1234\nGID=5678\n")
             assertTrue(Regex("ADMIN_PASSWORD=[A-Za-z0-9]{20}").containsMatchIn(env) && Regex("SITE_SECRET=[A-Za-z0-9]{20}").containsMatchIn(env), env)
-            assertContains(root.resolve("gradle/wrapper/gradle-wrapper.properties").readText(), "gradle-8.")
+            assertContains(root.resolve("gradle/wrapper/gradle-wrapper.properties").readText(), "gradle-9.")
         } finally {
             into.toFile().deleteRecursively()
         }
