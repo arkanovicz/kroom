@@ -19,7 +19,7 @@ class EventTest {
         val round by int()
     }
 
-    @Test fun `the json is the truth, the class a view`() {
+    @Test fun `the json is the truth the class a view`() {
         val play = Play(Json.MutableObject("move" to "rock"))   // a button's spelling
         assertEquals(Move.ROCK, play.move)
         assertNull(play.note)
@@ -39,7 +39,7 @@ class EventTest {
         assertEquals("STRING", fields[0].getString("kind"))
     }
 
-    @Test fun `validation names the field, accept refuses with it`() {
+    @Test fun `validation names the field accept refuses with it`() {
         assertEquals("missing {\"field\":\"move\"}", Play().validate().toString())
         assertEquals("invalid {\"field\":\"move\",\"kind\":\"STRING\"}", Play(Json.MutableObject("move" to "WELL")).validate().toString())
         assertEquals("invalid {\"field\":\"round\",\"kind\":\"INT\"}", Match(Json.MutableObject("player1" to "a", "player2" to "b", "round" to "x")).validate().toString())
@@ -50,7 +50,7 @@ class EventTest {
         assertFailsWith<IllegalStateException> { Play().move }
     }
 
-    @Test fun `one life, in order, stamped in the metadata`() {
+    @Test fun `one life in order stamped in the metadata`() {
         val play = Play(Json.MutableObject("move" to "PAPER"))
         assertEquals(Stage.BORN, play.stage)
         play.accept("alice", "t1")
@@ -123,7 +123,7 @@ class EventTest {
         val seats by keyed(::Seat)
     }
 
-    @Test fun `a keyed list is an object by id, iterated in insertion order, updated in place`() {
+    @Test fun `a keyed list is an object by id iterated in insertion order updated in place`() {
         val table = Table()
         table.seats.add(Seat(Json.MutableObject("id" to "a", "name" to "Alice")))
         table.seats.add(Seat(Json.MutableObject("id" to "b", "name" to "Bob")))

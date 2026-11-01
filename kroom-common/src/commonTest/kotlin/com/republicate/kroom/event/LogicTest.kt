@@ -72,7 +72,7 @@ class LogicTest {
         assertEquals(4, counter.n) // a function: the State is read, never written
     }
 
-    @Test fun `a handler per intent, a cancel per cancellable one, checked when first needed`() {
+    @Test fun `a handler per intent a cancel per cancellable one checked when first needed`() {
         val partial = object : Logic<Counter>(Events) { init { on(Events.add) { _, _, _ -> done } } }
         assertFailsWith<IllegalArgumentException> { partial.decide(Counter(), alice, Add(Json.MutableObject("by" to 1))) }   // note, wait unhandled
         assertFailsWith<IllegalArgumentException> { partial.checkCoverage() }
@@ -82,7 +82,7 @@ class LogicTest {
         assertEquals("not_cancellable", (Rule.decide(Counter(), alice, Cancel(Json.MutableObject("intent" to "add"))) as Reason).key)
     }
 
-    @Test fun `a check is declared on the State it reads, and refuses before the logic`() {
+    @Test fun `a check is declared on the State it reads and refuses before the logic`() {
         assertEquals(Counter::class, Add().checkState)
         assertNull(Set().checkState)
         assertEquals("full", Add(Json.MutableObject("by" to 1)).check(Counter(Json.MutableObject("n" to 10)), alice)?.key)
@@ -91,7 +91,7 @@ class LogicTest {
         assertFailsWith<IllegalStateException> { Add().check(ChatState(), alice) }   // another State
     }
 
-    @Test fun `a deposit is the State's, and cancel reads it there`() {
+    @Test fun `a deposit is the State's and cancel reads it there`() {
         val counter = Counter()
         val wait = Wait()
         assertSame(done, Rule.decide(counter, alice, wait))
@@ -106,7 +106,7 @@ class LogicTest {
         assertTrue(counter.waiting.isEmpty())
     }
 
-    @Test fun `the state is the fold of the frames, bounded logs included`() {
+    @Test fun `the state is the fold of the frames bounded logs included`() {
         val counter = Counter()
         assertNull(counter.n)
         counter.reduce(Set(Json.MutableObject("n" to 7)))
@@ -117,7 +117,7 @@ class LogicTest {
         assertEquals(listOf("users", "n", "notes", "waiting"), counter.describe().map { (it as Json.Object).getString("name") })
     }
 
-    @Test fun `the room's events are the alphabet, postable names apart`() {
+    @Test fun `the room's events are the alphabet postable names apart`() {
         val r = Rule.events
         assertEquals(setOf("status", "cancel", "add", "note", "wait"), r.names)
         assertEquals(listOf("join", "leave", "status", "cancel", "add", "note", "wait", "set"), r.all.toList())   // the room's own first: on every wire
@@ -133,13 +133,13 @@ class LogicTest {
         assertEquals(listOf(false, true), d["note"]!!.getArray("fields")!!.map { (it as Json.Object).getBoolean("selective") })
     }
 
-    @Test fun `an out field is the loop's, undeclared when sent and never missing`() {
+    @Test fun `an out field is the loop's undeclared when sent and never missing`() {
         assertNull(Set().validate())
         assertEquals("undeclared {\"field\":\"n\"}", Set(Json.MutableObject("n" to 1)).validate().toString())
         assertFailsWith<IllegalStateException> { Set().n } // required: the loop must fill it before the wire
     }
 
-    @Test fun `a selective field is seen by whom its rule names at any depth, to is for the named`() {
+    @Test fun `a selective field is seen by whom its rule names at any depth to is for the named`() {
         val note = Note(Json.MutableObject("author" to "alice", "text" to "secret"))
         assertEquals("secret", note.text)   // the server reads it
         assertEquals("""{"author":"alice","text":"secret"}""", note.view("alice").toString())

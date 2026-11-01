@@ -39,7 +39,7 @@ class LobbyTest {
     private fun actor(user: User, tab: String = "t1") = Actor(Actor.connectionId(user, tab), user)
     private suspend fun Channel<ServerSentEvent>.next(): ServerSentEvent = withTimeout(2000) { receive() }
 
-    @Test fun `a match from the lobby to its end, as bob's tab sees it`() = runBlocking {
+    @Test fun `a match from the lobby to its end as bob's tab sees it`() = runBlocking {
         val room = Arena("arena")
         val a = actor(user("a", "Alice")); val b = actor(user("b", "Bob"))
         val ca = room.join(a)

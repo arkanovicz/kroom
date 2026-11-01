@@ -28,7 +28,7 @@ class ChifoumiLogicTest {
         return (intent.check(this, actor) ?: logic.decide(this, actor, intent)).also { if (it is Emit) { fold(intent); it.events.forEach { e -> fold(e) } } }
     }
 
-    @Test fun `wanting a match is a deposit, the second one pairs, and the queue is the fold`() {
+    @Test fun `wanting a match is a deposit the second one pairs and the queue is the fold`() {
         val state = LobbyState()
         val wantA = Match()
         assertSame(done, logic.decide(state, alice, wantA))
@@ -48,7 +48,7 @@ class ChifoumiLogicTest {
         assertEquals("in_match", Match().check(state, bob)?.key)
     }
 
-    @Test fun `a move is a deposit, the second resolves the round, and the stats are the fold`() {
+    @Test fun `a move is a deposit the second resolves the round and the stats are the fold`() {
         val state = LobbyState()
         state.act(alice, Match())
         state.act(bob, Match())
@@ -70,7 +70,7 @@ class ChifoumiLogicTest {
         assertEquals("not_in_match", Play(json("move" to "ROCK")).check(state, Who("c"))?.key)
     }
 
-    @Test fun `a withdrawn move frees the round, a leave forfeits the match`() {
+    @Test fun `a withdrawn move frees the round a leave forfeits the match`() {
         val state = LobbyState()
         state.act(alice, Match())
         assertSame(done, state.act(alice, Cancel(json("intent" to "match"))))

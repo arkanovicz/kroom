@@ -18,7 +18,7 @@ class RoomTest {
         override fun reduce(event: Event) { if (event is Chat) lines += "${event.text} (${room().state.history.size} in history)" }
     }
 
-    @Test fun `a frame folds into the state, then the page memory, then reacts`() {
+    @Test fun `a frame folds into the state then the page memory then reacts`() {
         lateinit var room: Room<ChatState>
         val seen = Seen { room }
         val reacted = ArrayList<String>()

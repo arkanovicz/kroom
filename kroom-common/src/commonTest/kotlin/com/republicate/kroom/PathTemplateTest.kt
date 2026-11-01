@@ -46,7 +46,7 @@ class PathTemplateTest {
     }
 
     @Test
-    fun `a placeholder never matches across a slash, nor a wrong depth`() {
+    fun `a placeholder never matches across a slash nor a wrong depth`() {
         val t = PathTemplate("pages/club/_code_/club.html")
         assertNull(t.match("pages/club/13Ma/sub/club.html"))
         assertNull(t.match("pages/club/13Ma/other.html"))
@@ -54,7 +54,7 @@ class PathTemplateTest {
     }
 
     @Test
-    fun `a missing value is an error, not a guess`() {
+    fun `a missing value is an error not a guess`() {
         val t = PathTemplate("pages/club/_code_/club.html")
         val failure = assertFailsWith<IllegalArgumentException> { t.expand(emptyMap()) }
         assertTrue(failure.message!!.contains("code"), failure.message!!)
