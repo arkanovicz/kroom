@@ -60,6 +60,9 @@ All notable changes to kroom will be documented in this file.
   `<api>/rooms/<name>/stream`, `act(event)` typed, `on(entry) { event -> }` typed beside `react`. Chifoumi:
   its stream block, the three principals and `Lobby.register` give way to one `room(ChifoumiLobby) { … }`;
   the lobby's chat scroll on `on(LobbyEvents.chat)`. `RouteTest` pins the routes.
+- `Route.room`'s stream: a frame written to a closed tab ends the stream with one log line, no stack trace
+  (`ClosedByteChannelException` caught); the room's `leave` runs. A heartbeat written to one still logs ktor's
+  trace: its `heartbeat {}` launches the writes unguarded (to be reported upstream).
 
 #### kroom-server — rooms over Event (branch `kroom-events`)
 - `handleAction` / `ActionResult` are gone: a room declares each event once, class and handler

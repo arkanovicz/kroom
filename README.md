@@ -247,8 +247,10 @@ emits itself, still runs underneath (`Table` is on it); its events register into
 
 SSE connections can die silently — browser killed, network dropped without TCP FIN. Ktor's SSE
 heartbeat periodically writes a comment line to the socket; the write fails on a dead connection,
-the handler ends and the room's `leave` runs. `room(…)` sets it on its stream (15 s). A stream route
-written by hand must set it itself:
+the handler ends and the room's `leave` runs. `room(…)` sets it on its stream (15 s). A frame written
+to a closed tab ends the stream with one log line; a heartbeat written to one still logs ktor's
+"Unhandled exception" trace (ktor launches its heartbeat writes unguarded). A stream route written by
+hand sets the heartbeat itself:
 
 ```kotlin
 sse("/my/stream") {
@@ -263,8 +265,6 @@ sse("/my/stream") {
 | 2-5s | Fast | Good for interactive apps (games, chat) |
 | 15s | Moderate | kroom's default |
 | 30s | Ktor default | Sufficient for low-frequency updates |
-
-A tab closed while a frame is on its way ends the stream with one line in the log, no trace.
 
 ## kroom-webapp-core
 

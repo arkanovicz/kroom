@@ -8,19 +8,23 @@ import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.http.*
 import com.republicate.kson.Json
+import io.ktor.utils.io.ClosedByteChannelException
 import kotlinx.coroutines.flow.consumeAsFlow
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.seconds
 
 /** The tab id: a query parameter on the event stream, a header (`X-Kroom-Tab`) on an intent. */
 val ApplicationCall.tabId: String?
     get() = request.queryParameters["tabId"] ?: request.header("X-Kroom-Tab")
 
+private val logger = LoggerFactory.getLogger("kroom.room")
+
 private suspend fun ApplicationCall.json(status: HttpStatusCode, body: String) = respondText(body, ContentType.Application.Json, status)
 private fun refusal(reason: String, args: Json.Object = Json.Object()) = Json.Object("reason" to reason, "args" to args).toString()
 
 /**
  * Everything a room serves, read from its events: the stream (`GET /rooms/{id}/stream`, the viewer's snapshot then
- * every frame), one `POST /rooms/{id}/{name}` per intent, the catalog (`GET /rooms/{id}/events`), and for a chat the
+ * every frame, ktor's heartbeat every 15 s), one `POST /rooms/{id}/{name}` per intent, the catalog (`GET /rooms/{id}/events`), and for a chat the
  * scroll-back (`GET /rooms/{id}/history`). [principal] names the user from the call (its session); null refuses.
  */
 fun Route.room(room: Room<*>, principal: suspend (ApplicationCall) -> User?) {
@@ -32,7 +36,9 @@ fun Route.room(room: Room<*>, principal: suspend (ApplicationCall) -> User?) {
         // the tab id keeps a reconnecting tab the same connection
         val actor = Actor(Actor.connectionId(user, call.tabId), user)
         val channel = room.join(actor)
-        try { channel.consumeAsFlow().collect { send(it) } } finally { room.leave(actor) }
+        try { channel.consumeAsFlow().collect { send(it) } }
+        catch (e: ClosedByteChannelException) { logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id) }   // a tab gone: no trace
+        finally { room.leave(actor) }
     }
     room.events.names.forEach { name -> post("$base/$name") { call.intent(room, name, principal) } }
     get("$base/events") { call.json(HttpStatusCode.OK, room.describe().toString()) }
