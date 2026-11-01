@@ -62,9 +62,9 @@ nimbus-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimb
 
 # Android
 androidx-core = { module = "androidx.core:core-ktx", version = "1.15.0" }
-androidx-appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.0" }
-androidx-webkit = { module = "androidx.webkit:webkit", version = "1.12.1" }
-android-material = { module = "com.google.android.material:material", version = "1.12.0" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version = "1.8.0" }
+androidx-webkit = { module = "androidx.webkit:webkit", version = "1.18.0" }
+android-material = { module = "com.google.android.material:material", version = "1.14.0" }
 
 [plugins]
 android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
