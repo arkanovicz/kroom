@@ -304,6 +304,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-common, kroom-server — the avatar on the line
+- `Actor.avatar` (common, null by default), the server's from its `User` (`User.avatar`, a `var` read when asked,
+  so a new picture reaches connected tabs; `Users.getOrCreate(id, name, avatar)`) or from its constructor;
+  `ChatLogic` writes it into the line's `author` when present, `sendChat(Author(id, name, avatar), text)` carries a
+  bridge's, so it reaches the frame, the tail and the store.
+
 #### chifoumi
 - The pages on `Room`: the server renders the chrome (head, nav, login, the sentences `say` reads, now
   `data-kroom-msg` / `data-kroom-verdict`), the room's parts are regions — `online.html`, `lobby.html`,

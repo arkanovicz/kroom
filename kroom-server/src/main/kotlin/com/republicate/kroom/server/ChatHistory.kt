@@ -11,7 +11,7 @@ data class Author(val id: String, val name: String, val avatar: String? = null) 
     fun toJson(): Json.Object = Json.Object("id" to id, "name" to name, "avatar" to avatar)
 
     companion object {
-        fun of(actor: Actor) = Author(actor.user?.userId ?: actor.connectionId, actor.name)
+        fun of(actor: Actor) = Author(actor.id, actor.name, actor.avatar)
     }
 }
 

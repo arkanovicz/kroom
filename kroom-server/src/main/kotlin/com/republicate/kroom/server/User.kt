@@ -12,10 +12,12 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * @param userId The unique persistent identifier for this user
  * @param displayName The user's display name
+ * @param avatar An image URL; a new picture replaces it
  */
 class User(
     val userId: String,
-    val displayName: String
+    val displayName: String,
+    @Volatile var avatar: String? = null
 ) {
     /**
      * Connections per room (roomId -> set of Actors).
@@ -95,13 +97,13 @@ object Users {
 
     /**
      * Get or create a User for the given userId.
-     * If the user already exists, returns the existing instance (displayName is not updated).
-     * If the user doesn't exist, creates a new User with the given displayName.
+     * If the user already exists, returns the existing instance (displayName and avatar are not updated).
+     * If the user doesn't exist, creates a new User with the given displayName and avatar.
      */
-    fun getOrCreate(userId: String, displayName: String): User {
+    fun getOrCreate(userId: String, displayName: String, avatar: String? = null): User {
         return users.computeIfAbsent(userId) {
             logger.debug("Creating new user: $userId ($displayName)")
-            User(userId, displayName)
+            User(userId, displayName, avatar)
         }
     }
 

@@ -30,7 +30,7 @@ open class ChatRoom<S : ChatState>(id: String, private val history: ChatHistory,
 
     /** Say something from elsewhere than a door (a bridge, a route): the same life, under the author's id. */
     suspend fun sendChat(author: Author, text: String): ChatMessage {
-        val chat = act(Actor(author.id, null, author.name), Chat(Json.MutableObject("text" to text))).await()
+        val chat = act(Actor(author.id, null, author.name, author.avatar), Chat(Json.MutableObject("text" to text))).await()
         // the store may already have moved it on to PERSISTED: the verdict is "not rejected"
         if (chat.stage == Stage.REJECTED) throw Event.Rejected(com.republicate.kroom.event.Reason(chat.meta.reason ?: "rejected", chat.meta.args ?: Json.Object()))
         return (chat as Chat).toMessage()

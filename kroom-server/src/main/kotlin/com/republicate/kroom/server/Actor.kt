@@ -15,12 +15,16 @@ import kotlinx.coroutines.channels.Channel
  * @param connectionId Unique ID for this connection (changes on reconnect)
  * @param user The User this actor belongs to (null for anonymous connections)
  * @param name Display name for this actor (defaults to user's displayName if available)
+ * @param avatar Image URL for this actor (defaults to the user's, read when asked)
  */
 open class Actor(
     val connectionId: String,
     val user: User? = null,
-    override val name: String = user?.displayName ?: "Anonymous"
+    override val name: String = user?.displayName ?: "Anonymous",
+    avatar: String? = null
 ) : com.republicate.kroom.event.Actor {
+    private val ownAvatar = avatar
+    override val avatar: String? get() = ownAvatar ?: user?.avatar
     /** The user's id; a connection without a user is its own. */
     override val id: String get() = user?.userId ?: connectionId
     override val client: String? get() = tab.takeIf { it.isNotEmpty() }

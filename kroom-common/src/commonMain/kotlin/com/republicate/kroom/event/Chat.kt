@@ -36,7 +36,7 @@ class ChatLogic(private val clock: Clock = Clock.System, events: ChatEvents = Ch
     fun chat(state: ChatState, actor: Actor, chat: Chat): Outcome<Nothing> {
         chat.seq = (state.history.lastOrNull()?.seq ?: 0) + 1
         chat.from = actor.name
-        chat.author = Json.Object("id" to actor.id, "name" to actor.name)
+        chat.author = Json.MutableObject("id" to actor.id, "name" to actor.name).also { a -> actor.avatar?.let { a["avatar"] = it } }
         chat.timestamp = clock.now().toString()
         return done
     }

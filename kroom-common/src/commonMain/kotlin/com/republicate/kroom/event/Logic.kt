@@ -30,6 +30,8 @@ interface Actor {
     val id: String
     val name: String
     val client: String?
+    /** An image URL, null when none. */
+    val avatar: String? get() = null
 }
 
 /**
