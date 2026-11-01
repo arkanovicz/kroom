@@ -19,6 +19,7 @@ include("kroom-webapp-session")
 include("kroom-webapp-oauth")
 include("kroom-webapp-auth")
 include("kroom-webapp-push")
+include("kroom-webapp-images")
 
 // Rendering
 include("kroom-markdown")

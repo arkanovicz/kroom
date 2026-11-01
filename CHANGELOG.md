@@ -315,6 +315,15 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-images (new)
+- `Images(imgproxy, cache, local)` + `Route.images(images)`: images resized through imgproxy v3 and kept on disk
+  (`<cache>/<2 hex>/<sha256>-<rendition>.webp`), from local files and remote sources (fetched server-side); sizes
+  snap to `fill` 32/64/128/300 and `fit` 600/900, the original beyond; a local file newer than its rendition, or a
+  remote one older than `remoteTtl`, is made again; imgproxy down serves the original, a remote unreachable its
+  last copy. Remote sources only through `images.url(src, size)`, HMAC-signed (key given or `<cache>/secret`); a
+  remote original must be png, jpeg, gif, webp or avif. Responses carry `nosniff` and `default-src 'none'`. Moved up
+  from gallope's `serveImage` (which resized on every request, no cache, jpeg only).
+
 #### kroom-common, kroom-server — the avatar on the line
 - `Actor.avatar` (common, null by default), the server's from its `User` (`User.avatar`, a `var` read when asked,
   so a new picture reaches connected tabs; `Users.getOrCreate(id, name, avatar)`) or from its constructor;

@@ -17,6 +17,7 @@ kroom-webapp-session  encrypted session identity (shared by oauth/auth)
 kroom-webapp-oauth    OIDC authentication
 kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
+kroom-webapp-images   resized images through imgproxy, cached on disk, local and remote sources
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
 kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms
@@ -886,6 +887,26 @@ val room = ChatRoom("lounge", DbChatHistory(), ChatState(line = ::Line), ChatLog
 
 The room hands the store copies and seeds the tail with copies: a fold changing a line of the tail never races a
 store reading its own.
+
+## Images
+
+`kroom-webapp-images` serves images resized by an [imgproxy](https://imgproxy.net) container and kept on disk, from
+local files and remote sources alike, so a viewer only ever hits your server:
+
+```kotlin
+val images = Images(imgproxy = "http://app-img:8080", cache = File("data/cache/img"), local = File("data/img"))
+routing { images(images) }                                   // GET /img/{path...}?size=
+images.url("avatars/u1.png", 64)                             // /img/avatars/u1.png?size=64
+images.url("https://cdn.discordapp.com/avatars/…/….png", 64)  // /img/~/<signature>/<source>?size=64
+```
+
+A size snaps up to a rendition, `fill` (cropped square) 32/64/128/300, `fit` 600/900, the original beyond or at 0;
+renditions are webp, kept under `cache` by source and rendition, made again when a local file is newer or after
+`remoteTtl` (7 days) for a remote one. imgproxy failing, the original is served; a remote unreachable, its last copy.
+A remote source is served only under this server's signature (HMAC, key in `cache/secret` unless given), so the
+route is no open proxy; a remote original must be a raster image (no SVG). Guard the route like any other by
+mounting it inside your own. On the imgproxy side: private network only, `IMGPROXY_LOCAL_FILESYSTEM_ROOT` = the
+`local` directory as mounted there, and optionally `IMGPROXY_ALLOWED_SOURCES`.
 
 ## Starting a site
 
