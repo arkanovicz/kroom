@@ -11,7 +11,6 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
-import com.republicate.kroom.view.databinding.ActivityKroomBinding
 import java.io.ByteArrayInputStream
 
 private const val TAG = "kroom"
@@ -25,7 +24,6 @@ private const val TAG = "kroom"
  */
 abstract class KroomActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityKroomBinding
     protected lateinit var webView: WebView
 
     /**
@@ -109,9 +107,8 @@ abstract class KroomActivity : AppCompatActivity() {
         ViewHandler.setContext(this)
         ViewHandler.init()
 
-        binding = ActivityKroomBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        webView = binding.webview
+        setContentView(R.layout.activity_kroom)
+        webView = findViewById(R.id.webview)
 
         webView.webViewClient = KroomWebViewClient()
 

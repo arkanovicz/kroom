@@ -1,5 +1,5 @@
 [versions]
-agp = "8.5.2"
+agp = "8.13.2"
 kotlin = "2.4.21"
 dokka = "2.2.0"
 maven-publish = "0.35.0"
@@ -104,7 +104,7 @@ android-material = { module = "com.google.android.material:material", version = 
 slf4j-handroid = { module = "sk.baka.slf4j:slf4j-handroid", version = "2.0.13" }
 
 [plugins]
-android-library = { id = "com.android.library", version.ref = "agp" }
+android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 antlr = { id = "com.strumenta.antlr-kotlin", version.ref = "antlr-kotlin" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "kotlinx-atomicfu" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

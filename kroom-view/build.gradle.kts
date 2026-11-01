@@ -2,6 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 description = "Kroom view components - WebView integration for embedding kroom webapps"
@@ -11,25 +12,6 @@ plugins {
     alias(libs.plugins.multiplatform)
 }
 
-
-android {
-    namespace = "com.republicate.kroom.view"
-    compileSdk = 34
-
-    defaultConfig {
-        minSdk = 24
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    buildFeatures {
-        viewBinding = true
-        buildConfig = true
-    }
-}
 
 kotlin {
     applyDefaultHierarchyTemplate {
@@ -59,9 +41,13 @@ kotlin {
         }
     }
 
-    // Android JVM target
-    androidTarget {
-        publishLibraryVariants("release")
+    // Android JVM target; the layout and themes need resources, off by default on this plugin
+    android {
+        namespace = "com.republicate.kroom.view"
+        compileSdk = 35
+        minSdk = 24
+        compilerOptions { jvmTarget.set(JvmTarget.JVM_21) }
+        androidResources { enable = true }
     }
 
     // JS targets
