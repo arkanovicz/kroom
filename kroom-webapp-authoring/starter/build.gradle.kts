@@ -2,7 +2,6 @@ description = "Kroom site starter - asks a few questions, writes a site"
 
 plugins {
     alias(libs.plugins.jvm)
-    `maven-publish`
 }
 
 java {
@@ -51,11 +50,5 @@ tasks.test {
     useJUnitPlatform()
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-            artifact(fatJar)
-        }
-    }
-}
+// the publication is the publish plugin's; the fat jar rides along as `-all`
+publishing.publications.withType<MavenPublication>().configureEach { artifact(fatJar) }

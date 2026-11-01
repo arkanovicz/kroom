@@ -2,7 +2,6 @@ description = "Kroom client - a page on a room: the stream folded into the State
 
 plugins {
     alias(libs.plugins.multiplatform)
-    `maven-publish`
 }
 
 kotlin {

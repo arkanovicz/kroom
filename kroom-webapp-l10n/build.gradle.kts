@@ -2,14 +2,12 @@ description = "Kroom webapp l10n - Localization plugin with PO file support"
 
 plugins {
     alias(libs.plugins.jvm)
-    `maven-publish`
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
 }
 
 dependencies {
@@ -28,12 +26,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }

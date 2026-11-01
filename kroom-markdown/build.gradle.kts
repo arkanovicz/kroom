@@ -5,14 +5,12 @@ description = "Kroom markdown - VTL for Markdown documents, where '#' is a headi
 plugins {
     alias(libs.plugins.jvm)
     alias(libs.plugins.antlr)
-    `maven-publish`
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
 }
 
 // Resolves the engine jar the grammar template is unpacked from — a second view of the same artifact,
@@ -83,12 +81,4 @@ kotlin.sourceSets.main { kotlin.srcDir(generateMarkdownLexer) }
 
 tasks.test {
     useJUnitPlatform()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }

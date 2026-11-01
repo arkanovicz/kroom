@@ -3,14 +3,12 @@ description = "Kroom webapp session - encrypted session identity for Ktor webapp
 plugins {
     alias(libs.plugins.jvm)
     alias(libs.plugins.kotlin.serialization)
-    `maven-publish`
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
 }
 
 dependencies {
@@ -23,12 +21,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }

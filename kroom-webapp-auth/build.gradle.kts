@@ -2,14 +2,12 @@ description = "Kroom webapp auth - email+password identity (argon2id) with OIDC 
 
 plugins {
     alias(libs.plugins.jvm)
-    `maven-publish`
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
 }
 
 dependencies {
@@ -24,12 +22,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }

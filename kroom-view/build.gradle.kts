@@ -9,7 +9,6 @@ description = "Kroom view components - WebView integration for embedding kroom w
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.multiplatform)
-    `maven-publish`
 }
 
 

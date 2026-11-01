@@ -12,7 +12,6 @@ description = "Kroom common code"
 
 plugins {
     alias(libs.plugins.multiplatform)
-    `maven-publish`
     alias(libs.plugins.atomicfu)
 }
 
@@ -132,12 +131,4 @@ kotlin {
     }
 }
 
-/*
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
-}
- */
+/* */

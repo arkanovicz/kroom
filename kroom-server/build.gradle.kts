@@ -3,7 +3,6 @@ description = "Kroom server"
 plugins {
     alias(libs.plugins.jvm)
     application
-    `maven-publish`
 }
 
 java {
@@ -31,16 +30,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-java {
-    withSourcesJar()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }

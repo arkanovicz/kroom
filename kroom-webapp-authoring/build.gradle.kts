@@ -3,14 +3,12 @@ description = "Kroom webapp authoring - block-based content editing (locks, cont
 plugins {
     alias(libs.plugins.jvm)
     `java-test-fixtures`          // the dummy theme: every layout of the contract, for this module's tests and the demo
-    `maven-publish`
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
 }
 
 dependencies {
@@ -41,11 +39,3 @@ tasks.test {
 val javaComponent = components["java"] as AdhocComponentWithVariants
 javaComponent.withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
 javaComponent.withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
-}

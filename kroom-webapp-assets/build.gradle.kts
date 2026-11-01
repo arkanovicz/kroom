@@ -2,14 +2,12 @@ description = "Kroom webapp assets - shared JS/CSS for Ktor webapps"
 
 plugins {
     alias(libs.plugins.jvm)
-    `maven-publish`
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
 }
 
 // Generate version constant from project.version (single source of truth)
@@ -41,12 +39,9 @@ tasks.named("compileKotlin") {
     dependsOn(generateVersion)
 }
 
-tasks.named("sourcesJar") {
-    dependsOn(generateVersion)
-}
-
+// sourcesJar is registered late by the publish plugin, hence the name test
 tasks.configureEach {
-    if (name.contains("dokka", ignoreCase = true)) {
+    if (name == "sourcesJar" || name.contains("dokka", ignoreCase = true)) {
         dependsOn(generateVersion)
     }
 }
@@ -62,12 +57,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }
