@@ -42,7 +42,7 @@ fun Route.room(room: Room<*>, principal: suspend (ApplicationCall) -> User?) {
     }
     room.events.names.forEach { name -> post("$base/$name") { call.intent(room, name, principal) } }
     get("$base/events") { call.json(HttpStatusCode.OK, room.describe().toString()) }
-    if (room is ChatRoom<*>) get("$base/history") { call.history(room, principal) }
+    if (room is ChatRoom<*, *>) get("$base/history") { call.history(room, principal) }
 }
 
 /**
@@ -66,11 +66,12 @@ fun Route.events() {
 
 /**
  * Scroll-back, `GET /rooms/{room}/history?before=<seq>&n=<count>` → `{messages: [...]}`, oldest
- * first; no `before` means from the latest. [principal] names the reading user; null refuses.
+ * first, each line as the reader's snapshot shows it; no `before` means from the latest. [principal] names the
+ * reading user; null refuses.
  */
 fun Route.chatHistory(principal: suspend (ApplicationCall) -> User?) {
     get("/rooms/{room}/history") {
-        val room = Lobby.get<Any>(call.parameters["room"]!!) as? ChatRoom<*> ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
+        val room = Lobby.get<Any>(call.parameters["room"]!!) as? ChatRoom<*, *> ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
         call.history(room, principal)
     }
 }
@@ -89,9 +90,9 @@ private suspend fun ApplicationCall.intent(room: Room<*>, name: String, principa
     else json(HttpStatusCode.OK, "{}")
 }
 
-private suspend fun ApplicationCall.history(room: ChatRoom<*>, principal: suspend (ApplicationCall) -> User?) {
-    principal(this) ?: return json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
+private suspend fun ApplicationCall.history(room: ChatRoom<*, *>, principal: suspend (ApplicationCall) -> User?) {
+    val user = principal(this) ?: return json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
     val before = request.queryParameters["before"]?.toLongOrNull() ?: Long.MAX_VALUE
     val n = (request.queryParameters["n"]?.toIntOrNull() ?: 50).coerceIn(1, 500)
-    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.before(before, n).map { it.toJson() })).toString())
+    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.before(before, n).map { it.view(user.userId) })).toString())
 }

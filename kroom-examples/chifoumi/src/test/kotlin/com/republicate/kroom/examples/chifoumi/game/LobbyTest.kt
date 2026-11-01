@@ -5,6 +5,7 @@ import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.Store
 import com.republicate.kroom.server.Actor
+import com.republicate.kroom.event.Chat
 import com.republicate.kroom.server.ChatRoom
 import com.republicate.kroom.server.MemoryChatHistory
 import com.republicate.kroom.server.User
@@ -30,7 +31,7 @@ class LobbyTest {
 
     /** Ids and the clock fixed: the recording is the same at every run. */
     @OptIn(ExperimentalTime::class)
-    private class Arena(id: String) : ChatRoom<LobbyState>(id, MemoryChatHistory(), LobbyState(),
+    private class Arena(id: String) : ChatRoom<Chat, LobbyState>(id, MemoryChatHistory(), LobbyState(),
         ChifoumiLogic(object : Clock { override fun now() = Instant.parse("2026-10-27T12:00:00Z") }, ids = { "m1" })) {
         override val leaveGrace = 0L
         override fun shouldCloseWhenEmpty() = false

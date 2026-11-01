@@ -13,13 +13,13 @@ import kotlin.test.assertNull
 
 class RoomTest {
     /** Page memory: what the room's frames left behind, as a page remembers them. */
-    private class Seen(private val room: () -> Room<ChatState>) : State() {
+    private class Seen(private val room: () -> Room<ChatState<Chat>>) : State() {
         val lines = ArrayList<String>()
         override fun reduce(event: Event) { if (event is Chat) lines += "${event.text} (${room().state.history.size} in history)" }
     }
 
     @Test fun `a frame folds into the state then the page memory then reacts`() {
-        lateinit var room: Room<ChatState>
+        lateinit var room: Room<ChatState<Chat>>
         val seen = Seen { room }
         val reacted = ArrayList<String>()
         room = Room("chat", ChatState(), ChatEvents(), VelocityEngine(null)).apply { page = seen }

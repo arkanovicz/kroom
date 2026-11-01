@@ -77,7 +77,7 @@ Four declarations, the matchmaking part of the chifoumi example:
 
 ```kotlin
 // the data: a view over the room's JSON, reduce its only writer
-class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(json) {
+class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Chat>(json, line = ::Chat) {
     val queue by keyed(::Player)                     // who waits, by id, in order
     override fun reduce(event: Event) {
         super.reduce(event)                           // the chat's, then presence (users)
@@ -97,7 +97,7 @@ class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", js
 }
 
 // the alphabet: every name on the wire; join, leave, status, cancel are kroom's, in every room
-object LobbyEvents : ChatEvents() {
+object LobbyEvents : ChatEvents<Chat>(::Chat) {
     val match = intent(::Match, cancellable = true)   // a client may post it, and withdraw its deposit
     val round = event(::Round)                        // only the logic emits it
 }
@@ -150,7 +150,7 @@ snapshot. `Event.to(users…)` addresses a frame to some users: a message, not f
 ### Serving it (kroom-server)
 
 ```kotlin
-object Arena : ChatRoom<LobbyState>("lobby", MemoryChatHistory(), LobbyState(), MatchmakingLogic(ids))
+object Arena : ChatRoom<Chat, LobbyState>("lobby", MemoryChatHistory(), LobbyState(), MatchmakingLogic(ids))
 
 routing {
     route("/api") {
@@ -862,15 +862,30 @@ client must not miss belongs in the State, and one stream in order needs no dedu
 
 ## Chat history
 
-`ChatRoom(id, history: ChatHistory = MemoryChatHistory())` keeps a chat beyond the State's tail. The logic
+`ChatRoom(id, history: ChatHistory<Chat> = MemoryChatHistory())` keeps a chat beyond the State's tail. The logic
 numbers a line (`seq`, following the State's last), the State keeps the last 50 — what a snapshot carries —,
 the room frames it, then hands it to the store in the background: the loop never waits on a store. The store
 is asked twice on its own terms: `tail(n)` when the room starts, to seed the tail, and `before(seq, n)` for
 scroll-back, which `room(…)` serves as `GET /rooms/{room}/history?before=&n=` (`{messages: [...]}`, oldest
-first; `Route.chatHistory { call -> user }` does it for every room the `Lobby` knows). A
-message carries its `Author(id, name, avatar)`: the user's id, or an external one once a bridge speaks for
-someone else. Write a `ChatHistory` over your database and hand it to the room; `MemoryChatHistory` keeps
-the last 1000 and dies with the process.
+first, each line as the reader's snapshot shows it; `Route.chatHistory { call -> user }` does it for every room
+the `Lobby` knows). A line carries its `author` (`Author(id, name, avatar)`): the user's id and avatar (`User.avatar`),
+or an external one once a bridge speaks for someone else (`sendChat(author, text)`). Write a `ChatHistory` over
+your database and hand it to the room; `MemoryChatHistory` keeps the last 1000 and dies with the process.
+
+A line is one class from the frame to the store: extend `Chat` and every chat type carries it, so a field declared
+once (reactions, edits) is in the frame, the tail, the snapshot, the store and the scroll-back, and its visibility
+holds everywhere:
+
+```kotlin
+class Line(json: Json.MutableObject = Json.MutableObject()) : Chat(json) {
+    var reactions by keyed(::Reaction).out           // filled by the app's logic or its store, never posted
+}
+object Events : ChatEvents<Line>(::Line)
+val room = ChatRoom("lounge", DbChatHistory(), ChatState(line = ::Line), ChatLogic(Clock.System, Events))
+```
+
+The room hands the store copies and seeds the tail with copies: a fold changing a line of the tail never races a
+store reading its own.
 
 ## Starting a site
 

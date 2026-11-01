@@ -36,7 +36,7 @@ class LogicRoomTest {
         val by by int().required
         init { check { state: Counter, _ -> if (state.n == 10) Reason("full") else null } }
     }
-    class Odd(json: Json.MutableObject = Json.MutableObject()) : Event("odd", json = json) { init { check { _: ChatState, _ -> null } } }
+    class Odd(json: Json.MutableObject = Json.MutableObject()) : Event("odd", json = json) { init { check { _: ChatState<*>, _ -> null } } }
     class Wait(json: Json.MutableObject = Json.MutableObject()) : Event("wait", json = json) { var user by string().out }
     class Whisper(json: Json.MutableObject = Json.MutableObject()) : Event("whisper", json = json) { val who by string().required }
     class Stray(json: Json.MutableObject = Json.MutableObject()) : Event("stray", json = json)

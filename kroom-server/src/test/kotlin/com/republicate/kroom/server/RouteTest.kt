@@ -55,4 +55,15 @@ class RouteTest {
         assertEquals(listOf("hi"), history.getArray("messages")!!.map { (it as Json.Object).getString("text") })
         room.stop()
     }
+
+    @Test fun `the scroll-back serves an app's lines as the reader's snapshot would`() = testApplication {
+        val room = lineRoom("chat-route-${n++}")
+        routing { route("/api") { room(room, principal) } }
+        client.post("/api/rooms/${room.id}/chat") { header("X-User", "alice"); contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""") }
+        assertEquals(HttpStatusCode.BadRequest, client.post("/api/rooms/${room.id}/chat") { header("X-User", "alice"); contentType(ContentType.Application.Json); setBody("""{"text":"x","mood":"faked"}""") }.status)
+        suspend fun line(user: String) = ((Json.parse(client.get("/api/rooms/${room.id}/history") { header("X-User", user) }.bodyAsText()) as Json.Object).getArray("messages")!!.single() as Json.Object)
+        line("alice").let { assertEquals("calm", it.getString("mood")); assertEquals("to self", it.getString("note")) }
+        line("bob").let { assertEquals("calm", it.getString("mood")); assertNull(it["note"]) }
+        room.stop()
+    }
 }

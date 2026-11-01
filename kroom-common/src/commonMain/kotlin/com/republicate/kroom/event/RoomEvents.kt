@@ -5,7 +5,7 @@ import com.republicate.kson.Json
 /**
  * A room's alphabet, static and common: every name on its wire, each an [intent] (a client may post it) or an
  * [event] (born by the room, emitted by its logic). An app declares its own as an object, one typed property per
- * name, `object LobbyEvents : ChatEvents() { val play = intent(::Play, cancellable = true) }`; kroom's come first
+ * name, `object LobbyEvents : ChatEvents<Chat>(::Chat) { val play = intent(::Play, cancellable = true) }`; kroom's come first
  * in every room. The room's door and dispatch, the routes, the browser's fold, posts and stream, and the catalog
  * read it. A door builds the right class from a frame, a browser without Kotlin reads it as JSON.
  */

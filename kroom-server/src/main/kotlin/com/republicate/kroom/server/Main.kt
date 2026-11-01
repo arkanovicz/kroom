@@ -1,5 +1,6 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Author
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*

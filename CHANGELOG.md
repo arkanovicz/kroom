@@ -6,6 +6,17 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-common, kroom-server — one chat line, the app's
+- `Chat` is open and every chat type carries the line class: `ChatState<C>(json, max, line)`, `ChatEvents<C>(line)`,
+  `ChatLogic<C>(clock, events)`, `ChatHistory<C>`, `MemoryChatHistory<C>`, `ChatRoom<C, S>`; `ChatState()`,
+  `ChatEvents()`, `ChatLogic()` build plain `Chat` lines. An app's subclass fields travel in the frame, the tail, the
+  snapshot, the store and the scroll-back. The room hands the store, and seeds the tail with, deep copies (taken on
+  the loop). `sendChat` answers the line.
+- `Author` is common, a view over `{id, name, avatar}` (`Chat.author` reads it typed); the server's `Author` data
+  class and `ChatMessage` are gone, and so is a line's `from` (it repeated `author.name`). Chifoumi's golden
+  refreshed.
+- `GET …/history` serves each line as the reader's `view`, as the snapshot does.
+
 #### kroom-common — events v4, the State side (step 5)
 - Field kind `keyed(::V)`: views by their `id`, in insertion order, on the wire an object keyed by id;
   `add` on a present id updates in place, `remove(id)`, `id in`, `[id]`, iterated as values (a page's

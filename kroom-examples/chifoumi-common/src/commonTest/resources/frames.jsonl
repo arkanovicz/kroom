@@ -2,7 +2,7 @@
 {"id":2,"event":"join","data":{"user":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"},"first":true,"count":2}}
 {"id":3,"event":"match","data":{"player":{"id":"a","name":"Alice"}}}
 {"id":4,"event":"match","data":{"player":{"id":"b","name":"Bob"},"match":{"id":"m1","player1":"a","player2":"b","name1":"Alice","name2":"Bob","score1":0,"score2":0,"round":1,"target":5,"finished":false}}}
-{"id":5,"event":"chat","data":{"text":"gl hf","seq":1,"from":"Alice","author":{"id":"a","name":"Alice"},"timestamp":"2026-10-27T12:00:00Z"}}
+{"id":5,"event":"chat","data":{"text":"gl hf","seq":1,"author":{"id":"a","name":"Alice"},"timestamp":"2026-10-27T12:00:00Z"}}
 {"id":6,"event":"play","data":{"player":"a"}}
 {"id":7,"event":"play","data":{"move":"PAPER","player":"b"}}
 {"id":8,"event":"round","data":{"match":{"id":"m1","player1":"a","player2":"b","name1":"Alice","name2":"Bob","score1":0,"score2":1,"round":2,"target":5,"finished":false},"round":{"number":1,"result":-1,"move1":"rock","move2":"paper","winner":"b"}}}
@@ -13,4 +13,4 @@
 {"id":13,"event":"round","data":{"match":{"id":"m1","player1":"a","player2":"b","name1":"Alice","name2":"Bob","score1":1,"score2":1,"round":3,"target":5,"finished":false},"round":{"number":2,"result":1,"move1":"rock","move2":"scissors","winner":"a"}}}
 {"id":14,"event":"leave","data":{"user":{"id":"a","name":"Alice","status":"AWAY"},"last":true,"count":1}}
 {"id":15,"event":"match","data":{"match":{"id":"m1","player1":"a","player2":"b","name1":"Alice","name2":"Bob","score1":1,"score2":1,"round":3,"target":5,"finished":true,"winner":"b"}}}
-{"event":"final","data":{"stats":{"played":1,"rock":2,"paper":1,"scissors":1,"well":0},"users":{"b":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"}},"matches":{},"queue":{},"history":[{"text":"gl hf","seq":1,"from":"Alice","author":{"id":"a","name":"Alice"},"timestamp":"2026-10-27T12:00:00Z"}],"me":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"}}}
+{"event":"final","data":{"stats":{"played":1,"rock":2,"paper":1,"scissors":1,"well":0},"users":{"b":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"}},"matches":{},"queue":{},"history":[{"text":"gl hf","seq":1,"author":{"id":"a","name":"Alice"},"timestamp":"2026-10-27T12:00:00Z"}],"me":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"}}}

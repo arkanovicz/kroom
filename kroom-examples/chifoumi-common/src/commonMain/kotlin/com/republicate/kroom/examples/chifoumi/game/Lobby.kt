@@ -11,7 +11,7 @@ import com.republicate.kroom.event.Leave
 import com.republicate.kson.Json
 
 /** The lobby's alphabet: the chat's, the game's intents, the round the logic emits; kroom's beside. */
-object LobbyEvents : ChatEvents() {
+object LobbyEvents : ChatEvents<Chat>(::Chat) {
     val match = intent(::Match, cancellable = true)
     val play = intent(::Play, cancellable = true)
     val round = event(::Round)
@@ -142,7 +142,7 @@ class Round(json: Json.MutableObject = Json.MutableObject()) : Event("round", js
 }
 
 /** The lobby's State: the chat's tail, who waits, the matches running, the totals. */
-class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState(json) {
+class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Chat>(json, line = ::Chat) {
     val queue by keyed(::Player)
     val matches by keyed(::MatchView)
     val stats by obj(::Stats)
