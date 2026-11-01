@@ -44,7 +44,7 @@ kotlin {
     // Android JVM target; the layout and themes need resources, off by default on this plugin
     android {
         namespace = "com.republicate.kroom.view"
-        compileSdk = 35
+        compileSdk = 36
         minSdk = 24
         compilerOptions { jvmTarget.set(JvmTarget.JVM_21) }
         androidResources { enable = true }

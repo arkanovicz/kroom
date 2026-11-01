@@ -13,6 +13,7 @@ java {
 dependencies {
     api(libs.essential.kson)
     api(libs.web.push)
+    implementation(libs.httpasyncclient)
     implementation(libs.slf4j.api)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)
