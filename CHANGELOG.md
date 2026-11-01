@@ -197,6 +197,30 @@ All notable changes to kroom will be documented in this file.
   (defaults to `stateToJson()`): `sendStateTo` is gone, `Table` overrides the former instead; a hook
   that used to resend the joiner its own context moves that into the snapshot.
 
+#### build — Gradle 9.4.1 (2026-11-01)
+- Gradle 8.9 → 9.4.1, Kotlin 2.4.0 → 2.4.21 (`apiVersion` 2.2), velocity `3.0.0-BETA-20261101-01` (its compiler
+  plugin is built on 2.4.21: the Kotlin patch of kroom follows the engine beta), AGP 8.5.2 → 9.2.1 (the last one
+  running on Gradle 9.4), Dokka 1.9.20 → 2.2.0 (V2), ben-manes versions 0.67.0 under `io.github.ben-manes.versions`.
+- Publishing: the vanniktech `com.vanniktech.maven.publish` plugin (0.37.0) replaces nexus-publish and the hand
+  wiring (per-publication `dokkaJar`, `Sign` ordering, `-Prelease`): it builds the publications, sources and javadoc
+  jars for every module; the root keeps only the pom. Signatures only when the invoked task names Central
+  (`publishAndReleaseToMavenCentral`), so `build` and `publishToMavenLocal` never prompt. The examples and the
+  demo are no longer published. `kroom-velocity-l10n` and the starter now ship sources jars.
+- kroom-view on `com.android.kotlin.multiplatform.library` (mandatory with AGP 9): `compileSdk` 35, resources
+  opted in, the activity finds its WebView by id (view binding is not a library feature on that plugin). The
+  Android variants carry `libraryelements=aar` and `jvm.environment=android`, `viewbinding` is no longer a
+  dependency.
+- `GenerateTranslatedTemplatesTask` is `@CacheableTask` with relative path sensitivity (Gradle 9 validates
+  plugins strictly). `kotlin.publishJvmEnvironmentAttribute=false` is gone: the attribute is published.
+- Catalog pruned of the 24 aliases and 12 versions no script referenced. Kotlin/Native refuses commas in
+  backticked test names: 17 tests renamed.
+- Sites written by the starter get the 9.4.1 wrapper.
+- Dependencies: essential-kson 2.18, kotlin-logging 8.0.4 (prints one `initializing` line to stderr at first use),
+  slf4j 2.0.20, bouncycastle 1.86, greenmail 2.1.15, junit-jupiter 6.1.3, nimbus oauth2-oidc-sdk 11.38.2, web-push
+  5.1.2 (kroom-webapp-push now declares `httpasyncclient`, which web-push moved to runtime scope while
+  `PushService` reads the `HttpResponse` itself), androidx core 1.18.0 / appcompat 1.8.0 / webkit 1.18.0, material
+  1.14.0, kroom-view `compileSdk` 36 (core 1.19 wants 37, not installed).
+
 #### ktor 3.6.1
 - Bumped from 3.5.0, no change on kroom's side. Brings KTOR-9790: the SSE heartbeat belongs to the session
   and stops when its handler returns.
