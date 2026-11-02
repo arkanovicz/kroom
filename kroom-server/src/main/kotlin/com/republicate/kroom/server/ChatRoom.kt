@@ -9,6 +9,8 @@ import com.republicate.kroom.event.Logic
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -30,7 +32,8 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
     init {
         // the tail comes from the store: once, before the first join
         runBlocking { history.tail(state.max) }.forEach { state.history += copy(it) }
-        scope.launch { for ((chat, line) in writer) { history.append(line); trace(chat.persist()) } }
+        // its own scope: a stopping room closes the channel, the writer drains it, then ends
+        CoroutineScope(Dispatchers.IO).launch { for ((chat, line) in writer) { history.append(line); trace(chat.persist()) } }
     }
 
     /** Say something from elsewhere than a door (a bridge, a route): the same life, under the author's id. */
@@ -45,6 +48,8 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
         // copied on the loop, before anything may touch the State's line
         if (event is Chat && event.stage == Stage.APPLIED) writer.trySend(event to copy(event))
     }
+
+    override fun stopped() { writer.close() }
 
     /** Scroll-back: up to [n] lines older than [seq], oldest first. */
     suspend fun before(seq: Long, n: Int = 50): List<C> = history.before(seq, n)

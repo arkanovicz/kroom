@@ -25,9 +25,9 @@ class RoomTest {
     class Vip(json: Json.MutableObject = Json.MutableObject()) : Event("vip", permission = "vip", json = json)
     class Slow(json: Json.MutableObject = Json.MutableObject()) : Event("slow", json = json)
 
-    private class TestRoom(id: String, val grace: Long = 0) : Room<Json.MutableObject>(id) {
+    private class TestRoom(id: String, val grace: Long = 0, val closes: Boolean = false) : Room<Json.MutableObject>(id) {
         override var state = Json.MutableObject()
-        override fun shouldCloseWhenEmpty() = false
+        override fun shouldCloseWhenEmpty() = closes
         override val channelCapacity = 8
         override val leaveGrace = grace
         override fun stateToJson(): Json.Object = Json.Object()
@@ -78,6 +78,18 @@ class RoomTest {
             assertEquals(verdict.meta.seq.toString(), it.id)
             assertEquals(moved.id!!.toLong() + 1, it.id!!.toLong())
         }
+    }
+
+    @Test fun `an anonymous spectator keeps a closing room open`() = runBlocking {
+        val room = TestRoom("room-${n++}", closes = true)
+        val watcher = room.join(Spectator("anon-1")).also { it.state() }
+        val alice = Actor(Actor.connectionId(user("alice"), "t1"), user("alice"))
+        room.join(alice).also { it.state() }
+        room.leave(alice)
+        room.broadcast("still", Json.Object())
+        while (watcher.next().event != "still") {}
+        room.leave(room.getActor("anon-1")!!)
+        assertTrue(room.join(alice).isClosedForReceive)   // the last one gone: stopped
     }
 
     @Test fun `a rejection is the verdict alone, nothing is framed`() = runBlocking {

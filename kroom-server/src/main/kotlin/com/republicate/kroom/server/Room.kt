@@ -131,7 +131,11 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         users.values.forEach { it.connectionsByRoom.remove(id) }
         actors.clear(); spectators.clear(); users.clear()
         logger.info("Room '$id' stopped")
+        stopped()
     }
+
+    /** The loop is gone: what the room still owes elsewhere (a store's pending writes) finishes here. */
+    protected open fun stopped() {}
 
     // ---- the door
 
@@ -306,7 +310,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         handle(actor, leave)
         if (last && leave.stage == Stage.APPLIED) { emit(leave); follow(leave) }
 
-        if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty()) {
+        if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty() && spectators.isEmpty()) {
             stop()
             Lobby.remove(id)
         }

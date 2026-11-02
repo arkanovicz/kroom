@@ -580,6 +580,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-server — a room that stops
+- A stopping `ChatRoom` lost the lines still queued for its store: the writer ran on the room's scope. It now runs on
+  its own, and `Room.stopped()` (new hook) closes its channel: the pending lines are written, then it ends.
+- A room closing when empty ignored anonymous spectators and stopped under them; spectators now count.
+
 #### kroom-webapp-l10n
 - `HtmlFragmentTranslator` reads HTML through kroom-common's `Segmentizer` instead of two regexes: a
   tag with several translatable attributes (`title` and `aria-label`) had only the last one

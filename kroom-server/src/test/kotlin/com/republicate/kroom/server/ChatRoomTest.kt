@@ -109,6 +109,18 @@ class ChatRoomTest {
         room.stop()
     }
 
+    @Test fun `a stopped room's pending lines still reach the store`() = runBlocking {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val kept = MemoryChatHistory<Chat>()
+        val slow = object : ChatHistory<Chat> by kept { override suspend fun append(line: Chat) { gate.await(); kept.append(line) } }
+        val room = ChatRoom("chat-${n++}", slow)
+        repeat(3) { room.sendChat(Author("u", "u"), "m$it") }
+        room.stop()
+        gate.complete(Unit)
+        kept.settled(3)
+        assertEquals(listOf("m0", "m1", "m2"), kept.tail(10).map { it.text })
+    }
+
     @Test fun `the store seeds the sequence and the snapshot's tail`() = runBlocking {
         val store = MemoryChatHistory<Chat>()
         val before = ChatRoom("chat-${n++}", store)
