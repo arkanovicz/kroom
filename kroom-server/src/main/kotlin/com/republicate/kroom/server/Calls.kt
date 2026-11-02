@@ -1,5 +1,6 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Stage
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -9,6 +10,7 @@ import io.ktor.server.sse.*
 import io.ktor.http.*
 import com.republicate.kson.Json
 import io.ktor.utils.io.ClosedByteChannelException
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.consumeAsFlow
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.seconds
@@ -24,75 +26,100 @@ private fun refusal(reason: String, args: Json.Object = Json.Object()) = Json.Ob
 
 /**
  * Everything a room serves, read from its events: the stream (`GET /rooms/{id}/stream`, the viewer's snapshot then
- * every frame, ktor's heartbeat every 15 s), one `POST /rooms/{id}/{name}` per intent, the catalog (`GET /rooms/{id}/events`), and for a chat the
- * scroll-back (`GET /rooms/{id}/history`). [principal] names the user from the call (its session); null refuses.
+ * every frame, ktor's heartbeat every 15 s), one `POST /rooms/{id}/{name}` per intent, the catalog (`GET
+ * /rooms/{id}/events`), and for a chat the scroll-back (`GET /rooms/{id}/history`). [principal] names the user from
+ * the call (its session), null for anonymous; the room's [Room.role] says what that user is there.
  */
-fun Route.room(room: Room<*>, principal: suspend (ApplicationCall) -> User?) {
-    val base = "/rooms/${room.id}"
+fun Route.room(room: Room<*>, principal: suspend (ApplicationCall) -> User?) = serve("/rooms/${room.id}", { room }, principal)
+
+/**
+ * The same routes for every room of a kind, `/rooms/{room}/…`: the room is the [Lobby]'s, else [build]s (null: no
+ * such room, 404); one built here closes once idle (see [Lobby.getOrCreate]).
+ */
+fun Route.rooms(build: suspend (id: String) -> Room<*>?, principal: suspend (ApplicationCall) -> User?) =
+    serve("/rooms/{room}", { call -> Lobby.getOrCreate(call.parameters["room"]!!, build) }, principal)
+
+private fun Route.serve(base: String, resolve: suspend (ApplicationCall) -> Room<*>?, principal: suspend (ApplicationCall) -> User?) {
     if (application.pluginOrNull(SSE) == null) application.install(SSE)
-    sse("$base/stream") {
-        heartbeat { period = 15.seconds }
-        val user = principal(call) ?: return@sse call.respond(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
-        // the tab id keeps a reconnecting tab the same connection
-        val actor = Actor(Actor.connectionId(user, call.tabId), user)
-        val channel = room.join(actor)
-        try { channel.consumeAsFlow().collect { send(it) } }
-        catch (e: ClosedByteChannelException) { logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id) }   // a tab gone: no trace
-        finally { room.leave(actor) }
+    get("$base/stream") {
+        val user = principal(call)
+        // admitted before the 200: a refusal is a status, not a stream that ends
+        val (room, actor) = call.inRoom(resolve) { it to it.connect(user, call.tabId) } ?: return@get call.noRoom()
+        if (actor == null) return@get call.refuse(user)
+        try {
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.response.header("X-Accel-Buffering", "no")
+            // the body is written after respond returns: the stream's own end is the leave
+            call.respond(SSEServerContent(call) {
+                heartbeat { period = 15.seconds }
+                try { actor.channel?.consumeAsFlow()?.collect { send(it) } }
+                catch (e: ClosedByteChannelException) { logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id) }   // a tab gone: no trace
+                finally { room.leave(actor) }
+            })
+        } catch (e: Throwable) { room.leave(actor); throw e }   // gone before the stream started
     }
-    room.events.names.forEach { name -> post("$base/$name") { call.intent(room, name, principal) } }
-    get("$base/events") { call.json(HttpStatusCode.OK, room.describe().toString()) }
-    if (room is ChatRoom<*, *>) get("$base/history") { call.history(room, principal) }
-}
-
-/**
- * Intents to any room the [Lobby] knows, `POST /rooms/{room}/{name}` with the event's payload: what [room] mounts for
- * one room, for all of them.
- */
-fun Route.intents(principal: suspend (ApplicationCall) -> User?) {
-    post("/rooms/{room}/{name}") {
-        val room = Lobby.get<Any>(call.parameters["room"]!!) ?: return@post call.json(HttpStatusCode.NotFound, refusal("no_room"))
-        call.intent(room, call.parameters["name"]!!, principal)
+    post("$base/{name}") {
+        val user = principal(call) ?: return@post call.json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
+        val name = call.parameters["name"]!!
+        val body = call.receiveText()
+        call.inRoom(resolve) { room ->
+            if (name !in room.events.names) return@inRoom call.json(HttpStatusCode.NotFound, refusal("unknown"))
+            val json = Json.parse(body) as? Json.MutableObject ?: return@inRoom call.json(HttpStatusCode.BadRequest, refusal("not_an_object"))
+            call.verdict(room.act(user, call.tabId, name, json))
+        } ?: call.noRoom()
     }
-}
-
-/** The room's events as data, `GET /rooms/{room}/events`: the state's fields and the alphabet, what a browser without Kotlin reads. */
-fun Route.events() {
-    get("/rooms/{room}/events") {
-        val room = Lobby.get<Any>(call.parameters["room"]!!) ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
-        call.json(HttpStatusCode.OK, room.describe().toString())
+    get("$base/events") {
+        val user = principal(call)
+        call.inRoom(resolve) { room ->
+            if (room.admit(user) == null) call.refuse(user) else call.json(HttpStatusCode.OK, room.describe().toString())
+        } ?: call.noRoom()
     }
-}
-
-/**
- * Scroll-back, `GET /rooms/{room}/history?before=<seq>&n=<count>` → `{messages: [...]}`, oldest
- * first, each line as the reader's snapshot shows it; no `before` means from the latest. [principal] names the
- * reading user; null refuses.
- */
-fun Route.chatHistory(principal: suspend (ApplicationCall) -> User?) {
-    get("/rooms/{room}/history") {
-        val room = Lobby.get<Any>(call.parameters["room"]!!) as? ChatRoom<*, *> ?: return@get call.json(HttpStatusCode.NotFound, refusal("no_room"))
-        call.history(room, principal)
+    get("$base/history") {
+        val user = principal(call)
+        call.inRoom(resolve) { room ->
+            if (room !is ChatRoom<*, *>) call.json(HttpStatusCode.NotFound, refusal("no_history"))
+            else if (room.admit(user) == null) call.refuse(user)
+            else call.history(room, user)
+        } ?: call.noRoom()
     }
 }
 
 /**
- * One intent: the event of that name over the posted JSON goes to the room; the reply is the verdict and nothing
- * else — `200` `{}` applied, `400` `{reason, args}` rejected. The effects come down the stream, to the emitter like
- * to everyone.
+ * [block] on the room [resolve] names; null: no such room. A room built on demand may close under the call
+ * ([ClosedSendChannelException]): the next resolve builds it again.
  */
-private suspend fun ApplicationCall.intent(room: Room<*>, name: String, principal: suspend (ApplicationCall) -> User?) {
-    val user = principal(this) ?: return json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
-    val json = Json.parse(receiveText()) as? Json.MutableObject ?: return json(HttpStatusCode.BadRequest, refusal("not_an_object"))
-    val event = room.act(user, tabId, name, json)
-    // a store may have moved it on to PERSISTED already: the verdict is rejected or not
-    if (event.stage == Stage.REJECTED) json(HttpStatusCode.BadRequest, refusal(event.meta.reason ?: "rejected", event.meta.args ?: Json.Object()))
-    else json(HttpStatusCode.OK, "{}")
+private suspend fun <T : Any> ApplicationCall.inRoom(resolve: suspend (ApplicationCall) -> Room<*>?, block: suspend (Room<*>) -> T): T? {
+    repeat(2) {
+        val room = resolve(this) ?: return null
+        try { return block(room) } catch (e: ClosedSendChannelException) { logger.debug("Room '{}' closed under a call", room.id) }
+    }
+    return null
 }
 
-private suspend fun ApplicationCall.history(room: ChatRoom<*, *>, principal: suspend (ApplicationCall) -> User?) {
-    val user = principal(this) ?: return json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))
+private suspend fun ApplicationCall.noRoom() = json(HttpStatusCode.NotFound, refusal("no_room"))
+
+private suspend fun ApplicationCall.refuse(user: User?) =
+    if (user == null) json(HttpStatusCode.Unauthorized, refusal("unauthenticated")) else json(HttpStatusCode.Forbidden, refusal("forbidden"))
+
+/**
+ * One intent's reply is its verdict and nothing else: `200` `{}` applied; `403` `{reason}` for whom the room refuses
+ * (`spectator`, `forbidden`), `400` `{reason, args}` otherwise. The effects come down the stream, to the emitter like
+ * to everyone. A room closed meanwhile is resolved again ([inRoom]).
+ */
+private suspend fun ApplicationCall.verdict(event: Event) {
+    val reason = event.meta.reason
+    when {
+        // a store may have moved it on to PERSISTED already: the verdict is rejected or not
+        event.stage != Stage.REJECTED -> json(HttpStatusCode.OK, "{}")
+        reason == "closed" -> throw ClosedSendChannelException("closed")
+        reason == "spectator" || reason == "forbidden" -> json(HttpStatusCode.Forbidden, refusal(reason, event.meta.args ?: Json.Object()))
+        else -> json(HttpStatusCode.BadRequest, refusal(reason ?: "rejected", event.meta.args ?: Json.Object()))
+    }
+}
+
+/** Scroll-back, `?before=<seq>&n=<count>` → `{messages: [...]}`, oldest first, each line as [user]'s snapshot shows it. */
+private suspend fun ApplicationCall.history(room: ChatRoom<*, *>, user: User?) {
     val before = request.queryParameters["before"]?.toLongOrNull() ?: Long.MAX_VALUE
     val n = (request.queryParameters["n"]?.toIntOrNull() ?: 50).coerceIn(1, 500)
-    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.before(before, n).map { it.view(user.userId) })).toString())
+    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.before(before, n).map { it.view(user?.userId) })).toString())
 }

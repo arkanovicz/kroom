@@ -7,6 +7,17 @@ All notable changes to kroom will be documented in this file.
 ### Changed (breaking)
 
 #### kroom-server — rooms on demand
+- `Route.rooms(build, principal)` serves every room of a kind, `/rooms/{room}/…` (stream, intents, catalog,
+  scroll-back), through `Lobby.getOrCreate`; a room closing under a call is resolved once more. `Route.intents`,
+  `Route.events()` and `Route.chatHistory` are gone into it.
+- `Room.role(user): Role?` (`ACTOR`, `SPECTATOR`, null) decides every route call, on the loop: the stream (an
+  anonymous caller may spectate), each intent (actors only, asked in the step that applies it: a tab joined as a
+  spectator acts once its user's role allows), the scroll-back and the catalog. Null is `401 unauthenticated`
+  anonymous, `403 forbidden` otherwise. Defaults to today's: signed-in callers act, anonymous ones are refused —
+  the catalog included, which was open.
+- Intent replies: `403` for `spectator` and `forbidden` (a missing permission too, which was a `400`).
+- A refused stream is a status before it starts (the 401 used to be attempted after the SSE 200).
+- What was queued behind a `stop()` is answered `closed` instead of waiting forever.
 - A room closes once idle: empty for `idleTimeout` (30 s, counted from its last leave; a timer finding the room
   busied since does nothing), not at its last leave; a room built and never joined closes too. Only a room built
   on demand closes (`shouldCloseWhenEmpty()` defaults to that): a room the host built lives with the app.

@@ -375,4 +375,21 @@ class RoomTest {
         kotlinx.coroutines.delay(50)
         while (true) { val f = tryReceive().getOrNull() ?: break; assertTrue(f.event == "join" || f.event == "leave", "unexpected ${f.event}") }
     }
+
+    @Test fun `what was queued behind a stop is answered closed`() = runBlocking {
+        val room = TestRoom("room-${n++}")
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = java.util.concurrent.CountDownLatch(1)
+        room.onSlow = { entered.complete(Unit); release.await(); room.stop() }
+        val alice = user("alice")
+        val slow = async(kotlinx.coroutines.Dispatchers.Default) { room.act(alice, "t1", "slow", json()) }
+        entered.await()
+        val asked = async(kotlinx.coroutines.Dispatchers.Default) { runCatching { room.admit(alice) } }
+        val acted = async(kotlinx.coroutines.Dispatchers.Default) { room.act(alice, "t1", "ok", json()) }
+        delay(100)   // both queued behind the step that stops
+        release.countDown()
+        assertEquals(Stage.APPLIED, slow.await().stage)
+        assertIs<kotlinx.coroutines.channels.ClosedSendChannelException>(asked.await().exceptionOrNull())
+        assertEquals("closed", acted.await().meta.reason)
+    }
 }

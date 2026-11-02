@@ -14,6 +14,7 @@ import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,9 @@ import java.util.concurrent.atomic.AtomicLong
 /** An event with no declaration: what [Room.broadcast] births, what the door rejects by name. */
 class Generic(name: String, json: Json.MutableObject = Json.MutableObject(), audience: Audience = Audience.ROOM) :
     Event(name, audience, json = json)
+
+/** What a caller is to a room ([Room.role]): one who acts, or one who watches. */
+enum class Role { ACTOR, SPECTATOR }
 
 /**
  * A room: state, membership (users; actors write, spectators read), one loop, and the events
@@ -79,6 +83,22 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
 
     /** Whether [user] holds [permission] here; the host's call (authoring's roles), everything by default. */
     protected open fun permits(user: User, permission: String): Boolean = true
+
+    /**
+     * What [user] (null: anonymous) is here, asked of every call a route serves: the stream (an actor or a
+     * spectator), each intent (an actor's), the scroll-back and the catalog (anyone admitted); null admits nobody,
+     * 401 when anonymous, 403 otherwise. It runs on the loop, the room's critical section: it may read the state
+     * (who sits where, who is a member) as the same step sees it, and must not wait. An anonymous caller is at most
+     * a spectator. Signed-in callers act by default.
+     */
+    protected open fun role(user: User?): Role? = user?.let { Role.ACTOR }
+
+    private fun roleOf(user: User?): Role? = try {
+        role(user)?.let { if (user == null) Role.SPECTATOR else it }
+    } catch (e: Exception) {
+        logger.error("role of '${user?.userId}' failed in room '$id'", e)
+        null
+    }
 
     /** Every stage change of every event: the operator's line. */
     protected open fun trace(event: Event) {
@@ -150,6 +170,8 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
 
     fun stop() {
         queue.close()
+        // what was queued behind the stop gets its answer: closed
+        while (true) queue.tryReceive().getOrNull()?.abort() ?: break
         processingJob?.cancel()
         scope.cancel()
         actors.values.forEach { it.disconnect() }
@@ -170,8 +192,9 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
      * then the loop. A refusal here or there is answered, never framed: the returned event is
      * `REJECTED` with its reason. The promise is the event in its final stage.
      */
-    fun act(actor: Actor, event: Event): Deferred<Event> {
-        val verdict = CompletableDeferred<Event>()
+    fun act(actor: Actor, event: Event): Deferred<Event> = CompletableDeferred<Event>().also { act(actor, event, it, gated = false) }
+
+    private fun act(actor: Actor, event: Event, verdict: CompletableDeferred<Event>, gated: Boolean) {
         val refused = when {
             actor is Spectator -> Reason("spectator")
             event.name in system || handlers[event.name] == null -> Reason("unknown")
@@ -182,24 +205,26 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
             try {
                 event.accept(actor.user?.userId ?: actor.connectionId, actor.tab)
             } catch (e: Event.Rejected) {
-                return verdict.also { it.complete(event.reject(e.reason).also(::trace)) }
+                verdict.complete(event.reject(e.reason).also(::trace))
+                return
             }
         }
-        if (refused != null) return verdict.also { it.complete(event.reject(refused).also(::trace)) }
+        if (refused != null) { verdict.complete(event.reject(refused).also(::trace)); return }
         trace(event)
-        if (!queue.trySend(Op.Act(actor, event, verdict)).isSuccess) verdict.complete(event.reject(Reason("closed")))
-        return verdict
+        if (!queue.trySend(Op.Act(actor, event, verdict, gated)).isSuccess) verdict.complete(event.reject(Reason("closed")))
     }
 
     /**
      * The route's entry: a session and a client id, not a connection. The name is looked up in the
-     * [catalog]; the connection id is composed server-side so the client lands under its own user.
+     * [catalog]; the connection id is composed server-side so the client lands under its own user. [role] decides
+     * on the loop, in the step that applies it: `spectator`, or `forbidden` when the user is nobody here.
      */
     suspend fun act(user: User, tab: String?, name: String, json: Json.MutableObject): Event {
         val connectionId = Actor.connectionId(user, tab)
-        val actor = getActor(connectionId) ?: Actor(connectionId, user)
+        // the role, not how the tab joined, says who acts: a spectator seated since acts from its next intent
+        val actor = getActor(connectionId)?.takeIf { it !is Spectator } ?: Actor(connectionId, user)
         val event = events.of(name, json) ?: return Generic(name, json).reject(Reason("unknown")).also(::trace)
-        return act(actor, event).await()
+        return CompletableDeferred<Event>().also { act(actor, event, it, gated = true) }.await()
     }
 
     // ---- emissions
@@ -247,6 +272,29 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     }
 
     suspend fun joinAsSpectator(spectator: Spectator): Channel<ServerSentEvent> = join(spectator)
+
+    /**
+     * The route's join: [role] decides on the loop, in the step that joins — an [Actor], a [Spectator] (an
+     * anonymous one under a fresh id: a tab id is no credential), or null, nobody. Throws
+     * [ClosedSendChannelException] when the room is stopped.
+     */
+    internal suspend fun connect(user: User?, tab: String?): Actor? = ask {
+        when (roleOf(user)) {
+            null -> null
+            Role.ACTOR -> Actor(Actor.connectionId(user!!, tab), user)
+            Role.SPECTATOR -> user?.let { Spectator(Actor.connectionId(it, tab), it) } ?: Spectator(java.util.UUID.randomUUID().toString())
+        }?.also(::processJoin)
+    }
+
+    /** [role], asked on the loop; throws [ClosedSendChannelException] when the room is stopped. */
+    internal suspend fun admit(user: User?): Role? = ask { roleOf(user) }
+
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T> ask(block: () -> T): T {
+        val answer = CompletableDeferred<Any?>()
+        if (!queue.trySend(Op.Ask(block, answer)).isSuccess) throw ClosedSendChannelException("room '$id' is closed")
+        return answer.await() as T
+    }
 
     /** A connection leaves; returns once the room has forgotten it. */
     suspend fun leave(actor: Actor) {
@@ -361,7 +409,12 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         try {
             when (op) {
                 is Op.Act -> {
-                    handle(op.actor, op.event)
+                    val refused = if (!op.gated) null else when (roleOf(op.actor.user)) {
+                        Role.ACTOR -> null
+                        Role.SPECTATOR -> Reason("spectator")
+                        null -> Reason("forbidden")
+                    }
+                    if (refused != null) trace(op.event.reject(refused)) else handle(op.actor, op.event)
                     // the handler's own emissions are already framed: the event's frame lands after them, its firing follows
                     if (op.event.stage == Stage.APPLIED) { frame(op.event, emptyList()); follow(op.event) }
                     op.verdict.complete(op.event)
@@ -370,6 +423,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
                 is Op.Run -> op.block()
                 is Op.Join -> try { processJoin(op.actor) } finally { op.ready.complete(op.actor.channel ?: closed()) }
                 is Op.Leave -> try { processLeave(op.actor) } finally { op.done.complete(Unit) }
+                is Op.Ask -> try { op.answer.complete(op.block()) } catch (e: Exception) { op.answer.completeExceptionally(e); throw e }
             }
         } finally {
             loopThread = null
@@ -457,11 +511,22 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         "events" to events.describe()
     )
 
+    private fun Op.abort() {
+        when (this) {
+            is Op.Act -> verdict.complete(event.reject(Reason("closed")))
+            is Op.Join -> ready.complete(closed())
+            is Op.Leave -> done.complete(Unit)
+            is Op.Ask -> answer.completeExceptionally(ClosedSendChannelException("room '$id' is closed"))
+            is Op.Emit, is Op.Run -> {}
+        }
+    }
+
     private sealed class Op {
-        class Act(val actor: Actor, val event: Event, val verdict: CompletableDeferred<Event>) : Op()
+        class Act(val actor: Actor, val event: Event, val verdict: CompletableDeferred<Event>, val gated: Boolean) : Op()
         class Emit(val event: Event, val to: List<String>) : Op()
         class Run(val block: () -> Unit) : Op()
         class Join(val actor: Actor, val ready: CompletableDeferred<Channel<ServerSentEvent>>) : Op()
         class Leave(val actor: Actor, val done: CompletableDeferred<Unit>) : Op()
+        class Ask(val block: () -> Any?, val answer: CompletableDeferred<Any?>) : Op()
     }
 }

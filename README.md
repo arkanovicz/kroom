@@ -8,7 +8,7 @@ Kotlin multiplatform library for real-time collaborative applications using Serv
 kroom-common          the common declaration of a room: State, events, RoomEvents, Logic (KMP)
 kroom-client          a page on a room: the stream folded into the State, its regions merged into the DOM by the engine's sink after every frame (KMP jvm+js)
 kroom-view            client-side SSE handling (JS/Wasm)
-kroom-server          rooms on the JVM: the loop, presence, Route.room (stream, intents, catalog)
+kroom-server          rooms on the JVM: the loop, presence, roles, Route.room / rooms (stream, intents, catalog)
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
 kroom-webapp-assets   shared client-side JS/CSS
 kroom-webapp-velocity Velocity template integration
@@ -163,14 +163,31 @@ routing {
 `room(room) { call -> user }` reads the room's events and mounts everything it serves: the stream
 (`GET /rooms/{id}/stream`, with a 15 s heartbeat), one `POST /rooms/{id}/{name}` per intent, the
 catalog (`GET /rooms/{id}/events`) and, for a chat, the scroll-back (`GET /rooms/{id}/history`). The
-lambda names the user from the call; null refuses. `LogicRoom(id, state, logic)` is the room for a
-logic; `ChatRoom` adds the chat's history store.
+lambda names the user from the call, null for anonymous. `rooms(build) { call -> user }` serves the same
+routes for every room of a kind, `/rooms/{room}/…`: the `Lobby`'s room of that id, else `build(id)` (null:
+404 `no_room`), which closes once idle. `LogicRoom(id, state, logic)` is the room for a logic; `ChatRoom`
+adds the chat's history store.
 
+- **Who the caller is, the room says**: `role(user)` answers `Role.ACTOR`, `Role.SPECTATOR` or null, asked of
+  every call — the stream (an actor or a spectator; anonymous, at most a spectator), each intent (an actor's),
+  the scroll-back and the catalog (anyone admitted). Null is `401 unauthenticated` for the anonymous, `403
+  forbidden` otherwise, the stream's before it starts. It runs on the loop, the room's critical section: it reads
+  the state (members, seats) as the step sees it, and must not wait. Signed-in callers act by default:
+  ```kotlin
+  override fun role(user: User?) = when (level) {
+      PUBLIC  -> if (user != null) Role.ACTOR else Role.SPECTATOR
+      OPEN    -> user?.let { Role.ACTOR }
+      PRIVATE -> user?.takeIf { it.userId in state.members }?.let { Role.ACTOR }
+  }
+  ```
+  An intent's role is asked in the step that applies it: a member removed, a seat taken, holds from the next
+  intent. What an actor may do *now* (its turn, its seat) is the logic's `check`.
 - **The door is stateless**: an unknown name, a bad shape, a field beyond the declared
-  (`undeclared`), a missing permission (`permits(user, permission)`, the host's call), a spectator —
-  refused with `400` before the loop, never queued.
-- **The reply is the verdict**, nothing else: `200 {}` applied, `400 {reason, args}` rejected. A
-  rejection is framed to nobody; the effects come down the stream, to the author like to everyone.
+  (`undeclared`), a missing permission (`permits(user, permission)`, the host's call) — refused
+  before the loop, never queued.
+- **The reply is the verdict**, nothing else: `200 {}` applied, `403 {reason}` for whom the room refuses
+  (`spectator`, `forbidden`), `400 {reason, args}` rejected. A rejection is framed to nobody; the effects come
+  down the stream, to the author like to everyone.
 - **The instant.** A step of the loop numbers and writes everything it produces before it returns:
   a snapshot taken at a position holds exactly the frames up to it. Every frame's SSE `id` is its
   position on the room's channel.
@@ -868,8 +885,7 @@ numbers a line (`seq`, following the State's last), the State keeps the last 50 
 the room frames it, then hands it to the store in the background: the loop never waits on a store. The store
 is asked twice on its own terms: `tail(n)` when the room starts, to seed the tail, and `before(seq, n)` for
 scroll-back, which `room(…)` serves as `GET /rooms/{room}/history?before=&n=` (`{messages: [...]}`, oldest
-first, each line as the reader's snapshot shows it; `Route.chatHistory { call -> user }` does it for every room
-the `Lobby` knows). A line carries its `author` (`Author(id, name, avatar)`): the user's id and avatar (`User.avatar`),
+first, each line as the reader's snapshot shows it; `rooms(…)` for every room of a kind). A line carries its `author` (`Author(id, name, avatar)`): the user's id and avatar (`User.avatar`),
 or an external one once a bridge speaks for someone else (`sendChat(author, text)`). Write a `ChatHistory` over
 your database and hand it to the room; `MemoryChatHistory` keeps the last 1000 and dies with the process.
 
