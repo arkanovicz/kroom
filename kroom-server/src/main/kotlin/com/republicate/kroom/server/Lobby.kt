@@ -1,5 +1,7 @@
 package com.republicate.kroom.server
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -26,15 +28,29 @@ object Lobby {
     @Suppress("UNCHECKED_CAST")
     fun <S : Any> get(id: String): Room<S>? = rooms[id] as? Room<S>
 
+    private val building = Mutex()
+
     /**
-     * Get room or create with factory
+     * The running room [id], built by [build] on first use (null: no such room). One build at a time: the room is
+     * looked up, then under the lock looked up again before building, so two first calls build it once. A room
+     * built here closes once idle and is forgotten; the next call builds it anew.
      */
-    @Suppress("UNCHECKED_CAST")
-    fun <S : Any> getOrCreate(id: String, factory: () -> Room<S>): Room<S> {
-        return rooms.computeIfAbsent(id) {
-            logger.info("Creating room '$id'")
-            factory()
-        } as Room<S>
+    suspend fun getOrCreate(id: String, build: suspend (id: String) -> Room<*>?): Room<*>? =
+        live(id) ?: building.withLock {
+            live(id) ?: build(id)?.also { room ->
+                require(room.id == id) { "built '${room.id}' for '$id'" }
+                room.onDemand = true
+                rooms[id] = room
+                room.idle()
+                logger.info("Room '$id' built on demand")
+            }
+        }
+
+    private fun live(id: String): Room<*>? = rooms[id]?.takeIf { it.running }
+
+    /** A room that closed itself: forgotten, unless another already took its id. */
+    internal fun forget(room: Room<*>) {
+        if (rooms.remove(room.id, room)) logger.info("Room '${room.id}' forgotten")
     }
 
     /**

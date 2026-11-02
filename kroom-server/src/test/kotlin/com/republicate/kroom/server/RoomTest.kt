@@ -10,6 +10,7 @@ import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.*
@@ -28,6 +29,7 @@ class RoomTest {
     private class TestRoom(id: String, val grace: Long = 0, val closes: Boolean = false) : Room<Json.MutableObject>(id) {
         override var state = Json.MutableObject()
         override fun shouldCloseWhenEmpty() = closes
+        override val idleTimeout get() = 50L
         override val channelCapacity = 8
         override val leaveGrace = grace
         override fun stateToJson(): Json.Object = Json.Object()
@@ -89,7 +91,8 @@ class RoomTest {
         room.broadcast("still", Json.Object())
         while (watcher.next().event != "still") {}
         room.leave(room.getActor("anon-1")!!)
-        assertTrue(room.join(alice).isClosedForReceive)   // the last one gone: stopped
+        withTimeout(2000) { while (room.running) delay(10) }   // the last one gone, then idle: stopped
+        assertTrue(room.join(alice).isClosedForReceive)
     }
 
     @Test fun `a rejection is the verdict alone, nothing is framed`() = runBlocking {

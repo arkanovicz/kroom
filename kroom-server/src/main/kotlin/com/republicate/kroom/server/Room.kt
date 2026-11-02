@@ -107,6 +107,32 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         start()
     }
 
+    /** Built by the [Lobby] on first use: such a room closes once idle (see [shouldCloseWhenEmpty]). */
+    internal var onDemand = false
+
+    /** False once stopped: a stopped room answers nothing (a join gets a closed channel, an act `closed`). */
+    val running: Boolean get() = !queue.isClosedForSend
+
+    // each time the room empties, a timer of its own: one that finds the room busied since does nothing
+    private val idleEpoch = AtomicLong(0)
+
+    private val empty: Boolean get() = users.isEmpty() && actors.isEmpty() && spectators.isEmpty()
+
+    /** The room just emptied, or was just built: it closes after [idleTimeout] if nobody came meanwhile. */
+    internal fun idle() {
+        val epoch = idleEpoch.incrementAndGet()
+        scope.launch {
+            delay(idleTimeout)
+            step {
+                if (idleEpoch.get() == epoch && empty && shouldCloseWhenEmpty()) {
+                    logger.info("Room '$id' idle for {} ms: closing", idleTimeout)
+                    stop()
+                    Lobby.forget(this@Room)
+                }
+            }
+        }
+    }
+
     private fun start() {
         processingJob = scope.launch {
             logger.info("Room '$id' started")
@@ -310,10 +336,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         handle(actor, leave)
         if (last && leave.stage == Stage.APPLIED) { emit(leave); follow(leave) }
 
-        if (shouldCloseWhenEmpty() && users.isEmpty() && actors.isEmpty() && spectators.isEmpty()) {
-            stop()
-            Lobby.remove(id)
-        }
+        if (empty) idle()
     }
 
     /** The handler, then the stage it earned. */
@@ -412,7 +435,11 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
      */
     open fun stateToJson(actor: Actor): Json.Object = stateToJson()
 
-    protected open fun shouldCloseWhenEmpty(): Boolean = true
+    /** Whether the room closes once idle: a room built on demand does, one the host built lives with the app. */
+    protected open fun shouldCloseWhenEmpty(): Boolean = onDemand
+
+    /** How long (ms) an empty room waits before closing: whatever it still had to write is written long before. */
+    protected open val idleTimeout: Long = 30_000
 
     fun getActors(): List<Actor> = actors.values.toList()
     fun getUsers(): List<User> = users.values.toList()

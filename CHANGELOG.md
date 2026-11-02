@@ -6,6 +6,14 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-server — rooms on demand
+- A room closes once idle: empty for `idleTimeout` (30 s, counted from its last leave; a timer finding the room
+  busied since does nothing), not at its last leave; a room built and never joined closes too. Only a room built
+  on demand closes (`shouldCloseWhenEmpty()` defaults to that): a room the host built lives with the app.
+- `Lobby.getOrCreate(id, build: suspend (id) -> Room?)` is suspend and double-checked: the running room, else under
+  a lock looked up again, else built (null: no such room); what it builds closes once idle, is forgotten
+  (`Lobby.forget`, only that instance), and the next call builds it anew. `Room.running`.
+
 #### kroom-common, kroom-server — one chat line, the app's
 - `Chat` is open and every chat type carries the line class: `ChatState<C>(json, max, line)`, `ChatEvents<C>(line)`,
   `ChatLogic<C>(clock, events)`, `ChatHistory<C>`, `MemoryChatHistory<C>`, `ChatRoom<C, S>`; `ChatState()`,
