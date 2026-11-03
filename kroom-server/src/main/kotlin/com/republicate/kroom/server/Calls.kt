@@ -117,9 +117,14 @@ private suspend fun ApplicationCall.verdict(event: Event) {
     }
 }
 
-/** Scroll-back, `?before=<seq>&n=<count>` → `{messages: [...]}`, oldest first, each line as [user]'s snapshot shows it. */
+/**
+ * The history, `?before=<seq>` (scroll-back; none: from the latest) or `?after=<seq>` (reading on from a line jumped
+ * to), `&n=<count>` → `{messages: [...]}`, oldest first, each line as [user]'s snapshot shows it.
+ */
 private suspend fun ApplicationCall.history(room: ChatRoom<*, *>, user: User?) {
-    val before = request.queryParameters["before"]?.toLongOrNull() ?: Long.MAX_VALUE
+    val after = request.queryParameters["after"]?.toLongOrNull()
+    val before = request.queryParameters["before"]?.toLongOrNull()
+    if (after != null && before != null) return json(HttpStatusCode.BadRequest, refusal("before_and_after"))
     val n = (request.queryParameters["n"]?.toIntOrNull() ?: 50).coerceIn(1, 500)
-    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.before(before, n).map { it.view(user?.userId) })).toString())
+    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array((if (after != null) room.after(after, n) else room.before(before ?: Long.MAX_VALUE, n)).map { it.view(user?.userId) })).toString())
 }

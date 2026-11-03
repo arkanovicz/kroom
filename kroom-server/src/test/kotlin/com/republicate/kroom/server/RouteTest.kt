@@ -10,7 +10,9 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import kotlin.test.*
 
 /** Arkad's levels: public reads for anyone and writes for the signed-in, open is the signed-in's, private its members'. */
@@ -68,8 +70,14 @@ class RouteTest {
             assertEquals("alice", (Json.parse(first.data!!) as Json.Object).getObject("me")!!.getString("id"))
         }
         client.post("/api/rooms/${room.id}/chat") { header("X-User", "alice"); contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""") }
-        val history = Json.parse(client.get("/api/rooms/${room.id}/history") { header("X-User", "alice") }.bodyAsText()) as Json.Object
-        assertEquals(listOf("hi"), history.getArray("messages")!!.map { (it as Json.Object).getString("text") })
+        client.post("/api/rooms/${room.id}/chat") { header("X-User", "alice"); contentType(ContentType.Application.Json); setBody("""{"text":"there"}""") }
+        suspend fun texts(query: String) = (Json.parse(client.get("/api/rooms/${room.id}/history$query") { header("X-User", "alice") }.bodyAsText()) as Json.Object)
+            .getArray("messages")!!.map { (it as Json.Object).getString("text") }
+        withTimeout(2000) { while (texts("").size < 2) delay(10) }
+        assertEquals(listOf("hi", "there"), texts(""))
+        assertEquals(listOf("hi"), texts("?before=2"))
+        assertEquals(listOf("there"), texts("?after=1"))
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/rooms/${room.id}/history?before=2&after=1") { header("X-User", "alice") }.status)
         room.stop()
     }
 

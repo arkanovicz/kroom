@@ -145,5 +145,7 @@ class ChatRoomTest {
         assertEquals(listOf("m4", "m5"), room.before(7, 2).map { it.text }) // m0 is seq 1
         assertEquals(listOf("m3", "m4", "m5", "m6", "m7"), room.before(Long.MAX_VALUE, 10).map { it.text })
         assertEquals(emptyList(), room.before(1, 10))
+        assertEquals(listOf("m5", "m6"), room.after(5, 2).map { it.text })
+        assertEquals(emptyList(), room.after(8, 10))
     }
 }

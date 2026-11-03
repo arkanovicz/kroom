@@ -53,6 +53,9 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
 
     /** Scroll-back: up to [n] lines older than [seq], oldest first. */
     suspend fun before(seq: Long, n: Int = 50): List<C> = history.before(seq, n)
+
+    /** Reading on from a line jumped to: up to [n] lines newer than [seq], oldest first. */
+    suspend fun after(seq: Long, n: Int = 50): List<C> = history.after(seq, n)
 }
 
 /** A chat room and nothing more. */
