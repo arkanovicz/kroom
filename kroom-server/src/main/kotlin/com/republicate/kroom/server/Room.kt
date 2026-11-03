@@ -460,9 +460,11 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
             else -> { fold(emitted); toAll(frame) }
         }
         emitted(emitted)
-        // copied on the loop, before anything may touch what the State kept of it
-        val copy = emitted.json.copy()
-        writer.trySend(emitted to (events.frame(emitted.name, copy) ?: Generic(emitted.name, copy, emitted.audience)))
+        // copied on the loop, before anything may touch what the State kept of it; the metadata too (seq, from)
+        val json = emitted.json.copy()
+        val copy = events.frame(emitted.name, json) ?: Generic(emitted.name, json, emitted.audience)
+        copy.meta.json.putAll(emitted.meta.json.copy())
+        writer.trySend(emitted to copy)
     }
 
     /** The frame a connection gets, serialized once per user (or once, when the event is the same for everyone). */

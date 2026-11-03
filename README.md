@@ -124,8 +124,8 @@ class MatchmakingLogic(private val ids: () -> String) : Logic<LobbyState>(LobbyE
   validation, typed on the State it reads: the browser runs it before posting, the room first on its
   loop, and a room refuses at construction an event checked on another State.
 - **RoomEvents** is the alphabet as an object of typed entries: `intent(::E, cancellable)` (postable)
-  or `event(::E)` (born by the room). It feeds the door, the routes, the browser's fold, posts and
-  stream, and the catalog (`describe()`, served as `GET …/events`). Composition is inheritance:
+  or `event(::E)` (the room's: a client never posts it, server code may act it — a store's answer). It feeds the
+  door, the routes, the browser's fold, posts and stream, and the catalog (`describe()`, served as `GET …/events`). Composition is inheritance:
   `ChatEvents` brings `chat`.
 - **Logic.** `on(entry) { state, actor, event -> Outcome }` per intent, typed on the entry's class;
   a `Reason` is the reply (nothing framed), an `Emit` (`emit(…)`, `done`) frames the intent then each
@@ -207,9 +207,12 @@ adds the chat's history store.
 - **What the loop cannot decide, the store does, off the loop.** `persist(event)` gets every frame, copied on the
   loop, in the room's order, off the loop; the event goes `PERSISTED` after it. It is where a store writes (`ChatRoom`
   → `ChatHistory.append` for lines, `ChatHistory.persist` for the rest: a reaction never reaches the store before its
-  line), and where a lookup the State cannot answer runs — deleting a line older than the tail: the logic applies the
-  request (framed to its author), `persist` reads the store, and the answer comes back as a step. So `200` is "taken
-  into account", decided at once whenever the State is enough; what the store decides comes down the stream.
+  line), and where a lookup the State cannot answer runs. Deleting a line older than the tail: the logic emits its
+  question (an `event` entry, `USERS`: the author's tabs), `persist` reads the store and `act`s the answer (another
+  `event` entry, so no client can forge it) as the request's author — an emission carries its intent's author —, and
+  the logic decides on it like on any intent: checked, framed, or refused (the verdict is `act`'s, the app frames a
+  late refusal to the author). So `200` is "taken into account", decided at once whenever the State is enough; what
+  the store decides comes down the stream.
 
 ### In the browser (kroom-client)
 

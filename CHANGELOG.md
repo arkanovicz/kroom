@@ -20,7 +20,12 @@ All notable changes to kroom will be documented in this file.
   goes `PERSISTED` after it, a stopping room drains it. `ChatRoom`'s private writer is gone into it: lines go to
   `ChatHistory.append`, every other frame to `ChatHistory.persist(event)` (new, nothing by default), so a reaction
   never reaches the store before its line. Every event now reaches `PERSISTED` (with no store, at once): a verdict is
-  "not `REJECTED`". `Room.stopped()` (added in this snapshot) is gone: the room closes its writer itself.
+  "not `REJECTED`". `Room.stopped()` (added in this snapshot) is gone: the room closes its writer itself. The copy
+  carries the metadata (seq, from, at).
+- A `LogicRoom` handles every entry of its catalog, `event(::E)` ones too: a client still cannot post them (no route,
+  `unknown` at the door), server code `act`s them — a store's answer, as the request's author, decided by the logic
+  like an intent. A handler's emission carries its intent's author (`meta.from`, `tab`): a `USERS` emission reaches
+  the author's tabs without `.to()`, a store knows whose request it answers.
 
 #### kroom-server — rooms on demand
 - `Route.rooms(build, principal)` serves every room of a kind, `/rooms/{room}/…` (stream, intents, catalog,

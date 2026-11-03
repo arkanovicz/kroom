@@ -31,8 +31,11 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
             events.frame(name, Json.MutableObject())!!.checkState?.let { require(it.isInstance(state)) { "'$name' is checked on ${it.simpleName}, room '$id' holds ${state::class.simpleName}" } }
         }
         logic.checkCoverage()
-        // the check first, on the loop: the State it read is the one the logic decides on
-        events.names.forEach { name -> on(events.entry(name)!!.factory) { actor, intent -> intent.check(state, actor) ?: settle(intent, logic.decide(state, actor, intent)) } }
+        // every entry of the app, the room's events (`event(::E)`) too: a client posts the postable ones, server code
+        // acts the others (a store's answer, as the request's author); the check first, on the loop: the State it
+        // read is the one the logic decides on
+        val kroom = setOf(events.join.name, events.leave.name, events.status.name, events.cancel.name)
+        events.all.filter { it !in kroom }.forEach { name -> on(events.entry(name)!!.factory) { actor, intent -> intent.check(state, actor) ?: settle(intent, logic.decide(state, actor, intent)) } }
         on(::Status) { actor, status -> status(actor, status) }
         on(::Cancel) { actor, cancel -> cancel(actor, cancel) }
         // the logic hears a user, not a connection
@@ -75,7 +78,8 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
     override fun follow(intent: Event) {
         val emitted = outcome ?: return
         outcome = null
-        emitted.events.forEach { emit(it) }
+        // an emission is its intent's: it carries the author (a USERS frame finds its tabs, a store its requester)
+        emitted.events.forEach { e -> if (e.meta.from == null) { e.meta.from = intent.meta.from; e.meta.tab = intent.meta.tab }; emit(e) }
     }
 
     override fun fold(frame: Event) = state.reduce(frame)

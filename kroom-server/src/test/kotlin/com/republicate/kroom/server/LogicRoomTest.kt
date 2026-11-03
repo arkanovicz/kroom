@@ -1,5 +1,6 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Audience
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Event
@@ -280,5 +281,68 @@ class LogicRoomTest {
         val spectator = Spectator(Actor.connectionId(alice, "t1"), alice)
         room.joinAsSpectator(spectator).state()
         assertEquals("spectator", room.act(spectator, Add(json("by" to 1))).await().meta.reason)
+    }
+
+    // ---- what the State cannot decide, the store answers: the logic decides twice
+
+    class Delete(json: Json.MutableObject = Json.MutableObject()) : Event("delete", Audience.USERS, json = json) { val seq by long().required }
+    class OwnerOf(json: Json.MutableObject = Json.MutableObject()) : Event("ownerOf", Audience.USERS, json = json) { var seq by long().required }
+    class Owner(json: Json.MutableObject = Json.MutableObject()) : Event("owner", Audience.USERS, json = json) { var seq by long().required; var author by string() }
+    class Deleted(json: Json.MutableObject = Json.MutableObject()) : Event("deleted", json = json) { var seq by long().required }
+    class Refused(json: Json.MutableObject = Json.MutableObject()) : Event("refused", Audience.USERS, json = json) { var intent by string().required; var reason by string().required }
+
+    object Lookup : RoomEvents() {
+        val delete = intent(::Delete)
+        val ownerOf = event(::OwnerOf)
+        val owner = event(::Owner)
+        val deleted = event(::Deleted)
+        val refused = event(::Refused)
+    }
+
+    class Tail(json: Json.MutableObject = Json.MutableObject()) : State(json)
+
+    /** The tail knows lines 11..20; older ones only the store does. */
+    object Rule2 : Logic<Tail>(Lookup) {
+        private fun mine(seq: Long, author: String?, actor: Who) = if (author == actor.id) emit(Deleted().also { it.seq = seq }) else Reason("not_yours")
+        init {
+            on(Lookup.delete) { _, actor, d -> if (d.seq > 10) mine(d.seq, "alice", actor) else emit(OwnerOf().also { it.seq = d.seq }) }
+            on(Lookup.owner) { _, actor, o -> mine(o.seq, o.author, actor) }
+        }
+    }
+
+    private class StoreRoom(id: String, val store: Map<Long, String>) : LogicRoom<Tail>(id, Tail(), Rule2) {
+        val asked = mutableListOf<Long>()
+        override fun shouldCloseWhenEmpty() = false
+        override suspend fun persist(event: Event) {
+            if (event !is OwnerOf) return
+            asked += event.seq!!
+            val author = Actor(Actor.connectionId(Users.get(event.meta.from!!)!!, event.meta.tab), Users.get(event.meta.from!!))
+            val verdict = act(author, Owner().also { it.seq = event.seq; it.author = store[event.seq!!] }).await()
+            if (verdict.stage == Stage.REJECTED) emit(Refused().also { it.intent = "delete"; it.reason = verdict.meta.reason!! }, author.user!!)
+        }
+    }
+
+    @Test fun `a request the State cannot decide is answered by the store, the logic decides on the answer`() = runBlocking {
+        val room = StoreRoom("lookup-${n++}", mapOf(3L to "alice", 4L to "bob"))
+        val alice = user("alice"); val bob = user("bob")
+        val a = room.join(actor(alice, "t1")).also { it.state(); it.joined() }
+        val b = room.join(actor(bob, "t1")).also { it.state(); it.joined() }
+        a.joined()   // bob's
+
+        assertEquals("not_yours", room.act(bob, "t1", "delete", json("seq" to 15)).meta.reason)   // the State knows: inline
+        assertNotEquals(Stage.REJECTED, room.act(alice, "t1", "delete", json("seq" to 15)).stage)
+        assertEquals(listOf("delete", "deleted"), listOf(a.next().event, a.next().event))   // her request (USERS: hers alone), then the outcome
+        assertEquals("deleted", b.next().event)
+
+        assertNotEquals(Stage.REJECTED, room.act(alice, "t1", "delete", json("seq" to 3)).stage)   // older than the tail: taken into account
+        assertEquals(listOf("delete", "ownerOf", "owner", "deleted"), List(4) { a.next().event })   // her tabs: the request, the question, the store's answer, its decision
+        assertEquals("deleted", b.next().event)   // bob: the outcome alone
+
+        assertNotEquals(Stage.REJECTED, room.act(alice, "t1", "delete", json("seq" to 4)).stage)   // bob's line: refused late, to her alone
+        assertEquals(listOf("delete", "ownerOf"), List(2) { a.next().event })   // the refused answer is framed to nobody, like any rejection
+        a.next().let { assertEquals("refused", it.event); assertEquals("not_yours", it.json().getString("reason")) }
+        b.silent()
+        assertEquals(listOf(3L, 4L), room.asked)
+        room.stop()
     }
 }
