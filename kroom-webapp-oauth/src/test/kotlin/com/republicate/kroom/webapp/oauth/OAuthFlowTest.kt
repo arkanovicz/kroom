@@ -82,6 +82,8 @@ class OAuthFlowTest {
             .claim("nonce", idTokenNonce)
             .claim("name", idTokenName)
             .claim("email", "test@example.com")
+            .claim("picture", "https://idp.example/u/123.png")
+            .claim("groups", listOf("staff", "ops"))
             .build()
         return SignedJWT(JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test").build(), claims).apply {
             sign(RSASSASigner(rsaKey))
@@ -222,15 +224,26 @@ class OAuthFlowTest {
 
     @Test
     fun `hook enriches session with appId`() = runFlow(
-        configure = { onAuthenticated = { session, _ -> session.copy(appId = "dude-42") } },
+        configure = { onAuthenticated = { session, _, _ -> session.copy(appId = "dude-42") } },
         assertions = { _, client ->
             assertTrue(client.get("/api/auth/user").bodyAsText().contains("dude-42"))
         }
     )
 
     @Test
+    fun `hook sees the id_token's claims`() = runFlow(
+        configure = { onAuthenticated = { session, _, claims ->
+            session.copy(appId = claims.getString("picture") + " " + claims.getArray("groups")!!.joinToString(","))
+        } },
+        assertions = { _, client ->
+            val user = client.get("/api/auth/user").bodyAsText()
+            assertTrue(user.contains("https://idp.example/u/123.png staff,ops"), user)
+        }
+    )
+
+    @Test
     fun `hook replaces session`() = runFlow(
-        configure = { onAuthenticated = { session, _ -> session.copy(name = "Renamed") } },
+        configure = { onAuthenticated = { session, _, _ -> session.copy(name = "Renamed") } },
         assertions = { _, client ->
             assertTrue(client.get("/api/auth/user").bodyAsText().contains("Renamed"))
         }
@@ -238,7 +251,7 @@ class OAuthFlowTest {
 
     @Test
     fun `hook returning null rejects login`() = runFlow(
-        configure = { onAuthenticated = { _, _ -> null } },
+        configure = { onAuthenticated = { _, _, _ -> null } },
         assertions = { callback, client ->
             assertEquals("/", callback.headers[HttpHeaders.Location])
             assertTrue(client.get("/api/auth/user").bodyAsText().contains("\"authenticated\":false"))

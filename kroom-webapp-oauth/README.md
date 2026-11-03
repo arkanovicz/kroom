@@ -36,9 +36,10 @@ fun Application.module() {
             privateKey = System.getenv("APPLE_PRIVATE_KEY") // .p8 PEM (or bare base64)
         }
 
-        // enrich or reject logins; returning null rejects
-        onAuthenticated = { session, call ->
-            session.copy(appId = findOrCreateUser(session))
+        // enrich or reject logins; returning null rejects. `claims`: the provider's whole answer
+        // (the validated id_token's claims for OIDC, the userinfo document for OAuth2): `picture`, `groups`…
+        onAuthenticated = { session, call, claims ->
+            session.copy(appId = findOrCreateUser(session, avatar = claims.getString("picture")))
         }
     }
 }
@@ -100,7 +101,7 @@ to link accounts app-side: `provider`, `email`, and `id` — the
 **stable per-provider user id** (OIDC `sub`, GitHub numeric id). Store
 the `(provider, id)` credential and match by normalized email; kroom
 owns the flow, the app owns the store. With `kroom-webapp-auth`:
-`onAuthenticated = { s, _ -> authStore.linkOidc(s) }`.
+`onAuthenticated = { s, _, _ -> authStore.linkOidc(s) }`.
 
 Apple only sends the email on the first authorization — link on first
 login and rely on `id` afterwards.

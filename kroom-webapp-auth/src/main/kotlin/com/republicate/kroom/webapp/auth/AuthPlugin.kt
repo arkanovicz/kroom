@@ -118,7 +118,7 @@ inline fun <reified ID> ApplicationCall.authId(): ID? {
  * session re-anchored to the local principal id (or null to reject — e.g. no email,
  * or the app's `createPrincipal` refused via [AuthStoreException]).
  *
- * Wire into `installOAuth { onAuthenticated = { s, _ -> authStore.linkOidc(s) } }`.
+ * Wire into `installOAuth { onAuthenticated = { s, _, _ -> authStore.linkOidc(s) } }`.
  */
 suspend fun <ID> AuthStore<ID>.linkOidc(session: UserSession): UserSession? {
     val email = session.email ?: return null

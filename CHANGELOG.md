@@ -6,6 +6,15 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-webapp-oauth
+- `onAuthenticated` gets the provider's claims as a third argument, `(session, call, claims) -> UserSession?`: the
+  validated id_token's claims (OIDC), the userinfo document (OAuth2; an extractor's own `Profile.claims` win).
+  `Profile.claims` carries them. For an avatar (`picture`), groups mapped onto members (`groups`).
+
+#### kroom-server
+- `ChatHistory.after(seq, n)`: up to n lines newer than seq, oldest first (`MemoryChatHistory` has it); a store
+  implements it. `ChatRoom.after`; the history route takes `?after=` (with `?before=`, a 400).
+
 #### kroom-server — rooms on demand
 - `Route.rooms(build, principal)` serves every room of a kind, `/rooms/{room}/…` (stream, intents, catalog,
   scroll-back), through `Lobby.getOrCreate`; a room closing under a call is resolved once more. `Route.intents`,

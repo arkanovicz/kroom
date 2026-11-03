@@ -46,10 +46,10 @@ class OAuthConfig {
     /**
      * Called after profile extraction, before the session is set.
      * The session carries `provider`, `email`, and the stable per-provider
-     * user id in `id` — enough to link accounts app-side.
+     * user id in `id` — enough to link accounts app-side; [Profile.claims] carries the rest (`picture`, `groups`).
      * Return a (possibly enriched) session to accept, null to reject the login.
      */
-    var onAuthenticated: (suspend (session: UserSession, call: ApplicationCall) -> UserSession?)? = null
+    var onAuthenticated: (suspend (session: UserSession, call: ApplicationCall, claims: Json.Object) -> UserSession?)? = null
 }
 
 class AppleConfig {
@@ -236,7 +236,7 @@ private suspend fun handleCallback(
             provider = provider.name
         )
         config.onAuthenticated?.let { hook ->
-            session = hook(session, call)
+            session = hook(session, call, profile.claims)
                 ?: throw OAuthFlowException("login rejected by onAuthenticated hook")
         }
         call.sessions.set(session)

@@ -21,7 +21,7 @@ fun Application.module() {
     // OAuth that links into the same accounts by email:
     installOAuth {
         googleClientId = ...; googleClientSecret = ...
-        onAuthenticated = { session, _ -> MyAuthStore.linkOidc(session) }
+        onAuthenticated = { session, _, _ -> MyAuthStore.linkOidc(session) }
     }
 }
 ```

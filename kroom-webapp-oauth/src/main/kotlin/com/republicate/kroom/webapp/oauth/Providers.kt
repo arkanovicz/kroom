@@ -34,7 +34,9 @@ data class Profile(
     /** Stable per-provider user id (OIDC `sub`, GitHub numeric id). */
     val id: String,
     val name: String?,
-    val email: String?
+    val email: String?,
+    /** What the provider said, whole: the validated id_token's claims (OIDC), the userinfo document (OAuth2). */
+    val claims: Json.Object = Json.Object()
 )
 
 /** An authentication provider usable in [OAuthConfig.providers]. */
@@ -124,7 +126,8 @@ class OidcProvider(
         return Profile(
             id = claims.subject.value,
             name = claims.getStringClaim("name") ?: claims.getStringClaim("preferred_username"),
-            email = claims.getStringClaim("email")
+            email = claims.getStringClaim("email"),
+            claims = Json.parse(claims.toJSONObject().toString()) as Json.Object
         )
     }
 }
@@ -174,8 +177,10 @@ class OAuth2Provider(
         val fetch: suspend (String) -> Json? = { url -> Json.parse(getWithBearer(url, accessToken)) }
         val userInfo = fetch(userInfoUri) as? Json.Object
             ?: throw OAuthFlowException("unparseable userinfo from $name")
-        return extractProfile(userInfo, fetch)
+        val profile = extractProfile(userInfo, fetch)
             ?: throw OAuthFlowException("no usable profile from $name userinfo")
+        // an extractor's own claims (fetched beyond userinfo) win
+        return if (profile.claims.isEmpty()) profile.copy(claims = userInfo) else profile
     }
 
     companion object {
