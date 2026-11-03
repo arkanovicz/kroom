@@ -105,8 +105,18 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         if (logger.isDebugEnabled) logger.debug("{} {} {}", id, event.name, event.meta.json)
     }
 
-    /** An event just went on the wire: where a store persists it, off the loop. */
+    /** An event just went on the wire, on the loop: what the room does at once (the store is [persist]'s). */
     protected open fun emitted(event: Event) {}
+
+    /**
+     * Every frame, in the room's order, off the loop: where a store writes, and where what the loop cannot decide
+     * (a lookup in the store) runs, its answer coming back as a step ([emit]). It gets a copy taken on the loop;
+     * the event goes `PERSISTED` once it returns. The loop never waits on it; a stopping room drains it.
+     */
+    protected open suspend fun persist(event: Event) {}
+
+    // one writer, in seq order: persist() sees the frames as the room numbered them
+    private val writer = Channel<Pair<Event, Event>>(Channel.UNLIMITED)
 
     /**
      * A frame the whole room gets, numbered, goes into the marking before anyone reads it: where a
@@ -125,6 +135,13 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         on(::Join) { _, _ -> null }
         on(::Leave) { _, _ -> null }
         start()
+        // its own scope: a stopping room closes the channel, the writer drains it, then ends
+        CoroutineScope(Dispatchers.IO).launch {
+            for ((event, copy) in writer) {
+                try { persist(copy) } catch (e: Exception) { logger.error("persisting '${event.name}' failed in room '$id'", e) }
+                trace(event.persist())
+            }
+        }
     }
 
     /** Built by the [Lobby] on first use: such a room closes once idle (see [shouldCloseWhenEmpty]). */
@@ -178,12 +195,9 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         spectators.values.forEach { it.disconnect() }
         users.values.forEach { it.connectionsByRoom.remove(id) }
         actors.clear(); spectators.clear(); users.clear()
+        writer.close()
         logger.info("Room '$id' stopped")
-        stopped()
     }
-
-    /** The loop is gone: what the room still owes elsewhere (a store's pending writes) finishes here. */
-    protected open fun stopped() {}
 
     // ---- the door
 
@@ -446,6 +460,9 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
             else -> { fold(emitted); toAll(frame) }
         }
         emitted(emitted)
+        // copied on the loop, before anything may touch what the State kept of it
+        val copy = emitted.json.copy()
+        writer.trySend(emitted to (events.frame(emitted.name, copy) ?: Generic(emitted.name, copy, emitted.audience)))
     }
 
     /** The frame a connection gets, serialized once per user (or once, when the event is the same for everyone). */

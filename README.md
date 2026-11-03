@@ -203,8 +203,13 @@ adds the chat's history store.
   tab makes its own); `?tabId=` on the stream, `X-Kroom-Tab` on an intent; the connection is
   `<userId>/<tabId>`, never a credential. A user's tabs see the same thing.
 - **The loop never waits on a consumer**: a tab that stops draining is dropped and reconnects.
-  `trace(event)` is the operator's line at every stage; `emitted(event)` is where a store persists,
-  off the loop (`ChatRoom` → `ChatHistory`).
+  `trace(event)` is the operator's line at every stage.
+- **What the loop cannot decide, the store does, off the loop.** `persist(event)` gets every frame, copied on the
+  loop, in the room's order, off the loop; the event goes `PERSISTED` after it. It is where a store writes (`ChatRoom`
+  → `ChatHistory.append` for lines, `ChatHistory.persist` for the rest: a reaction never reaches the store before its
+  line), and where a lookup the State cannot answer runs — deleting a line older than the tail: the logic applies the
+  request (framed to its author), `persist` reads the store, and the answer comes back as a step. So `200` is "taken
+  into account", decided at once whenever the State is enough; what the store decides comes down the stream.
 
 ### In the browser (kroom-client)
 

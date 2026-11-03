@@ -9,22 +9,16 @@ import com.republicate.kroom.event.Logic
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Stage
 import com.republicate.kson.Json
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
  * A chat room: a `chat` event is numbered, framed, folded into the RAM tail, then persisted in the
- * background by [history] ([MemoryChatHistory] by default); its seq continues the tail's (the
- * logic numbers from the State, loaded from the store). A join gets the tail in its `state`;
- * older lines come from [before]. Lines are the State's [ChatState.line] everywhere.
+ * background by [history] ([MemoryChatHistory] by default), every other frame after the lines before it
+ * ([ChatHistory.persist]); its seq continues the tail's (the logic numbers from the State, loaded from the store).
+ * A join gets the tail in its `state`; older lines come from [before], newer ones from [after]. Lines are the
+ * State's [ChatState.line] everywhere.
  */
 open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history: ChatHistory<C>, state: S, logic: Logic<S>) : LogicRoom<S>(id, state, logic) {
-
-    // one writer, in seq order: the store sees the lines as the room numbered them
-    private val writer = Channel<Pair<Chat, C>>(Channel.UNLIMITED)
 
     // the State's lines and the store's never share a JSON: one may change while the other is read
     private fun copy(line: Chat): C = state.line(line.json.copy())
@@ -32,8 +26,6 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
     init {
         // the tail comes from the store: once, before the first join
         runBlocking { history.tail(state.max) }.forEach { state.history += copy(it) }
-        // its own scope: a stopping room closes the channel, the writer drains it, then ends
-        CoroutineScope(Dispatchers.IO).launch { for ((chat, line) in writer) { history.append(line); trace(chat.persist()) } }
     }
 
     /** Say something from elsewhere than a door (a bridge, a route): the same life, under the author's id. */
@@ -44,12 +36,8 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
         return copy(chat as Chat)
     }
 
-    override fun emitted(event: Event) {
-        // copied on the loop, before anything may touch the State's line
-        if (event is Chat && event.stage == Stage.APPLIED) writer.trySend(event to copy(event))
-    }
-
-    override fun stopped() { writer.close() }
+    // the room's copy already: lines as the State's class, the rest as they are
+    override suspend fun persist(event: Event) = if (event is Chat) history.append(state.line(event.json)) else history.persist(event)
 
     /** Scroll-back: up to [n] lines older than [seq], oldest first. */
     suspend fun before(seq: Long, n: Int = 50): List<C> = history.before(seq, n)

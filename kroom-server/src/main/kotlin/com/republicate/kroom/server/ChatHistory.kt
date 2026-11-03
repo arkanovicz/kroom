@@ -1,6 +1,7 @@
 package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Chat
+import com.republicate.kroom.event.Event
 import java.util.ArrayDeque
 
 /**
@@ -17,6 +18,12 @@ interface ChatHistory<C : Chat> {
 
     /** Persist a line; called off the loop, in order of seq. */
     suspend fun append(line: C)
+
+    /**
+     * Every other frame (a reaction, an edit, a request the logic left to the store), in the same order as the lines:
+     * one never reaches the store before a line it names. Nothing by default.
+     */
+    suspend fun persist(event: Event) {}
 
     /** Up to [n] lines older than [seq], oldest first. */
     suspend fun before(seq: Long, n: Int): List<C>

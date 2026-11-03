@@ -15,6 +15,13 @@ All notable changes to kroom will be documented in this file.
 - `ChatHistory.after(seq, n)`: up to n lines newer than seq, oldest first (`MemoryChatHistory` has it); a store
   implements it. `ChatRoom.after`; the history route takes `?after=` (with `?before=`, a 400).
 
+#### kroom-server — one ordered writer, the store's stage
+- `Room.persist(event)` (suspend, off the loop): every frame, a copy taken on the loop, in the room's order; the event
+  goes `PERSISTED` after it, a stopping room drains it. `ChatRoom`'s private writer is gone into it: lines go to
+  `ChatHistory.append`, every other frame to `ChatHistory.persist(event)` (new, nothing by default), so a reaction
+  never reaches the store before its line. Every event now reaches `PERSISTED` (with no store, at once): a verdict is
+  "not `REJECTED`". `Room.stopped()` (added in this snapshot) is gone: the room closes its writer itself.
+
 #### kroom-server — rooms on demand
 - `Route.rooms(build, principal)` serves every room of a kind, `/rooms/{room}/…` (stream, intents, catalog,
   scroll-back), through `Lobby.getOrCreate`; a room closing under a call is resolved once more. `Route.intents`,
@@ -610,7 +617,7 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-server — a room that stops
 - A stopping `ChatRoom` lost the lines still queued for its store: the writer ran on the room's scope. It now runs on
-  its own, and `Room.stopped()` (new hook) closes its channel: the pending lines are written, then it ends.
+  its own, and the stopping room closes its channel: the pending lines are written, then it ends.
 - A room closing when empty ignored anonymous spectators and stopped under them; spectators now count.
 
 #### kroom-webapp-l10n

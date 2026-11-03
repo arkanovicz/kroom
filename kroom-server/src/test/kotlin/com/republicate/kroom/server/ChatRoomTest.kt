@@ -47,7 +47,7 @@ class ChatRoomTest {
         assertEquals("state", ch.next().event)   // presence is in it: no `users` frame of the room's own
         assertEquals("join", ch.next().event)
         val chat = room.act(a, Chat(Json.MutableObject("text" to "hi"))).await()
-        assertEquals(Stage.APPLIED, chat.stage)
+        assertNotEquals(Stage.REJECTED, chat.stage)
         ch.next().let {
             assertEquals("chat", it.event)
             val msg = Json.parse(it.data!!) as Json.Object
@@ -119,6 +119,21 @@ class ChatRoomTest {
         gate.complete(Unit)
         kept.settled(3)
         assertEquals(listOf("m0", "m1", "m2"), kept.tail(10).map { it.text })
+    }
+
+    @Test fun `every frame reaches the store in the room's order, lines through append`() = runBlocking {
+        val seen = mutableListOf<String>()
+        val kept = MemoryChatHistory<Chat>()
+        val store = object : ChatHistory<Chat> by kept {
+            override suspend fun append(line: Chat) { kotlinx.coroutines.delay(20); seen += "line ${line.text}"; kept.append(line) }   // slower than what follows
+            override suspend fun persist(event: com.republicate.kroom.event.Event) { if (event.name == "react") seen += "react ${event.json.getLong("on")}" }
+        }
+        val room = ChatRoom("chat-${n++}", store)
+        val line = room.sendChat(Author("u", "U"), "hi")
+        room.broadcast("react", Json.Object("on" to line.seq))
+        withTimeout(2000) { while (seen.size < 2) kotlinx.coroutines.yield() }
+        assertEquals(listOf("line hi", "react 1"), seen)
+        room.stop()
     }
 
     @Test fun `the store seeds the sequence and the snapshot's tail`() = runBlocking {
