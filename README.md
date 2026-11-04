@@ -889,9 +889,10 @@ client must not miss belongs in the State, and one stream in order needs no dedu
 ## Chat history
 
 `ChatRoom(id, history: ChatHistory<Chat> = MemoryChatHistory())` keeps a chat beyond the State's tail. The logic
-numbers a line (`seq`, following the State's last), the State keeps the last 50 — what a snapshot carries —,
-the room frames it, then hands it to the store in the background: the loop never waits on a store. The store
-is asked on its own terms: `tail(n)` when the room starts, to seed the tail, and `before(seq, n)` for
+numbers a line (`seq` = the State's `last` + 1), the State keeps the last 50 — what a snapshot carries; `max = 0`
+keeps none, an app's State may keep them in another order (a tree) —, the room frames it, then hands it to the
+store in the background: the loop never waits on a store. The store is asked on its own terms: `last()` and
+`tail(n)` when the room starts, to seed the sequence and the tail, and `before(seq, n)` for
 scroll-back, which `room(…)` serves as `GET /rooms/{room}/history?before=&n=` (`{messages: [...]}`, oldest
 first, each line as the reader's snapshot shows it; `rooms(…)` for every room of a kind); `after(seq, n)` and
 `?after=` read on from a line jumped to (a reply's source, a search hit). A line carries its `author` (`Author(id, name, avatar)`): the user's id and avatar (`User.avatar`),

@@ -14,9 +14,9 @@ import kotlinx.coroutines.runBlocking
 /**
  * A chat room: a `chat` event is numbered, framed, folded into the RAM tail, then persisted in the
  * background by [history] ([MemoryChatHistory] by default), every other frame after the lines before it
- * ([ChatHistory.persist]); its seq continues the tail's (the logic numbers from the State, loaded from the store).
- * A join gets the tail in its `state`; older lines come from [before], newer ones from [after]. Lines are the
- * State's [ChatState.line] everywhere.
+ * ([ChatHistory.persist]); its seq continues the store's (the logic numbers from the State's `last`, seeded from
+ * [ChatHistory.last]). A join gets the tail in its `state`, in whatever order and size the app keeps it; older lines
+ * come from [before], newer ones from [after]. Lines are the State's [ChatState.line] everywhere.
  */
 open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history: ChatHistory<C>, state: S, logic: Logic<S>) : LogicRoom<S>(id, state, logic) {
 
@@ -24,8 +24,11 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
     private fun copy(line: Chat): C = state.line(line.json.copy())
 
     init {
-        // the tail comes from the store: once, before the first join
-        runBlocking { history.tail(state.max) }.forEach { state.history += copy(it) }
+        // the sequence and the tail come from the store: once, before the first join
+        runBlocking {
+            state.last = history.last()
+            history.tail(state.max).forEach { state.history += copy(it) }
+        }
     }
 
     /** Say something from elsewhere than a door (a bridge, a route): the same life, under the author's id. */

@@ -7,13 +7,15 @@ import java.util.ArrayDeque
 /**
  * Where a room's chat lives beyond its RAM tail — one instance per room, over the room's line class (`Chat`, or
  * the app's subclass: what it adds is stored and served like the rest). The loop never waits on it: a line is
- * numbered and broadcast first, then [append]ed in the background; [tail] runs once, when the room starts, to
- * seed the sequence and the snapshot; [before] and [after] serve the history route (scroll-back, and reading on
- * from a line jumped to). The room hands over and takes
- * back copies: a line here is the store's own.
+ * numbered and broadcast first, then [append]ed in the background; [last] and [tail] run once, when the room
+ * starts, to seed the sequence and the snapshot; [before] and [after] serve the history route (scroll-back, and
+ * reading on from a line jumped to). The room hands over and takes back copies: a line here is the store's own.
  */
 interface ChatHistory<C : Chat> {
-    /** The last [n] lines, oldest first. */
+    /** The seq of the last line stored, 0 for none: by default the tail's last, a store with a counter answers from it. */
+    suspend fun last(): Long = tail(1).lastOrNull()?.seq ?: 0
+
+    /** The last [n] lines, oldest first: the snapshot's tail, in the order the app's State keeps it. */
     suspend fun tail(n: Int): List<C>
 
     /** Persist a line; called off the loop, in order of seq. */

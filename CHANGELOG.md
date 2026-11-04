@@ -7,6 +7,8 @@ All notable changes to kroom will be documented in this file.
 ### Changed (breaking)
 
 #### kroom-common
+- `ChatState.last`: the seq of the last line said, bumped by `reduce`, seeded by the room from the store; `ChatLogic`
+  numbers `last + 1` instead of the tail's last seq, so a tail may be empty (`max = 0`) or in another order.
 - An event's checks compose like `init` blocks: a subclass's `check {}` runs after its parent's, the first refusal
   wins (a `Line : Chat` keeps Chat's "blank"). `Event.checkState` → `checkStates` (parent's first); a room verifies
   each at construction.
@@ -17,6 +19,7 @@ All notable changes to kroom will be documented in this file.
   `Profile.claims` carries them. For an avatar (`picture`), groups mapped onto members (`groups`).
 
 #### kroom-server
+- `ChatHistory.last()`: the seq of the last line stored (default: the tail's), read once at `ChatRoom` start.
 - `ChatHistory.after(seq, n)`: up to n lines newer than seq, oldest first (`MemoryChatHistory` has it); a store
   implements it. `ChatRoom.after`; the history route takes `?after=` (with `?before=`, a 400).
 

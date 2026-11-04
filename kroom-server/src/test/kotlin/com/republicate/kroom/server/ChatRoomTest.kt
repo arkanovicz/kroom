@@ -152,6 +152,23 @@ class ChatRoomTest {
         assertEquals("next", (Json.parse(ch.until("chat").data!!) as Json.Object).getString("text"))
     }
 
+    @Test fun `the sequence is the store's last, not the tail's, so a room may keep no tail`() = runBlocking {
+        val store = MemoryChatHistory<Chat>()
+        val before = ChatRoom("chat-${n++}", store)
+        repeat(3) { before.sendChat(Author("u", "u"), "m$it") }
+        store.settled(3)
+        before.stop()
+
+        val after = ChatRoom("chat-${n++}", store, ChatState(max = 0), ChatLogic())
+        assertEquals(3L, after.state.last)
+        assertTrue(after.state.history.isEmpty())
+        assertEquals(4L, after.sendChat(Author("v", "v"), "next").seq)
+        assertEquals(5L, after.sendChat(Author("v", "v"), "again").seq)
+        assertTrue(after.state.history.isEmpty())
+        assertEquals(5L, after.state.last)
+        after.stop()
+    }
+
     @Test fun `scroll-back pages older than a seq, oldest first`() = runBlocking {
         val store = MemoryChatHistory<Chat>(capacity = 5)
         val room = ChatRoom("chat-${n++}", store)

@@ -24,9 +24,15 @@ class Author(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
  */
 open class ChatState<C : Chat>(json: Json.MutableObject = Json.MutableObject(), val max: Int = 50, val line: (Json.MutableObject) -> C) : State(json) {
     val history by log(line, max)
+    /** The seq of the last line said, whatever the tail holds (none with `max = 0`, or lines in another order): the next line is `last + 1`. */
+    var last by long().required
+    init { if (json["last"] == null) last = 0 }
     override fun reduce(event: Event) {
         super.reduce(event)
-        if (event is Chat) history += line(event.json)
+        if (event is Chat) {
+            if (max > 0) history += line(event.json)   // a log's 0 is "unbounded"; a tail's is "none"
+            last = event.seq!!
+        }
     }
 }
 
@@ -59,7 +65,7 @@ class ChatLogic<C : Chat>(private val clock: Clock, events: ChatEvents<C>) : Log
     init { on(events.chat) { state, actor, line -> chat(state, actor, line) } }
 
     fun chat(state: ChatState<*>, actor: Actor, chat: Chat): Outcome<Nothing> {
-        chat.seq = (state.history.lastOrNull()?.seq ?: 0) + 1
+        chat.seq = state.last + 1
         chat.author = Author.of(actor)
         chat.timestamp = clock.now().toString()
         return done
