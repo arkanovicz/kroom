@@ -50,21 +50,22 @@ abstract class Event(
     /**
      * The stateful half of validation, declared in the event's body, typed on the State it reads:
      * `init { check { state: LobbyState, actor -> … } }`. It reads the `in` fields and the State, never an
-     * `out` field (the logic fills those later); no I/O. Null: the logic may decide.
+     * `out` field (the logic fills those later); no I/O. Null: the logic may decide. Checks compose like `init`
+     * blocks: a subclass's is run after its parent's, and the first refusal wins.
      */
     protected inline fun <reified S : State> check(noinline body: (state: S, actor: Actor) -> Reason?) {
-        checker = Checker(S::class) { state, actor -> body(state as S, actor) }
+        checkers += Checker(S::class) { state, actor -> body(state as S, actor) }
     }
 
-    @PublishedApi internal var checker: Checker? = null
+    @PublishedApi internal val checkers = mutableListOf<Checker>()
 
     @PublishedApi internal class Checker(val state: KClass<out State>, val body: (State, Actor) -> Reason?)
 
-    /** The State class the check reads, null without one: a room refuses at construction an event checked on another State. */
-    val checkState: KClass<out State>? get() = checker?.state
+    /** The State classes the checks read, parent's first: a room refuses at construction an event checked on another State. */
+    val checkStates: List<KClass<out State>> get() = checkers.map { it.state }
 
-    /** The check on that State, by that actor: a refusal, or null. */
-    fun check(state: State, actor: Actor): Reason? = checker?.let { c ->
+    /** The checks on that State, by that actor, parent's first: the first refusal, or null. */
+    fun check(state: State, actor: Actor): Reason? = checkers.firstNotNullOfOrNull { c ->
         kotlin.check(c.state.isInstance(state)) { "$name: checked on ${c.state.simpleName}, not ${state::class.simpleName}" }
         c.body(state, actor)
     }

@@ -28,7 +28,7 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
 
     init {
         events.all.forEach { name ->
-            events.frame(name, Json.MutableObject())!!.checkState?.let { require(it.isInstance(state)) { "'$name' is checked on ${it.simpleName}, room '$id' holds ${state::class.simpleName}" } }
+            events.frame(name, Json.MutableObject())!!.checkStates.forEach { require(it.isInstance(state)) { "'$name' is checked on ${it.simpleName}, room '$id' holds ${state::class.simpleName}" } }
         }
         logic.checkCoverage()
         // every entry of the app, the room's events (`event(::E)`) too: a client posts the postable ones, server code

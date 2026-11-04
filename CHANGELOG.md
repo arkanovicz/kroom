@@ -6,6 +6,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-common
+- An event's checks compose like `init` blocks: a subclass's `check {}` runs after its parent's, the first refusal
+  wins (a `Line : Chat` keeps Chat's "blank"). `Event.checkState` → `checkStates` (parent's first); a room verifies
+  each at construction.
+
 #### kroom-webapp-oauth
 - `onAuthenticated` gets the provider's claims as a third argument, `(session, call, claims) -> UserSession?`: the
   validated id_token's claims (OIDC), the userinfo document (OAuth2; an extractor's own `Profile.claims` win).
