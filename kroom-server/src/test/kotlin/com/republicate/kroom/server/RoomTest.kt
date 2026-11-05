@@ -26,12 +26,13 @@ class RoomTest {
     class Vip(json: Json.MutableObject = Json.MutableObject()) : Event("vip", permission = "vip", json = json)
     class Slow(json: Json.MutableObject = Json.MutableObject()) : Event("slow", json = json)
 
-    private class TestRoom(id: String, val grace: Long = 0, val closes: Boolean = false) : Room<Json.MutableObject>(id) {
+    private class TestRoom(id: String, val grace: Long = 0, val closes: Boolean = false, val lost: Long = 0) : Room<Json.MutableObject>(id) {
         override var state = Json.MutableObject()
         override fun shouldCloseWhenEmpty() = closes
         override val idleTimeout get() = 50L
         override val channelCapacity = 8
         override val leaveGrace = grace
+        override val lostGrace = lost
         override fun stateToJson(): Json.Object = Json.Object()
         override fun stateToJson(actor: Actor): Json.Object = Json.Object("you" to actor.name, "n" to state.getInt("n"))
         override fun permits(user: User, permission: String) = user.userId == "alice"
@@ -323,6 +324,93 @@ class RoomTest {
         assertEquals("gone", cv.next().event)                 // the handler heard it once, after the grace
         cv.next().let { assertEquals("leave", it.event); assertEquals(true, it.json().getBoolean("last")) }
         assertNull(room.getUser("u"))
+    }
+
+    // ---- LOST: past the leave grace, the user is still counted, the room says so, then leaves after the lost grace
+
+    private suspend fun Channel<ServerSentEvent>.lostFrame(): Json.Object = next().let {
+        assertEquals("status", it.event)
+        it.json().also { j -> assertEquals("LOST", j.getString("status")); assertEquals("u", j.getString("user")) }
+    }
+
+    @Test fun `a user gone past the grace is LOST, then leaves after the lost grace`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 200, lost = 400)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        assertEquals("join", cv.next().event)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        assertNull(cv.tryReceiveAfter(150))                             // within the leave grace: nothing
+        cv.lostFrame().let { assertEquals("LOST", it.getObject("client")!!.getString("status")); assertEquals("t1", it.getObject("client")!!.getString("id")) }
+        assertNotNull(room.getUser("u"))                      // still counted
+        assertEquals(2, room.userCount.value)
+        assertNull(cv.tryReceiveAfter(300))                             // within the lost grace: nothing
+        assertEquals("gone", cv.next().event)
+        cv.next().let {
+            assertEquals("leave", it.event)
+            assertEquals(true, it.json().getBoolean("last"))
+            assertEquals("LOST", it.json().getObject("user")!!.getString("status"))
+        }
+        assertNull(room.getUser("u"))
+    }
+
+    @Test fun `a user back while LOST is ONLINE again, no join`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 200, lost = 400)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        assertEquals("join", cv.next().event)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        cv.lostFrame()
+        room.join(actor(u, "t2")).state()
+        cv.next().let {
+            assertEquals("status", it.event)
+            assertEquals("ONLINE", it.json().getString("status"))
+            assertEquals("t2", it.json().getObject("client")!!.getString("id"))
+        }
+        assertNull(cv.tryReceiveAfter(600))                             // no join, no leave
+        assertNotNull(room.getUser("u"))
+    }
+
+    @Test fun `a second drop inside the lost grace leaves a lost grace after itself`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 200, lost = 400)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        assertEquals("join", cv.next().event)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)   // drop 1, at 0: LOST at 200, its leave would be at 600
+        cv.lostFrame()
+        room.join(actor(u, "t1")).state()
+        assertEquals("ONLINE", cv.next().json().getString("status"))
+        kotlinx.coroutines.delay(100)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)   // drop 2, at ~300: LOST at ~500, leave at ~900
+        cv.lostFrame()
+        assertNull(cv.tryReceiveAfter(300))                             // past drop 1's 600: its step is stale
+        assertNotNull(room.getUser("u"))
+        assertEquals("gone", cv.next().event)
+        assertEquals("leave", cv.next().event)
+        assertNull(room.getUser("u"))
+    }
+
+    @Test fun `a drop, a reconnect, a drop inside the leave grace, the grace counts from the second`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 400)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        assertEquals("join", cv.next().event)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)   // drop 1 at 0: its step at 400
+        kotlinx.coroutines.delay(50)
+        room.join(actor(u, "t1")).state()
+        kotlinx.coroutines.delay(100)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)   // drop 2 at ~150: leave at ~550
+        assertNull(cv.tryReceiveAfter(320))                           // drop 1's step finds a later drop: no-op
+        assertNotNull(room.getUser("u"))
+        assertEquals("gone", cv.next().event)
+        assertEquals("leave", cv.next().event)
     }
 
     // ---- the instant: a snapshot at a position holds exactly the transitions up to it

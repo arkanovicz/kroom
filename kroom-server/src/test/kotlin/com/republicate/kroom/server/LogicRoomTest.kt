@@ -248,6 +248,40 @@ class LogicRoomTest {
         assertEquals("IDLE", post(t1, "AWAY").getString("status")) // t2 still idle
     }
 
+    @Test fun `only the room says LOST`() = runBlocking {
+        val room = room()
+        val alice = actor(user("alice"), "t1")
+        val ca = room.join(alice).also { it.state(); it.joined() }
+        room.act(alice, Status(json("status" to "LOST"))).await().let {
+            assertEquals(Stage.REJECTED, it.stage)
+            assertEquals("invalid", it.meta.reason)
+            assertEquals("status", it.meta.args?.getString("field"))
+        }
+        ca.silent()
+    }
+
+    private class LostRoom(id: String) : LogicRoom<Counter>(id, Counter(), Rule) {
+        override val leaveGrace = 100L
+        override val lostGrace = 400L
+        override fun shouldCloseWhenEmpty() = false
+    }
+
+    @Test fun `a late joiner sees a LOST user as LOST, its return ONLINE`() = runBlocking {
+        val room = LostRoom("logic-${n++}")
+        val alice = actor(user("alice"), "t1")
+        room.join(alice).also { it.state(); it.joined() }
+        room.leave(alice)
+        delay(200)
+        val cb = room.join(actor(user("bob"), "t1"))
+        assertEquals("LOST", cb.state().getObject("users")!!.getObject("alice")!!.getString("status"))
+        cb.joined()
+        room.join(actor(user("alice"), "t2")).state()
+        cb.next().let { assertEquals("status", it.event); assertEquals("ONLINE", it.json().getString("status")) }
+        room.join(actor(user("carol"), "t1")).state().getObject("users")!!.getObject("alice")!!.let {
+            assertEquals("ONLINE", it.getString("status"))
+        }
+    }
+
     @Test fun `a leave is framed, then what the logic emits on it`() = runBlocking {
         val room = room()
         val alice = actor(user("alice"), "t1")

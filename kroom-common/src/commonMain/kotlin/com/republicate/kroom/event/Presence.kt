@@ -2,8 +2,11 @@ package com.republicate.kroom.event
 
 import com.republicate.kson.Json
 
-/** A client's, and by composition a user's: online if any client is, else idle if any is, else away. */
-enum class Presence { ONLINE, IDLE, AWAY }
+/**
+ * A client's, and by composition a user's: online if any client is, else idle if any is, else away; lost when
+ * none is left (the room's word alone, between the drop and the `leave`).
+ */
+enum class Presence { ONLINE, IDLE, AWAY, LOST }
 
 /** One client of a user: a tab, an app. */
 class Client(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {

@@ -11,6 +11,6 @@
 {"id":11,"event":"play","data":{"move":"SCISSORS","player":"b"}}
 {"id":12,"event":"play","data":{"player":"a"}}
 {"id":13,"event":"round","data":{"match":{"id":"m1","player1":"a","player2":"b","name1":"Alice","name2":"Bob","score1":1,"score2":1,"round":3,"target":5,"finished":false},"round":{"number":2,"result":1,"move1":"rock","move2":"scissors","winner":"a"}}}
-{"id":14,"event":"leave","data":{"user":{"id":"a","name":"Alice","status":"AWAY"},"last":true,"count":1}}
+{"id":14,"event":"leave","data":{"user":{"id":"a","name":"Alice","status":"LOST"},"last":true,"count":1}}
 {"id":15,"event":"match","data":{"match":{"id":"m1","player1":"a","player2":"b","name1":"Alice","name2":"Bob","score1":1,"score2":1,"round":3,"target":5,"finished":true,"winner":"b"}}}
 {"event":"final","data":{"last":1,"stats":{"played":1,"rock":2,"paper":1,"scissors":1,"well":0},"users":{"b":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"}},"matches":{},"queue":{},"history":[{"text":"gl hf","seq":1,"author":{"id":"a","name":"Alice"},"timestamp":"2026-10-27T12:00:00Z"}],"me":{"id":"b","name":"Bob","clients":[{"id":"t1","kind":"web","status":"ONLINE"}],"status":"ONLINE"}}}

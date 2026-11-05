@@ -9,6 +9,7 @@ import com.republicate.kroom.event.Presence
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.RoomEvents
 import com.republicate.kroom.event.Stage
+import com.republicate.kroom.event.Status
 import com.republicate.kroom.event.UserPresence
 import com.republicate.kson.Json
 import io.ktor.sse.*
@@ -194,7 +195,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         actors.values.forEach { it.disconnect() }
         spectators.values.forEach { it.disconnect() }
         users.values.forEach { it.connectionsByRoom.remove(id) }
-        actors.clear(); spectators.clear(); users.clear()
+        actors.clear(); spectators.clear(); users.clear(); lost.clear(); drops.clear()
         writer.close()
         logger.info("Room '$id' stopped")
     }
@@ -325,6 +326,17 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     protected open val leaveGrace: Long = 1000
 
     /**
+     * How long (ms) a user may stay LOST (past [leaveGrace], no client left, a `status` said so) before the room
+     * says `leave`; 0 goes straight to `leave` after [leaveGrace], with no LOST frame.
+     */
+    protected open val lostGrace: Long = 0
+
+    // loop-confined: who is LOST, and each user's last drop (room-wide numbering: a delayed step of an older drop is a no-op)
+    private val lost = HashSet<String>()
+    private val drops = HashMap<String, Long>()
+    private var dropCount = 0L
+
+    /**
      * A connection id already present is the same tab back (reconnect, or a duplicated tab): the
      * newcomer takes the slot, the stale connection is closed and its later [leave] is a no-op.
      */
@@ -359,6 +371,20 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         handle(actor, join)
         // the handler hears every connection, the wire hears a user's first
         if (first && join.stage == Stage.APPLIED) { emit(join); follow(join) }
+        // back from LOST: never left, so no join, a status
+        actor.user?.let { user -> if (lost.remove(user.userId)) status(actor, user) }
+    }
+
+    /** A room-born `status`: the user's composed presence, [actor] the client that changed. */
+    private fun status(actor: Actor, user: User) {
+        val status = Status().also {
+            it.user = user.userId
+            it.client = Client().also { c -> c.id = actor.tab; c.kind = actor.kind; c.status = actor.status }
+            it.status = presence(user).status!!
+        }
+        status.meta.from = user.userId
+        handle(actor, status)
+        if (status.stage == Stage.APPLIED) { emit(status); follow(status) }
     }
 
     /** A user as presence sees it now: its status composed from its clients' in this room. */
@@ -367,7 +393,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         p.name = user.displayName
         val clients = user.getConnectionsInRoom(id)
         clients.forEach { c -> p.clients += Client().also { it.id = c.tab; it.kind = c.kind; it.status = c.status } }
-        p.status = clients.minOfOrNull { it.status } ?: Presence.AWAY
+        p.status = clients.minOfOrNull { it.status } ?: Presence.LOST
     }
 
     private fun processLeave(actor: Actor) {
@@ -382,9 +408,22 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' left room '$id' (last=$none)")
         if (user != null && none && leaveGrace > 0) {
             // the user's last connection: a reload or a blip is back within the grace, a departure is not
+            val drop = ++dropCount
+            drops[user.userId] = drop
+            fun away() = drops[user.userId] == drop && users.containsKey(user.userId) && !user.isConnectedTo(id)
             scope.launch {
                 delay(leaveGrace)
-                step { if (users.containsKey(user.userId) && !user.isConnectedTo(id)) gone(actor, spectator, true) }
+                step {
+                    if (!away()) return@step
+                    if (lostGrace == 0L) { gone(actor, spectator, true); return@step }
+                    actor.status = Presence.LOST
+                    status(actor, user)
+                    lost += user.userId
+                    scope.launch {
+                        delay(lostGrace)
+                        step { if (away() && user.userId in lost) gone(actor, spectator, true) }
+                    }
+                }
             }
         } else gone(actor, spectator, none)
     }
@@ -392,7 +431,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     /** The leave itself: the handler hears every connection, the wire hears a user's last. */
     private fun gone(actor: Actor, spectator: Boolean, last: Boolean) {
         val user = actor.user
-        if (last && user != null) { users.remove(user.userId); _userCount.value = users.size }
+        if (last && user != null) { users.remove(user.userId); lost.remove(user.userId); drops.remove(user.userId); _userCount.value = users.size }
         val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size }
         leave.meta.from = user?.userId
         handle(actor, leave)

@@ -8,7 +8,9 @@ import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Logic
 import com.republicate.kroom.event.Outcome
+import com.republicate.kroom.event.Presence
 import com.republicate.kroom.event.Reason
+import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.State
 import com.republicate.kroom.event.Status
 import com.republicate.kroom.event.UserPresence
@@ -50,6 +52,8 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
     }
 
     private fun status(actor: Actor, status: Status): Reason? {
+        // only the room says LOST: its own frame had no door, it is still BORN
+        if (status.status == Presence.LOST && status.stage != Stage.BORN) return Reason("invalid", Json.Object("field" to "status"))
         actor.status = status.status
         val user = actor.user ?: return null
         status.user = user.userId
