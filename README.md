@@ -195,8 +195,12 @@ adds the chat's history store.
   only ever means a transition.
 - **Presence is kroom's layer.** `users` is a keyed field of the base `State` (`{id, name, status,
   clients}`), kept by `reduce` from `join`, `leave` and `status`; a user's status composes its
-  clients' (`ONLINE`, else `IDLE`, else `AWAY`). The wire hears a user's first `join` and last
-  `leave`, the leave after `leaveGrace` (1 s) so a reload is no departure. A joiner is not in its
+  clients' (`ONLINE`, else `IDLE`, else `AWAY`; `LOST` when none is left). The wire hears a user's
+  first `join` and last `leave`, the leave after `leaveGrace` (1 s) so a reload is no departure. A
+  room with a `lostGrace` says more: past `leaveGrace` the user is `LOST` (a `status` frame, the
+  snapshot's `users` too, still counted), back before `lostGrace` is a `status` again (no `join`:
+  they never left), `leave` after it — a phone in a tunnel, the same dot for every viewer. Only the
+  room says `LOST`: a client posting it is refused (`invalid`). A joiner is not in its
   own snapshot: its `join`, the same frame everyone gets, follows it. The snapshot also carries `me`,
   the viewer's own entry (absent for a spectator).
 - **Tabs.** A tab id is taken from `sessionStorage` at load and put back on `pagehide` (a duplicated
@@ -240,6 +244,14 @@ fun main() {
 - **One path down**: each frame is folded into the State by the same `reduce`, then into the page
   memory, then every region is merged again; the engine's DOM sink touches only what differs (a
   value's text node, a dynamic tag's attributes, an item added, moved or removed by its key).
+- **Targeted**: the fold records what it wrote (`State.dirty`: the `id` / `seq` of every view on a
+  write's path), and an item keyed by its identity that no write went under is clean — moved into
+  place, its body not rendered. The rule: an item depends only on the writes under its own key (a
+  line reading its author's name refreshes when the author is written); an item known by its
+  position is never clean. A snapshot renders every item, and so does `room.merge()`, the pass a
+  page asks for itself (a timer writes nothing keyed, and "5 min ago" may sit in any item);
+  `merge(all = false)` for a page that wrote through its fields. Write through the fields: a write
+  past the views (`json[k] = v`) leaves no mark.
 - **Roots**: `state` (the viewer's view), `me` (its presence entry), `page` (page memory: a `State`
   of the page's own, folding every frame after the room's, with derived getters like `$page.phase`).
 - **Intents in the markup**: `data-kroom-intent="play"` posts the event with the trigger's

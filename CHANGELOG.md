@@ -6,6 +6,25 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-common, kroom-server — presence LOST
+- `Presence.LOST`, last in the order: a user with no client left. A room with a `lostGrace` (new `protected open val`,
+  0 = as before) says it past `leaveGrace` — a room-born `status` frame (the gone tab as its client), `users` keeps the
+  user as `LOST` and counted — and `leave`s after `lostGrace`; a connection back meanwhile is a `status` (ONLINE), no
+  `join`. A client posting `LOST` is refused (`invalid`: only the room says it). A drop's delayed steps are stale once
+  another drop follows (drop, reconnect, drop inside a grace: the grace counts from the second — the `leaveGrace` path
+  had the race too). The `leave` frame's user reads `LOST` where it read `AWAY` (chifoumi's golden refreshed).
+
+#### kroom-common, kroom-client — targeted merges
+- A view knows its `owner` (the view it was read from) and its `identity` (`id`, else `seq`, when declared and present);
+  a write through a field, `Keyed.add/remove` or `Log +=` reports every identity on its path to the root's
+  `State.dirty`, when a browser's Room keeps one (null on the server: nothing recorded).
+- `Room.frame` merges targeted: `HtmlDomSink(tree, root, ::key, ::clean)` — an item whose key is in no dirty set
+  (`state`'s, `page`'s) is clean, moved into place, its body not rendered. `key` answers a `Position(index)` for an
+  item with no identity (never clean: a removal before it shifts it). `merge(all = true)`, the default and what a
+  timer calls, renders every item; a snapshot too. Pinned in `RegionsTest`: a frame writing one line of the chat
+  renders one body (the tree double counts the sites read); every region's tree still equals its text render after
+  every frame.
+
 #### kroom-common
 - `ChatState.last`: the seq of the last line said, bumped by `reduce`, seeded by the room from the store; `ChatLogic`
   numbers `last + 1` instead of the tail's last seq, so a tail may be empty (`max = 0`) or in another order.
