@@ -11,7 +11,7 @@ class KeyTest {
 
     @Test fun aLoggedEventByItsSeq() = assertEquals(7L, (key(Chat(Json.parse("""{"text":"hi","seq":7}""") as Json.MutableObject), 0) as Number).toLong())
 
-    @Test fun aDeclaredKeyAbsentFallsBackToPosition() = assertEquals(2, key(UserPresence(), 2))
+    @Test fun aDeclaredKeyAbsentFallsBackToPosition() = assertEquals(Position(2), key(UserPresence(), 2))
 
-    @Test fun aPlainValueByItsPosition() = assertEquals(1, key("rock", 1))
+    @Test fun aPlainValueByItsPosition() = assertEquals(Position(1), key("rock", 1))
 }

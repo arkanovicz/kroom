@@ -19,6 +19,20 @@ abstract class JsonView(val json: Json.MutableObject) {
     /** The declaration, in declaration order. */
     val fields: List<Field<*>> get() = declared
 
+    /** The view this one was read from (an `obj`, `keyed` or `log` field's), so a write can tell the root which items it is under. */
+    internal var owner: JsonView? = null
+
+    /** What this item is across changes of its content: its `id`, else its `seq`, when declared and present; null when it is known by its position. */
+    val identity: Any? get() = IDENTITY.firstNotNullOfOrNull { k -> if (declared.any { it.name == k }) json[k] else null }
+
+    /** A write here: the identities from this view up to the root are dirty, the root is told. */
+    internal fun touched() {
+        val keys = ArrayList<Any>(2)
+        var v: JsonView = this
+        while (true) { v.identity?.let { keys += it }; v = v.owner ?: break }
+        (v as? State)?.dirty?.addAll(keys)
+    }
+
     /**
      * What [viewer] (a user id, null for nobody in particular) sees of the JSON, at any depth: the selective fields
      * whose rule refuses it removed. What a frame and a snapshot carry; the JSON itself when nothing is selective.
@@ -55,20 +69,20 @@ abstract class JsonView(val json: Json.MutableObject) {
 
     /** A nested view, built over the object under the key (which stays the truth); null when absent. */
     protected fun <V : JsonView> obj(view: (Json.MutableObject) -> V) =
-        Field<V?>(Kind.OBJECT, { j, k -> j.getObject(k)?.let { view(it as Json.MutableObject) } }, { it?.json }, nested = Nested(Shape.ONE, view))
+        Field<V?>(Kind.OBJECT, { j, k -> j.getObject(k)?.let { view(it as Json.MutableObject).also { v -> v.owner = this } } }, { it?.json }, nested = Nested(Shape.ONE, view))
 
     /** Views by their `id`, in insertion order; on the wire an object keyed by id. Absent reads empty. */
     protected fun <V : JsonView> keyed(view: (Json.MutableObject) -> V) =
         Field<Keyed<V>>(Kind.OBJECT, { j, k ->
             val obj = j.getObject(k) as Json.MutableObject? ?: Json.MutableObject().also { (j as Json.MutableObject)[k] = it }
-            Keyed(obj, view)
+            Keyed(obj, view, this)
         }, { it.obj }, nested = Nested(Shape.KEYED, view))
 
     /** An append-only list of views, the last [max] when bounded: a frame named like it appends. */
     protected fun <V : JsonView> log(view: (Json.MutableObject) -> V, max: Int = 0) =
         Field<Log<V>>(Kind.ARRAY, { j, k ->
             val arr = j.getArray(k) as Json.MutableArray? ?: Json.MutableArray().also { (j as Json.MutableObject)[k] = it }
-            Log(arr, view, max)
+            Log(arr, view, max, this)
         }, { it.array }, nested = Nested(Shape.LOG, view))
 
     enum class Shape { ONE, KEYED, LOG }
@@ -123,6 +137,7 @@ abstract class JsonView(val json: Json.MutableObject) {
                 /** Null removes the key: absent and null read alike. */
                 override fun setValue(thisRef: JsonView, property: KProperty<*>, value: T) {
                     write(value)?.let { thisRef.json[name] = it } ?: thisRef.json.remove(name)
+                    thisRef.touched()
                 }
             }
         }
@@ -140,23 +155,33 @@ abstract class JsonView(val json: Json.MutableObject) {
     }
 
     /** The views over an array of objects, appended through [plusAssign], never removed but by the bound. */
-    class Log<V : JsonView>(val array: Json.MutableArray, private val view: (Json.MutableObject) -> V, val max: Int = 0) : AbstractList<V>() {
+    class Log<V : JsonView>(val array: Json.MutableArray, private val view: (Json.MutableObject) -> V, val max: Int = 0, private val owner: JsonView? = null) : AbstractList<V>() {
         override val size: Int get() = array.size
-        override fun get(index: Int): V = view(array[index] as Json.MutableObject)
+        override fun get(index: Int): V = view(array[index] as Json.MutableObject).also { it.owner = owner }
         operator fun plusAssign(v: V) {
             array.add(v.json)
             if (max > 0) while (array.size > max) array.removeAt(0)
+            v.owner = owner
+            v.touched()
         }
     }
 
     /** The views of an object keyed by id, iterated in insertion order: [add] on a present id updates in place, keeping its rank. */
-    class Keyed<V : JsonView>(val obj: Json.MutableObject, private val view: (Json.MutableObject) -> V) : AbstractList<V>() {
+    class Keyed<V : JsonView>(val obj: Json.MutableObject, private val view: (Json.MutableObject) -> V, private val owner: JsonView? = null) : AbstractList<V>() {
         override val size: Int get() = obj.size
-        override fun get(index: Int): V = view(obj.values.elementAt(index) as Json.MutableObject)
-        override fun iterator(): Iterator<V> = obj.values.asSequence().map { view(it as Json.MutableObject) }.iterator()
-        operator fun get(id: String): V? = (obj[id] as? Json.MutableObject)?.let(view)
+        override fun get(index: Int): V = at(obj.values.elementAt(index))
+        override fun iterator(): Iterator<V> = obj.values.asSequence().map { at(it) }.iterator()
+        operator fun get(id: String): V? = (obj[id] as? Json.MutableObject)?.let { at(it) }
         operator fun contains(id: String): Boolean = obj.containsKey(id)
-        fun add(item: V) { obj[item.json.getString("id") ?: throw IllegalArgumentException("no id: ${item.json}")] = item.json }
-        fun remove(id: String) { obj.remove(id) }
+        fun add(item: V) {
+            obj[item.json.getString("id") ?: throw IllegalArgumentException("no id: ${item.json}")] = item.json
+            item.owner = owner
+            item.touched()
+        }
+        fun remove(id: String) { obj.remove(id); owner?.touched() }
+        private fun at(o: Any?): V = view(o as Json.MutableObject).also { it.owner = owner }
     }
 }
+
+/** The fields that name an item, in the order tried. */
+private val IDENTITY = listOf("id", "seq")

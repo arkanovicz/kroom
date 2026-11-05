@@ -73,6 +73,28 @@ class LogicTest {
         assertEquals(4, counter.n) // a function: the State is read, never written
     }
 
+    @Test fun `a fold records the identities each write went under when asked`() {
+        val s = Counter()
+        s.reduce(Set(Json.MutableObject("n" to 3)))                                   // no set: nothing kept, nothing thrown
+        s.dirty = HashSet()
+        s.reduce(Set(Json.MutableObject("n" to 4)))
+        assertEquals("", dirty(s))                               // a root field: no item
+        s.reduce(Wait(Json.MutableObject("user" to "a")))
+        s.reduce(Join(Json.MutableObject("user" to Json.MutableObject("id" to "b"))))
+        assertEquals("a b", dirty(s))
+        s.dirty!!.clear()
+        s.reduce(Status(Json.MutableObject("status" to "IDLE", "user" to "b")))
+        s.users["b"]!!.clients += Client(Json.MutableObject("id" to "t1"))
+        assertEquals("b t1", dirty(s))                         // a nested write: every identity on its path
+        s.dirty!!.clear()
+        s.reduce(Note(Json.MutableObject("text" to "x", "author" to "a")))
+        s.reduce(Cancel(Json.MutableObject("intent" to "wait", "user" to "a")))
+        assertEquals("", dirty(s))                               // a logged event with no seq, a removal: no key
+        assertTrue(s.waiting.isEmpty())
+    }
+
+    private fun dirty(s: State) = s.dirty!!.map { it.toString() }.sorted().joinToString(" ")
+
     @Test fun `a handler per intent a cancel per cancellable one checked when first needed`() {
         val partial = object : Logic<Counter>(Events) { init { on(Events.add) { _, _, _ -> done } } }
         assertFailsWith<IllegalArgumentException> { partial.decide(Counter(), alice, Add(Json.MutableObject("by" to 1))) }   // note, wait unhandled

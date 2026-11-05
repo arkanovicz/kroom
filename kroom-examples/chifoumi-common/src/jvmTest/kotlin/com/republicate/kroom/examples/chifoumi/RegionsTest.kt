@@ -67,6 +67,27 @@ class RegionsTest {
         assertTrue(line != null, "the chat line came")
     }
 
+    /** The merge is targeted: a frame writing one line of the chat renders that item's body, the others are clean. */
+    @Test fun `a frame writing one line renders one body`() {
+        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        val tree = TreeDouble()
+        val root = tree.element("div")
+        room.page = LobbyPage(room, say) { "t" }
+        room.attach("en/lobby.html", tree, root)
+        val line = { n: Int -> """{"text":"line $n","seq":$n,"author":{"id":"a","name":"Alice"}}""" }
+        val n = room.state.max - 1
+        room.frame("state", """{"last":$n,"stats":{"played":0,"rock":0,"paper":0,"scissors":0,"well":0},"users":{},"history":[${(1..n).joinToString(",", transform = line)}]}""")
+        tree.clearLog()
+        room.frame("chat", line(n + 1))
+        val sites = tree.reads
+        assertTrue(sites < 2 * n, "$sites sites read for one line of ${n + 1}")   // a line's body reads two
+        assertEquals(engine.getTemplate("en/lobby.html").merge(VelocityContext(mutableMapOf("state" to room.state, "me" to room.me, "page" to room.page))), html(root.children))
+        // the page's own pass renders every item
+        tree.clearLog()
+        room.merge()
+        assertTrue(tree.reads >= 2 * n, "${tree.reads} sites read by a whole pass")
+    }
+
     private fun DElement.byId(id: String): DElement? = descendants().filterIsInstance<DElement>().firstOrNull { it.attributes["id"] == id }
 
     @Test fun `the game's regions over the match`() {

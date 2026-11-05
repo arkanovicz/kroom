@@ -12,6 +12,13 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
     /** kroom's presence, a field like any other: who is in the room, kept from `join`, `leave` and `status`. */
     val users by keyed(::UserPresence)
 
+    /**
+     * What the writes since it was last cleared went under: the identities ([JsonView.identity]) of every view on each
+     * write's path, when a browser's Room keeps one — the merge's clean door answers for the other items. None on the
+     * server. A write past the views (`json[k] = v`) leaves no mark: reduce through the fields.
+     */
+    var dirty: MutableSet<Any>? = null
+
     /** One frame into the State: the arrows of the grammar, read right to left. A room's State calls `super` first, for presence. */
     open fun reduce(event: Event) {
         when (event) {

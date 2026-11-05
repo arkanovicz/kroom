@@ -25,7 +25,7 @@ class TreeDouble : Tree<DNode> {
 
     private val numbers = IdentityHashMap<DNode, Int>()
 
-    fun clearLog() = log.clear()
+    fun clearLog() { log.clear(); reads = 0 }
 
     // a node built outside this tree gets its number when first seen
     private fun num(node: DNode?) = if (node == null) "null" else "#" + numbers.getOrPut(node) { numbers.size + 1 }
@@ -34,7 +34,10 @@ class TreeDouble : Tree<DNode> {
 
     override fun text(data: String) = DText(data).also { log += "text(${num(it)}, ${quote(data)})" }
 
-    override fun textOf(text: DNode) = asText(text).data
+    /** Sites read since [clearLog]: a body rendered reads each of its sites, a clean item reads none. */
+    var reads = 0
+
+    override fun textOf(text: DNode) = asText(text).data.also { reads++ }
 
     override fun setText(text: DNode, data: String) {
         asText(text).data = data
