@@ -9,40 +9,35 @@ import java.io.File
  * Mount static routes for serving CSS, JS, images, fonts, sounds and other static assets.
  *
  * In production mode: assets loaded from classpath resources under /static/
- * In dev mode: assets loaded from filesystem first, falling back to classpath, never cached by the browser
+ * In dev mode: assets loaded from the filesystem first (each dev dir in order), falling back to classpath, never cached by the browser
  */
 fun Route.staticRoutes(config: StaticConfig = StaticConfig()) {
-    val devDir = if (config.devMode) config.devDir else null
-    if (devDir != null) {
-        println("Dev mode: serving static files from ${devDir.absolutePath}")
+    val devDirs = if (config.devMode) config.devDirs else emptyList()
+    if (devDirs.isNotEmpty()) {
+        println("Dev mode: serving static files from ${devDirs.joinToString { it.absolutePath }}")
     }
 
     config.prefixes.forEach { prefix ->
         route("/$prefix") {
             get("/{path...}") {
                 val path = call.parameters.getAll("path")?.joinToString("/")
-                serveStatic(prefix, path, devDir)
+                serveStatic(prefix, path, devDirs)
             }
         }
     }
 }
 
-private suspend fun RoutingContext.serveStatic(prefix: String, path: String?, devDir: File?) {
+private suspend fun RoutingContext.serveStatic(prefix: String, path: String?, devDirs: List<File>) {
     if (path.isNullOrBlank()) {
         call.respond(HttpStatusCode.NotFound)
         return
     }
 
-    // Dev mode: try filesystem first
-    if (devDir != null) {
-        val file = File(devDir, "$prefix/$path")
-        if (file.isFile) {
-            val contentType = contentTypeFor(path)
-            call.response.header(HttpHeaders.CacheControl, "no-cache")
-            call.respondBytes(file.readBytes(), contentType)
-            return
-        }
-        // Fall through to classpath
+    // Dev mode: the first dir holding the file, else the classpath
+    devDirs.map { File(it, "$prefix/$path") }.firstOrNull { it.isFile }?.let { file ->
+        call.response.header(HttpHeaders.CacheControl, "no-cache")
+        call.respondBytes(file.readBytes(), contentTypeFor(path))
+        return
     }
 
     // Production: serve from classpath
@@ -59,7 +54,7 @@ private suspend fun RoutingContext.serveStatic(prefix: String, path: String?, de
     // Long cache (1 year) when versioned (?v=...), short cache otherwise; none in dev, where a rebuild changes it
     val hasVersion = call.request.queryParameters.contains("v")
     val maxAge = if (hasVersion) 31536000 else 3600  // 1 year vs 1 hour
-    call.response.header(HttpHeaders.CacheControl, if (devDir != null) "no-cache" else "public, max-age=$maxAge")
+    call.response.header(HttpHeaders.CacheControl, if (devDirs.isNotEmpty()) "no-cache" else "public, max-age=$maxAge")
     call.respondBytes(resource.readBytes(), contentType)
 }
 

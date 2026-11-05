@@ -38,6 +38,10 @@ All notable changes to kroom will be documented in this file.
   before the view's check and the POST: `replyTo: "42"` no longer goes on the wire as a string, an emptied `Long?`
   field is null rather than `invalid`. An undeclared key stays a string (the shape refuses it). `Intents(root, events, act)`.
 
+#### kroom-webapp-core
+- `StaticConfig.devDirs: List<File>`, tried in order before the classpath (sources, then a build output that cannot live in
+  them: a Kotlin/JS bundle); `devDir` stays as the one-directory shorthand.
+
 #### kroom-examples/chifoumi
 - The page memories keep fields, like any State: `LobbyPage.feed` is a `log(::Line, max = 10)` read newest first,
   `GamePage`'s `last`, `reveal` (a `Reveal` view) and `note` are `obj` / `string` fields — a merge sees what went

@@ -65,5 +65,10 @@ class CoreConfig {
 class StaticConfig {
     var prefixes: List<String> = listOf("css", "js", "img", "fonts", "lib", "snd")
     var devMode: Boolean = false
-    var devDir: File? = null
+    /** Served live in dev mode, tried in order before the classpath: sources, then a build output (a Kotlin/JS bundle). */
+    var devDirs: List<File> = emptyList()
+    /** The one-directory shorthand. */
+    var devDir: File?
+        get() = devDirs.firstOrNull()
+        set(value) { devDirs = listOfNotNull(value) }
 }

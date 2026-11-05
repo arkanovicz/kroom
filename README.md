@@ -325,6 +325,8 @@ installCore {
         // Dev mode: serve from filesystem first, fallback to classpath; no-cache either way
         devMode = true
         devDir = File("src/main/resources/static")
+        // or several, tried in order: sources, then a build output (a Kotlin/JS bundle)
+        // devDirs = listOf(File("src/main/resources/static"), File("build/static"))
     }
 }
 ```
