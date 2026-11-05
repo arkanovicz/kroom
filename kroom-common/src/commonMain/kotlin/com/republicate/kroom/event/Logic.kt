@@ -19,6 +19,9 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
      */
     var dirty: MutableSet<Any>? = null
 
+    /** A write went through the fields since a browser's Room last cleared it: the root changed. Never cleared on the server. */
+    var touched: Boolean = false
+
     /** One frame into the State: the arrows of the grammar, read right to left. A room's State calls `super` first, for presence. */
     open fun reduce(event: Event) {
         when (event) {

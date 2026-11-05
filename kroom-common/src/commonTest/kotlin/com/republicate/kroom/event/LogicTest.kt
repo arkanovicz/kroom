@@ -76,9 +76,12 @@ class LogicTest {
     @Test fun `a fold records the identities each write went under when asked`() {
         val s = Counter()
         s.reduce(Set(Json.MutableObject("n" to 3)))                                   // no set: nothing kept, nothing thrown
+        assertTrue(s.touched)
+        s.touched = false
         s.dirty = HashSet()
         s.reduce(Set(Json.MutableObject("n" to 4)))
         assertEquals("", dirty(s))                               // a root field: no item
+        assertTrue(s.touched)                                    // but the root changed
         s.reduce(Wait(Json.MutableObject("user" to "a")))
         s.reduce(Join(Json.MutableObject("user" to Json.MutableObject("id" to "b"))))
         assertEquals("a b", dirty(s))
@@ -91,6 +94,10 @@ class LogicTest {
         s.reduce(Cancel(Json.MutableObject("intent" to "wait", "user" to "a")))
         assertEquals("", dirty(s))                               // a logged event with no seq, a removal: no key
         assertTrue(s.waiting.isEmpty())
+        s.touched = false
+        s.reduce(Status(Json.MutableObject("status" to "IDLE", "user" to "nobody")))
+        s.reduce(Cancel(Json.MutableObject("intent" to "wait", "user" to "nobody")))
+        assertFalse(s.touched)                                   // nothing to write: unchanged
     }
 
     private fun dirty(s: State) = s.dirty!!.map { it.toString() }.sorted().joinToString(" ")

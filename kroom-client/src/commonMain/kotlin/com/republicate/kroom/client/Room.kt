@@ -24,8 +24,9 @@ import org.apache.velocity.engine.sink.OutputSink
  * A frame's merge is targeted: the fold records what it wrote ([State.dirty], the identities on each write's path),
  * and an item keyed by its identity that no write went under is clean — moved into place, its body not rendered. So
  * an item depends only on the writes under its own key: what it reads of another key (a line reading its author's
- * name) refreshes when that key is written. A snapshot, the first merge and a pass the page asks for itself render
- * every item.
+ * name) refreshes when that key is written. A region is merged when a root its header declares changed (`state`, `page`:
+ * a write through their fields; `me`: a snapshot), so a header declares every root the region reads, through a page
+ * getter too. A snapshot, the first merge and a pass the page asks for itself merge every region and render every item.
  *
  * [engine] knows the pages: on the browser, the app's compiled classes behind its template registry.
  */
@@ -44,11 +45,16 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
 
     init { state.dirty = HashSet() }
 
-    private val regions = ArrayList<Pair<String, OutputSink>>()
+    /** A region: its template, its sink, the roots its header declares (none: merged on every frame), whether never merged. */
+    private class Region(val template: String, val sink: OutputSink, val roots: Set<String>) { var fresh = true }
+
+    private val regions = ArrayList<Region>()
     private val reactions = ArrayList<(String, Event?) -> Unit>()
 
     /** A region: [template] merged under [root]; its first merge, at the snapshot, builds the tree. */
-    fun <N : Any> attach(template: String, tree: Tree<N>, root: N): Room<S> = apply { regions += template to HtmlDomSink(tree, root, ::key, ::clean) }
+    fun <N : Any> attach(template: String, tree: Tree<N>, root: N): Room<S> = apply {
+        regions += Region(template, HtmlDomSink(tree, root, ::key, ::clean), engine.getTemplate(template).header.map { it.name }.toSet())
+    }
 
     /** The sink's door: an item the fold did not write under, known by its identity (a position shifts). */
     private fun clean(key: Any?): Boolean = !all && key !is Position && key !in state.dirty!! && page?.dirty?.contains(key) != true
@@ -83,17 +89,25 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
     }
 
     /**
-     * Merge every region again. A frame's pass is targeted ([all] false: the items its fold left untouched are clean); a pass
-     * the page asks for itself renders every item, the default — a timer writes nothing keyed, and what it shows may sit
-     * in any item ("5 min ago"). A page that wrote through its fields may ask the targeted one.
+     * Merge the regions again. A frame's pass is targeted ([all] false: a region none of whose roots changed is left alone,
+     * the items the fold left untouched are clean); a pass the page asks for itself merges every region and renders every
+     * item, the default — a timer writes nothing keyed, and what it shows may sit in any item ("5 min ago"). A page that
+     * wrote through its fields may ask the targeted one.
      */
     fun merge(all: Boolean = true) {
         if (all) this.all = true
-        for ((template, sink) in regions) engine.getTemplate(template).merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), sink)
+        for (r in regions) {
+            if (!this.all && !r.fresh && r.roots.isNotEmpty() && r.roots.none(::changed)) continue
+            engine.getTemplate(r.template).merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), r.sink)
+            r.fresh = false
+        }
         this.all = false
-        state.dirty!!.clear()
-        page?.dirty?.clear()
+        state.dirty!!.clear(); state.touched = false
+        page?.let { it.dirty?.clear(); it.touched = false }
     }
+
+    /** Whether a root changed since the last merge; a name the room does not know is taken as changed. */
+    private fun changed(root: String): Boolean = when (root) { "state" -> state.touched; "page" -> page?.touched == true; "me" -> false; else -> true }
 }
 
 /**

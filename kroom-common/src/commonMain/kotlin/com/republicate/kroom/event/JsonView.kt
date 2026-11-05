@@ -30,7 +30,7 @@ abstract class JsonView(val json: Json.MutableObject) {
         val keys = ArrayList<Any>(2)
         var v: JsonView = this
         while (true) { v.identity?.let { keys += it }; v = v.owner ?: break }
-        (v as? State)?.dirty?.addAll(keys)
+        (v as? State)?.let { it.touched = true; it.dirty?.addAll(keys) }
     }
 
     /**
@@ -178,7 +178,7 @@ abstract class JsonView(val json: Json.MutableObject) {
             item.owner = owner
             item.touched()
         }
-        fun remove(id: String) { obj.remove(id); owner?.touched() }
+        fun remove(id: String) { if (obj.remove(id) != null) owner?.touched() }
         private fun at(o: Any?): V = view(o as Json.MutableObject).also { it.owner = owner }
     }
 }

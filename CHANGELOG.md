@@ -24,6 +24,17 @@ All notable changes to kroom will be documented in this file.
   timer calls, renders every item; a snapshot too. Pinned in `RegionsTest`: a frame writing one line of the chat
   renders one body (the tree double counts the sites read); every region's tree still equals its text render after
   every frame.
+- A region is merged when a root its `##@` header declares changed (`Template.header`, velocity -02): `State.touched`
+  (a write through the fields since the last merge) for `state` and `page`, a snapshot for `me`; a header that
+  declares nothing merges on every frame, a region never merged is. The header declares every root the region reads,
+  a page getter over the state included — `round.html` now declares `state`. `Keyed.remove` of an absent id marks
+  nothing. Pinned in `RegionsTest`: a frame the state and page have nothing for merges no region; a `leave` the state
+  has nothing for merges `lobby.html` (its feed) and not `online.html`.
+
+#### kroom-examples/chifoumi
+- The page memories keep fields, like any State: `LobbyPage.feed` is a `log(::Line, max = 10)` read newest first,
+  `GamePage`'s `last`, `reveal` (a `Reveal` view) and `note` are `obj` / `string` fields — a merge sees what went
+  through them.
 
 #### kroom-common
 - `ChatState.last`: the seq of the last line said, bumped by `reduce`, seeded by the room from the store; `ChatLogic`
@@ -301,7 +312,7 @@ All notable changes to kroom will be documented in this file.
 
 #### velocity 3.0.0-BETA-20261105-02
 - Bumped: `Template.header` (the `##@` declarations: name, type, whether a default) answers on every form, a
-  build-time-compiled class included — what kroom asked for a region's roots. Nothing read yet.
+  build-time-compiled class included — what kroom asked for a region's roots.
 
 #### velocity 3.0.0-BETA-20261105-01
 - Bumped: `HtmlDomSink` takes a fourth parameter, `clean: (key) -> Boolean` (default never) — a logged item whose

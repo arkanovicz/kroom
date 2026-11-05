@@ -88,6 +88,23 @@ class RegionsTest {
         assertTrue(tree.reads >= 2 * n, "${tree.reads} sites read by a whole pass")
     }
 
+    /** A region is merged when a root its header declares changed: `online.html` reads the state, `lobby.html` the state and the page. */
+    @Test fun `a region none of whose roots changed is not merged`() {
+        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        room.page = LobbyPage(room, say) { "t" }
+        val online = TreeDouble(); val onlineRoot = online.element("div")
+        val lobby = TreeDouble(); val lobbyRoot = lobby.element("div")
+        room.attach("en/online.html", online, onlineRoot).attach("en/lobby.html", lobby, lobbyRoot)
+        room.frame("state", frames[0].getObject("data").toString())
+        fun TreeDouble.work() = reads + log.size   // a merge reads its sites, a first pass writes them
+        assertTrue(online.work() > 0 && lobby.work() > 0, "the snapshot merges every region")
+        fun after(name: String, data: String): Pair<Int, Int> { online.clearLog(); lobby.clearLog(); room.frame(name, data); return online.work() to lobby.work() }
+        after("status", """{"status":"IDLE","user":"nobody"}""").let { (o, l) -> assertEquals(0 to 0, o to l, "nothing changed: no region merged") }
+        after("leave", """{"user":{"id":"nobody","name":"Nobody"},"last":true,"count":1}""").let { (o, l) -> assertTrue(o == 0 && l > 0, "the page took a line, the state had nothing: lobby $l, online $o") }
+        after("chat", """{"text":"hi","seq":1,"author":{"id":"a","name":"Alice"}}""").let { (o, l) -> assertTrue(o > 0 && l > 0, "the state changed: both merged") }
+        assertEquals(engine.getTemplate("en/lobby.html").merge(VelocityContext(mutableMapOf("state" to room.state, "me" to room.me, "page" to room.page))), html(lobbyRoot.children))
+    }
+
     private fun DElement.byId(id: String): DElement? = descendants().filterIsInstance<DElement>().firstOrNull { it.attributes["id"] == id }
 
     @Test fun `the game's regions over the match`() {

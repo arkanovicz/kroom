@@ -248,10 +248,15 @@ fun main() {
   write's path), and an item keyed by its identity that no write went under is clean — moved into
   place, its body not rendered. The rule: an item depends only on the writes under its own key (a
   line reading its author's name refreshes when the author is written); an item known by its
-  position is never clean. A snapshot renders every item, and so does `room.merge()`, the pass a
-  page asks for itself (a timer writes nothing keyed, and "5 min ago" may sit in any item);
-  `merge(all = false)` for a page that wrote through its fields. Write through the fields: a write
-  past the views (`json[k] = v`) leaves no mark.
+  position is never clean. A region is merged when a root its `##@` header declares changed
+  (`state`, `page`: a write through their fields; `me`: a snapshot), so the header declares every
+  root the region reads, through a page getter too (`round.html` reads the match off the state
+  through `$page.round`: it declares `state`). A snapshot merges every region and renders every
+  item, and so does `room.merge()`, the pass a page asks for itself (a timer writes nothing keyed,
+  and "5 min ago" may sit in any item); `merge(all = false)` for a page that wrote through its
+  fields. One rule for items and roots: a merge sees what went through the fields. A write past the
+  views (`json[k] = v`, a plain Kotlin property) leaves no mark — a page memory is a State, its
+  memory is fields.
 - **Roots**: `state` (the viewer's view), `me` (its presence entry), `page` (page memory: a `State`
   of the page's own, folding every frame after the room's, with derived getters like `$page.phase`).
 - **Intents in the markup**: `data-kroom-intent="play"` posts the event with the trigger's

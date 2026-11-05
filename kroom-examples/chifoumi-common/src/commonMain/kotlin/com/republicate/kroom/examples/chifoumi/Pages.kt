@@ -4,6 +4,7 @@ import com.republicate.kroom.client.Room
 import com.republicate.kroom.event.Cancel
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Join
+import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.State
 import com.republicate.kroom.examples.chifoumi.game.LobbyState
@@ -11,18 +12,25 @@ import com.republicate.kroom.examples.chifoumi.game.Match
 import com.republicate.kroom.examples.chifoumi.game.MatchView
 import com.republicate.kroom.examples.chifoumi.game.Play
 import com.republicate.kroom.examples.chifoumi.game.Round
+import com.republicate.kson.Json
 
 /** A sentence of the page's, `{k}` filled: the browser's are held by the document, so l10n translates them. */
 typealias Say = (key: String, vars: Map<String, Any?>) -> String
 
 /**
  * The lobby's page memory: the feed, past frames the snapshot has no memory of (newest first, ten kept), and the
- * viewer's perspective on the marking.
+ * viewer's perspective on the marking. Its memory is fields, like any State's: a merge sees what went through them.
  */
 class LobbyPage(private val room: Room<LobbyState>, private val say: Say, private val now: () -> String) : State() {
-    class Line(val text: String, val time: String)
+    class Line(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
+        var text by string()
+        var time by string()
+    }
 
-    val feed = ArrayList<Line>()
+    private val lines by log(::Line, max = 10)
+
+    /** The feed, newest first. */
+    val feed: List<Line> get() = lines.asReversed()
 
     val name: String? get() = room.me?.name
 
@@ -42,10 +50,7 @@ class LobbyPage(private val room: Room<LobbyState>, private val say: Say, privat
         }
     }
 
-    private fun tell(text: String) {
-        feed.add(0, Line(text, now()))
-        while (feed.size > 10) feed.removeAt(feed.size - 1)
-    }
+    private fun tell(text: String) { lines += Line().also { it.text = text; it.time = now() } }
 }
 
 /**
@@ -60,13 +65,19 @@ class GamePage(
     /** Run after a delay; answers how to call it off. */
     private val later: (ms: Int, () -> Unit) -> () -> Unit,
 ) : State() {
-    class Reveal(val yours: String?, val theirs: String?, val outcome: String, val message: String, val verdict: String)
+    class Reveal(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
+        var yours by string()
+        var theirs by string()
+        var outcome by string()
+        var message by string()
+        var verdict by string()
+    }
 
-    private var last: MatchView? = null
-    var reveal: Reveal? = null
+    private var last by obj(::MatchView)
+    var reveal by obj(::Reveal)
         private set
-    private var note: String? = null
-    private var timer: (() -> Unit)? = null
+    private var note by string()
+    private var timer: (() -> Unit)? = null   // not memory: how to call the reveal off
 
     private val me: String? get() = room.me?.id
     private val live: MatchView? get() = room.state.myMatch(me)
@@ -96,8 +107,13 @@ class GamePage(
             1 -> "${round.getString("move1")}-${round.getString("move2")}"
             else -> "${round.getString("move2")}-${round.getString("move1")}"
         }
-        reveal = Reveal(EMOJI[round.getString(if (first) "move1" else "move2")], EMOJI[round.getString(if (first) "move2" else "move1")],
-            outcome, say("round-$outcome", emptyMap()), verdict(key))
+        reveal = Reveal().also {
+            it.yours = EMOJI[round.getString(if (first) "move1" else "move2")]
+            it.theirs = EMOJI[round.getString(if (first) "move2" else "move1")]
+            it.outcome = outcome
+            it.message = say("round-$outcome", emptyMap())
+            it.verdict = verdict(key)
+        }
         timer?.invoke()
         timer = later(2000) { reveal = null; timer = null; room.merge() }
     }
