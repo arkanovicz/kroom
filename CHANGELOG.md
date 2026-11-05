@@ -299,6 +299,10 @@ All notable changes to kroom will be documented in this file.
   `PushService` reads the `HttpResponse` itself), androidx core 1.18.0 / appcompat 1.8.0 / webkit 1.18.0, material
   1.14.0, kroom-view `compileSdk` 36 (core 1.19 wants 37, not installed).
 
+#### velocity 3.0.0-BETA-20261105-02
+- Bumped: `Template.header` (the `##@` declarations: name, type, whether a default) answers on every form, a
+  build-time-compiled class included — what kroom asked for a region's roots. Nothing read yet.
+
 #### velocity 3.0.0-BETA-20261105-01
 - Bumped: `HtmlDomSink` takes a fourth parameter, `clean: (key) -> Boolean` (default never) — a logged item whose
   key is clean is moved into place and kept, its body not rendered (the door for kroom-client's targeted merges);
