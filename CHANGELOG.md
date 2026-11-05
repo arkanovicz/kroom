@@ -280,6 +280,13 @@ All notable changes to kroom will be documented in this file.
   `PushService` reads the `HttpResponse` itself), androidx core 1.18.0 / appcompat 1.8.0 / webkit 1.18.0, material
   1.14.0, kroom-view `compileSdk` 36 (core 1.19 wants 37, not installed).
 
+#### velocity 3.0.0-BETA-20261105-01
+- Bumped: `HtmlDomSink` takes a fourth parameter, `clean: (key) -> Boolean` (default never) — a logged item whose
+  key is clean is moved into place and kept, its body not rendered (the door for kroom-client's targeted merges);
+  `SafeText` is markup on the DOM sink (a range read like static text, rebuilt whole when the string changes);
+  a block or markup site at an item's own level is now removed with the item. `Room.attach` passes the key
+  positionally, unaffected by the trailing lambda now binding to `clean`.
+
 #### ktor 3.6.1
 - Bumped from 3.5.0, no change on kroom's side. Brings KTOR-9790: the SSE heartbeat belongs to the session
   and stops when its handler returns.
