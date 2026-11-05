@@ -47,7 +47,10 @@ class Intents(private val root: Element, private val events: RoomEvents, private
         val intentOf = el.getAttribute("$attribute-of")
         if (el.getAttribute(attribute) == "cancel" && intentOf != null) return out.also { it["intent"] = intentOf }
         val fields = events.of(intent)?.fields.orEmpty()
-        fun put(k: String, text: String) { out[k] = fields.firstOrNull { it.name == k }?.parse(text) ?: text }   // an undeclared key as is: the shape refuses it
+        fun put(k: String, text: String) {
+            val field = fields.firstOrNull { it.name == k }
+            out[k] = if (field != null) field.parse(text) else text   // parsed null included; an undeclared key as is, for the shape to refuse
+        }
         for (i in 0 until el.attributes.length) {
             val a = el.attributes[i] ?: continue
             if (a.name.startsWith(fieldPrefix) && !a.name.startsWith(attribute)) put(camel(a.name.removePrefix(fieldPrefix)), a.value)
