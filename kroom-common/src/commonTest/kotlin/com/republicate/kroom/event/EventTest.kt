@@ -17,6 +17,7 @@ class EventTest {
         val player1 by string().required
         val player2 by string().required
         val round by int()
+        val rated by bool()
     }
 
     @Test fun `the json is the truth the class a view`() {
@@ -48,6 +49,23 @@ class EventTest {
         val e = assertFailsWith<Event.Rejected> { Play().accept("alice") }
         assertEquals("missing", e.reason.key)
         assertFailsWith<IllegalStateException> { Play().move }
+    }
+
+    @Test fun `a form's text is parsed in its kind an empty field null a bad text left for validation`() {
+        val round = Match().fields.single { it.name == "round" }
+        val move = Play().fields.single { it.name == "move" }
+        assertEquals(3, round.parse("3"))
+        assertNull(round.parse(""))   // the key stays: a field emptied on purpose
+        assertEquals("x", round.parse("x"))
+        assertEquals("", move.parse(""))   // a string is what it says
+        val rated = Match().fields.single { it.name == "rated" }
+        assertEquals(true, rated.parse("on"))   // a checkbox
+        assertEquals(false, rated.parse("false"))
+        assertNull(rated.parse(""))
+        val json = Json.MutableObject("player1" to "a", "player2" to "b", "round" to round.parse(""))
+        assertTrue(json.containsKey("round"))
+        assertNull(Match(json).validate())
+        assertEquals("invalid {\"field\":\"round\",\"kind\":\"INT\"}", Match(Json.MutableObject("player1" to "a", "player2" to "b", "round" to round.parse("x"))).validate().toString())
     }
 
     @Test fun `one life in order stamped in the metadata`() {

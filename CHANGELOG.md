@@ -31,6 +31,13 @@ All notable changes to kroom will be documented in this file.
   nothing. Pinned in `RegionsTest`: a frame the state and page have nothing for merges no region; a `leave` the state
   has nothing for merges `lobby.html` (its feed) and not `online.html`.
 
+#### kroom-common, kroom-client — a form's text in its kind
+- `Field.parse(text)`: a form's text in the field's declared kind — a number parsed, a checkbox's `on` true, `""` null for
+  every kind but STRING (the key stays: a field emptied on purpose, a vote undone), a text no kind reads left as is for
+  validation to refuse. `Intents` applies it to every `data-kroom-<field>` and form value by the intent's declaration
+  before the view's check and the POST: `replyTo: "42"` no longer goes on the wire as a string, an emptied `Long?`
+  field is null rather than `invalid`. An undeclared key stays a string (the shape refuses it). `Intents(root, events, act)`.
+
 #### kroom-examples/chifoumi
 - The page memories keep fields, like any State: `LobbyPage.feed` is a `log(::Line, max = 10)` read newest first,
   `GamePage`'s `last`, `reveal` (a `Reveal` view) and `note` are `obj` / `string` fields — a merge sees what went

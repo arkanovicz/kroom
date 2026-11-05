@@ -1,5 +1,6 @@
 package com.republicate.kroom.client
 
+import com.republicate.kroom.event.RoomEvents
 import com.republicate.kson.Json
 import kotlinx.browser.document
 import org.w3c.dom.Element
@@ -15,11 +16,12 @@ import kotlin.js.Promise
 /**
  * `[data-kroom-intent]` triggers: a click posts the intent and leaves the trigger busy until the reply, the
  * verdict: accepted frees it (and resets its form), rejected frees it and shows the reason right after it. The
- * payload is the trigger's `data-kroom-<field>` values, plus its form's fields when in a form; a `cancel` names
- * what it withdraws with `data-kroom-intent-of`. Call sites hold no code. Triggers inside a region may be rebuilt
- * by a merge while their POST runs: they are found again by name when the reply comes.
+ * payload is the trigger's `data-kroom-<field>` values, plus its form's fields when in a form, each text in its
+ * declared kind (`Field.parse`: a number, a boolean, an empty field null); a `cancel` names what it withdraws with
+ * `data-kroom-intent-of`. Call sites hold no code. Triggers inside a region may be rebuilt by a merge while their
+ * POST runs: they are found again by name when the reply comes.
  */
-class Intents(private val root: Element, private val act: (String, Json.Object) -> Promise<dynamic>) {
+class Intents(private val root: Element, private val events: RoomEvents, private val act: (String, Json.Object) -> Promise<dynamic>) {
     private val pending = HashSet<String>()
     private val attribute = "data-kroom-intent"
     private val fieldPrefix = "data-kroom-"
@@ -34,25 +36,27 @@ class Intents(private val root: Element, private val act: (String, Json.Object) 
             pending += intent
             busy(el, true)
             clearReason(intent)
-            act(intent, payload(el)).then<Unit>(
+            act(intent, payload(intent, el)).then<Unit>(
                 onFulfilled = { settle(intent, null); formOf(el)?.reset() },
                 onRejected = { err -> settle(intent, reasonOf(err)) })
         })
     }
 
-    fun payload(el: HTMLElement): Json.Object {
+    fun payload(intent: String, el: HTMLElement): Json.Object {
         val out = Json.MutableObject()
         val intentOf = el.getAttribute("$attribute-of")
         if (el.getAttribute(attribute) == "cancel" && intentOf != null) return out.also { it["intent"] = intentOf }
+        val fields = events.of(intent)?.fields.orEmpty()
+        fun put(k: String, text: String) { out[k] = fields.firstOrNull { it.name == k }?.parse(text) ?: text }   // an undeclared key as is: the shape refuses it
         for (i in 0 until el.attributes.length) {
             val a = el.attributes[i] ?: continue
-            if (a.name.startsWith(fieldPrefix) && !a.name.startsWith(attribute)) out[camel(a.name.removePrefix(fieldPrefix))] = a.value
+            if (a.name.startsWith(fieldPrefix) && !a.name.startsWith(attribute)) put(camel(a.name.removePrefix(fieldPrefix)), a.value)
         }
         val form = formOf(el)
         if (form != null) {
             val fd = FormData(form)
             val keys = js("Array.from(fd.keys())") as Array<String>
-            for (k in keys) out[k] = fd.get(k)?.toString()
+            for (k in keys) put(k, fd.get(k)?.toString() ?: "")
         }
         return out
     }

@@ -12,7 +12,7 @@ import kotlin.js.Promise
 
 /** The page merged under [root] of the live document, its `[data-kroom-intent]` triggers posting to the room. */
 fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!): Room<S> =
-    attach(template, JsTree(document), root as Node).also { Intents(root) { type, payload -> act(type, payload) } }
+    attach(template, JsTree(document), root as Node).also { Intents(root, store.events) { type, payload -> act(type, payload) } }
 
 /**
  * The room's stream (`<api>/rooms/<name>/stream`, what kroom-server's `Route.room` mounts): the snapshot first, then

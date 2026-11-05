@@ -260,7 +260,8 @@ fun main() {
 - **Roots**: `state` (the viewer's view), `me` (its presence entry), `page` (page memory: a `State`
   of the page's own, folding every frame after the room's, with derived getters like `$page.phase`).
 - **Intents in the markup**: `data-kroom-intent="play"` posts the event with the trigger's
-  `data-kroom-<field>` values and its form's fields; the trigger is busy for the span of the POST.
+  `data-kroom-<field>` values and its form's fields, each text in its declared kind (a number parsed,
+  a checkbox true, an emptied field null, the key kept); the trigger is busy for the span of the POST.
   The intent's shape and its check run on the viewer's view first: a refusal there is shown like a
   reply's, without a request. A reason is a key a page may hold a sentence for
   (`#messages [data-kroom-msg="play:already_played"]`).

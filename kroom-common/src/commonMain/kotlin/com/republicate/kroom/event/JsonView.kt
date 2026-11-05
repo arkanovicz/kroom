@@ -152,6 +152,21 @@ abstract class JsonView(val json: Json.MutableObject) {
         }
 
         fun toJson(): Json.Object = Json.Object("name" to name, "kind" to kind.name, "required" to mandatory, "out" to isOut, "selective" to (visibleTo != null))
+
+        /**
+         * A form's text in this kind, as early as the browser reads it: a number parsed, a checkbox's `on` true, `""` null
+         * for every kind but STRING (the key stays: a field emptied on purpose, a vote undone); a text no kind reads stays
+         * as is, for [check] to refuse.
+         */
+        fun parse(text: String): Any? = when {
+            kind == Kind.STRING -> text
+            text.isEmpty() -> null
+            kind == Kind.INT -> text.toIntOrNull() ?: text
+            kind == Kind.LONG -> text.toLongOrNull() ?: text
+            kind == Kind.DOUBLE -> text.toDoubleOrNull() ?: text
+            kind == Kind.BOOL -> when (text.lowercase()) { "true", "on", "1" -> true; "false", "off", "0" -> false; else -> text }
+            else -> text
+        }
     }
 
     /** The views over an array of objects, appended through [plusAssign], never removed but by the bound. */
