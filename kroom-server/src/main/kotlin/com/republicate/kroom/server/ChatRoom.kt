@@ -47,6 +47,9 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
 
     /** Reading on from a line jumped to: up to [n] lines newer than [seq], oldest first. */
     suspend fun after(seq: Long, n: Int = 50): List<C> = history.after(seq, n)
+
+    /** What the history route serves: the store's [ChatHistory.between], the request's other query parameters in [params]. */
+    suspend fun between(after: Long?, before: Long?, n: Int = 50, params: Map<String, String> = emptyMap()): List<C> = history.between(after, before, n, params)
 }
 
 /** A chat room and nothing more. */

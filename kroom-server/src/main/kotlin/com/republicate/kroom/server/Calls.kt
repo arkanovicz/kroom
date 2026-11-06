@@ -118,13 +118,16 @@ private suspend fun ApplicationCall.verdict(event: Event) {
 }
 
 /**
- * The history, `?before=<seq>` (scroll-back; none: from the latest) or `?after=<seq>` (reading on from a line jumped
- * to), `&n=<count>` → `{messages: [...]}`, oldest first, each line as [user]'s snapshot shows it.
+ * The history, `?before=<seq>` (scroll-back; none: from the latest), `?after=<seq>` (reading on from a line jumped
+ * to), both (strictly between), `&n=<count>` → `{messages: [...]}`, oldest first, each line as [user]'s snapshot shows
+ * it. Any other query parameter is the store's ([ChatHistory.between]).
  */
 private suspend fun ApplicationCall.history(room: ChatRoom<*, *>, user: User?) {
     val after = request.queryParameters["after"]?.toLongOrNull()
     val before = request.queryParameters["before"]?.toLongOrNull()
-    if (after != null && before != null) return json(HttpStatusCode.BadRequest, refusal("before_and_after"))
     val n = (request.queryParameters["n"]?.toIntOrNull() ?: 50).coerceIn(1, 500)
-    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array((if (after != null) room.after(after, n) else room.before(before ?: Long.MAX_VALUE, n)).map { it.view(user?.userId) })).toString())
+    val params = request.queryParameters.entries().filter { it.key !in HISTORY_PARAMS }.associate { it.key to it.value.first() }
+    json(HttpStatusCode.OK, Json.Object("messages" to Json.Array(room.between(after, before, n, params).map { it.view(user?.userId) })).toString())
 }
+
+private val HISTORY_PARAMS = setOf("after", "before", "n")

@@ -43,6 +43,13 @@ All notable changes to kroom will be documented in this file.
   trigger still is; each is busy, settled and shows its reason on its own, found again by selector after a merge rebuilt
   it. `IntentsTest` runs under karma only (no `document` on node).
 
+#### kroom-server — the history between two bounds, the store's parameters
+- `ChatHistory.between(after, before, n, params)`: the history route's one call, up to `n` lines oldest first — strictly
+  between the two seqs when both are given (`?after=A&before=B`, a 400 `before_and_after` until now; by default
+  `after(A, n)` cut at `B`), else `after` or `before` as before. `params` = the request's query parameters kroom does not
+  read (`after`, `before`, `n` removed), for a store with more to say (a span, a ranking); the default ignores them, a
+  store that overrides nothing serves as before. `ChatRoom.between` delegates. Pinned in `RouteTest`.
+
 #### kroom-common, kroom-server — the avatar in presence
 - `UserPresence.avatar` (an image URL, as of the join: a snapshot's `users` and `me`, a `join`'s `user`), the server's from
   `User.avatar`; a user without one has no key. A picture changed meanwhile shows at the next join or snapshot.

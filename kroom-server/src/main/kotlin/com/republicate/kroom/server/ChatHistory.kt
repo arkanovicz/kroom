@@ -32,6 +32,18 @@ interface ChatHistory<C : Chat> {
 
     /** Up to [n] lines newer than [seq], oldest first. */
     suspend fun after(seq: Long, n: Int): List<C>
+
+    /**
+     * The history route's one call, up to [n] lines oldest first: strictly between [after] and [before] when both are
+     * given (by default reading on from [after] and stopping at [before]; a store with a ranking cuts the span its own
+     * way), else [after] or [before] as above, neither = from the latest. [params] are the request's other query
+     * parameters (`after`, `before`, `n` removed): an app's store reads what it means by them, the default ignores them.
+     */
+    suspend fun between(after: Long?, before: Long?, n: Int, params: Map<String, String> = emptyMap()): List<C> = when {
+        after != null && before != null -> after(after, n).filter { it.seq!! < before }
+        after != null -> after(after, n)
+        else -> before(before ?: Long.MAX_VALUE, n)
+    }
 }
 
 /**

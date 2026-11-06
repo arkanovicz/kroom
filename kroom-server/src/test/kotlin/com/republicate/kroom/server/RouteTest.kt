@@ -77,7 +77,24 @@ class RouteTest {
         assertEquals(listOf("hi", "there"), texts(""))
         assertEquals(listOf("hi"), texts("?before=2"))
         assertEquals(listOf("there"), texts("?after=1"))
-        assertEquals(HttpStatusCode.BadRequest, client.get("/api/rooms/${room.id}/history?before=2&after=1") { header("X-User", "alice") }.status)
+        assertEquals(emptyList(), texts("?after=1&before=2"))   // strictly between
+        client.post("/api/rooms/${room.id}/chat") { header("X-User", "alice"); contentType(ContentType.Application.Json); setBody("""{"text":"all"}""") }
+        withTimeout(2000) { while (texts("").size < 3) delay(10) }
+        assertEquals(listOf("there"), texts("?after=1&before=3"))
+        room.stop()
+    }
+
+    @Test fun `the history's other query parameters are the store's`() = testApplication {
+        val asked = ArrayList<String>()
+        val store = object : ChatHistory<Chat> by MemoryChatHistory<Chat>() {
+            override suspend fun between(after: Long?, before: Long?, n: Int, params: Map<String, String>): List<Chat> =
+                emptyList<Chat>().also { asked += "$after/$before/$n/${params.toSortedMap()}" }
+        }
+        val room = ChatRoom("chat-route-${n++}", store)
+        routing { route("/api") { room(room, principal) } }
+        client.get("/api/rooms/${room.id}/history?after=1&before=9&n=7&span=1h&curate=off") { header("X-User", "alice") }
+        client.get("/api/rooms/${room.id}/history") { header("X-User", "alice") }
+        assertEquals(listOf("1/9/7/{curate=off, span=1h}", "null/null/50/{}"), asked)
         room.stop()
     }
 

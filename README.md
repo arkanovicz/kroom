@@ -919,7 +919,9 @@ store in the background: the loop never waits on a store. The store is asked on 
 `tail(n)` when the room starts, to seed the sequence and the tail, and `before(seq, n)` for
 scroll-back, which `room(…)` serves as `GET /rooms/{room}/history?before=&n=` (`{messages: [...]}`, oldest
 first, each line as the reader's snapshot shows it; `rooms(…)` for every room of a kind); `after(seq, n)` and
-`?after=` read on from a line jumped to (a reply's source, a search hit). A line carries its `author` (`Author(id, name, avatar)`): the user's id and avatar (`User.avatar`),
+`?after=` read on from a line jumped to (a reply's source, a search hit); both bounds together are the lines strictly
+between. The route's one call is `between(after, before, n, params)`, by default over those two; `params` are the
+request's other query parameters, for a store with more to say (a span, a ranking). A line carries its `author` (`Author(id, name, avatar)`): the user's id and avatar (`User.avatar`),
 or an external one once a bridge speaks for someone else (`sendChat(author, text)`). Write a `ChatHistory` over
 your database and hand it to the room; `MemoryChatHistory` keeps the last 1000 and dies with the process.
 
