@@ -15,7 +15,11 @@ class Client(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     var status by enum<Presence>()
 }
 
-/** A user as presence sees it: what a snapshot's `users` lists, what `join` carries (the avatar as of then: an image URL). */
+/**
+ * A user as presence sees it: what a snapshot's `users` lists, what `join` carries (the avatar as of then: an image URL).
+ * The fold keeps `clients` as of the user's first `join` (a later tab's join, an earlier one's leave are not on the wire)
+ * and follows `status` alone; the snapshot's `me` is composed afresh.
+ */
 class UserPresence(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     var id by string().required
     var name by string()

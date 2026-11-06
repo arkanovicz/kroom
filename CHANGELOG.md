@@ -59,6 +59,10 @@ All notable changes to kroom will be documented in this file.
   only — the tab hidden → `AWAY`, no input (mouse, key, touch, scroll) for `idleAfter` ms → `IDLE`, back → `ONLINE` —
   and again after each snapshot when not `ONLINE` (a reconnect is a join, and the room starts a joiner `ONLINE`); a
   spectator posts nothing, a refusal is one console line. Returns what stops it. Pinned in `PresenceTest` (karma).
+- A page going away (`pagehide`) posts nothing until `pageshow`: a reload fires `pagehide`, then the hidden
+  `visibilitychange`, and that `AWAY` landed on the reloaded page's seat (same tab id, `api.js`), which had started
+  `ONLINE` and so said nothing more — a visible tab listed `AWAY` (arkad, 2026-11-06). `UserPresence.clients` documented
+  as the fold keeps it: as of the user's first `join`, `status` alone following.
   `status.js` (`StatusTracker`, lowercase statuses and an `OFFLINE`, posting to `game/{id}/status`) predates the events
   and is the legacy chifoumi page's alone.
 

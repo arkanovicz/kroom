@@ -268,7 +268,8 @@ fun main() {
   (`#messages [data-kroom-msg="play:already_played"]`).
 - **Presence from the tab**: `room.report(idleAfter)` (`kroom.report()` from plain JS) posts `status` on change —
   hidden → `AWAY`, no input for `idleAfter` ms (2 min) → `IDLE`, back → `ONLINE` — and again after a snapshot when
-  not `ONLINE` (a reconnect is a join, started `ONLINE`); a spectator posts nothing. It returns what stops it.
+  not `ONLINE` (a reconnect is a join, started `ONLINE`); a spectator posts nothing, a page going away (`pagehide`)
+  nothing either. It returns what stops it.
 - From code: `room.act(Play(…))` (typed) or `act(type, payload)`; `on(entry) { event -> }` reacts to
   one name, `react { name, event -> }` to every frame (navigation, say). Reactions never emit.
 - A plain-JS page gets the `kroom` facade: `kroom.connect()`, `kroom.act('status', {status})`,

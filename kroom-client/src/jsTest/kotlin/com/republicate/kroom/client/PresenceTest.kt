@@ -10,7 +10,7 @@ import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Pins what the tab posts as its presence: on change only, nothing as a spectator, again after a snapshot when not ONLINE. */
+/** Pins what the tab posts as its presence: on change only, nothing as a spectator, again after a snapshot when not ONLINE, nothing once going away. */
 class PresenceTest {
 
     private fun posted() = (js("window.posted") as Array<String>).toList()
@@ -43,9 +43,14 @@ class PresenceTest {
             hidden(true)
             room.frame("state", """{"history":[],"me":{"id":"a","name":"Alice"}}""")
             assertEquals(listOf("status:AWAY", "status:AWAY"), posted().takeLast(2))   // a reconnect while AWAY: said again
-            stop()
+            window.dispatchEvent(Event("pagehide"))
             hidden(false)
-            assertEquals(6, posted().size)
+            assertEquals(6, posted().size)   // going away (a reload: pagehide, then the visibility change): nothing to report
+            window.dispatchEvent(Event("pageshow"))
+            assertEquals("status:ONLINE", posted().last())   // back from the cache: what changed meanwhile, said
+            stop()
+            hidden(true)
+            assertEquals(7, posted().size)
         }
     }
 }
