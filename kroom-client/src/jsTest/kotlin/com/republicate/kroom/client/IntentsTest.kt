@@ -18,7 +18,12 @@ class IntentsTest {
         val weight by double()
     }
 
-    object Events : RoomEvents() { val say = intent(::Say) }
+    class Vote(json: Json.MutableObject = Json.MutableObject()) : Event("vote", json = json) {
+        val seq by long().required
+        val value by double().required
+    }
+
+    object Events : RoomEvents() { val say = intent(::Say); val vote = intent(::Vote) }
 
     private fun page(html: String): Pair<HTMLElement, MutableList<Pair<String, Json.Object>>> {
         val root = document.createElement("div") as HTMLElement
@@ -67,6 +72,36 @@ class IntentsTest {
         click(root, "button")
         assertEquals("x", posted.single().second["text"])   // data-kroom-reply-to camel-cased
         assertEquals("abc", posted.single().second["replyTo"])   // no long reads it: `invalid`, from the view's check
+    }
+
+    /** Two triggers of one intent with different fields run independently; the same one twice is one POST; a reason lands after its own trigger. */
+    @Test fun triggersOfOneIntentAreBusyAndSettledEachOnItsOwn(): Promise<Unit> {
+        val root = document.createElement("div") as HTMLElement
+        root.innerHTML = """
+            <button id="a" data-kroom-intent="vote" data-kroom-seq="3" data-kroom-value="1.0">👍</button>
+            <button id="b" data-kroom-intent="vote" data-kroom-seq="7" data-kroom-value="-1.0">👎</button>"""
+        document.body!!.appendChild(root)
+        val replies = ArrayList<Pair<(dynamic) -> Unit, (Throwable) -> Unit>>()
+        val posted = ArrayList<Json.Object>()
+        Intents(root, Events) { _, payload -> posted += payload; Promise { resolve, reject -> replies += Pair(resolve, reject) } }
+        val a = root.querySelector("#a") as HTMLElement
+        val b = root.querySelector("#b") as HTMLElement
+        a.click(); a.click(); b.click()
+        assertEquals(listOf(3L, 7L), posted.map { it["seq"] })   // the second click on a swallowed, b's not
+        assertTrue(a.hasAttribute("disabled") && b.hasAttribute("disabled"))
+        replies[0].second(js("({data: {reason: 'already_voted'}})").unsafeCast<Throwable>())
+        return Promise.resolve(Unit).then {   // a's verdict, delivered: a free with its reason, b still busy
+            assertFalse(a.hasAttribute("disabled"))
+            assertTrue(b.hasAttribute("disabled"))
+            assertEquals("already_voted", (a.nextElementSibling as HTMLElement).textContent)
+            assertEquals("b", root.querySelector(".intent-reason + *")?.id)
+            replies[1].first(js("({})"))
+        }.then {
+            assertFalse(b.hasAttribute("disabled"))
+            assertEquals(1, root.querySelectorAll(".intent-reason").length)
+            a.click()   // free again: posts
+            assertEquals(3, posted.size)
+        }
     }
 
     @Test fun aCancelNamesWhatItWithdraws() {

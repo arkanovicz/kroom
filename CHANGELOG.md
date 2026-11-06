@@ -38,6 +38,10 @@ All notable changes to kroom will be documented in this file.
   before the view's check and the POST: `replyTo: "42"` no longer goes on the wire as a string, an emptied `Long?`
   field is null rather than `invalid`. An undeclared key stays a string (the shape refuses it). `Intents(root, events, act)`.
   Pinned in kroom-client's `IntentsTest` (jsTest, under karma like kroom-common's: the browser test task is on again).
+- `Intents` tells a trigger by its selector (its intent and its `data-kroom-*` attributes, `-of` included), no longer by
+  its intent's name: a vote on line 7 posts while line 3's is in flight (it was swallowed), a second click on the same
+  trigger still is; each is busy, settled and shows its reason on its own, found again by selector after a merge rebuilt
+  it. `IntentsTest` runs under karma only (no `document` on node).
 
 #### kroom-webapp-core
 - `StaticConfig.devDirs: List<File>`, tried in order before the classpath (sources, then a build output that cannot live in
