@@ -15,10 +15,11 @@ class Client(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     var status by enum<Presence>()
 }
 
-/** A user as presence sees it: what a snapshot's `users` lists, what `join` carries. */
+/** A user as presence sees it: what a snapshot's `users` lists, what `join` carries (the avatar as of then: an image URL). */
 class UserPresence(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     var id by string().required
     var name by string()
+    var avatar by string()
     var status by enum<Presence>()
     val clients by log(::Client)
 }

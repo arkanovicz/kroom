@@ -43,6 +43,18 @@ All notable changes to kroom will be documented in this file.
   trigger still is; each is busy, settled and shows its reason on its own, found again by selector after a merge rebuilt
   it. `IntentsTest` runs under karma only (no `document` on node).
 
+#### kroom-common, kroom-server — the avatar in presence
+- `UserPresence.avatar` (an image URL, as of the join: a snapshot's `users` and `me`, a `join`'s `user`), the server's from
+  `User.avatar`; a user without one has no key. A picture changed meanwhile shows at the next join or snapshot.
+
+#### kroom-client — the tab reports its presence
+- `Room.report(idleAfter = 120_000)` (js; `kroom.report()` on the facade): posts kroom's `status` through `act` on change
+  only — the tab hidden → `AWAY`, no input (mouse, key, touch, scroll) for `idleAfter` ms → `IDLE`, back → `ONLINE` —
+  and again after each snapshot when not `ONLINE` (a reconnect is a join, and the room starts a joiner `ONLINE`); a
+  spectator posts nothing, a refusal is one console line. Returns what stops it. Pinned in `PresenceTest` (karma).
+  `status.js` (`StatusTracker`, lowercase statuses and an `OFFLINE`, posting to `game/{id}/status`) predates the events
+  and is the legacy chifoumi page's alone.
+
 #### kroom-webapp-core
 - `StaticConfig.devDirs: List<File>`, tried in order before the classpath (sources, then a build output that cannot live in
   them: a Kotlin/JS bundle); `devDir` stays as the one-directory shorthand.

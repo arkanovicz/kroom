@@ -391,6 +391,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     protected fun presence(user: User): UserPresence = UserPresence().also { p ->
         p.id = user.userId
         p.name = user.displayName
+        p.avatar = user.avatar
         val clients = user.getConnectionsInRoom(id)
         clients.forEach { c -> p.clients += Client().also { it.id = c.tab; it.kind = c.kind; it.status = c.status } }
         p.status = clients.minOfOrNull { it.status } ?: Presence.LOST

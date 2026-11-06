@@ -24,6 +24,8 @@ object kroom {
     fun act(type: String, payload: dynamic = js("({})")) = room?.act(type, Json.parse(JSON.stringify(payload)) as Json.Object)
     /** Open the stream, closing a previous one: a reconnect is a join. */
     fun connect() { source?.close(); source = room?.connect() }
+    /** The tab reports its presence (hidden → AWAY, no input for [idleAfter] ms → IDLE, back → ONLINE); what it returns stops it. */
+    fun report(idleAfter: Int = 120_000): () -> Unit = room?.report(idleAfter) ?: {}
     fun frame(name: String, data: String) { room?.frame(name, data) }
     fun say(key: String, vars: dynamic = js("({})")): String {
         val keys = js("Object.keys(vars)") as Array<String>

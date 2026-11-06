@@ -193,8 +193,8 @@ adds the chat's history store.
   position on the room's channel.
 - **No replay.** A reconnect is a join; the snapshot is the truth, first on every stream; an event
   only ever means a transition.
-- **Presence is kroom's layer.** `users` is a keyed field of the base `State` (`{id, name, status,
-  clients}`), kept by `reduce` from `join`, `leave` and `status`; a user's status composes its
+- **Presence is kroom's layer.** `users` is a keyed field of the base `State` (`{id, name, avatar,
+  status, clients}`, the avatar as of the join), kept by `reduce` from `join`, `leave` and `status`; a user's status composes its
   clients' (`ONLINE`, else `IDLE`, else `AWAY`; `LOST` when none is left). The wire hears a user's
   first `join` and last `leave`, the leave after `leaveGrace` (1 s) so a reload is no departure. A
   room with a `lostGrace` says more: past `leaveGrace` the user is `LOST` (a `status` frame, the
@@ -266,6 +266,9 @@ fun main() {
   The intent's shape and its check run on the viewer's view first: a refusal there is shown like a
   reply's, without a request. A reason is a key a page may hold a sentence for
   (`#messages [data-kroom-msg="play:already_played"]`).
+- **Presence from the tab**: `room.report(idleAfter)` (`kroom.report()` from plain JS) posts `status` on change —
+  hidden → `AWAY`, no input for `idleAfter` ms (2 min) → `IDLE`, back → `ONLINE` — and again after a snapshot when
+  not `ONLINE` (a reconnect is a join, started `ONLINE`); a spectator posts nothing. It returns what stops it.
 - From code: `room.act(Play(…))` (typed) or `act(type, payload)`; `on(entry) { event -> }` reacts to
   one name, `react { name, event -> }` to every frame (navigation, say). Reactions never emit.
 - A plain-JS page gets the `kroom` facade: `kroom.connect()`, `kroom.act('status', {status})`,
