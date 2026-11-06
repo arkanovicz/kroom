@@ -10,7 +10,7 @@ kotlin {
         testRuns["test"].executionTask.configure { useJUnitPlatform() }
     }
     js {
-        browser { testTask { enabled = false } } // the grammar is tested on the JVM and on node; the DOM half in the pages' jsdom harness
+        browser { testTask { useKarma { useChromeHeadless() } } }   // jsTest: the DOM half (Intents); the grammar runs here too, and on node
         nodejs()
     }
     sourceSets {

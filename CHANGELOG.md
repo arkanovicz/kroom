@@ -37,6 +37,7 @@ All notable changes to kroom will be documented in this file.
   validation to refuse. `Intents` applies it to every `data-kroom-<field>` and form value by the intent's declaration
   before the view's check and the POST: `replyTo: "42"` no longer goes on the wire as a string, an emptied `Long?`
   field is null rather than `invalid`. An undeclared key stays a string (the shape refuses it). `Intents(root, events, act)`.
+  Pinned in kroom-client's `IntentsTest` (jsTest, under karma like kroom-common's: the browser test task is on again).
 
 #### kroom-webapp-core
 - `StaticConfig.devDirs: List<File>`, tried in order before the classpath (sources, then a build output that cannot live in
