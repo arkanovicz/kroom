@@ -3,6 +3,7 @@ package com.republicate.kroom.server
 import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.Stage
 import io.ktor.server.application.*
+import io.ktor.server.http.HttpRequestLifecycle
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -41,22 +42,27 @@ fun Route.rooms(build: suspend (id: String) -> Room<*>?, principal: suspend (App
 
 private fun Route.serve(base: String, resolve: suspend (ApplicationCall) -> Room<*>?, principal: suspend (ApplicationCall) -> User?) {
     if (application.pluginOrNull(SSE) == null) application.install(SSE)
-    get("$base/stream") {
-        val user = principal(call)
-        // admitted before the 200: a refusal is a status, not a stream that ends
-        val (room, actor) = call.inRoom(resolve) { it to it.connect(user, call.tabId) } ?: return@get call.noRoom()
-        if (actor == null) return@get call.refuse(user)
-        try {
-            call.response.header(HttpHeaders.CacheControl, "no-store")
-            call.response.header("X-Accel-Buffering", "no")
-            // the body is written after respond returns: the stream's own end is the leave
-            call.respond(SSEServerContent(call) {
-                heartbeat { period = 15.seconds }
-                try { actor.channel?.consumeAsFlow()?.collect { send(it) } }
-                catch (e: ClosedByteChannelException) { logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id) }   // a tab gone: no trace
-                finally { room.leave(actor) }
-            })
-        } catch (e: Throwable) { room.leave(actor); throw e }   // gone before the stream started
+    route("$base/stream") {
+        // a stream closed by the client is cancelled at once (Netty, CIO), not at the next heartbeat; the stream alone:
+        // an app's other calls finish whether or not the client waits
+        install(HttpRequestLifecycle) { cancelCallOnClose = true }
+        get {
+            val user = principal(call)
+            // admitted before the 200: a refusal is a status, not a stream that ends
+            val (room, actor) = call.inRoom(resolve) { it to it.connect(user, call.tabId) } ?: return@get call.noRoom()
+            if (actor == null) return@get call.refuse(user)
+            try {
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                call.response.header("X-Accel-Buffering", "no")
+                // the body is written after respond returns: the stream's own end — a write failed, the call cancelled — is the leave
+                call.respond(SSEServerContent(call) {
+                    heartbeat { period = 15.seconds }
+                    try { actor.channel?.consumeAsFlow()?.collect { send(it) } }
+                    catch (e: ClosedByteChannelException) { logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id) }   // a tab gone: no trace
+                    finally { room.leave(actor) }
+                })
+            } catch (e: Throwable) { room.leave(actor); throw e }   // gone before the stream started
+        }
     }
     post("$base/{name}") {
         val user = principal(call) ?: return@post call.json(HttpStatusCode.Unauthorized, refusal("unauthenticated"))

@@ -8,10 +8,13 @@ import io.ktor.client.plugins.sse.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.*
 
@@ -82,6 +85,31 @@ class RouteTest {
         withTimeout(2000) { while (texts("").size < 3) delay(10) }
         assertEquals(listOf("there"), texts("?after=1&before=3"))
         room.stop()
+    }
+
+    /** Netty alone (the test host has no connection to lose): the socket closed, the room hears the leave now, not at the heartbeat. */
+    @Test fun `a stream the client closes is left at once`() {
+        val room = object : LogicRoom<LogicRoomTest.Counter>("route-${n++}", LogicRoomTest.Counter(), LogicRoomTest.Rule) { override val leaveGrace = 0L }
+        val server = embeddedServer(Netty, port = 0) { routing { route("/api") { room(room, principal) } } }.start(wait = false)
+        try {
+            val port = runBlocking { server.engine.resolvedConnectors().first().port }
+            java.net.Socket("127.0.0.1", port).use { socket ->
+                socket.soTimeout = 3000
+                socket.getOutputStream().run {
+                    write("GET /api/rooms/${room.id}/stream?tabId=t1 HTTP/1.1\r\nHost: localhost\r\nX-User: alice\r\nAccept: text/event-stream\r\n\r\n".toByteArray())
+                    flush()
+                }
+                val reader = socket.getInputStream().bufferedReader()
+                while (reader.readLine() != "event: state") { /* the headers, then the snapshot */ }
+                assertEquals(1, room.userCount.value)
+            }
+            val left = System.nanoTime()
+            runBlocking { withTimeout(5000) { room.userCount.first { it == 0 } } }   // the heartbeat is 15 s away
+            assertTrue((System.nanoTime() - left) < 2_000_000_000L)
+        } finally {
+            server.stop(100, 500)
+            room.stop()
+        }
     }
 
     @Test fun `the history's other query parameters are the store's`() = testApplication {

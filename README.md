@@ -199,8 +199,11 @@ adds the chat's history store.
   first `join` and last `leave`, the leave after `leaveGrace` (1 s) so a reload is no departure. A
   room with a `lostGrace` says more: past `leaveGrace` the user is `LOST` (a `status` frame, the
   snapshot's `users` too, still counted), back before `lostGrace` is a `status` again (no `join`:
-  they never left), `leave` after it — a phone in a tunnel, the same dot for every viewer. Only the
-  room says `LOST`: a client posting it is refused (`invalid`). A joiner is not in its
+  they never left), `leave` after it — a phone in a tunnel, the same dot for every viewer; with
+  `leaveGrace` 0 the room says `LOST` at the drop itself. Only the room says `LOST`: a client posting
+  it is refused (`invalid`). The `leave` carries `seen`, the room's position when the user's last
+  connection dropped — the last frame it may have received, where a store marks the user read up to;
+  the graces' frames, the `leave` itself, come after it. A joiner is not in its
   own snapshot: its `join`, the same frame everyone gets, follows it. The snapshot also carries `me`,
   the viewer's own entry (absent for a spectator).
 - **Tabs.** A tab id is taken from `sessionStorage` at load and put back on `pagehide` (a duplicated
@@ -294,12 +297,18 @@ emits itself, still runs underneath (`Table` is on it); its events register into
 
 ## Heartbeat and Dead Connection Detection
 
-SSE connections can die silently — browser killed, network dropped without TCP FIN. Ktor's SSE
+A stream the client closes (a tab gone, `EventSource.close()`, a proxy's `RST_STREAM`) is noticed at
+once: `room(…)` installs ktor's `HttpRequestLifecycle` (`cancelCallOnClose`) on the stream route alone,
+so the handler is cancelled, the room's `leave` runs and the graces count from the close — on Netty and
+CIO; the other engines only fail at the next write. Nothing else is cancelled: an app's other calls
+finish whether or not the client still waits. Note ktor logs no `CallLogging` line for a cancelled call.
+
+SSE connections can also die silently — browser killed, network dropped without TCP FIN. Ktor's SSE
 heartbeat periodically writes a comment line to the socket; the write fails on a dead connection,
 the handler ends and the room's `leave` runs. `room(…)` sets it on its stream (15 s). A frame written
 to a closed tab ends the stream with one log line; a heartbeat written to one still logs ktor's
 "Unhandled exception" trace (ktor launches its heartbeat writes unguarded). A stream route written by
-hand sets the heartbeat itself:
+hand sets the heartbeat (and the lifecycle plugin) itself:
 
 ```kotlin
 sse("/my/stream") {

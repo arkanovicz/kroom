@@ -13,6 +13,7 @@ All notable changes to kroom will be documented in this file.
   `join`. A client posting `LOST` is refused (`invalid`: only the room says it). A drop's delayed steps are stale once
   another drop follows (drop, reconnect, drop inside a grace: the grace counts from the second — the `leaveGrace` path
   had the race too). The `leave` frame's user reads `LOST` where it read `AWAY` (chifoumi's golden refreshed).
+  `leaveGrace` 0 with a `lostGrace` says `LOST` at the drop itself (it skipped LOST, straight to `leave`).
 
 #### kroom-common, kroom-client — targeted merges
 - A view knows its `owner` (the view it was read from) and its `identity` (`id`, else `seq`, when declared and present);
@@ -442,6 +443,18 @@ All notable changes to kroom will be documented in this file.
   2.x-legitimate, but a block has no business with reflection.
 
 ### Added
+
+#### kroom-common, kroom-server — the leave's `seen`
+- `Leave.seen`: the room's position when the user's last connection dropped — the last frame its client may have
+  received, where a store marks the user read up to (`persist(Leave)`); the graces' frames and the `leave` itself come
+  after it (chifoumi's golden refreshed). On every leave the handler hears, the position at that connection's drop.
+
+#### kroom-server — a closed stream is left at once
+- `room(…)` / `rooms(…)` install ktor's `HttpRequestLifecycle` (`cancelCallOnClose`) on the stream route alone: a
+  stream the client closes is cancelled at once on Netty and CIO (a proxy's `RST_STREAM` included), the room's `leave`
+  runs and the graces count from the close, not from the heartbeat's failed write 15–55 s later. The app's other calls
+  are not cancelled. `Room.leave` waits for the room under `NonCancellable`: a cancelled handler still returns once the
+  room has forgotten its connection. Pinned over a real Netty socket in `RouteTest`.
 
 #### kroom-webapp-images (new)
 - `Images(imgproxy, cache, local)` + `Route.images(images)`: images resized through imgproxy v3 and kept on disk
