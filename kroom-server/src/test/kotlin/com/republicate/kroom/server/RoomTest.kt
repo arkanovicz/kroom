@@ -395,6 +395,54 @@ class RoomTest {
         assertNull(room.getUser("u"))
     }
 
+    @Test fun `no leave grace but a lost grace, LOST at the drop itself, the leave after the lost grace`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 0, lost = 300)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        assertEquals("join", cv.next().event)
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        withTimeout(100) { cv.receive() }.let { assertEquals("status", it.event); assertEquals("LOST", it.json().getString("status")) }
+        assertNotNull(room.getUser("u"))                                // still counted
+        assertNull(cv.tryReceiveAfter(200))                             // within the lost grace: nothing
+        assertEquals("gone", cv.next().event)
+        cv.next().let { assertEquals("leave", it.event); assertEquals(true, it.json().getBoolean("last")) }
+        assertNull(room.getUser("u"))
+    }
+
+    // ---- the leave's `seen`: the position at the drop, whatever the graces frame after it
+
+    @Test fun `the leave says where the user's last connection dropped`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 200, lost = 300)
+        val u = user("u")
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(u, "t1")).state()
+        val dropped = cv.next().also { assertEquals("join", it.event) }.id!!.toLong()   // the last frame u's tab may have received
+        room.leave(room.getActor(Actor.connectionId(u, "t1"))!!)
+        room.broadcast("moved", Json.Object())                          // framed after the drop
+        assertEquals(dropped + 1, cv.next().also { assertEquals("moved", it.event) }.id!!.toLong())
+        cv.lostFrame()
+        assertEquals("gone", cv.next().event)
+        cv.next().let {
+            assertEquals("leave", it.event)
+            assertEquals(dropped, it.json().getLong("seen"))
+            assertTrue(it.id!!.toLong() > dropped + 2)
+        }
+    }
+
+    @Test fun `without graces the leave's seen is the position just before it`() = runBlocking {
+        val room = room()
+        val cv = room.join(actor(user("v"), "t1")).also { it.state() }
+        cv.drain()
+        room.join(actor(user("u"), "t1")).state()
+        val dropped = cv.next().also { assertEquals("join", it.event) }.id!!.toLong()
+        room.leave(room.getActor(Actor.connectionId(user("u"), "t1"))!!)
+        assertEquals("gone", cv.next().event)
+        cv.next().let { assertEquals("leave", it.event); assertEquals(dropped, it.json().getLong("seen")); assertEquals(dropped + 2, it.id!!.toLong()) }
+    }
+
     @Test fun `a drop, a reconnect, a drop inside the leave grace, the grace counts from the second`() = runBlocking {
         val room = TestRoom("room-${n++}", grace = 400)
         val u = user("u")

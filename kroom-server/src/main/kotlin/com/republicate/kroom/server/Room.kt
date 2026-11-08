@@ -311,10 +311,10 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         return answer.await() as T
     }
 
-    /** A connection leaves; returns once the room has forgotten it. */
+    /** A connection leaves; returns once the room has forgotten it, a cancelled caller (a stream the client closed) too. */
     suspend fun leave(actor: Actor) {
         val done = CompletableDeferred<Unit>()
-        if (queue.trySend(Op.Leave(actor, done)).isSuccess) done.await()
+        if (queue.trySend(Op.Leave(actor, done)).isSuccess) withContext(NonCancellable) { done.await() }
     }
 
     private fun closed() = Channel<ServerSentEvent>(0).also { it.close() }
@@ -322,7 +322,10 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     /** Per-connection buffer: the loop never waits on a consumer (see [sendSafe]). */
     protected open val channelCapacity: Int = 64
 
-    /** How long (ms) a user's last connection may be gone before the room says `leave`: a reload, a blip. */
+    /**
+     * How long (ms) a user's last connection may be gone before the room says anything: a reload, a blip. Past it,
+     * `leave`, or LOST first when the room has a [lostGrace]; 0 with a [lostGrace] says LOST at the drop itself.
+     */
     protected open val leaveGrace: Long = 1000
 
     /**
@@ -406,34 +409,38 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         else actors.remove(actor.connectionId)
         val user = actor.user
         val none = user?.removeConnection(id, actor) ?: true
+        val seen = seq.get()   // the last frame this connection may have received; the graces' frames come after
         logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' left room '$id' (last=$none)")
-        if (user != null && none && leaveGrace > 0) {
-            // the user's last connection: a reload or a blip is back within the grace, a departure is not
+        if (user != null && none && (leaveGrace > 0 || lostGrace > 0)) {
+            // the user's last connection: a reload or a blip is back within the graces, a departure is not
             val drop = ++dropCount
             drops[user.userId] = drop
             fun away() = drops[user.userId] == drop && users.containsKey(user.userId) && !user.isConnectedTo(id)
-            scope.launch {
+            fun lose() {
+                actor.status = Presence.LOST
+                status(actor, user)
+                lost += user.userId
+                scope.launch {
+                    delay(lostGrace)
+                    step { if (away() && user.userId in lost) gone(actor, spectator, true, seen) }
+                }
+            }
+            if (leaveGrace == 0L) lose()   // LOST at the drop itself
+            else scope.launch {
                 delay(leaveGrace)
                 step {
                     if (!away()) return@step
-                    if (lostGrace == 0L) { gone(actor, spectator, true); return@step }
-                    actor.status = Presence.LOST
-                    status(actor, user)
-                    lost += user.userId
-                    scope.launch {
-                        delay(lostGrace)
-                        step { if (away() && user.userId in lost) gone(actor, spectator, true) }
-                    }
+                    if (lostGrace == 0L) gone(actor, spectator, true, seen) else lose()
                 }
             }
-        } else gone(actor, spectator, none)
+        } else gone(actor, spectator, none, seen)
     }
 
-    /** The leave itself: the handler hears every connection, the wire hears a user's last. */
-    private fun gone(actor: Actor, spectator: Boolean, last: Boolean) {
+    /** The leave itself: the handler hears every connection, the wire hears a user's last; [seen] the position at the drop. */
+    private fun gone(actor: Actor, spectator: Boolean, last: Boolean, seen: Long) {
         val user = actor.user
         if (last && user != null) { users.remove(user.userId); lost.remove(user.userId); drops.remove(user.userId); _userCount.value = users.size }
-        val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size }
+        val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size; it.seen = seen }
         leave.meta.from = user?.userId
         handle(actor, leave)
         if (last && leave.stage == Stage.APPLIED) { emit(leave); follow(leave) }
