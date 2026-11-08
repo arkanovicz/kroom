@@ -55,6 +55,16 @@ All notable changes to kroom will be documented in this file.
 - `UserPresence.avatar` (an image URL, as of the join: a snapshot's `users` and `me`, a `join`'s `user`), the server's from
   `User.avatar`; a user without one has no key. A picture changed meanwhile shows at the next join or snapshot.
 
+#### kroom-client — the stream follows the page
+- `Room.connect()` returns a `Stream` (`close()`), no longer the bare `EventSource`; `kroom.connect()` unchanged. The
+  stream closes on `pagehide` and opens again on `pageshow`, the same URL and tab id, the snapshot first like any
+  reconnect: a page parked in the back/forward cache kept its `EventSource` open, and the server heard the drop only
+  when the browser discarded the page (60 s in Chrome, arkad 2026-11-08) — the user listed present in a room they had
+  left, the `leave` and what it persists that late. Back within the graces is a `status`, no `leave`, no `join`; a
+  reload's `pagehide` is the close the unload made anyway. Nothing reconnects while parked (a closed `EventSource` has
+  no retry); a `Stream` the page closed stays closed. `report()` unchanged: `AWAY` remains `visibilitychange`'s, a live
+  hidden tab keeps its stream. Pinned in `StreamTest` (karma).
+
 #### kroom-client — the tab reports its presence
 - `Room.report(idleAfter = 120_000)` (js; `kroom.report()` on the facade): posts kroom's `status` through `act` on change
   only — the tab hidden → `AWAY`, no input (mouse, key, touch, scroll) for `idleAfter` ms → `IDLE`, back → `ONLINE` —

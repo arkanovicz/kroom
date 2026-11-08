@@ -2,7 +2,6 @@
 package com.republicate.kroom.client
 
 import com.republicate.kson.Json
-import org.w3c.dom.EventSource
 
 /**
  * What a plain-JS page may call on the attached room: `kroom.connect()`, `kroom.on('state', fn)`,
@@ -12,7 +11,7 @@ import org.w3c.dom.EventSource
 @JsExport
 object kroom {
     private var room: Room<*>? = null
-    private var source: EventSource? = null
+    private var source: Stream? = null
 
     fun attach(r: Any) { room = r as Room<*> }
     val me: String? get() = room?.me?.id
@@ -22,7 +21,7 @@ object kroom {
         r.react { n, e -> if (n == name) fn(JSON.parse((e?.json ?: r.state.json).toString())) }
     }
     fun act(type: String, payload: dynamic = js("({})")) = room?.act(type, Json.parse(JSON.stringify(payload)) as Json.Object)
-    /** Open the stream, closing a previous one: a reconnect is a join. */
+    /** Open the stream, closing a previous one: a reconnect is a join. It follows the page into and out of the back/forward cache. */
     fun connect() { source?.close(); source = room?.connect() }
     /** The tab reports its presence (hidden → AWAY, no input for [idleAfter] ms → IDLE, back → ONLINE); what it returns stops it. */
     fun report(idleAfter: Int = 120_000): () -> Unit = room?.report(idleAfter) ?: {}

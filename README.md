@@ -273,7 +273,7 @@ fun main() {
 - **Presence from the tab**: `room.report(idleAfter)` (`kroom.report()` from plain JS) posts `status` on change —
   hidden → `AWAY`, no input for `idleAfter` ms (2 min) → `IDLE`, back → `ONLINE` — and again after a snapshot when
   not `ONLINE` (a reconnect is a join, started `ONLINE`); a spectator posts nothing, a page going away (`pagehide`)
-  nothing either. It returns what stops it.
+  nothing either — its stream is closed then, opened again on `pageshow` (see Reconnect). It returns what stops it.
 - From code: `room.act(Play(…))` (typed) or `act(type, payload)`; `on(entry) { event -> }` reacts to
   one name, `react { name, event -> }` to every frame (navigation, say). Reactions never emit.
 - A plain-JS page gets the `kroom` facade: `kroom.connect()`, `kroom.act('status', {status})`,
@@ -917,9 +917,14 @@ The `Table` class:
 
 ## Reconnect
 
-`EventSource` reconnects on its own; a page can also close its source and `connect()` again. Either
-way the server sees a join and answers with the snapshot: there is no replay buffer, anything a
-client must not miss belongs in the State, and one stream in order needs no dedupe.
+`EventSource` reconnects on its own; a page can also `close()` the `Stream` that `connect()` returned
+and `connect()` again. Either way the server sees a join and answers with the snapshot: there is no
+replay buffer, anything a client must not miss belongs in the State, and one stream in order needs no
+dedupe. The stream follows the page's life: `pagehide` closes it — a page parked in the back/forward
+cache keeps its `EventSource` open otherwise, and the server only hears the drop when the browser
+discards the page (60 s in Chrome), the user listed present in a room they left —, `pageshow` opens it
+again with the same tab id (back within the graces: a `status`, no `leave`, no `join`). A reload's
+`pagehide` is the close the unload would have made. A `Stream` closed by the page stays closed.
 
 ## Chat history
 

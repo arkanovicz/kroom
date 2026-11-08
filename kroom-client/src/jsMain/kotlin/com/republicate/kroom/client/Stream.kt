@@ -4,6 +4,7 @@ import com.republicate.kroom.event.Event
 import com.republicate.kroom.event.State
 import com.republicate.kson.Json
 import kotlinx.browser.document
+import kotlinx.browser.window
 import org.apache.velocity.engine.dom.JsTree
 import org.w3c.dom.Element
 import org.w3c.dom.EventSource
@@ -16,15 +17,40 @@ fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!
 
 /**
  * The room's stream (`<api>/rooms/<name>/stream`, what kroom-server's `Route.room` mounts): the snapshot first, then
- * every frame in order, each folded and merged. A reconnect is a join: close the source and connect again. `api.js`
- * owns the API's base and the tab id.
+ * every frame in order, each folded and merged. A reconnect is a join: [Stream.close] and connect again. The stream
+ * follows the page's life: `pagehide` closes it (a page in the back/forward cache keeps its `EventSource` open, the
+ * server only sees the drop when the browser discards the page — 60 s in Chrome), `pageshow` opens it again, the
+ * same tab id, the snapshot first like any reconnect (back within the graces: a `status`, no `leave`, no `join`); a
+ * reload's `pagehide` is the close the unload would have made. `api.js` owns the API's base and the tab id.
  */
-fun Room<*>.connect(stream: String = "${api.base}rooms/${encodeURIComponent(name)}/stream"): EventSource {
+fun Room<*>.connect(stream: String = "${api.base}rooms/${encodeURIComponent(name)}/stream"): Stream {
     val tab = api.tabId() as String?
     val url = if (tab == null) stream else stream + (if ('?' in stream) "&" else "?") + "tabId=" + encodeURIComponent(tab)
-    val source = EventSource(url)
-    for (name in store.events.all + "state") source.addEventListener(name, { e: org.w3c.dom.events.Event -> frame(name, e.asDynamic().data as String) })
-    return source
+    return Stream(this, url)
+}
+
+/** The room's stream over an `EventSource`, open until [close]d; parked while the page is away (`pagehide` → `pageshow`). */
+class Stream internal constructor(private val room: Room<*>, val url: String) {
+    private var source: EventSource? = open()
+    private var parked = false
+    private val hide: (org.w3c.dom.events.Event) -> Unit = { source?.let { s -> s.close(); source = null; parked = true } }
+    private val show: (org.w3c.dom.events.Event) -> Unit = { if (parked) { parked = false; source = open() } }
+
+    init {
+        window.addEventListener("pagehide", hide)
+        window.addEventListener("pageshow", show)
+    }
+
+    private fun open(): EventSource = EventSource(url).also { source ->
+        for (name in room.store.events.all + "state") source.addEventListener(name, { e: org.w3c.dom.events.Event -> room.frame(name, e.asDynamic().data as String) })
+    }
+
+    /** Closed for good: no frame after this, nothing reopened on `pageshow`. */
+    fun close() {
+        window.removeEventListener("pagehide", hide)
+        window.removeEventListener("pageshow", show)
+        source?.close(); source = null; parked = false
+    }
 }
 
 /** Post an intent, typed: `room.act(Play(…))`, its name its path. */
