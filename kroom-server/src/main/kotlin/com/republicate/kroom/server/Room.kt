@@ -334,6 +334,12 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
      */
     protected open val lostGrace: Long = 0
 
+    /**
+     * The room's own position, for the `leave`'s `read` (read on the loop at the drop): a numbering of its own that a
+     * store marks a user read up to — a chat's last line. Null when the room has none; the frame position is `seen`.
+     */
+    protected open val read: Long? get() = null
+
     // loop-confined: who is LOST, and each user's last drop (room-wide numbering: a delayed step of an older drop is a no-op)
     private val lost = HashSet<String>()
     private val drops = HashMap<String, Long>()
@@ -410,6 +416,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         val user = actor.user
         val none = user?.removeConnection(id, actor) ?: true
         val seen = seq.get()   // the last frame this connection may have received; the graces' frames come after
+        val read = read        // and the room's own position then, when it has one
         logger.debug("${if (spectator) "Spectator" else "Actor"} '${actor.name}' left room '$id' (last=$none)")
         if (user != null && none && (leaveGrace > 0 || lostGrace > 0)) {
             // the user's last connection: a reload or a blip is back within the graces, a departure is not
@@ -422,7 +429,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
                 lost += user.userId
                 scope.launch {
                     delay(lostGrace)
-                    step { if (away() && user.userId in lost) gone(actor, spectator, true, seen) }
+                    step { if (away() && user.userId in lost) gone(actor, spectator, true, seen, read) }
                 }
             }
             if (leaveGrace == 0L) lose()   // LOST at the drop itself
@@ -430,17 +437,17 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
                 delay(leaveGrace)
                 step {
                     if (!away()) return@step
-                    if (lostGrace == 0L) gone(actor, spectator, true, seen) else lose()
+                    if (lostGrace == 0L) gone(actor, spectator, true, seen, read) else lose()
                 }
             }
-        } else gone(actor, spectator, none, seen)
+        } else gone(actor, spectator, none, seen, read)
     }
 
-    /** The leave itself: the handler hears every connection, the wire hears a user's last; [seen] the position at the drop. */
-    private fun gone(actor: Actor, spectator: Boolean, last: Boolean, seen: Long) {
+    /** The leave itself: the handler hears every connection, the wire hears a user's last; [seen], [read] as of the drop. */
+    private fun gone(actor: Actor, spectator: Boolean, last: Boolean, seen: Long, read: Long?) {
         val user = actor.user
         if (last && user != null) { users.remove(user.userId); lost.remove(user.userId); drops.remove(user.userId); _userCount.value = users.size }
-        val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size; it.seen = seen }
+        val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size; it.seen = seen; it.read = read }
         leave.meta.from = user?.userId
         handle(actor, leave)
         if (last && leave.stage == Stage.APPLIED) { emit(leave); follow(leave) }

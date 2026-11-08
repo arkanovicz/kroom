@@ -37,14 +37,17 @@ class Join(json: Json.MutableObject = Json.MutableObject()) : Event("join", json
 
 /**
  * Born by the room at a user's last connection gone past the graces; the handler also hears the others, with `last`
- * false. `seen` is the room's position when that connection dropped: the last frame its client may have received,
- * where a store marks the user read up to (the frames of the graces, this one included, come after it).
+ * false. Where the user was when that connection dropped, both read on the loop then and kept through the graces:
+ * `seen`, the room's position (the SSE id of the last frame its client may have received; the graces' frames, this one
+ * included, come after it), and `read`, the room's own numbering when it has one — a chat's last line (`state.last`),
+ * what a store marks the user read up to; absent otherwise.
  */
 class Leave(json: Json.MutableObject = Json.MutableObject()) : Event("leave", json = json) {
     var user by obj(::UserPresence).out
     var last by bool().out
     var count by int().out
     var seen by long().out
+    var read by long().out
 }
 
 /** A client reports its presence; the frame carries the user's composed status and the client that changed. */

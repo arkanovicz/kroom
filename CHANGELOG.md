@@ -444,10 +444,14 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
-#### kroom-common, kroom-server — the leave's `seen`
-- `Leave.seen`: the room's position when the user's last connection dropped — the last frame its client may have
-  received, where a store marks the user read up to (`persist(Leave)`); the graces' frames and the `leave` itself come
-  after it (chifoumi's golden refreshed). On every leave the handler hears, the position at that connection's drop.
+#### kroom-common, kroom-server — the leave's `seen` and `read`
+- `Leave.seen`: the room's position when the user's last connection dropped — the SSE id of the last frame its client
+  may have received; the graces' frames and the `leave` itself come after it (chifoumi's golden refreshed). On every
+  leave the handler hears, the position at that connection's drop.
+- `Leave.read`: the room's own numbering then, when it has one — `Room.read` (`protected open val`, null by default),
+  a `ChatRoom`'s `state.last`: the last line said as of the drop, what a store marks the user read up to
+  (`persist(Leave)`). The frame counter restarts with the room; a chat's lines continue the store's — a consumer
+  marking lines wants `read`, not `seen`.
 
 #### kroom-server — a closed stream is left at once
 - `room(…)` / `rooms(…)` install ktor's `HttpRequestLifecycle` (`cancelCallOnClose`) on the stream route alone: a

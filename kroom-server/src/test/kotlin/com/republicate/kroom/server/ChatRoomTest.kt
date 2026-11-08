@@ -7,6 +7,7 @@ import com.republicate.kroom.event.ChatLogic
 import com.republicate.kroom.event.ChatState
 import com.republicate.kroom.event.Logic
 import com.republicate.kroom.event.Stage
+import com.republicate.kroom.event.Status
 import com.republicate.kson.Json
 import io.ktor.sse.*
 import kotlinx.coroutines.channels.Channel
@@ -38,6 +39,29 @@ class ChatRoomTest {
     private suspend fun ChatHistory<*>.settled(seq: Long) = withTimeout(2000) { while (tail(1).lastOrNull()?.seq != seq) kotlinx.coroutines.yield() }
 
     @BeforeTest fun clean() = Users.clear()
+
+    /** The store's numbering is far ahead of the room's frame counter: the leave says where the user was in each. */
+    @Test fun `the leave's read is the line position at the drop, its seen the frame position`() = runBlocking {
+        val store = MemoryChatHistory<Line>()
+        store.append(Line(Json.MutableObject("seq" to 56730L, "text" to "old")))
+        val room = object : ChatRoom<Line, ChatState<Line>>("chat-${n++}", store, ChatState(line = ::Line), LineLogic()) { override val leaveGrace = 0L }
+        val u = actor(user("u")); val v = actor(user("v"))
+        val uc = room.join(u); uc.next()
+        val vc = room.join(v); vc.next(); vc.until("join")
+        room.act(v, Status(Json.MutableObject("status" to "AWAY"))).await()          // frames that are no lines
+        room.act(u, Line(Json.MutableObject("text" to "hi"))).await()
+        val chat = vc.until("chat")                                                   // the last frame before u's drop
+        assertEquals(56731L, (Json.parse(chat.data!!) as Json.Object).getLong("seq"))
+        val dropped = chat.id!!.toLong()
+        room.leave(u)
+        vc.until("leave").let {
+            val leave = Json.parse(it.data!!) as Json.Object
+            assertEquals(56731L, leave.getLong("read"))                                 // the store's numbering
+            assertEquals(dropped, leave.getLong("seen"))                                // the room's
+            assertTrue(dropped < 100)
+        }
+        room.stop()
+    }
 
     @Test fun `a message is numbered, emitted, then kept`() = runBlocking {
         val store = MemoryChatHistory<Chat>()

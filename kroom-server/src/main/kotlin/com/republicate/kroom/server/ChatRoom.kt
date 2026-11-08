@@ -39,6 +39,9 @@ open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history:
         return copy(chat as Chat)
     }
 
+    // the leave's `read`: the last line numbered when the user's connection dropped
+    override val read: Long? get() = state.last
+
     // the room's copy already: lines as the State's class, the rest as they are
     override suspend fun persist(event: Event) = if (event is Chat) history.append(state.line(event.json)) else history.persist(event)
 

@@ -201,9 +201,10 @@ adds the chat's history store.
   snapshot's `users` too, still counted), back before `lostGrace` is a `status` again (no `join`:
   they never left), `leave` after it — a phone in a tunnel, the same dot for every viewer; with
   `leaveGrace` 0 the room says `LOST` at the drop itself. Only the room says `LOST`: a client posting
-  it is refused (`invalid`). The `leave` carries `seen`, the room's position when the user's last
-  connection dropped — the last frame it may have received, where a store marks the user read up to;
-  the graces' frames, the `leave` itself, come after it. A joiner is not in its
+  it is refused (`invalid`). The `leave` says where the user was when its last connection dropped:
+  `seen`, the room's position (the SSE id of the last frame it may have received; the graces' frames,
+  the `leave` itself, come after it), and `read`, the room's own numbering when it has one — a chat's
+  last line, what a store marks the user read up to (`Room.read`, null by default). A joiner is not in its
   own snapshot: its `join`, the same frame everyone gets, follows it. The snapshot also carries `me`,
   the viewer's own entry (absent for a spectator).
 - **Tabs.** A tab id is taken from `sessionStorage` at load and put back on `pagehide` (a duplicated
