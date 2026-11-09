@@ -818,7 +818,8 @@ is what `installContentSite { requestLanguage = { it.language } }` answers (kroo
 application's), the default filling what a language lacks.
 
 **Authored pages.** A page need not be a template: an editor makes one, a record (`path`, `layout`,
-`draft`|`published`), and kroom renders it through one template, `kroom/page.html`, each region a block in the
+`draft`|`published`), and kroom renders it through one template, `kroom/page.html` (`installContentSite { pageTemplate = … }`
+names an application's own — one that picks its blocks per language, say), each region a block in the
 content store right where a template's would be (`pages/company/history/content.md`), edited in place like any
 other, previewed within its page. Authored pages answer after the templates, in the not-found phase: a
 developer's page wins, an editor cannot take `/login`. Deleting the record leaves its blocks in the store.

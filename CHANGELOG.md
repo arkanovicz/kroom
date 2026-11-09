@@ -454,6 +454,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-authoring — the authored page's template
+- `installContentSite { pageTemplate = … }` names the template an authored page is rendered through (`$authored`,
+  `$kroomPage`), `kroom/page.html` by default; `Site.pageTemplate` reads it. The door for an application that wants
+  its regions otherwise — a block per language with a fallback, say — without a core that knows about languages.
+
 #### kroom-webapp-authoring-git — the content store as a git repository
 - `GitResourceStore(root, committer, domain)`: a `FileResourceStore` that is `Versioned` through a git repository
   under the content root (its own `.git`, hidden from `list` and refused as a path). Every write is a commit by the

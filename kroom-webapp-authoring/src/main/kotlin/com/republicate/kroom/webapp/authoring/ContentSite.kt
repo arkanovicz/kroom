@@ -34,7 +34,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     if (config.sessions) installSessions { config.sessionSecret?.let { sessionSecret = it } }
 
     // plugins only register: what they bring is wired below, each piece where the engines need it
-    val site = Site(this, config.storage, config.roles, config.siteApiPrefix, config.pagePrefix, config.pageExtension)
+    val site = Site(this, config.storage, config.roles, config.siteApiPrefix, config.pagePrefix, config.pageExtension, config.pageTemplate)
     putSite(site)
     site.words.putAll(config.strings)
     site.declaredSettings += config.settings
@@ -167,6 +167,12 @@ class ContentSiteConfig {
 
     /** The template decorating each block; kroom's own ships in this module. */
     var wrapper: String = "kroom/block_wrapper.html"
+
+    /**
+     * The template rendering an authored page (`$authored`, the page's blocks under `$kroomPage`); kroom's own
+     * ships in this module. An application's names its regions otherwise — per language, say.
+     */
+    var pageTemplate: String = "kroom/page.html"
 
     /**
      * Page-context tools every block may use, by name. A block sees nothing else of the page but what the

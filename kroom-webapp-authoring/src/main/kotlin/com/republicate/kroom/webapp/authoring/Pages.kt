@@ -150,7 +150,7 @@ internal class AuthoredPages(private val site: Site) {
     fun resolve(call: ApplicationCall, url: String): Pair<String, Map<String, Any?>>? {
         val path = url.substringBefore('?').trimEnd('/').ifEmpty { "/" }
         val page = get(path)?.takeIf { visible(it, call) } ?: return null
-        return "kroom/page.html" to mapOf(
+        return site.pageTemplate to mapOf(
             MARKDOWN_PAGE to page.template,
             "authored" to AuthoredPageView(page, site, call)
         )

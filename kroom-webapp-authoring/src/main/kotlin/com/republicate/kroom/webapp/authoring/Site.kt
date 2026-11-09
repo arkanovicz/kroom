@@ -36,7 +36,9 @@ class Site internal constructor(
     /** Where the admin API mounts; under `/api/`, where api.js roots its calls. */
     val apiPrefix: String,
     val pagePrefix: String,
-    val pageExtension: String
+    val pageExtension: String,
+    /** The template an authored page is rendered through — `ContentSiteConfig.pageTemplate`. */
+    val pageTemplate: String = "kroom/page.html"
 ) {
     private val registered = LinkedHashMap<String, Plugin>()
     val plugins: Collection<Plugin> get() = registered.values

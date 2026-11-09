@@ -21,10 +21,11 @@ class PagesTest {
 
     private val storage = MemoryStorage()
 
-    private fun ApplicationTestBuilder.site() = application {
+    private fun ApplicationTestBuilder.site(pageTemplate: String? = null) = application {
         installContentSite {
             storage = this@PagesTest.storage
             sessionSecret = "test-secret"
+            pageTemplate?.let { this.pageTemplate = it }
             identity = IdentityProvider { mapOf("admin" to setOf(Roles.ADMIN), "ed" to setOf(Roles.EDITOR), "ed2" to setOf(Roles.EDITOR), "au" to setOf(Roles.AUTHOR))[it.id].orEmpty() }
             loginPage = "pages/login.html"
         }
@@ -221,5 +222,18 @@ class PagesTest {
         } finally {
             root.toFile().deleteRecursively()
         }
+    }
+
+    @Test
+    fun `an application renders authored pages through a template of its own`() = testApplication {
+        site(pageTemplate = "inc/custom_page.html")
+        val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/team","label":{"en":"Team"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        storage.content.write("pages/company/team/content-fr.md", "Bonjour l'équipe.", mapOf("author" to "ed"))
+        val page = editor.get("/company/team").bodyAsText()
+        assertContains(page, "<title>Team</title>")
+        assertContains(page, """<main class="custom">""")
+        assertContains(page, "Bonjour l'équipe.")
+        assertContains(page, """data-content="pages/company/team/content-fr.md"""", message = "the block the application named, edited in place like any other")
     }
 }
