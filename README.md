@@ -20,6 +20,7 @@ kroom-webapp-push     Web Push notifications
 kroom-webapp-images   resized images through imgproxy, cached on disk, local and remote sources
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
+kroom-webapp-authoring-git  the content store as a git repository: every write a commit, history and journal (kroom-webapp-authoring/git/)
 kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms
 kroom-webapp-authoring-demo  the authoring stack as a thing you can click (kroom-webapp-authoring/demo/)
 ```
@@ -572,7 +573,9 @@ An error answers `{message, code, args}`: `message` in English, `code` (`lockHel
 `broken`, …) and `args` for a client that says it its own way — see *The editor's words* below.
 
 **History and the journal exist only when the store is `Versioned`** — a plain `FileResourceStore` keeps no
-past, and both routes answer 404. There is no `revert` route either: restoring an old body writes it as a
+past, and both routes answer 404; `GitResourceStore(root)` (module `kroom-webapp-authoring-git`, JGit) keeps it as
+a git repository under the content root: a commit per write, deletion or move, authored by the block's author,
+a block's past following it across a move. There is no `revert` route either: restoring an old body writes it as a
 new revision through the ordinary submit, which keeps the journal honest.
 
 ### The page side

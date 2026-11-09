@@ -9,6 +9,8 @@ bouncycastle = "1.86"
 essential-kson = "2.18"
 angus-mail = "2.0.5"
 greenmail = "2.1.15"
+# 7.x needs Java 17; kept out of authoring, in its own module
+jgit = "7.8.0.202609011348-r"
 # last 0.64.x; JVM-only by design — server-side rendering, not part of kroom's KMP surface
 flexmark = "0.64.8"
 kotlin-logging = "8.0.4"
@@ -28,6 +30,7 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 essential-kson = { module = "com.republicate.kson:essential-kson", version.ref = "essential-kson" }
 angus-mail = { module = "org.eclipse.angus:angus-mail", version.ref = "angus-mail" }
 greenmail = { module = "com.icegreen:greenmail", version.ref = "greenmail" }
+jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 # core + the GFM set; no flexmark-all, and no subscript ext (it fights strikethrough over `~`)
 flexmark = { module = "com.vladsch.flexmark:flexmark", version.ref = "flexmark" }
 flexmark-ext-autolink = { module = "com.vladsch.flexmark:flexmark-ext-autolink", version.ref = "flexmark" }

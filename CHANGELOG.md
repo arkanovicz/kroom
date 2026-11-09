@@ -454,6 +454,16 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-authoring-git — the content store as a git repository
+- `GitResourceStore(root, committer, domain)`: a `FileResourceStore` that is `Versioned` through a git repository
+  under the content root (its own `.git`, hidden from `list` and refused as a path). Every write is a commit by the
+  block's author (`meta["author"]`, else the last one, else the committer), a deletion and a move too; the same
+  body again is none; content found under the root at creation is the first commit. `log(path)` follows renames,
+  each revision under the name it bore, so a moved block keeps its past and an old revision answers under the new
+  path; `log()` is the journal, newest first, with the path each commit touched. A git failure after the file is
+  written is a warning, never a lost edit. Moved up from site2026, where it was app-side. Pinned in
+  `GitResourceStoreTest`. JGit stays in this module: authoring itself gains no dependency.
+
 #### kroom-common, kroom-server — the leave's `seen` and `read`
 - `Leave.seen`: the room's position when the user's last connection dropped — the SSE id of the last frame its client
   may have received; the graces' frames and the `leave` itself come after it (chifoumi's golden refreshed). On every

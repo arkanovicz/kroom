@@ -10,9 +10,8 @@ import kotlin.io.path.relativeTo
 import kotlin.io.path.writeText
 
 /**
- * A content tree on disk, under [root]. No history of its own: the history routes stay unmounted unless an
- * application subclasses it into something [Versioned] — the git-backed store site2026 needs lives there,
- * app-side, with JGit and the commit policy it wants.
+ * A content tree on disk, under [root]. No history of its own: the history routes stay unmounted unless the
+ * store is [Versioned] — `GitResourceStore` (kroom-webapp-authoring-git) subclasses this one into a git repository.
  *
  * Handed to the `%` engine as `markdown.loader`: the application holds the very object the editor writes
  * through.

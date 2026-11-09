@@ -33,6 +33,9 @@ for (plugin in listOf("webmaster", "forms")) {
     project(":kroom-plugin-$plugin").projectDir = file("kroom-webapp-authoring/plugins/$plugin")
 }
 
+// The git-backed content store: every write a commit, the editor's history a git log (JGit stays out of authoring)
+include("kroom-webapp-authoring-git")
+project(":kroom-webapp-authoring-git").projectDir = file("kroom-webapp-authoring/git")
 // The authoring demo, a thing you can click
 include("kroom-webapp-authoring-demo")
 project(":kroom-webapp-authoring-demo").projectDir = file("kroom-webapp-authoring/demo")
