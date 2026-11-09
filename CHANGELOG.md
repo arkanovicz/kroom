@@ -454,6 +454,21 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-plugin-gallery — photo galleries
+- `Gallery(images?, strings)`: a gallery is a record of this plugin (`galleries`: its pictures in order, a caption per
+  language), shown wherever a block or page calls `$gallery.show("<id>")` — a grid of square thumbnails, each figure
+  a link to its slide, that `gallery.js` opens as a slideshow (scroll-snap scroller, swipe, ←/→ wrapping, autoplay,
+  dots or a counter, captions, zoom and download of the original, `#<id>-<n>` deep links with Back closing) — and,
+  for whoever holds `gallery.edit` (editors and authors), edited in place: upload or drop pictures (the media API),
+  drag to reorder (SortableJS), caption per language, remove; every change is one `PUT /api/gallery/{id}` of the
+  whole list, the reply the gallery as stored with its URLs, which the grid is rebuilt from. `POST /api/gallery`
+  makes one, `GET /api/gallery/{id}` reads it, `DELETE` removes it; `GET /api/gallery` is the admin bar's table.
+  A page born with the `gallery` layout is seeded with `$gallery.show("<new id>")`. Renditions come from a
+  `kroom-webapp-images` `Images` the application hands over (fill 300 for the grid, fit 900 for the show, the
+  original to zoom and download; its route mounted by the plugin, on a path of its own — `/img` is the static
+  files'), the originals otherwise. Pictures only; videos later. Pinned in `GalleryTest`; the browser side in
+  `plugins/gallery/src/test/js/smoke.mjs` (jsdom in docker). In the demo.
+
 #### kroom-webapp-authoring — a seed per layout, the `gallery` layout, the upload ceiling
 - `Site.seed(layout) { page -> body }`: what the content block of a page born with that layout starts as — a
   plugin's call (`$gallery.show("k7f3a")`), signed by the page's author; a root page's table of contents stays the

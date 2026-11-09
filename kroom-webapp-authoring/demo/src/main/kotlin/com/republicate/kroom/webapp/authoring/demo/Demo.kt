@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.authoring.demo
 
 import com.republicate.kroom.plugins.forms.Forms
+import com.republicate.kroom.plugins.gallery.Gallery
 import com.republicate.kroom.plugins.webmaster.Webmaster
 import com.republicate.kroom.webapp.authoring.AuthoredPage
 import com.republicate.kroom.webapp.authoring.BasicTheme
@@ -42,7 +43,7 @@ fun Application.demo(storage: Storage = MemoryStorage()) {
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet for **\$name**.*"
         // the dummy theme beside the basic one: the themes panel has something to switch
-        plugins += listOf(Webmaster(), Forms(), BasicTheme(), DummyTheme())
+        plugins += listOf(Webmaster(), Forms(), Gallery(), BasicTheme(), DummyTheme())
         blockTools += "stack"
     }
     velocity.registerApplication("stack") { STACK }

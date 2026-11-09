@@ -21,7 +21,7 @@ kroom-webapp-images   resized images through imgproxy, cached on disk, local and
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
 kroom-webapp-authoring-git  the content store as a git repository: every write a commit, history and journal (kroom-webapp-authoring/git/)
-kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms
+kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, gallery
 kroom-webapp-authoring-demo  the authoring stack as a thing you can click (kroom-webapp-authoring/demo/)
 ```
 
@@ -744,7 +744,13 @@ A layout owes its plugins two calls, `$site.head()` at the end of `<head>` and `
 (the site as seen from outside: whether it wants indexing — robots.txt, a robots meta, `$page.noindex()` for
 one page —, sitemap.xml over `site.pages()`, and every page walked on a schedule, every link and picture tried,
 the broken ones listed with their page), **forms** (`$forms.contact()` in any block, a honeypot, messages as
-records for `forms.read`, daily retention). Mail is the site's, not a plugin's: `site.mailer` is SMTP over the
+records for `forms.read`, daily retention), **gallery** (photo galleries: a record of pictures in order with a
+caption per language, shown wherever a block calls `$gallery.show("k7f3a")` as a grid of squares that opens a
+slideshow — swipe, keys, autoplay, deep links `#<id>-<n>`, zoom and download of the original — and edited in
+place by `gallery.edit` holders: upload or drop, drag to reorder, caption, remove, every change one `PUT
+/api/gallery/{id}` of the whole list; a page born with the `gallery` layout is seeded with a gallery of its own;
+renditions through `kroom-webapp-images` when the application hands a `Gallery(Images(local = File("data/media"),
+path = "/pictures", …))`, the originals otherwise). Mail is the site's, not a plugin's: `site.mailer` is SMTP over the
 site's *Mail* settings once a host is set (the same `Mailer` kroom-webapp-auth sends its codes through), or the
 transport the application set; forms mails each message to its `notify` address through it.
 
@@ -968,6 +974,7 @@ local files and remote sources alike, so a viewer only ever hits your server:
 
 ```kotlin
 val images = Images(imgproxy = "http://app-img:8080", cache = File("data/cache/img"), local = File("data/img"))
+// beside kroom-webapp-core's static files, give it a `path` of its own: `/img` is theirs (static/img/)
 routing { images(images) }                                   // GET /img/{path...}?size=
 images.url("avatars/u1.png", 64)                             // /img/avatars/u1.png?size=64
 images.url("https://cdn.discordapp.com/avatars/…/….png", 64)  // /img/~/<signature>/<source>?size=64

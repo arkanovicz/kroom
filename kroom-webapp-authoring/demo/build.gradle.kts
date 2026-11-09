@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":kroom-markdown"))                          // the blocks
     implementation(project(":kroom-plugin-webmaster"))
     implementation(project(":kroom-plugin-forms"))
+    implementation(project(":kroom-plugin-gallery"))
     implementation(testFixtures(project(":kroom-webapp-authoring")))   // the dummy theme, beside the basic one
     implementation(libs.ktor.server.netty)
     runtimeOnly(libs.velocity.engine.scripting)                         // pages and blocks are interpreted here

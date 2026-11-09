@@ -1,0 +1,284 @@
+/* gallery.css - kroom-plugin-gallery: the grid, the slideshow, the editor */
+
+/* --- the grid: squares, cropped to fill --- */
+
+.kroom-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+@media (max-width: 48rem) {
+  .kroom-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+.kroom-gallery > figure {
+  position: relative;
+  margin: 0;
+}
+
+.kroom-gallery > figure > a {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--pico-border-radius);
+}
+
+.kroom-gallery > figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kroom-gallery > figure > figcaption {
+  padding: 0.25rem 0;
+  font-size: 0.875em;
+  color: var(--pico-muted-color);
+  text-align: center;
+}
+
+.kroom-gallery > figure > figcaption:empty {
+  display: none;
+}
+
+/* --- the slideshow --- */
+
+/* the page behind the modal keeps its own scrollbar, which scrolls what you cannot see */
+body.kroom-showing {
+  overflow: hidden;
+}
+
+.kroom-gallery-show {
+  width: 95vw;
+  max-width: 95vw;
+  max-height: 95vh;
+  padding: 0;
+  border: none;
+  background: black;
+  color: white;
+}
+
+.kroom-gallery-slides {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* a flick must not fly through the gallery, nor reach the browser's back gesture */
+  overscroll-behavior-x: contain;
+  /* the arrows and the dots are the navigation */
+  scrollbar-width: none;
+}
+
+.kroom-gallery-slides::-webkit-scrollbar {
+  display: none;
+}
+
+.kroom-gallery-slide {
+  flex: 0 0 100%;
+  margin: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.kroom-gallery-slide img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+.kroom-gallery-slide figcaption {
+  padding: 1rem;
+  text-align: center;
+}
+
+.kroom-gallery-slide figcaption:empty {
+  display: none;
+}
+
+/* controls live inside the dialog: the top layer makes anything outside it inert */
+.kroom-gallery-show :is(.kroom-gallery-close, .kroom-gallery-prev, .kroom-gallery-next,
+    .kroom-gallery-play, .kroom-gallery-zoom, .kroom-gallery-download) {
+  position: fixed;
+  z-index: 1;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.25rem;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kroom-gallery-show :is(.kroom-gallery-close, .kroom-gallery-prev, .kroom-gallery-next,
+    .kroom-gallery-play, .kroom-gallery-zoom, .kroom-gallery-download):hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.kroom-gallery-close { top: 1rem; right: 1rem; }
+.kroom-gallery-zoom { top: 1rem; right: 4rem; }
+.kroom-gallery-download { top: 1rem; right: 7rem; }
+.kroom-gallery-prev { top: 50%; left: 1rem; transform: translateY(-50%); }
+.kroom-gallery-next { top: 50%; right: 1rem; transform: translateY(-50%); }
+.kroom-gallery-play { bottom: 1rem; right: 1rem; }
+.kroom-gallery-show .kroom-gallery-prev,
+.kroom-gallery-show .kroom-gallery-next { font-size: 2rem; }
+
+.kroom-gallery-dots,
+.kroom-gallery-counter {
+  position: fixed;
+  z-index: 1;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.kroom-gallery-dots {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.kroom-gallery-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+
+.kroom-gallery-dot.active {
+  background: white;
+}
+
+.kroom-gallery-counter {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 1rem;
+  padding: 0.25rem 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* the original, at its own size, scrollable */
+.kroom-gallery-zoomed {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  overflow: auto;
+  display: flex;
+  background: black;
+  cursor: zoom-out;
+}
+
+.kroom-gallery-zoomed[hidden] {
+  display: none;
+}
+
+.kroom-gallery-zoomed img {
+  margin: auto;
+  max-width: none;
+}
+
+/* --- the editor --- */
+
+.kroom-gallery-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+}
+
+.kroom-gallery-tools button {
+  margin: 0;
+  width: auto;
+}
+
+.kroom-gallery-drop {
+  color: var(--pico-muted-color);
+}
+
+.kroom-gallery-status {
+  flex-basis: 100%;
+  font-size: 0.875em;
+  color: var(--pico-del-color);
+}
+
+.kroom-gallery-status:empty {
+  display: none;
+}
+
+/* an empty gallery still takes a drop */
+.kroom-gallery[data-edit] {
+  min-height: 8rem;
+  border: 2px dashed transparent;
+  border-radius: var(--pico-border-radius);
+}
+
+.kroom-gallery.kroom-gallery-over {
+  border-color: var(--pico-primary);
+  background: var(--pico-primary-focus);
+}
+
+.kroom-gallery[data-edit] > figure {
+  cursor: grab;
+}
+
+.kroom-gallery[data-edit] > figure > figcaption {
+  display: block;
+  min-height: 1.75em;
+  cursor: text;
+}
+
+.kroom-gallery[data-edit] > figure > figcaption:empty::before {
+  content: attr(data-placeholder);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.kroom-gallery[data-edit] > figure > figcaption input {
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  height: auto;
+  font-size: inherit;
+}
+
+.kroom-gallery-remove {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.kroom-gallery > figure:hover .kroom-gallery-remove,
+.kroom-gallery-remove:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .kroom-gallery-remove { opacity: 1; }
+}
