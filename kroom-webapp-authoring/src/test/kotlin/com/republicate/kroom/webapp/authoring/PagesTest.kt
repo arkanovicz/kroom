@@ -21,11 +21,12 @@ class PagesTest {
 
     private val storage = MemoryStorage()
 
-    private fun ApplicationTestBuilder.site(pageTemplate: String? = null) = application {
+    private fun ApplicationTestBuilder.site(pageTemplate: String? = null, vararg plugins: Plugin) = application {
         installContentSite {
             storage = this@PagesTest.storage
             sessionSecret = "test-secret"
             pageTemplate?.let { this.pageTemplate = it }
+            this.plugins += plugins
             identity = IdentityProvider { mapOf("admin" to setOf(Roles.ADMIN), "ed" to setOf(Roles.EDITOR), "ed2" to setOf(Roles.EDITOR), "au" to setOf(Roles.AUTHOR))[it.id].orEmpty() }
             loginPage = "pages/login.html"
         }
@@ -235,5 +236,23 @@ class PagesTest {
         assertContains(page, """<main class="custom">""")
         assertContains(page, "Bonjour l'équipe.")
         assertContains(page, """data-content="pages/company/team/content-fr.md"""", message = "the block the application named, edited in place like any other")
+    }
+
+    @Test
+    fun `a page born with a layout a plugin seeds starts as the plugin's call, a root page as its contents`() = testApplication {
+        val seeder = object : Plugin {
+            override val id = "seeder"
+            override fun install(site: Site) { site.seed("gallery") { page -> "\$gallery.show(\"${page.path.trim('/')}\")" } }
+        }
+        site(null, seeder)
+        val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/photos","layout":"gallery"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertEquals("\$gallery.show(\"photos\")", storage.content.read("pages/photos/content.md")!!.body, "the layout's seed wins over a root page's contents")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/photos/plage","layout":"gallery"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertEquals("\$gallery.show(\"photos/plage\")", storage.content.read("pages/photos/plage/content.md")!!.body)
+        assertEquals("ed", storage.content.read("pages/photos/plage/content.md")!!.author, "the page's author signs the seed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/team"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertEquals(AuthoredPage.TOC, storage.content.read("pages/team/content.md")!!.body)
+        assertNull(storage.content.read("pages/photos/plage/east.md"))
     }
 }

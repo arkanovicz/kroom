@@ -729,6 +729,7 @@ optional `group`, under which the admin form gathers it.
 | `head { }`, `foot { }` | fragments at `$site.head()` / `$site.foot()` | `wp_head`, `wp_footer` |
 | `admin(AdminEntry)` | an entry of the admin bar: a link, `{columns, rows}` tables, or an application framed | `add_menu_page` |
 | `onPublish { block, author -> }` | after each submit, off the request | `save_post` |
+| `seed(layout) { page -> }` | what a page born with that layout starts as: the plugin's call in its content block | a post template |
 | `every(period) { }` | scheduled jobs, from start to stop | WP-Cron |
 | `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
 
@@ -771,7 +772,7 @@ $page.description("Un club de go à Marseille")
 ```
 
 The regions are `$header`, `$top`, `$content`, `$east`, `$west`, `$footer`; the layouts `default`, `article`,
-`sidebar`, `landing`. `#layout()` takes the site's `layout` setting. `$header`, `$west` and `$footer` have a
+`sidebar`, `landing`, `gallery` (a page that is a gallery: a plugin seeds its call). `#layout()` takes the site's `layout` setting. `$header`, `$west` and `$footer` have a
 site-wide default a page overrides by defining them: the brand, the menu and the way in; the section the
 visitor is in, its pages listed; the site's `footer` line. Under the header, a breadcrumb (`$nav.trail`: the
 site, the section, the page) shows on any page inside a section — a region partial like the others.

@@ -69,6 +69,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         identity = config.identity
         roles = config.roles
         media = config.storage.media
+        mediaMaxSize = config.mediaMaxSize
         placeholder = config.placeholder
         language = config.language
         published = site::published
@@ -182,6 +183,9 @@ class ContentSiteConfig {
 
     /** What a page shows where a block has not been written yet (`%` markdown, `$name` in scope). */
     var placeholder: String? = null
+
+    /** The largest file the media API takes, in bytes (10 MB): photos for a gallery want more. */
+    var mediaMaxSize: Long = 10L * 1024 * 1024
 
     /** The language the editor and the admin bar speak — see [AuthoringConfig.language]. */
     var language: String = "auto"

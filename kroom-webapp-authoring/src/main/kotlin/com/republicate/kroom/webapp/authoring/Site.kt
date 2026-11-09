@@ -68,6 +68,7 @@ class Site internal constructor(
     internal val interceptors = ArrayList<suspend (ApplicationCall) -> Unit>()
     internal val notFoundHandlers = ArrayList<suspend (ApplicationCall) -> Unit>()
     internal val publishListeners = ArrayList<suspend (Block, UserSession) -> Unit>()
+    internal val seeds = LinkedHashMap<String, Owned<(AuthoredPage) -> String>>()
     internal val jobs = ArrayList<Pair<Duration, suspend () -> Unit>>()
     private val heads = ArrayList<(ApplicationCall) -> String?>()
     private val foots = ArrayList<(ApplicationCall) -> String?>()
@@ -322,6 +323,13 @@ class Site internal constructor(
     fun admin(entry: AdminEntry) { entries += Owned(installing, entry) }
 
     /** Called after each block an author submits — off the request: a slow listener delays nobody. */
+    /**
+     * What the content block of a page born with [layout] starts as, when nothing was written there yet — a
+     * plugin's call (`$gallery.show("k7f3a")`, the gallery made for the page), as a root page starts as its table
+     * of contents. One seed per layout; the page's author signs the block.
+     */
+    fun seed(layout: String, body: (AuthoredPage) -> String) { seeds[layout] = Owned(installing, body) }
+
     fun onPublish(listener: suspend (Block, UserSession) -> Unit) {
         val owner = installing
         publishListeners += { block, author -> if (enabled(owner)) listener(block, author) }

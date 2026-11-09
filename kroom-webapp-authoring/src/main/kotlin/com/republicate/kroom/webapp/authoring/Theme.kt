@@ -15,7 +15,8 @@ package com.republicate.kroom.webapp.authoring
  *
  * The regions: `$header` and `$footer` (the site's own when the page defines none), `$top` (under the header),
  * `$content`, `$east`, `$west` (the site's own — the section's pages — when the page defines none). The
- * layouts: `default`, `article`, `sidebar`, `landing`; `#layout()` takes the site's `layout` setting.
+ * layouts: `default`, `article`, `sidebar`, `landing`, `gallery` (a page that is a gallery, the plugin's call seeded in
+ * its content); `#layout()` takes the site's `layout` setting.
  *
  * Two kinds of theme. A **[Skin]** names its stylesheets (and scripts) and renders kroom's own skeleton,
  * `kroom/skeleton.html`, every layout of the contract in one file, each region through a partial the skin may
@@ -48,7 +49,7 @@ interface Skin : Theme {
 }
 
 /** The layouts kroom's skeleton renders — the contract's vocabulary. */
-val SKELETON_LAYOUTS: Set<String> = setOf("default", "article", "sidebar", "landing")
+val SKELETON_LAYOUTS: Set<String> = setOf("default", "article", "sidebar", "landing", "gallery")
 
 /** `$theme` in a layout: the active theme, and its settings by key (`$theme.scheme`). */
 class ThemeView internal constructor(private val theme: Theme, private val values: Settings) {

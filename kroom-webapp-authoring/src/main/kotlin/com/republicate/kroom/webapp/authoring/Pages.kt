@@ -90,14 +90,18 @@ internal class AuthoredPages(private val site: Site) {
     fun put(page: AuthoredPage) = records.put(id(page.path), page.toJson())
 
     /**
-     * A root page is born with its content: the loop listing the pages under it, an ordinary block [author]
-     * may rewrite or trash — a section's page is a table of contents until it says otherwise. A page made
-     * again where a deleted one left its blocks keeps them.
+     * A page is born with its content when its layout has a seed ([Site.seed], a plugin's call) or it is a root
+     * page: the loop listing the pages under it — an ordinary block [author] may rewrite or trash, a section's
+     * page is a table of contents until it says otherwise. A page made again where a deleted one left its
+     * blocks keeps them.
      */
     fun seed(page: AuthoredPage, author: String) {
-        if (page.path.count { it == '/' } != 1) return
         val block = "pages${page.path}/content.md"
-        if (site.storage.content.read(block) == null) site.storage.content.write(block, AuthoredPage.TOC, mapOf("author" to author))
+        if (site.storage.content.read(block) != null) return
+        val body = site.seeds[page.layout]?.takeIf { site.enabled(it.owner) }?.value?.invoke(page)
+            ?: AuthoredPage.TOC.takeIf { page.path.count { it == '/' } == 1 }
+            ?: return
+        site.storage.content.write(block, body, mapOf("author" to author))
     }
 
     fun delete(path: String): Boolean = records.delete(id(path))

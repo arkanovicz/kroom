@@ -10,7 +10,7 @@ class DummyTheme : Theme {
     override val id = "dummy"
     override val name = "Dummy"
     override val description = "Every layout, plainly — for testing themes end to end"
-    override val layouts = setOf("default", "article", "sidebar", "landing")
+    override val layouts = setOf("default", "article", "sidebar", "landing", "gallery")
     override val settings = listOf(
         Setting.text("accent", "Accent colour", default = "#b45309", help = "Any CSS colour")
     )

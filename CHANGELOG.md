@@ -454,6 +454,13 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-authoring — a seed per layout, the `gallery` layout, the upload ceiling
+- `Site.seed(layout) { page -> body }`: what the content block of a page born with that layout starts as — a
+  plugin's call (`$gallery.show("k7f3a")`), signed by the page's author; a root page's table of contents stays the
+  default when no plugin seeds its layout. Pinned in `PagesTest`.
+- `gallery` joins the skeleton's layouts (`SKELETON_LAYOUTS`, the dummy theme): a page that is a gallery.
+- `installContentSite { mediaMaxSize = … }` surfaces `AuthoringConfig.mediaMaxSize` (10 MB by default).
+
 #### kroom-webapp-authoring — the authored page's template
 - `installContentSite { pageTemplate = … }` names the template an authored page is rendered through (`$authored`,
   `$kroomPage`), `kroom/page.html` by default; `Site.pageTemplate` reads it. The door for an application that wants
