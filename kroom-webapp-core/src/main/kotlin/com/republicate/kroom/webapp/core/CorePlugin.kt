@@ -36,11 +36,9 @@ fun Application.installCore(block: CoreConfig.() -> Unit = {}) {
 
     install(StatusPages) {
         exception<Throwable> { call, cause ->
+            // the message is the operator's: it can carry paths, template names, values
             call.application.log.error("Unhandled exception", cause)
-            call.respondText(
-                text = cause.message ?: "Internal Server Error",
-                status = HttpStatusCode.InternalServerError
-            )
+            call.respondText("Internal Server Error", status = HttpStatusCode.InternalServerError)
         }
         // only a 404 nobody explained: one that carries a body (an API's JSON error) says why itself
         status(HttpStatusCode.NotFound) { _ ->
