@@ -434,7 +434,8 @@ All notable changes to kroom will be documented in this file.
   on the page closes it. Its last button is the eye: pressed, the page as visitors see it; released (struck
   through, remembered per tab), every block outlined, the empty regions with them. The site's first group of
   settings is *General* (was *Site*, the panel's own name); a settings form's groups fold, the first one open.
-  The plugins panel lists the themes first, their names aligned with the switched plugins'.
+  A theme's settings are on the themes panel, under the theme, worn or not (the preview shows them); the plugins
+  panel lists plugins only (`GET /api/site/themes` carries `settings`, `/plugins` no theme).
 - webmaster: every link a page carries is checked, the other sites' too — the `external` setting is gone (a
   link is a promise whoever it points to).
 - The admin bar is trimmed to what one acts on: site, pages, plugins, themes, roles, the eye. The journal's and

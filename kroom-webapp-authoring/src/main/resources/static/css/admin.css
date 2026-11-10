@@ -174,14 +174,9 @@ body:has(> .kroom-admin) {
 }
 
 .kroom-admin-plugin summary input[role="switch"] {
-    width: 2.25rem;     /* pico's 2.25em, but pico sizes inputs at 1rem and the summary isn't: rem keeps the offset below exact */
+    width: 2.25rem;
     margin: 0 .5rem 0 0;
     vertical-align: middle;
-}
-
-/* a theme has no switch here: its name lines up with the others' */
-.kroom-admin-plugin-theme > summary {
-    padding-left: 2.75rem;  /* the switch's width plus its margin */
 }
 
 /* off: still there to configure, said quietly */

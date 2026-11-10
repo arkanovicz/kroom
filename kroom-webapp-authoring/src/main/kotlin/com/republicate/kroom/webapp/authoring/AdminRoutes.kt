@@ -150,13 +150,13 @@ fun Route.siteRoutes() {
         get("/plugins") {
             admin(site) ?: return@get
             respondJson(Json.MutableArray().apply {
-                site.plugins.forEach { plugin ->
+                // a theme is chosen and set on the themes panel
+                site.plugins.filter { it !is Theme }.forEach { plugin ->
                     push(Json.MutableObject().apply {
                         set("id", plugin.id)
                         set("name", plugin.name)
                         set("description", plugin.description)
                         set("enabled", site.enabled(plugin))
-                        if (plugin is Theme) set("theme", true)       // switched on the themes panel, not here
                         set("settings", settingsJson(plugin.settings, site.settings(plugin)))
                         site.tables(plugin).takeIf { it.isNotEmpty() }?.let { tables ->
                             set("tables", Json.MutableArray().apply {
@@ -200,6 +200,8 @@ fun Route.siteRoutes() {
                         set("description", theme.description)
                         set("layouts", Json.MutableArray().apply { theme.layouts.sorted().forEach { push(it) } })
                         set("active", theme == active)
+                        // set before it is worn: the preview shows them (written like any plugin's, `plugins/{id}/settings`)
+                        set("settings", settingsJson(theme.settings, site.settings(theme)))
                     })
                 }
             })

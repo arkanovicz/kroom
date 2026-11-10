@@ -47,7 +47,7 @@
         confirmDeletePage: 'Delete this page? Its blocks stay in the store.',
         confirmDisable: 'Switch {name} off? It holds {holds} — the blocks calling it will say they cannot be displayed.',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
-        unknownAuthor: 'unknown', noPlugin: 'no plugin installed', enabled: 'enabled', disabled: 'disabled', save: 'save', saved: 'saved',
+        unknownAuthor: 'unknown', noPlugin: 'no plugin installed', enabled: 'enabled', disabled: 'disabled', settings: 'settings', save: 'save', saved: 'saved',
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
         yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
     }, fr: {
@@ -80,7 +80,7 @@
         confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.',
         confirmDisable: 'D\u00e9sactiver {name}\u00a0? Elle contient {holds} \u2014 les blocs qui l\u2019appellent diront qu\u2019ils ne peuvent pas \u00eatre affich\u00e9s.',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
-        unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', enabled: 'activée', disabled: 'désactivée', save: 'enregistrer', saved: 'enregistré',
+        unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', enabled: 'activée', disabled: 'désactivée', settings: 'réglages', save: 'enregistrer', saved: 'enregistré',
         secretSet: 'défini — laisser vide pour le garder', secretUnset: 'non défini',
         yourRoles: 'vos rôles : {roles}', empty: 'rien pour l’instant', error: 'Erreur : {message}'
     } };
@@ -436,18 +436,15 @@
         async plugins(body) {
             const plugins = await api.getJson(siteApi + 'plugins');
             if (!plugins.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noPlugin')));
-            // themes first, then the rest, each in the order given
-            const sorted = [...plugins.filter(p => p.theme), ...plugins.filter(p => !p.theme)];
             const fold = memory.get('fold');
-            for (const plugin of sorted) {
+            for (const plugin of plugins) {
                 const name = own(`${plugin.id}.name`, plugin.name);
                 const details = body.appendChild(element('details', 'kroom-admin-plugin'));
-                details.classList.toggle('kroom-admin-plugin-theme', !!plugin.theme);
                 details.classList.toggle('kroom-admin-off', !plugin.enabled);
                 const summary = details.appendChild(element('summary'));
-                // a theme is switched on the themes panel; any other plugin here, live — clicking the switch
-                // activates the switch, not the summary. Done, the page reloads: what it shows depends on it
-                if (!plugin.theme) {
+                // switched here, live — clicking the switch activates the switch, not the summary. Done, the
+                // page reloads: what it shows depends on it
+                {
                     const toggle = summary.appendChild(element('input'));
                     toggle.type = 'checkbox';
                     toggle.setAttribute('role', 'switch');
@@ -490,6 +487,7 @@
 
         async themes(body) {
             const themes = await api.getJson(siteApi + 'themes');
+            const fold = memory.get('fold');
             const list = body.appendChild(element('ul', 'kroom-admin-list'));
             for (const theme of themes) {
                 const item = list.appendChild(element('li'));
@@ -515,6 +513,14 @@
                             actions.appendChild(element('small', 'kroom-admin-error', said(err)));
                         }
                     });
+                }
+                // its settings, whether worn or not: the preview shows a theme as it is set
+                if (theme.settings?.length) {
+                    const details = item.appendChild(element('details', 'kroom-admin-group'));
+                    const summary = details.appendChild(element('summary', null, t('settings')));
+                    details.appendChild(settingsForm(theme, siteApi + `plugins/${encodeURIComponent(theme.id)}/settings`));
+                    remember(details, summary, theme.id);
+                    details.open = fold === theme.id || !!fold?.startsWith(theme.id + '.');
                 }
             }
         },

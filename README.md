@@ -873,8 +873,9 @@ blocks and nothing else. An application computing its own menu sets `navigation 
 
 `$site.foot()` emits, for whoever may open at least one of its entries (*pages* asks `pages.edit`, the others
 `site.admin`), a bar on the left of the page — the site's own settings (below), pages (the tree, see *Pages and
-the menu*), plugins (themes first; each with its settings form, a secret never read back, and its tables),
-themes (when more than one is installed), roles, then the plugins' entries that stand alone — a link, an
+the menu*), plugins (each with its switch, its settings form, a secret never read back, and its tables),
+themes (each with its preview and its settings, set whether worn or not; the entry shows when there is a choice
+or something to set), roles, then the plugins' entries that stand alone — a link, an
 application framed; tables alone show under their plugin, in the plugins panel — and the eye: pressed, the page as
 visitors see it, released, every block outlined. A panel action that changes what the page shows reloads it, and
 the bar reopens where it was. Switching off a plugin that `holds(site)` something ("3 galleries, 41 pictures")

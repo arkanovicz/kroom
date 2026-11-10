@@ -97,6 +97,9 @@ class ThemeTest {
 
         val admin = visitor("admin")
         assertContains(admin.get("/api/site/themes").bodyAsText(), """"id":"basic","name":"Basic"""")
+        // a theme's settings travel with the theme, not with the plugins
+        assertContains(admin.get("/api/site/themes").bodyAsText(), """"settings":[{"key":"scheme"""")
+        assertFalse(admin.get("/api/site/plugins").bodyAsText().contains(""""id":"basic""""))
         admin.put("/api/site/theme") { contentType(ContentType.Application.Json); setBody("""{"id":"plain"}""") }
             .let { assertEquals(HttpStatusCode.OK, it.status) }
         assertContains(client.get("/about").bodyAsText(), "<title>plain: About</title>")

@@ -362,7 +362,7 @@ class Site internal constructor(
      */
     internal fun adminEntries(session: UserSession?): List<AdminEntry> =
         if (session == null) emptyList()
-        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries.filter { enabled(it.owner) && it.value.standsAlone }.map { it.value })
+        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 || themes.any { theme -> theme.settings.isNotEmpty() } } + entries.filter { enabled(it.owner) && it.value.standsAlone }.map { it.value })
             .filter { can(session, it.permission) }
 
     /** The tables [plugin] declared in entries that do not stand alone: the plugins panel shows them under it. */
