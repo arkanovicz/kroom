@@ -88,7 +88,11 @@ class GalleryTest {
         assertEquals("The harbour", first.getString("caption"))
         assertEquals(null, (view.getArray("items")!![1] as Json.Object).getObject("captions")!!.getString("xx"), "a language the site does not speak is dropped")
 
+        // words right under the call: markdown's html block ends with the call, they are a paragraph of their own
+        storage.content.write("pages/photos/plage/content.md", "Summer\n\$gallery.show(\"$id\")\nSee **you** there", mapOf("author" to "editor"))
         val page = visitor().get("/photos/plage").bodyAsText()
+        assertContains(page, "<p>Summer</p>")
+        assertContains(page, "<p>See <strong>you</strong> there</p>", message = "the line after the gallery is markdown, not the tail of its html block")
         assertContains(page, """<figure data-media="$port" data-captions="{&quot;en&quot;:&quot;The harbour&quot;}"><a href="/media/$port" data-full="/media/$port"><img src="/media/$port" alt="The harbour" loading="lazy"></a><figcaption>The harbour</figcaption></figure>""")
         assertFalse(page.contains("data-edit"), "a visitor sees the grid, not the tools")
         val editing = editor.get("/photos/plage").bodyAsText()
