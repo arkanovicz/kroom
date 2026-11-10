@@ -67,7 +67,6 @@ internal fun Webmaster.installLinkCheck(site: Site) {
 /** One walk: answers the broken links found, page to link, and keeps them as the list the admin bar shows. */
 suspend fun Webmaster.checkLinks(site: Site): List<Pair<String, String>> {
     val base = site.baseUrl.takeIf { it.isNotEmpty() } ?: return emptyList()
-    val external = site.settings(this)["external"] == "true"
     val tried = HashMap<String, Int>()
     val broken = ArrayList<Triple<String, String, Int>>()
     val pages = site.urls()
@@ -75,7 +74,6 @@ suspend fun Webmaster.checkLinks(site: Site): List<Pair<String, String>> {
         val answer = http(base + page)
         if (answer.status !in 200..399) { broken += Triple(page, page, answer.status); continue }
         for (link in links(answer.html.orEmpty(), base + page)) {
-            if (!external && !link.startsWith(base)) continue
             if (tried.size >= MAX_LINKS && link !in tried) break
             val status = tried.getOrPut(link) { http(link).status }
             if (status !in 200..399) broken += Triple(page, link.removePrefix(base), status)

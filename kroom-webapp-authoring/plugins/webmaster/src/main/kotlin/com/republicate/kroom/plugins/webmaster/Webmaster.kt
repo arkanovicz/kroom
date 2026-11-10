@@ -34,7 +34,6 @@ class Webmaster(internal val http: suspend (String) -> Answer = ::fetch) : Plugi
     override val settings = listOf(
         Setting.boolean("indexed", "Indexed by search engines", default = true, group = SEARCH),
         Setting.textarea("exclude", "Left out of the sitemap", default = "/login", help = "One route per line", group = SEARCH),
-        Setting.boolean("external", "Check other sites' links too", default = true, group = LINKS),
         Setting.number("periodHours", "Every (hours)", default = 24, group = LINKS)
     )
 
