@@ -32,8 +32,16 @@ All notable changes to kroom will be documented in this file.
   for it, a block element being an html block of its own), and it is put back once the rest is sanitized. So
   `$gallery.show(…)` and `$forms.contact(…)` no longer shape their html for markdown (one line, no blank line, a
   closing newline). A tool that answers html as a plain string is sanitized like anything else: answer a `SafeText`.
-- A value a reference inserts that is no `SafeText` is sanitized like the author's own text (its html shows,
-  less what would run). Pinned in `SanitizerTest`, and through a page in `PagesTest`.
+- A value a reference inserts is data, shown as typed: a club named `<b>Lyon</b> *Go*` shows those characters,
+  in a heading, a table cell (its `|` is no border), a code span, an attribute, a link's text. A word only the
+  render can name stands for it in the markdown, and the value is written where the word landed once the block
+  is html — a text, an attribute's value — before the allowlist, so an address a value makes is judged like any
+  other. A value no longer carries markdown or html: a snippet to reuse is a `%define`, not a `%set` string.
+  Read into a string (`$tool.find("n$count")`, `%set($x = "$a b")`, a test), a reference is the value itself:
+  the block is merged into a sink the engine knows, and only what is written to it is set aside.
+- A body standing in for a block nobody wrote (`#@markdown("top") … #end`) is the page's own text, written
+  where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
+- Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
 #### velocity 3.0.0-BETA-20261110-01
 - Bumped. Strict mode and the invalid-reference handler as in 2.x, with `event_handler.invalid_references.missing`

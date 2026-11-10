@@ -17,7 +17,10 @@ import org.jsoup.safety.Safelist
 internal object Sanitizer {
 
     fun clean(html: String, slots: Slots): String {
-        val clean = cleaner.clean(Jsoup.parseBodyFragment(html, BASE))
+        val dirty = Jsoup.parseBodyFragment(html, BASE)
+        // before the allowlist: an address a value makes is judged with the others
+        slots.write(dirty.body())
+        val clean = cleaner.clean(dirty)
         for (element in clean.body().select("[${Slots.ATTRIBUTE}], [class], [id], input")) tidy(element, slots)
         clean.outputSettings().prettyPrint(false)
         return clean.body().html()

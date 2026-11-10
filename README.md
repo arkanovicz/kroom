@@ -524,8 +524,12 @@ markdown, whoever typed it and wherever it came from.
 An address is `http(s):`, `mailto:`, `tel:` or relative; the `kroom-` classes and ids are the house's. What
 needs more — an embed, a form — is a tool's business: a tool that answers a `SafeText`
 (`org.apache.velocity.engine.SafeText`) has its markup set aside while the block is merged and put back as
-written once the rest is safe, block element or inline. Anything else a reference inserts is sanitized like
-the author's own text.
+written once the rest is safe, block element or inline.
+
+Anything else a reference inserts is data, shown as typed, wherever it lands: a club named `<b>Lyon</b> *Go*`
+shows those characters in a heading, a table cell, a link's text, an attribute. Markdown and html are the
+block's own text, never a value's — a snippet to reuse is a `%define`, not a `%set` string. An address a value
+makes (`[site]($club.site)`) is judged like any other.
 
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.

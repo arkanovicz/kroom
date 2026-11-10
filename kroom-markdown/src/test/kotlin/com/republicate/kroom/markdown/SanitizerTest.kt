@@ -16,7 +16,11 @@ class SanitizerTest {
     class Widget {
         fun box() = SafeText(BOX)
         fun badge() = SafeText(BADGE)
-        val label = "<img src=x onerror=alert(1)> <em>typed</em>"
+        val label = "<img src=x onerror=alert(1)> *typed* | [x](y)"
+        val address = "javascript:alert(1)"
+        val site = "https://example.org/a?b=1&c=\"2\""
+        val count = 3
+        fun echo(text: String) = "($text)"
     }
 
     private val renderer = MarkdownRenderer()
@@ -87,10 +91,34 @@ class SanitizerTest {
     }
 
     @Test
-    fun `a value that is no SafeText is sanitized like the author's own text`() {
-        val html = render("- \$w.label")
-        assertContains(html, """<img src="x"> <em>typed</em>""")
-        assertInert(html, "the label")
+    fun `a value is shown as typed, wherever it lands - text, a table, code, an attribute, an address`() {
+        val typed = "&lt;img src=x onerror=alert(1)&gt; *typed* | [x](y)"
+        val html = render("""
+            # ${'$'}w.label
+
+            | name | n |
+            |------|---|
+            | ${'$'}w.label | **${'$'}w.count** |
+
+            `${'$'}w.label` <span title="${'$'}w.label" class="${'$'}w.label">x</span>
+
+            [site](${'$'}w.site) [gone](${'$'}w.address) <a href="${'$'}w.address">gone too</a> [${'$'}w.label](/club/${'$'}w.count)
+        """.trimIndent())
+        assertContains(html, "<h1>$typed</h1>")
+        assertContains(html, "<td>$typed</td>", message = "its bar is no cell's border")
+        assertContains(html, "<td><strong>3</strong></td>", message = "the block's own markdown still applies around it")
+        assertContains(html, "<code>$typed</code>")
+        assertContains(html, """<span title="$typed" class="$typed">x</span>""", message = "in an attribute, a value that cannot leave it")
+        assertContains(html, """<a href="https://example.org/a?b=1&amp;c=&quot;2&quot;">site</a>""")
+        assertContains(html, "<a>gone</a>", message = "an address a value makes is judged like any other")
+        assertContains(html, "<a>gone too</a>")
+        assertContains(html, """<a href="/club/3">$typed</a>""")
+        assertInert(html, "the values")
+    }
+
+    @Test
+    fun `a value handed on is the value - to a tool, to a string, to a test`() {
+        assertEquals("<p>(n3) 3 items yes</p>\n", render("\$w.echo(\"n\$w.count\") %set(\$x = \"\$w.count items\")\$x %if(\"\$w.count\" == \"3\")yes%end"))
     }
 
     @Test

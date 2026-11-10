@@ -236,6 +236,9 @@ class PagesTest {
         assertContains(page, """<main class="custom">""")
         assertContains(page, "Bonjour l'équipe.")
         assertContains(page, """data-content="pages/company/team/content-fr.md"""", message = "the block the application named, edited in place like any other")
+        assertContains(page, "<em>Nothing beside Team yet.</em>", message = "a body stands in for a block nobody wrote")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/lab","label":{"en":"R&D <b>"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertContains(editor.get("/company/lab").bodyAsText(), "<em>Nothing beside R&amp;D &lt;b&gt; yet.</em>", message = "it is the page's text: what it inserts is escaped where it lands")
     }
 
     @Test

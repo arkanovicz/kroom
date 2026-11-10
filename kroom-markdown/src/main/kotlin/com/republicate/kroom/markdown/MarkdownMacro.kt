@@ -1,5 +1,6 @@
 package com.republicate.kroom.markdown
 
+import org.apache.velocity.engine.BodyContent
 import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.Merge
 import org.apache.velocity.engine.SafeText
@@ -45,27 +46,30 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
         val block = VelocityContext(arguments)
         // a draft in the context stands in for what the store holds: the editor's preview IS the page render
         val draft = (context[DRAFTS] as? Map<*, *>)?.get(path)?.toString()
-        val html = if (draft != null) {
+        // a block's html is markup, sanitized; a body standing in for it is the page's own text, written where
+        // it lands — what it inserts is escaped there
+        val html: Any = if (draft != null) {
             // the author's own text: every problem is theirs to see, including in branches this render skips
             val problems = validate(draft, arguments.keys, path)
             if (problems.isNotEmpty()) throw BlockException(path, problems)
-            renderer.renderSource(draft, block, path)
+            SafeText(renderer.renderSource(draft, block, path))
         } else if (bodyContent != null && !renderer.exists(path)) {
             // #@markdown(name) … #end: the body stands in for a block nobody wrote — a site default an author
             // may override by writing the block (and trash to get the default back)
-            StringBuilder().also(bodyContent).toString()
-        } else try {
+            BodyContent(bodyContent)
+        } else SafeText(try {
             renderer.render(path, block)
         } catch (e: Exception) {
             // a stored block is already published: a visitor gets the page, the operator gets the log
             log.error("#markdown(): $path failed to render", e)
             renderer.renderSource(config.broken, VelocityContext(mutableMapOf("name" to blockName(path))), "broken")
-        }
+        })
 
         val wrapper = config.wrapper
         val interpret = scope.interpret
-        if (wrapper == null || interpret == null) out.append(html)
-        else interpret(wrapper, decoration(context, path, html), out, scope)
+        if (wrapper != null && interpret != null) interpret(wrapper, decoration(context, path, html), out, scope)
+        else if (html is BodyContent) html.renderInto(out)
+        else out.append(html as SafeText)
     }
 
     /**
@@ -91,10 +95,10 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
      * reach) with the block's `$path`, `$name` and `$html` added: which blocks may be edited is the
      * wrapper's question to ask, and the application's to answer. Nothing here knows about editing.
      */
-    private fun decoration(page: Context, path: String, html: String) = VelocityContext(parent = page).apply {
+    private fun decoration(page: Context, path: String, html: Any) = VelocityContext(parent = page).apply {
         this["path"] = path
         this["name"] = blockName(path)
-        this["html"] = SafeText(html)
+        this["html"] = html
     }
 
     companion object {
