@@ -1,7 +1,5 @@
 package com.republicate.kroom.plugins.forms
 
-import com.republicate.kroom.webapp.authoring.AdminEntry
-import com.republicate.kroom.webapp.authoring.AdminTable
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Roles
 import com.republicate.kroom.webapp.authoring.Setting
@@ -25,7 +23,7 @@ import kotlin.time.Duration.Companion.days
 /**
  * A contact form an author drops into any block — `$forms.contact()`, or `$forms.contact("membership")` to
  * sort the messages — the way a WordPress shortcode is typed into a post. Visitors post it anonymously; the
- * messages are records of this plugin, listed in the admin bar for whoever holds `forms.read` (editors, by
+ * messages are records of this plugin, read at `/api/forms/messages` by whoever holds `forms.read` (editors, by
  * default), and forgotten after the retention the admin sets.
  *
  * Spam is met with a honeypot: a field people never see and robots fill, answered as a success and dropped.
@@ -75,7 +73,6 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
     override fun install(site: Site) {
         site.grant(Roles.EDITOR, READ)
         site.tool("forms", Tool(site), blocks = true)
-        site.admin(AdminEntry("forms", "Messages", icon = "M4 6h16v12H4zM4 7l8 6 8-6", tables = listOf(AdminTable("messages", "Messages", "/api/forms/messages")), permission = READ))
         site.every(1.days) { purge(site, System.currentTimeMillis()) }
 
         // sent with fetch, the form stays on its page and says thanks; without scripts, the post comes back to it
