@@ -658,5 +658,5 @@
     }
 
     // reopen where the bar was left, now that the panels exist
-    nav.querySelector(`button[data-entry="${CSS.escape(memory.get('panel') || '')}"]`)?.click();
+    [...nav.querySelectorAll('button[data-entry]')].find(button => button.dataset.entry === memory.get('panel'))?.click();
 })();
