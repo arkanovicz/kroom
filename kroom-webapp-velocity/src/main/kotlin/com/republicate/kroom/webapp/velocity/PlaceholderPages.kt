@@ -56,8 +56,9 @@ fun Application.resolvePage(
         .firstOrNull { velocity.engine.resourceExists(it) }?.let { return it to emptyMap() }
     if (segments.isEmpty()) return null
     for (template in catalog(velocity, prefix, extension)) {
+        // the folder form is an `index` template's alone: `/topics` is no `topics/_topic_.html` with `index` for a topic
         val values = PathTemplate(template).match(concrete)
-            ?: PathTemplate(template).match("${prefix.trimEnd('/')}/$path/index.${extension.trimStart('.')}")
+            ?: if (template.endsWith("/index$suffix")) PathTemplate(template).match("$root/$path/index$suffix") else null
         if (values != null) return template to values
     }
     return null

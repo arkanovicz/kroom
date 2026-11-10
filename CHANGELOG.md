@@ -863,6 +863,17 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-assets, kroom-webapp-authoring — a snapshot's scripts were the browser's for an hour
+- `KroomAssets.VERSION` (and `AuthoringAssets.VERSION`, `$site.version`) of a `-SNAPSHOT` build also says when the
+  run started: its files change from one run to the next under one version, and `?v=…-SNAPSHOT` with
+  `max-age=3600` kept a browser on the script of the run before. A released version is unchanged. No longer `const`.
+
+#### kroom-webapp-velocity — the folder of a placeholder page
+- `resolvePage("/topics")` answered `pages/topics/_topic_.html` with `index` for a topic, while the route serves a
+  404 there: the folder form is an `index` template's alone. On an authoring site the pages panel offered to
+  create that section's page and the server refused it ("a page already answers /topics"). Pinned in
+  `PlaceholderPagesTest` and `PagesTest`.
+
 #### kroom-server — a room that stops
 - A stopping `ChatRoom` lost the lines still queued for its store: the writer ran on the room's scope. It now runs on
   its own, and the stopping room closes its channel: the pending lines are written, then it ends.

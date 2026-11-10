@@ -16,7 +16,7 @@ import com.republicate.kson.Json
 class AuthoringAssets(private val language: String = "auto") {
 
     companion object {
-        const val VERSION = KroomAssets.VERSION
+        val VERSION: String get() = KroomAssets.VERSION
     }
 
     fun styleTags(prefix: String = "") =

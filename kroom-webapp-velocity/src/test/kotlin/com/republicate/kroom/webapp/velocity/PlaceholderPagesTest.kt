@@ -50,6 +50,7 @@ class PlaceholderPagesTest {
             assertEquals("pages/shop/_id_/index.html" to mapOf("id" to "7"), resolvePage("/shop/7"))
             assertEquals("pages/city/lyon.html" to emptyMap(), resolvePage("/city/lyon"))
             assertEquals(null, resolvePage("/city/paris/extra"))
+            assertEquals(null, resolvePage("/city"), "the folder of a placeholder is no instance of it: it answers 404, as served")
             // as served: the root is the index, a folder its own
             assertEquals("pages/index.html" to emptyMap(), resolvePage("/"))
             assertEquals("pages/docs/index.html" to emptyMap(), resolvePage("/docs"))

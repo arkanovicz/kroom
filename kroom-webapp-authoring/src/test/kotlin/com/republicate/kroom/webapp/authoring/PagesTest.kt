@@ -72,6 +72,9 @@ class PagesTest {
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history"}""").let { assertEquals(HttpStatusCode.Conflict, it.status) }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/about"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "a template's page is not for the taking") }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club/anything"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "nor a place a placeholder template would answer") }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club"}""").let { assertEquals(HttpStatusCode.OK, it.status, "the section its instances sit under has no page: it may be given one — ${it.bodyAsText()}") }
+        assertEquals(HttpStatusCode.OK, editor.get("/club").status)
+        assertContains(editor.get("/club/13Ma").bodyAsText(), "<h1>13Ma</h1>", message = "and its instances answer as before")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"bad path"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status) }
         assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/company/history").status)
         assertEquals(HttpStatusCode.NotFound, visitor().get("/company/history").status)

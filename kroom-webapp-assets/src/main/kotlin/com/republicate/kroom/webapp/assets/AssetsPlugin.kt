@@ -80,8 +80,11 @@ private suspend fun serveAsset(path: String, call: ApplicationCall) {
  * Version info for cache busting
  */
 object KroomAssets {
-    /** Version is generated from project.version at build time */
-    const val VERSION = KROOM_VERSION
+    /**
+     * The build's version (generated from `project.version`). A snapshot's files change from one run to the next
+     * under one version: it also says when this run started, or a browser keeps yesterday's script for its hour.
+     */
+    val VERSION: String = if (KROOM_VERSION.endsWith("-SNAPSHOT")) "$KROOM_VERSION-${System.currentTimeMillis().toString(36)}" else KROOM_VERSION
 
     /** Script tag for domhelper.js */
     fun domhelperScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/domhelper.js?v=$VERSION"></script>"""
