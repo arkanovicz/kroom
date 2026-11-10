@@ -513,6 +513,13 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-authoring — a miss is a page of the site
+- A content site answers a page nobody answered with a page of its own: after the plugins' `notFound` handlers, a
+  browser's GET or HEAD for a page (`Accept: text/html`, outside `/api/`, no asset extension) gets
+  `kroom/not_found.html` in the active theme's layout, status 404, `noindex`, the path asked escaped as `$missing`.
+  `ContentSiteConfig.notFoundTemplate` names another (a site's own words; null: the plain 404). A page that fails
+  to render is logged and leaves the plain 404. An API's or an asset's miss stays plain. Pinned in `NotFoundPageTest`.
+
 #### kroom-plugin-gallery — photo galleries
 - `Gallery(images?, strings)`: a gallery is a record of this plugin (`galleries`: its pictures in order, a caption per
   language), shown wherever a block or page calls `$gallery.show("<id>")` — a grid of square thumbnails, each figure

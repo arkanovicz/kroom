@@ -1,0 +1,6 @@
+## What a page request nobody answered gets, in the site's clothes: $missing is the path asked.
+#set($title = "Not found")
+$page.title("Not found")$page.noindex()
+#define($content)<h1>Not found</h1>
+<p>There is no page at <code>$missing</code>. <a href="/">Back home</a>.</p>#end
+#layout()

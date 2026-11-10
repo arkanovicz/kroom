@@ -822,6 +822,10 @@ live under `static/{css,js,img,fonts}/<id>/`, private partials under `themes/<id
 hold a `DummyTheme` — every layout of the vocabulary, plainly and unmistakably — for testing a theme's path
 end to end; the demo installs it beside the basic one.
 
+A miss is a page of the site too: what no route, no page and no plugin's `notFound` answered gets
+`kroom/not_found.html` in the active theme, with a 404 — `notFoundTemplate` names the site's own, and an
+API's or an asset's miss keeps the plain answer.
+
 ### A value is data
 
 `installVelocity` switches velocity's dynamic escaping on: in a web page (`.html`, or a template whose header

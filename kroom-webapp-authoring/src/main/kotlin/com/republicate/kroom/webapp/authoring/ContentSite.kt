@@ -10,8 +10,15 @@ import com.republicate.kroom.webapp.velocity.resolvePage
 import com.republicate.kroom.webapp.velocity.velocity
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.PipelinePhase
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.decodeURLPart
+import io.ktor.server.request.accept
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.path
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import java.io.File
 import kotlin.time.Duration
@@ -97,15 +104,25 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         }
     }
     // a phase of our own, ahead of Fallback, where the engine answers 404 before any later interceptor looks
-    if (site.notFoundHandlers.isNotEmpty()) {
-        val notFound = PipelinePhase("KroomNotFound")
-        insertPhaseBefore(ApplicationCallPipeline.Fallback, notFound)
-        intercept(notFound) {
-            for (handler in site.notFoundHandlers) {
-                if (call.isHandled) return@intercept
-                handler(call)
-            }
+    val notFound = PipelinePhase("KroomNotFound")
+    insertPhaseBefore(ApplicationCallPipeline.Fallback, notFound)
+    intercept(notFound) {
+        for (handler in site.notFoundHandlers) {
+            if (call.isHandled) return@intercept
+            handler(call)
         }
+        // what no handler answered: a browser asking for a page gets one of the site's, anything else the plain 404
+        val template = config.notFoundTemplate
+        if (call.isHandled || template == null || !call.wantsPage(config.pageExtension)) return@intercept
+        val path = call.request.path().let { runCatching { it.decodeURLPart() }.getOrDefault(it) }
+        val html = try {
+            call.application.velocity.renderForCall(call, template, mapOf("missing" to path))
+        } catch (e: Exception) {
+            // a broken theme must not turn every miss into a 500
+            call.application.log.error("not-found page $template failed for $path", e)
+            return@intercept
+        }
+        call.respondText(html, ContentType.Text.Html, HttpStatusCode.NotFound)
     }
     site.startJobs()
     if (config.warmUp) warmUp()
@@ -127,6 +144,18 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         placeholderPages(config.pagePrefix, config.pageExtension)
         pages(config.pagePrefix, config.pageExtension)
     }
+}
+
+/**
+ * Whether a browser asked for a page: a GET or HEAD accepting HTML, outside `/api/` (where api.js roots its calls),
+ * its last segment extension-less or a page's — an asset's miss stays plain.
+ */
+private fun ApplicationCall.wantsPage(pageExtension: String): Boolean {
+    val path = request.path()
+    val extension = path.substringAfterLast('/').substringAfterLast('.', "")
+    return (request.httpMethod == HttpMethod.Get || request.httpMethod == HttpMethod.Head) &&
+        request.accept()?.contains("text/html") == true &&
+        !path.startsWith("/api/") && (extension.isEmpty() || extension == pageExtension)
 }
 
 /** A route selector matching nothing of the path: a place to hang an interceptor over a plugin's routes. */
@@ -174,6 +203,12 @@ class ContentSiteConfig {
      * ships in this module. An application's names its regions otherwise — per language, say.
      */
     var pageTemplate: String = "kroom/page.html"
+
+    /**
+     * The page a browser gets, with a 404, where nothing answered (`$missing`, the path asked); kroom's own, in
+     * English, ships in this module. Null: the plain 404.
+     */
+    var notFoundTemplate: String? = "kroom/not_found.html"
 
     /**
      * Page-context tools every block may use, by name. A block sees nothing else of the page but what the
