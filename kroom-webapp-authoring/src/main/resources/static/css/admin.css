@@ -26,6 +26,8 @@ body:has(> .kroom-admin) {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;    /* pico spreads a nav's items; the bar stacks them */
+    position: relative;             /* above the panel, which slides out from under it */
+    z-index: 1;
     align-items: center;
     gap: .25rem;
     padding: .5rem 0;
@@ -72,7 +74,7 @@ body:has(> .kroom-admin) {
     color: var(--pico-color, #1f2937);
     border-right: 1px solid var(--pico-muted-border-color, #d1d5db);
     box-shadow: .25rem 0 1rem rgb(0 0 0 / .15);
-    transition: transform .2s ease, opacity .2s ease, display .2s allow-discrete;
+    transition: transform .25s ease-out, display .25s allow-discrete;
 }
 
 /* a framed application needs room: most of the page */
@@ -82,17 +84,15 @@ body:has(> .kroom-admin) {
     flex-direction: column;
 }
 
-/* slides in and out: after the wide rule, so hiding beats its flex */
+/* slides out from under the bar, and back: after the wide rule, so hiding beats its flex */
 .kroom-admin-panel[hidden] {
     display: none;
-    transform: translateX(-1rem);
-    opacity: 0;
+    transform: translateX(-100%);
 }
 
 @starting-style {
     .kroom-admin-panel:not([hidden]) {
-        transform: translateX(-1rem);
-        opacity: 0;
+        transform: translateX(-100%);
     }
 }
 
