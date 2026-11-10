@@ -315,4 +315,5 @@ button.kroom-admin-menu-reset { width: auto; margin: .5rem 0 0; padding: 0; back
 .kroom-admin-new-page { display: flex; gap: .25rem; margin: .125rem 0; grid-column: 1 / -1; }
 .kroom-admin-new-page input { flex: 2 1 0; min-width: 0; margin: 0; padding: .2rem .4rem; height: auto; font-size: .8rem; border-style: dashed; }
 .kroom-admin-new-page input[name="slug"] { flex: 1 1 0; font-family: var(--pico-font-family-monospace, monospace); }
+.kroom-admin-new-page select { flex: 0 1 auto; width: auto; margin: 0; padding: .2rem 1.6rem .2rem .4rem; height: auto; font-size: .8rem; }
 .kroom-admin-new-page button { width: auto; margin: 0; padding: 0 .6rem; font-size: .9rem; line-height: 1.4; }

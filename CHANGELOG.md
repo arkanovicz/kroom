@@ -425,7 +425,9 @@ All notable changes to kroom will be documented in this file.
   partials, worded by the `name` and `footer` settings), never a page's. The handle on them opened an empty
   editor over a default a block could not reproduce. A block written there is ignored.
 - A page is born where it goes: the pages panel's bottom form is a phantom row dragged into the tree, which
-  asks the name and creates the page under that list, at that index (a link is stored there the same way).
+  asks the name and the layout and creates the page under that list, at that index (a link is stored there the
+  same way). The layout is chosen at birth because the seed runs at birth: a `gallery` page is born with its
+  gallery.
 - The pages panel reloads the page after every action — the menu, the west, a TOC are server-rendered — and
   the admin bar reopens where it was (panel and entry, `sessionStorage`); a newborn page is opened.
 - Logged in, one is back where one was: serving its login page, the site remembers the page it was reached

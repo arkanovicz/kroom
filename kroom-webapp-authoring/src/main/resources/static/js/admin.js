@@ -335,6 +335,10 @@
                 let typed = false;
                 name.addEventListener('input', () => { if (!typed) slug.value = slugify(name.value); });
                 slug.addEventListener('input', () => { typed = slug.value !== ''; });
+                // its layout is chosen at birth: what the layout seeds, the page gets
+                const layout = form.appendChild(element('select'));
+                layout.name = 'layout'; layout.title = t('pageLayout'); layout.setAttribute('aria-label', t('pageLayout'));
+                for (const l of answer.layouts) layout.appendChild(element('option', null, l)).value = l;
                 const create = form.appendChild(element('button', null, '\u2713'));
                 create.type = 'submit'; create.title = t('pageBorn'); create.setAttribute('aria-label', t('pageBorn'));
                 const cancel = form.appendChild(element('button', 'secondary outline', '\u2715'));
@@ -347,8 +351,8 @@
                     if (LINK.test(where)) { li._item = { href: where, label }; return store(read(root)); }
                     // the page, then the tree with it at this very index, then the page itself
                     try {
-                        await api.postJson(siteApi + 'pages', { path: `${path}/${where}`, label });
-                        li._item = { slug: where, label, children: [] };
+                        await api.postJson(siteApi + 'pages', { path: `${path}/${where}`, label, layout: layout.value });
+                        li._item = { slug: where, label, layout: layout.value, children: [] };
                         await api.putJson(siteApi + 'menu', { items: strip(read(root)) });
                     } catch (err) { await refresh(); return fail(err); }
                     born(`${path}/${where}`);
