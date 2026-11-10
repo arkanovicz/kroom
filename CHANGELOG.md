@@ -20,7 +20,20 @@ All notable changes to kroom will be documented in this file.
   so what it inserts is escaped there. `Site.head { }` / `foot { }` fragments stay strings: markup by contract.
 - A menu link's address is `http(s):`, `mailto:` or `tel:` — any scheme went (`javascript:`), `PUT /api/site/menu`
   answers 400 for another.
-- Blocks are not covered yet: a `%` block's own html and what its references insert still pass as typed.
+
+#### kroom-markdown — a block keeps its html and loses its scripting
+- What a block renders is sanitized (jsoup 1.24.1, an allowlist over flexmark's output): html stays, scripting
+  goes, whoever typed it and wherever it came from — no `script`, `style`, `iframe`, `object`, form control; no
+  `on*`, `style` or `data-*` attribute (the page's scripts read those); an address is `http(s):`, `mailto:`, `tel:`
+  or relative; the `kroom-` classes and ids are the house's. What markdown renders passes (tables and their
+  alignment, task lists, code and its language, struck text). The html comes out as jsoup writes it (`<br>`).
+- The one markup that passes as written is a tool's, answered as a `SafeText`: the block engine's insertion
+  handler sets it aside while the block is merged (an empty `div` or `span` named by a nonce of the render stands
+  for it, a block element being an html block of its own), and it is put back once the rest is sanitized. So
+  `$gallery.show(…)` and `$forms.contact(…)` no longer shape their html for markdown (one line, no blank line, a
+  closing newline). A tool that answers html as a plain string is sanitized like anything else: answer a `SafeText`.
+- A value a reference inserts that is no `SafeText` is sanitized like the author's own text (its html shows,
+  less what would run). Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
 #### velocity 3.0.0-BETA-20261110-01
 - Bumped. Strict mode and the invalid-reference handler as in 2.x, with `event_handler.invalid_references.missing`
@@ -99,6 +112,8 @@ All notable changes to kroom will be documented in this file.
   and is the legacy chifoumi page's alone.
 
 #### kroom-webapp-core
+- An unhandled exception answers 500 with a fixed "Internal Server Error": its message (paths, template names,
+  values someone typed) goes to the log only. Pinned in `InternalErrorTest`.
 - `StaticConfig.devDirs: List<File>`, tried in order before the classpath (sources, then a build output that cannot live in
   them: a Kotlin/JS bundle); `devDir` stays as the one-directory shorthand.
 

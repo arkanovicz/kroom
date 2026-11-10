@@ -30,6 +30,7 @@ dependencies {
     implementation(libs.flexmark.ext.gfm.strikethrough)
     implementation(libs.flexmark.ext.gfm.tasklist)
     implementation(libs.flexmark.ext.tables)
+    implementation(libs.jsoup)                          // what flexmark renders is sanitized: html stays, scripting goes
     grammarTemplate(libs.velocity.engine.common)
     testImplementation(libs.velocity.engine.core)       // the classic facade, as one page engine among two the tests run
     testImplementation(libs.kotlin.test)

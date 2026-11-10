@@ -59,15 +59,13 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
 
         fun contact(topic: String): SafeText {
             val thanks = site.settings(this@Forms)["thanks"].orEmpty()
-            // one line, a blank line would end markdown's html block halfway through the form — and a closing newline,
-            // so that the block ends there and the author's next line stands apart
             return SafeText("""<form class="kroom-form" method="post" action="/forms/contact" data-thanks="${htmlEscape(thanks)}" data-error="${htmlEscape(words["error"]!!)}">""" +
                 """<input type="hidden" name="topic" value="${htmlEscape(topic)}">""" +
                 """<label>${htmlEscape(words["name"]!!)} <input name="name" required maxlength="200"></label>""" +
                 """<label>${htmlEscape(words["email"]!!)} <input name="email" type="email" required maxlength="200"></label>""" +
                 """<label>${htmlEscape(words["message"]!!)} <textarea name="message" required maxlength="$MAX"></textarea></label>""" +
                 """<label aria-hidden="true" style="position:absolute;left:-10000px">Website <input name="website" tabindex="-1" autocomplete="off"></label>""" +
-                """<button type="submit">${htmlEscape(words["send"]!!)}</button></form>""" + "\n")
+                """<button type="submit">${htmlEscape(words["send"]!!)}</button></form>""")
         }
     }
 

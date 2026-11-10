@@ -13,6 +13,7 @@ greenmail = "2.1.15"
 jgit = "7.8.0.202609011348-r"
 # last 0.64.x; JVM-only by design — server-side rendering, not part of kroom's KMP surface
 flexmark = "0.64.8"
+jsoup = "1.24.1"
 kotlin-logging = "8.0.4"
 kotlinx-atomicfu = "0.33.0"
 ktor = "3.6.1"
@@ -37,6 +38,7 @@ flexmark-ext-autolink = { module = "com.vladsch.flexmark:flexmark-ext-autolink",
 flexmark-ext-gfm-strikethrough = { module = "com.vladsch.flexmark:flexmark-ext-gfm-strikethrough", version.ref = "flexmark" }
 flexmark-ext-gfm-tasklist = { module = "com.vladsch.flexmark:flexmark-ext-gfm-tasklist", version.ref = "flexmark" }
 flexmark-ext-tables = { module = "com.vladsch.flexmark:flexmark-ext-tables", version.ref = "flexmark" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlin-logging"}
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin"}
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

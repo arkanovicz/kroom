@@ -513,6 +513,20 @@ Blocks are watched by default — strict mode, the full sandbox (`Sandbox.DEFAUL
 `- java.lang.Object#getClass`), a loop stopped at 10 000 turns (`directive.foreach.max_loops`; each loop its
 own count), and of the 2.x conveniences only informal navigation, for prose. Relax any of it in `MarkdownConfig`.
 
+A block keeps its html and loses its scripting: what it renders is sanitized against an allowlist, after
+markdown, whoever typed it and wherever it came from.
+
+```html
+<div class="grid" id="top">…</div> <img src="/pictures/a.png" loading="lazy">     stays
+<script>, <style>, <iframe>, <form>, onclick=…, style=…, data-…=…, javascript:…     goes
+```
+
+An address is `http(s):`, `mailto:`, `tel:` or relative; the `kroom-` classes and ids are the house's. What
+needs more — an embed, a form — is a tool's business: a tool that answers a `SafeText`
+(`org.apache.velocity.engine.SafeText`) has its markup set aside while the block is merged and put back as
+written once the rest is safe, block element or inline. Anything else a reference inserts is sanitized like
+the author's own text.
+
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.
 

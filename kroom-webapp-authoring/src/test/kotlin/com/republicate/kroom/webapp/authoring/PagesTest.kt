@@ -262,7 +262,7 @@ class PagesTest {
         val editor = visitor("ed")
         storage.settings("site")["name"] = "<b>NAME</b>"
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/x","label":{"en":"<img src=x onerror=alert(1)>"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        storage.content.write("pages/x/content.md", "Some **words**.", mapOf("author" to "ed"))
+        storage.content.write("pages/x/content.md", "Some **words**.<script>alert(2)</script> <b onclick=\"alert(3)\">Bold</b>", mapOf("author" to "ed"))
         editor.json(HttpMethod.Put, "/api/site/pages/x", """{"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
 
         val page = visitor().get("/x").bodyAsText()
@@ -270,7 +270,8 @@ class PagesTest {
         assertContains(page, """<a href="/" class="brand"><strong>&lt;b&gt;NAME&lt;/b&gt;</strong></a>""")
         assertContains(page, """<a href="/x" aria-current="page">&lt;img src=x onerror=alert(1)&gt;</a>""")
         assertFalse(page.contains("<img src=x"), "nowhere as markup")
-        assertContains(page, "Some <strong>words</strong>.", message = "a block's html is markup")
+        assertContains(page, "Some <strong>words</strong>. <b>Bold</b>", message = "a block's html is markup, less what would run")
+        assertFalse(page.contains("alert(2)") || page.contains("alert(3)"))
         assertContains(page, """<script src="/js/kroom/domhelper.js""", message = "and so is what the site puts in the head")
 
         // a region a page #define'd is written where the layout calls it: what it inserts is escaped there

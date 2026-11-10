@@ -20,6 +20,10 @@ import org.apache.velocity.engine.runtime.introspection.Sandbox
  * point — a block is VTL that *produces* markdown, so `%foreach` may emit list items and `$name` may
  * land inside a heading, and flexmark sees a finished document rather than a template.
  *
+ * What comes out is sanitized ([Sanitizer]): a block keeps its html and loses its scripting. The one markup
+ * that passes as written is a tool's, answered as a `SafeText` — set aside while the block is merged
+ * ([Slots]), put back once the rest is safe.
+ *
  * Built on velocity 3.0 directly, never on the classic facade: whatever engine the application renders its
  * pages with, blocks run on this one, configured by [MarkdownConfig] alone.
  */
@@ -46,23 +50,27 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
 
     /** Render the markdown template at [path], as [MarkdownConfig.loader] serves it. */
     fun render(path: String, context: Context): String {
+        val slots = Slots()
         val markdown = try {
-            engine.mergeTemplate(path, scoped(context))
+            engine.mergeTemplate(path, scoped(context, slots))
         } catch (_: ResourceNotFoundException) {
             // an unwritten block is a normal state of a live content tree, not a failure
-            engine.evaluate(config.missing, scoped(context).also { it.put("name", blockName(path)) }, "missing")
+            engine.evaluate(config.missing, scoped(context, slots).also { it.put("name", blockName(path)) }, "missing")
         }
-        return emit(markdown)
+        return emit(markdown, slots)
     }
 
     /** Whether the loader holds a block at [path]. */
     fun exists(path: String): Boolean = engine.resourceExists(path)
 
     /** Render markdown the caller already holds — an editor preview, a draft never written to a loader. */
-    fun renderSource(source: String, context: Context, name: String = "markdown"): String =
-        emit(engine.evaluate(source, scoped(context), name))
+    fun renderSource(source: String, context: Context, name: String = "markdown"): String {
+        val slots = Slots()
+        return emit(engine.evaluate(source, scoped(context, slots), name), slots)
+    }
 
-    private fun emit(markdown: String): String = html.render(parser.parse(markdown))
+    private fun emit(markdown: String, slots: Slots): String =
+        slots.restore(Sanitizer.clean(html.render(parser.parse(markdown)), slots))
 }
 
 /** A block's name, as `missing`, `broken` and the wrapper see it: `pages/club/13Ma/description.md` → `description`. */
@@ -71,9 +79,10 @@ internal fun blockName(path: String) = path.substringAfterLast('/').substringBef
 /**
  * The context a caller hands in comes back as it went: reads fall through to it, writes (`%set($x = 1)`)
  * stay in the child and die at the block's boundary. (Which names that context holds is `#markdown`'s
- * business: a block's arguments and the named tools.)
+ * business: a block's arguments and the named tools.) The render's [slots] ride along.
  */
-private fun scoped(context: Context): VelocityContext = VelocityContext(parent = context)
+private fun scoped(context: Context, slots: Slots): VelocityContext =
+    VelocityContext(parent = context).also { it.put(Slots.KEY, slots) }
 
 /**
  * The one place a `%` sub-engine is built. The sandbox's parent loader is the thread-context one, the
@@ -88,7 +97,10 @@ private fun markdownEngine(config: MarkdownConfig, compiler: ScriptingCompiler) 
     compiler = compiler,
     // the one loader, the store's: kept as `markdown.resource.loader.blocks.*` says (nothing, by default)
     config = config.engine.copy(lexerSource = MarkdownVtl, loaders = listOf(BLOCKS)),
-).apply { addResourceLoader(BLOCKS, config.loader) }
+).apply {
+    addResourceLoader(BLOCKS, config.loader)
+    referenceInsertionEvents = SetAside
+}
 
 /** The name the block engine lists its store under. */
 private const val BLOCKS = "blocks"
