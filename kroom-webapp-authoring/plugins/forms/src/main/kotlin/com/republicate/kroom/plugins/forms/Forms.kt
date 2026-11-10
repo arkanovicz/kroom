@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.net.URI
 import kotlin.time.Duration.Companion.days
+import org.apache.velocity.engine.SafeText
 
 /**
  * A contact form an author drops into any block — `$forms.contact()`, or `$forms.contact("membership")` to
@@ -54,19 +55,19 @@ class Forms(strings: Map<String, String> = emptyMap()) : Plugin {
 
     /** What a block is handed as `$forms`. */
     inner class Tool internal constructor(private val site: Site) {
-        fun contact(): String = contact("contact")
+        fun contact(): SafeText = contact("contact")
 
-        fun contact(topic: String): String {
+        fun contact(topic: String): SafeText {
             val thanks = site.settings(this@Forms)["thanks"].orEmpty()
             // one line, a blank line would end markdown's html block halfway through the form — and a closing newline,
             // so that the block ends there and the author's next line stands apart
-            return """<form class="kroom-form" method="post" action="/forms/contact" data-thanks="${htmlEscape(thanks)}" data-error="${htmlEscape(words["error"]!!)}">""" +
+            return SafeText("""<form class="kroom-form" method="post" action="/forms/contact" data-thanks="${htmlEscape(thanks)}" data-error="${htmlEscape(words["error"]!!)}">""" +
                 """<input type="hidden" name="topic" value="${htmlEscape(topic)}">""" +
                 """<label>${htmlEscape(words["name"]!!)} <input name="name" required maxlength="200"></label>""" +
                 """<label>${htmlEscape(words["email"]!!)} <input name="email" type="email" required maxlength="200"></label>""" +
                 """<label>${htmlEscape(words["message"]!!)} <textarea name="message" required maxlength="$MAX"></textarea></label>""" +
                 """<label aria-hidden="true" style="position:absolute;left:-10000px">Website <input name="website" tabindex="-1" autocomplete="off"></label>""" +
-                """<button type="submit">${htmlEscape(words["send"]!!)}</button></form>""" + "\n"
+                """<button type="submit">${htmlEscape(words["send"]!!)}</button></form>""" + "\n")
         }
     }
 

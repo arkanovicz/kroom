@@ -19,6 +19,7 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
+import org.apache.velocity.engine.SafeText
 
 /**
  * Photo galleries. A gallery is a record of this plugin — its pictures in order, each with a caption per
@@ -125,9 +126,9 @@ class Gallery(private val images: Images? = null, strings: Map<String, String> =
     /** `$gallery` in a page or a block. */
     inner class Tool internal constructor(private val site: Site, private val call: ApplicationCall) {
         /** The gallery [id] as a grid the show opens from — one html block, no blank line, so markdown keeps it whole. */
-        fun show(id: String): String {
+        fun show(id: String): SafeText {
             val record = site.records(this@Gallery, GALLERIES).get(id)
-                ?: return """<div class="kroom-gallery kroom-gallery-missing" data-gallery="${htmlEscape(id)}"></div>""" + "\n"
+                ?: return SafeText("""<div class="kroom-gallery kroom-gallery-missing" data-gallery="${htmlEscape(id)}"></div>""" + "\n")
             call.attributes.put(SHOWN, true)
             val lang = site.language(call)
             val edit = site.can(call.userSession, EDIT)
@@ -144,7 +145,7 @@ class Gallery(private val images: Images? = null, strings: Map<String, String> =
             }
             // the closing newline: markdown's html block runs to a blank line, the author's next line stands apart
             out.append("\n</div>\n")
-            return out.toString()
+            return SafeText(out)
         }
     }
 

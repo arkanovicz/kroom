@@ -721,7 +721,7 @@ optional `group`, under which the admin form gathers it.
 | `Site` call | for | WordPress |
 |---|---|---|
 | `settings(plugin)`, `records(plugin, c)` | configuration, owned rows | options, custom tables |
-| `tool(name, value, blocks = true)` | `$name` in pages — and in `%` blocks | shortcodes |
+| `tool(name, value, blocks = true)` | `$name` in pages — and in `%` blocks; markup is answered as a `SafeText` | shortcodes |
 | `routes { }` | public or guarded endpoints (`site.can`) | REST routes, admin-ajax |
 | `requestTool(name) { call -> }` | `$name`, one value per request: what a page says of itself | `wp_title`-style filters |
 | `intercept { call -> }` | before routing: redirects, firewall, cache | `template_redirect`, drop-ins |
@@ -732,6 +732,10 @@ optional `group`, under which the admin form gathers it.
 | `seed(layout) { page -> }` | what a page born with that layout starts as: the plugin's call in its content block | a post template |
 | `every(period) { }` | scheduled jobs, from start to stop | WP-Cron |
 | `grant(role, permissions)` | the plugin's permissions, given to roles | `add_cap` |
+
+A page escapes what it inserts (below, *A value is data*): a tool's answer is data like any other, and a tool
+that answers html says so by its type — `fun show(id: String): SafeText` — having escaped itself, with
+`htmlEscape`, what it holds that someone typed.
 
 A plugin installed is switched on and off live, from the plugins panel (`PUT /api/site/plugins/{id}/enabled`):
 off, everything it recorded falls silent — fragments, routes (404), interceptors, listeners, jobs, its admin
@@ -803,6 +807,26 @@ adds to `<head>` like any plugin, `site.head { }` in its `install`, emitted whil
 live under `static/{css,js,img,fonts}/<id>/`, private partials under `themes/<id>/inc/`. The authoring tests
 hold a `DummyTheme` — every layout of the vocabulary, plainly and unmistakably — for testing a theme's path
 end to end; the demo installs it beside the basic one.
+
+### A value is data
+
+`installVelocity` switches velocity's dynamic escaping on: in a web page (`.html`, or a template whose header
+says `##@output web`) every value a reference inserts is escaped for where it lands.
+
+```html
+<title>$title — $site.name</title>              text up to the closing tag: `<` and `&`
+<a href="$item.link">$item.label</a>            an attribute value, then text
+<script>const user = $logged.name;</script>     a quoted JS literal
+$site.head()                                    a SafeText: markup, as it stands
+```
+
+Markup is `org.apache.velocity.engine.SafeText`, and nothing else is: what `#markdown` renders, `$site.head()`,
+`$site.foot()`, a plugin's tool that answers html. A region a page `#define`s is written where the layout calls
+it, so its own references are escaped there. A reference in a place no escaping makes safe (a tag name, an
+unquoted attribute) is refused with its position. An application that wants another handler, or none, names it
+in `installVelocity { properties["event_handler.reference_insertion.class"] = … }`. A URL attribute is an
+ordinary one: the scheme of an address someone typed is checked where it is stored (a menu link is `http(s):`,
+`mailto:` or `tel:`).
 
 ### Pages and the menu
 

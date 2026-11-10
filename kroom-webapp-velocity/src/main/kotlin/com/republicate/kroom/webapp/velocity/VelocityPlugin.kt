@@ -53,6 +53,10 @@ class VelocityPlugin(config: VelocityConfig) {
         setProperty(RuntimeConstants.VM_LIBRARY, "kroom-macros.vtl")
         setProperty(RuntimeConstants.VM_LIBRARY_AUTORELOAD, config.devMode)
 
+        // a value is data, escaped for where it lands in a web page (`.html`, or an `##@output web` header);
+        // markup is a SafeText. An application's own handler, or none, goes in `properties`
+        setProperty("event_handler.reference_insertion.class", "org.apache.velocity.engine.sink.DynamicEscaper")
+
         config.properties.forEach { (key, value) -> setProperty(key, value) }
 
         // Auto-register the directives whose module happens to be on the classpath. Resolve each the

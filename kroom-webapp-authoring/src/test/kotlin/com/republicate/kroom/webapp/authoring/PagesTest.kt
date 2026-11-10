@@ -255,4 +255,31 @@ class PagesTest {
         assertEquals(AuthoredPage.TOC, storage.content.read("pages/team/content.md")!!.body)
         assertNull(storage.content.read("pages/photos/plage/east.md"))
     }
+
+    @Test
+    fun `what is typed is data - a label, the site's name, a path segment are escaped where a page shows them, and a menu link runs nothing`() = testApplication {
+        site()
+        val editor = visitor("ed")
+        storage.settings("site")["name"] = "<b>NAME</b>"
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/x","label":{"en":"<img src=x onerror=alert(1)>"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        storage.content.write("pages/x/content.md", "Some **words**.", mapOf("author" to "ed"))
+        editor.json(HttpMethod.Put, "/api/site/pages/x", """{"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+
+        val page = visitor().get("/x").bodyAsText()
+        assertContains(page, "<title>&lt;img src=x onerror=alert(1)> — &lt;b>NAME&lt;/b></title>", message = "a title is text up to its closing tag: no tag opens in it")
+        assertContains(page, """<a href="/" class="brand"><strong>&lt;b&gt;NAME&lt;/b&gt;</strong></a>""")
+        assertContains(page, """<a href="/x" aria-current="page">&lt;img src=x onerror=alert(1)&gt;</a>""")
+        assertFalse(page.contains("<img src=x"), "nowhere as markup")
+        assertContains(page, "Some <strong>words</strong>.", message = "a block's html is markup")
+        assertContains(page, """<script src="/js/kroom/domhelper.js""", message = "and so is what the site puts in the head")
+
+        // a region a page #define'd is written where the layout calls it: what it inserts is escaped there
+        assertContains(visitor().get("/club/%3Ci%3Eit").bodyAsText(), "<h1>&lt;i&gt;it</h1>")
+
+        for (address in listOf("javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "vbscript:x")) {
+            val refused = editor.json(HttpMethod.Put, "/api/site/menu", """{"items":[{"href":${com.republicate.kson.Json.MutableArray().apply { push(address) }.toString().removeSurrounding("[", "]")},"label":{"en":"Elsewhere"}}]}""")
+            assertEquals(HttpStatusCode.BadRequest, refused.status, address)
+        }
+        editor.json(HttpMethod.Put, "/api/site/menu", """{"items":[{"slug":"x"},{"href":"https://example.org/","label":{"en":"Elsewhere"}},{"href":"mailto:someone@example.org","label":{"en":"Write"}}]}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+    }
 }

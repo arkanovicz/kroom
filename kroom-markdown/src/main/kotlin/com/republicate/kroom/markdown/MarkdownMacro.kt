@@ -2,6 +2,7 @@ package com.republicate.kroom.markdown
 
 import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.Merge
+import org.apache.velocity.engine.SafeText
 import org.apache.velocity.engine.VelocityContext
 import org.apache.velocity.engine.VelocityException
 import org.apache.velocity.engine.VtlMacro
@@ -93,7 +94,7 @@ class MarkdownMacro(val renderer: MarkdownRenderer) : VtlMacro {
     private fun decoration(page: Context, path: String, html: String) = VelocityContext(parent = page).apply {
         this["path"] = path
         this["name"] = blockName(path)
-        this["html"] = html
+        this["html"] = SafeText(html)
     }
 
     companion object {

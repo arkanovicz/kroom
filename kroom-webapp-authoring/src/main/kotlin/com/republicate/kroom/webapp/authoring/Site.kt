@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration
+import org.apache.velocity.engine.SafeText
 
 private val logger = LoggerFactory.getLogger("kroom.site")
 
@@ -275,7 +276,11 @@ class Site internal constructor(
         return { call -> if (enabled(owner)) handler(call) }
     }
 
-    /** `$name` in every page; with [blocks], in every `%` block too — what a WordPress shortcode is. */
+    /**
+     * `$name` in every page; with [blocks], in every `%` block too — what a WordPress shortcode is. What it
+     * answers is data, escaped where a page inserts it: markup is answered as a `SafeText`, whatever it holds
+     * that someone typed escaped by the tool ([htmlEscape]).
+     */
     fun tool(name: String, value: Any, blocks: Boolean = false) {
         tools[name] = Owned(installing, value)
         if (blocks) blockTools += name
@@ -313,7 +318,7 @@ class Site internal constructor(
      */
     fun notFound(handler: suspend (ApplicationCall) -> Unit) { notFoundHandlers += owned(handler) }
 
-    /** A fragment for `<head>` (meta, links, scripts); null or empty adds nothing. */
+    /** A fragment for `<head>` (meta, links, scripts), markup as it stands; null or empty adds nothing. */
     fun head(fragment: (ApplicationCall) -> String?) { heads += owned(fragment) }
 
     /** A fragment for the end of `<body>`. */
@@ -436,13 +441,13 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
      * Everything kroom and its plugins put in `<head>`: the house scripts, the editor's for whoever is logged
      * in (a visitor downloads none of it), then the plugins' fragments.
      */
-    fun head(): String = listOfNotNull(
+    fun head(): SafeText = SafeText(listOfNotNull(
         KroomAssets.coreScripts(),
         call.userSession?.let { site.application.authoringOrNull?.assets?.tags() },
         site.head(call).takeIf { it.isNotEmpty() }
-    ).joinToString("\n")
+    ).joinToString("\n"))
 
-    fun foot(): String = site.foot(call)
+    fun foot(): SafeText = SafeText(site.foot(call))
     fun can(permission: String, target: String = ""): Boolean = site.can(call.userSession, permission, target)
 
     /** The layout this page got — `#layout(name)` resolved it, the skeleton reads it. */

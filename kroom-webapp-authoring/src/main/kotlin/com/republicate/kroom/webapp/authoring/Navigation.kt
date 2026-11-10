@@ -60,8 +60,8 @@ data class MenuItem(
     companion object {
         private val SLUG = Regex("[A-Za-z0-9_-]+")
 
-        /** An address elsewhere: anything with a scheme (`https://…`, `mailto:…`) — what a segment can never be. */
-        val LINK = Regex("[a-z][a-z0-9+.-]*:.+", RegexOption.IGNORE_CASE)
+        /** An address elsewhere (`https://…`, `mailto:…`, `tel:…`) — what a segment can never be, and nothing a browser runs. */
+        val LINK = Regex("(https?|mailto|tel):.+", RegexOption.IGNORE_CASE)
 
         /** An entry from its JSON, or the reason it is not one. */
         fun parse(json: Json.Object): Result<MenuItem> = runCatching {

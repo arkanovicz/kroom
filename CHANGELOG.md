@@ -6,6 +6,27 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-webapp-velocity, kroom-markdown, kroom-webapp-authoring — a value is data, markup is a `SafeText`
+- `installVelocity` names velocity's `DynamicEscaper` (`event_handler.reference_insertion.class`): in a web page
+  (`.html`, or an `##@output web` header) every value a reference inserts is escaped for where it lands — text, an
+  attribute, a script, a style; `<title>` is text up to its closing tag. Markup passes as
+  `org.apache.velocity.engine.SafeText`, and only as that: a tool that answers html says so by its type, and
+  escapes itself what it holds that someone typed. An application's own handler, or none (`""`), goes in
+  `properties`. Other outputs (`.txt`, a mail's body) are left as written. Pinned in `EscapingTest`.
+- It closes a hole: a page's label and the site's name went raw into `<title>`, the brand and the menu of every
+  page — whoever could name a page ran script in every visitor's browser. Pinned in `PagesTest`.
+- `#markdown` hands its wrapper `$html` as a `SafeText`; `$site.head()` and `$site.foot()` answer one;
+  `$gallery.show(…)` and `$forms.contact(…)` too. A region a page `#define`s is written where the layout calls it,
+  so what it inserts is escaped there. `Site.head { }` / `foot { }` fragments stay strings: markup by contract.
+- A menu link's address is `http(s):`, `mailto:` or `tel:` — any scheme went (`javascript:`), `PUT /api/site/menu`
+  answers 400 for another.
+- Blocks are not covered yet: a `%` block's own html and what its references insert still pass as typed.
+
+#### velocity 3.0.0-BETA-20261110-01
+- Bumped. Strict mode and the invalid-reference handler as in 2.x, with `event_handler.invalid_references.missing`
+  to offer a handler what strict mode faults on (not used yet); under strict mode a key a Map does not hold is a
+  null value. No test moved.
+
 #### kroom-common, kroom-server — presence LOST
 - `Presence.LOST`, last in the order: a user with no client left. A room with a `lostGrace` (new `protected open val`,
   0 = as before) says it past `leaveGrace` — a room-born `status` frame (the gone tab as its client), `users` keeps the
