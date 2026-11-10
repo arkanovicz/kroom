@@ -74,7 +74,8 @@ async function page(template, scripts) {
     const before = p.posts.length;
     p.w.document.querySelector('#chat-form [name="text"]').value = '   ';
     await p.click('[data-kroom-intent="chat"]');
-    const refused = p.w.document.querySelector('[data-kroom-intent-reason="chat"]');
+    // the reason is tagged with its trigger's selector, not the intent's name: asked by where it shows
+    const refused = p.w.document.querySelector('#chat-form .intent-reason');
     console.log('blank chat: posts', p.posts.length - before, '| reason', refused && refused.textContent);
     must(p.posts.length === before && refused && refused.textContent === 'blank', 'blank chat: refused by its check, no POST');
     await p.send(frames[4]);
