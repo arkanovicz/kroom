@@ -1,7 +1,5 @@
 package com.republicate.kroom.plugins.gallery
 
-import com.republicate.kroom.webapp.authoring.AdminEntry
-import com.republicate.kroom.webapp.authoring.AdminTable
 import com.republicate.kroom.webapp.authoring.AuthoringAssets
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Roles
@@ -48,12 +46,11 @@ class Gallery(private val images: Images? = null, strings: Map<String, String> =
         private const val GALLERIES = "galleries"
         private const val API = "/api/gallery"
         private const val MAX_CAPTION = 1000
-        private const val ICON = "M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6M15 8h.01"
         private val SHOWN = AttributeKey<Boolean>("kroom.gallery.shown")
     }
 
     private val words = mapOf(
-        "add" to "Add photos", "drop" to "or drop them here", "delete" to "Remove from the gallery",
+        "add" to "Add photos", "drop" to "or drop or paste them here", "delete" to "Remove from the gallery",
         "confirmDelete" to "Remove this picture from the gallery?", "caption" to "Caption", "close" to "Close",
         "previous" to "Previous", "next" to "Next", "play" to "Play", "pause" to "Pause", "zoom" to "Zoom",
         "download" to "Download", "of" to "{n} / {total}", "uploading" to "uploading {name}…", "failed" to "{name}: {message}"
@@ -73,27 +70,10 @@ class Gallery(private val images: Images? = null, strings: Map<String, String> =
         site.seed("gallery") { page -> "\$gallery.show(\"${create(site, page.path)}\")" }
         // the grid's and the show's files, on the pages that showed a gallery, for whoever reads them
         site.foot { call -> if (call.attributes.getOrNull(SHOWN) == true) tags(site, call) else null }
-        site.admin(AdminEntry("gallery", "Galleries", icon = ICON, tables = listOf(AdminTable("galleries", "Galleries", API)), permission = EDIT))
 
         site.routes {
             images?.let { images(it) }
             route(API) {
-                // the admin table: every gallery, newest first
-                get {
-                    if (!site.can(call.userSession, EDIT)) return@get respondError("not allowed: $EDIT", HttpStatusCode.Forbidden, "notAllowed", mapOf("permission" to EDIT))
-                    val columns = listOf("id", "page", "pictures", "updated")
-                    respondJson {
-                        set("columns", Json.MutableArray().apply { columns.forEach { push(it) } })
-                        set("rows", Json.MutableArray().apply {
-                            site.records(this@Gallery, GALLERIES).list(200).forEach { (id, record) ->
-                                push(Json.MutableArray().apply {
-                                    push(id); push(record.getString("page") ?: ""); push(items(record).size)
-                                    push(record.getLong("updated")?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "")
-                                })
-                            }
-                        })
-                    }
-                }
                 // a gallery for a block to call, empty; `{"page": "/photos"}` notes where it goes
                 post {
                     if (!allowed(site)) return@post
@@ -175,6 +155,13 @@ class Gallery(private val images: Images? = null, strings: Map<String, String> =
         set("items", Json.MutableArray())
         set("updated", System.currentTimeMillis())
     })
+
+    override fun holds(site: Site): String? {
+        val galleries = site.records(this, GALLERIES).list(Int.MAX_VALUE).values
+        if (galleries.isEmpty()) return null
+        val pictures = galleries.sumOf { items(it).size }
+        return "${galleries.size} ${if (galleries.size == 1) "gallery" else "galleries"}, $pictures ${if (pictures == 1) "picture" else "pictures"}"
+    }
 
     private fun items(record: Json.Object): List<Item> = record.getArray("items")?.mapNotNull { entry ->
         val json = entry as? Json.Object ?: return@mapNotNull null

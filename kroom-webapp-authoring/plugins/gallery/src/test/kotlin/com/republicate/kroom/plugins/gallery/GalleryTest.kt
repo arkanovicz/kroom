@@ -38,7 +38,7 @@ class GalleryTest {
         installContentSite {
             storage = this@GalleryTest.storage
             sessionSecret = "test-secret"
-            identity = IdentityProvider { mapOf("ed" to setOf(Roles.EDITOR), "au" to setOf(Roles.AUTHOR))[it.id].orEmpty() }
+            identity = IdentityProvider { mapOf("ed" to setOf(Roles.EDITOR), "au" to setOf(Roles.AUTHOR), "ad" to setOf(Roles.ADMIN))[it.id].orEmpty() }
             plugins += gallery
         }
         routing { get("/as/{who}") { call.sessions.set(UserSession(call.parameters["who"]!!, "x", null, "t")); call.respondText("ok") } }
@@ -108,9 +108,7 @@ class GalleryTest {
         assertContains(refused.bodyAsText(), """"code":"galleryMedia"""")
         assertEquals(listOf(plage), Json.parse(visitor().get("/api/gallery/$id").bodyAsText()).let { (it as Json.Object).getArray("items")!!.map { i -> (i as Json.Object).getString("media") } }, "a refused arrangement changes nothing")
 
-        // the admin table, and a page without a gallery carries none of this
-        val table = Json.parse(editor.get("/api/gallery").bodyAsText()) as Json.Object
-        assertEquals(listOf(id), table.getArray("rows")!!.map { (it as Json.Array)[0] })
+        // a page without a gallery carries none of this
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/about"}""").let { assertEquals(HttpStatusCode.OK, it.status) }
         assertFalse(editor.get("/about").bodyAsText().contains("gallery.js"))
     }
@@ -127,5 +125,24 @@ class GalleryTest {
         val served = visitor().get("/pictures/$plage?size=300")
         assertEquals(HttpStatusCode.OK, served.status, "no imgproxy: the original, through the images route the plugin mounted — on a path of its own, /img being the static files'")
         assertEquals(ContentType.Image.PNG, served.contentType())
+    }
+
+    @Test
+    fun `switched off, it says what it holds first and its pages lose their gallery`() = testApplication {
+        site()
+        val editor = visitor("ed")
+        val admin = visitor("ad")
+        val id = editor.galleryPage("/album")
+        val port = editor.upload("port.png")
+        editor.json(HttpMethod.Put, "/api/gallery/$id", """{"items":[{"media":"$port"}]}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+
+        val listed = (Json.parse(admin.get("/api/site/plugins").bodyAsText()) as Json.Array).map { it as Json.Object }.single { it.getString("id") == "gallery" }
+        assertEquals("1 gallery, 1 picture", listed.getString("holds"), "what the admin bar asks about before switching it off")
+
+        admin.json(HttpMethod.Put, "/api/site/plugins/gallery/enabled", """{"enabled":false}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        val page = visitor().get("/album").bodyAsText()
+        assertFalse(page.contains("kroom-gallery"), "no grid")
+        // blocks are strict: the call is an undefined reference now, and the block says it cannot be displayed
+        assertContains(page, "cannot be displayed")
     }
 }

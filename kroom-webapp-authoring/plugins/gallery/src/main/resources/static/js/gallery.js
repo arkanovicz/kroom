@@ -11,7 +11,7 @@
 
     // English is the floor; the server emits the request's words ahead of this script
     const STOCK = {
-        add: 'Add photos', drop: 'or drop them here', delete: 'Remove from the gallery',
+        add: 'Add photos', drop: 'or drop or paste them here', delete: 'Remove from the gallery',
         confirmDelete: 'Remove this picture from the gallery?', caption: 'Caption',
         close: 'close', previous: 'previous', next: 'next', play: 'play', pause: 'pause',
         zoom: 'zoom', download: 'download', of: '{n} / {total}',
@@ -350,6 +350,7 @@
         add.on('click', () => input.click());
         tools.append(add, element('span', 'kroom-gallery-drop', t('drop')), input, element('div', 'kroom-gallery-status'));
         gallery.before(tools);
+        gallery.tabIndex = 0;                              // focusable: a click on it, then a paste, lands here
         figures(gallery).forEach(figure => decorate(gallery, figure));
 
         // files only: Sortable's own drags carry none
@@ -406,6 +407,20 @@
     }
 
     config.sync = (gallery) => save(gallery);
+
+    // pictures pasted: into the editable gallery the paste happens in, else into the page's only one — never
+    // while a field or an editor holds the caret
+    const FIELD = 'input, textarea, select, [contenteditable]';
+    document.addEventListener('paste', e => {
+        if (document.activeElement?.closest?.(FIELD)) return;
+        const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+        if (!files.length) return;
+        const editable = [...document.querySelectorAll('.kroom-gallery[data-gallery][data-edit]')];
+        const gallery = e.target.closest?.('.kroom-gallery[data-edit]') || (editable.length === 1 ? editable[0] : null);
+        if (!gallery) return;
+        e.preventDefault();
+        upload(gallery, files);
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.kroom-gallery[data-gallery]').forEach(enhance);

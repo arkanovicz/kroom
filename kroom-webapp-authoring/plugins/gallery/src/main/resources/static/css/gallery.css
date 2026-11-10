@@ -234,6 +234,9 @@ body.kroom-showing {
   background: var(--pico-primary-focus);
 }
 
+.kroom-gallery[data-edit]:focus { outline: none; }
+.kroom-gallery[data-edit]:focus-visible { border-color: var(--pico-primary); }
+
 .kroom-gallery[data-edit] > figure {
   cursor: grab;
 }

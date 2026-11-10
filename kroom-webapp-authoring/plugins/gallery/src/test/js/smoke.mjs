@@ -207,6 +207,26 @@ const stored = (items) => ({
         [1, [{ media: 'k7f3a-new.jpg', captions: {} }]]);
     check('the grid shows it', $$('.kroom-gallery > figure').length, 4);
     check('a failed upload says so, no alert', $('.kroom-gallery-status').textContent, 'Bad.jpg: too large');
+
+    // a paste with the page's only editable gallery: its pictures land there; with a field focused, nothing
+    const pasted = new window.File([new Uint8Array([4, 5, 6])], 'Pasted.png', { type: 'image/png' });
+    const paste = (target) => {
+        const ev = new window.Event('paste', { bubbles: true, cancelable: true });
+        Object.defineProperty(ev, 'clipboardData', { value: { files: [pasted] } });
+        target.dispatchEvent(ev);
+        return ev;
+    };
+    const before = calls.length;
+    paste(window.document.body);
+    await sleep(50);
+    check('a paste on the page goes to its only editable gallery', calls.slice(before).map(c => c.method), ['POST', 'PUT']);
+    check('the grid shows the pasted picture', $$('.kroom-gallery > figure').length, 5);
+    const field = window.document.body.appendChild(window.document.createElement('input'));
+    field.focus();
+    const caret = calls.length;
+    const ignored = paste(field);
+    await sleep(50);
+    check('a paste into a field is the field\'s', [calls.length - caret, ignored.defaultPrevented], [0, false]);
 }
 {
     const { window, $ } = page({ edit: true, responder: () => ({ status: 403, payload: { message: 'not allowed' } }) });
