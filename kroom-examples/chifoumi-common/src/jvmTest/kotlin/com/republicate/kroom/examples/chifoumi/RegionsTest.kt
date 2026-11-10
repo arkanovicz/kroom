@@ -122,4 +122,38 @@ class RegionsTest {
         assertTrue(shown.any { "verdict paper-rock" in it }, "a reveal with its verdict")
         assertTrue(shown.last().let { "match-result" in it && "class=\"winner\"" in it }, shown.last())
     }
+
+    /** A fault is its region's alone: marked, reported, the others merged; the region's next merge builds it again. */
+    @Test fun `a region that faults is marked broken, the others merge, and its next merge builds it again`() {
+        val match = frames[3].getObject("data")!!.getObject("match")!!
+        val snapshot = Json.MutableObject(frames[0].getObject("data")!!).also { it["matches"] = Json.MutableObject(match.getString("id")!! to match) }
+        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        var wordless = false
+        val page = GamePage(room, { key, vars -> if (wordless) error("no words") else say(key, vars) }, verdict = { "verdict $it" }, later = { _, _ -> {} })
+        room.page = page
+        val tree = TreeDouble()
+        val game = tree.element("div"); val round = tree.element("div")
+        room.attach("en/match.html", tree, game).attach("en/round.html", tree, round)
+        val faults = ArrayList<Pair<String, Throwable>>()
+        room.onFault = { template, fault -> faults += template to fault }
+        fun text(template: String) = engine.getTemplate("en/$template").merge(VelocityContext(mutableMapOf("state" to room.state, "me" to room.me, "page" to page)))
+
+        room.frame("state", snapshot.toString())
+        assertEquals(text("match.html"), html(game.children))
+        assertTrue(faults.isEmpty() && Room.BROKEN !in game.attributes)
+
+        wordless = true
+        room.merge()
+        assertEquals(listOf("en/match.html"), faults.map { it.first }, "the page's words failed the one region that asks for them")
+        assertTrue(generateSequence(faults.single().second) { it.cause }.any { it.message?.contains("no words") == true }, "${faults.single().second}")
+        assertEquals("", game.attributes[Room.BROKEN], "its root says so")
+        assertTrue(Room.BROKEN !in round.attributes)
+        assertEquals(text("round.html"), html(round.children), "the region after it merged")
+
+        wordless = false
+        room.merge()
+        assertEquals(1, faults.size)
+        assertTrue(Room.BROKEN !in game.attributes, "mended, it says nothing")
+        assertEquals(text("match.html"), html(game.children), "and it is the page again")
+    }
 }

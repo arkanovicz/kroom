@@ -65,6 +65,13 @@ All notable changes to kroom will be documented in this file.
   had the race too). The `leave` frame's user reads `LOST` where it read `AWAY` (chifoumi's golden refreshed).
   `leaveGrace` 0 with a `lostGrace` says `LOST` at the drop itself (it skipped LOST, straight to `leave`).
 
+#### kroom-client — a fault is its region's alone
+- `Room.merge` catches per region: a region whose merge faults no longer stops the ones after it. Its root
+  carries `data-kroom-broken` (`Room.BROKEN`) until its next good merge — the page's stylesheet says what a broken
+  region looks like — and `Room.onFault(template, fault)` is told (it logs by default). The region waits for a
+  root it reads to change, like any other, and is then built again whole: the sink starts over after a fault
+  (velocity 20261110-03). Pinned in `RegionsTest`: the page's words failing `match.html` leave `round.html` merged.
+
 #### kroom-common, kroom-client — targeted merges
 - A view knows its `owner` (the view it was read from) and its `identity` (`id`, else `seq`, when declared and present);
   a write through a field, `Keyed.add/remove` or `Log +=` reports every identity on its path to the root's

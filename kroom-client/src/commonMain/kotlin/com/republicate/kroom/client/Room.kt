@@ -28,6 +28,10 @@ import org.apache.velocity.engine.sink.OutputSink
  * a write through their fields; `me`: a snapshot), so a header declares every root the region reads, through a page
  * getter too. A snapshot, the first merge and a pass the page asks for itself merge every region and render every item.
  *
+ * A region whose merge faults is the only one to suffer: the others merge, its root carries [BROKEN] (the page's
+ * stylesheet says what a broken region looks like), [onFault] is told, and its next merge builds it again whole —
+ * the sink starts over after a fault.
+ *
  * [engine] knows the pages: on the browser, the app's compiled classes behind its template registry.
  */
 class Room<S : State>(val name: String, val state: S, events: RoomEvents, private val engine: VelocityEngine) {
@@ -45,15 +49,26 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
 
     init { state.dirty = HashSet() }
 
-    /** A region: its template, its sink, the roots its header declares (none: merged on every frame), whether never merged. */
-    private class Region(val template: String, val sink: OutputSink, val roots: Set<String>) { var fresh = true }
+    /**
+     * A region: its template, its sink, the roots its header declares (none: merged on every frame), how its root is
+     * marked broken, whether never merged, whether its last merge faulted.
+     */
+    private class Region(val template: String, val sink: OutputSink, val roots: Set<String>, val mark: (Boolean) -> Unit) {
+        var fresh = true
+        var broken = false
+    }
+
+    /** Told of a region's merge that faulted, with its template: the operator's line. The region is marked [BROKEN] either way. */
+    var onFault: (template: String, fault: Throwable) -> Unit = { template, fault -> println("kroom: region $template is broken: ${fault.stackTraceToString()}") }
 
     private val regions = ArrayList<Region>()
     private val reactions = ArrayList<(String, Event?) -> Unit>()
 
     /** A region: [template] merged under [root]; its first merge, at the snapshot, builds the tree. */
     fun <N : Any> attach(template: String, tree: Tree<N>, root: N): Room<S> = apply {
-        regions += Region(template, HtmlDomSink(tree, root, ::key, ::clean), engine.getTemplate(template).header.map { it.name }.toSet())
+        regions += Region(template, HtmlDomSink(tree, root, ::key, ::clean), engine.getTemplate(template).header.map { it.name }.toSet()) { broken ->
+            if (broken) tree.setAttribute(root, BROKEN, "") else tree.removeAttribute(root, BROKEN)
+        }
     }
 
     /** The sink's door: an item the fold did not write under, known by its identity (a position shifts). */
@@ -98,8 +113,15 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
         if (all) this.all = true
         for (r in regions) {
             if (!this.all && !r.fresh && r.roots.isNotEmpty() && r.roots.none(::changed)) continue
-            engine.getTemplate(r.template).merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), r.sink)
+            // what the roots held made it fault: it waits for them to change, like any region
             r.fresh = false
+            try {
+                engine.getTemplate(r.template).merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), r.sink)
+                if (r.broken) { r.broken = false; r.mark(false) }
+            } catch (fault: Throwable) {
+                if (!r.broken) { r.broken = true; r.mark(true) }
+                onFault(r.template, fault)
+            }
         }
         this.all = false
         state.dirty!!.clear(); state.touched = false
@@ -108,6 +130,11 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
 
     /** Whether a root changed since the last merge; a name the room does not know is taken as changed. */
     private fun changed(root: String): Boolean = when (root) { "state" -> state.touched; "page" -> page?.touched == true; "me" -> false; else -> true }
+
+    companion object {
+        /** The attribute a region's root carries while its last merge faulted. */
+        const val BROKEN = "data-kroom-broken"
+    }
 }
 
 /**
