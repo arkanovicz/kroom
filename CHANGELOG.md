@@ -43,6 +43,14 @@ All notable changes to kroom will be documented in this file.
   where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
 - Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
+#### velocity 3.0.0-BETA-20261110-03
+- Bumped. A fault during a merge into `HtmlDomSink` reaches the caller as thrown (it was lost to "unclosed
+  elements", and every later merge failed); the merge after it empties the root and builds the page again,
+  asking `clean` about nothing; `HtmlDomSink.reset()` does the same on demand. A `#break` or `#stop` inside an
+  element closes what it left open. Blocks must be balanced: an element closes in the block, or the iteration,
+  that opens it — refused at the end of the pass otherwise. `Tree.clear(element)` is new: chifoumi's
+  `TreeDouble` has it. chifoumi's regions are balanced, no test moved.
+
 #### velocity 3.0.0-BETA-20261110-01
 - Bumped. Strict mode and the invalid-reference handler as in 2.x, with `event_handler.invalid_references.missing`
   to offer a handler what strict mode faults on (not used yet); under strict mode a key a Map does not hold is a

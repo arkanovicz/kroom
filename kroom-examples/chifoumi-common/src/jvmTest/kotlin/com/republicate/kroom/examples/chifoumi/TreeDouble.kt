@@ -78,6 +78,13 @@ class TreeDouble : Tree<DNode> {
         log += "remove(${num(node)})"
     }
 
+    override fun clear(element: DNode) {
+        val e = asElement(element)
+        e.children.forEach { it.parent = null }
+        e.children.clear()
+        log += "clear(${num(element)})"
+    }
+
     fun parent(node: DNode): DNode? = node.parent
 
     override fun nextSibling(node: DNode): DNode? {
