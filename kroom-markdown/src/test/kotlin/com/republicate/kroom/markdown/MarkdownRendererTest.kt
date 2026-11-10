@@ -363,6 +363,8 @@ class MarkdownRendererTest {
         assertEquals("<p>1</p>\n", renderer.renderSource("%set(\$m = {\"a\": 1})\$m.a\n", ctx()))
         assertEquals("<p>3</p>\n", renderer.renderSource("%set(\$l = [1, 2, 3])\$l.size\n", ctx()))
         assertEquals("<p>1 2</p>\n", renderer.renderSource("%foreach(\$i in [1, 2])\$i %end\n", ctx()))
+        // a loop is capped: a block is run before anyone reviewed it
+        assertEquals(10_000, renderer.renderSource("%foreach(\$i in [1..1000000])x%end\n", ctx()).count { it == 'x' })
         assertEquals("<p>Les</p>\n", renderer.renderSource("\${club.name.substring(0, 3)}\n", club))
     }
 

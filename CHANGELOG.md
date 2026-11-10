@@ -472,6 +472,8 @@ All notable changes to kroom will be documented in this file.
 #### kroom-markdown
 - The default ACL also refuses `$x.class` (`- java.lang.Object#getClass`): velocity leaves it to the ACL as
   2.x-legitimate, but a block has no business with reflection.
+- A block's `%foreach` stops at 10 000 turns by default (`directive.foreach.max_loops`, unlimited in velocity):
+  a block runs before anyone reviewed it. Each loop its own count.
 
 ### Added
 

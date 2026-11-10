@@ -31,8 +31,12 @@ data class MarkdownConfig(
     /** What a stored block that fails to render shows instead (the failure is logged): a `%` snippet, `$name` in scope. */
     val broken: String = "*The content of **\$name** cannot be displayed.*",
 
-    /** Engine settings, as velocity 3.0 names them; the lexer is forced afterwards, whatever this says. */
-    val engine: Config = Config(strictReferences = true, informalNavigation = true),
+    /**
+     * Engine settings, as velocity 3.0 names them; the lexer is forced afterwards, whatever this says. A loop
+     * stops at 10 000 turns (`directive.foreach.max_loops`): nobody reviewed a block before it runs. Each loop
+     * its own count — nested ones multiply.
+     */
+    val engine: Config = Config(strictReferences = true, informalNavigation = true, maxLoops = 10_000),
 ) {
     companion object {
         /**

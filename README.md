@@ -510,8 +510,8 @@ facade, the block renders on its own 3.0 engine either way. With `VelocityPlugin
 `markdown.*` properties (`markdown.loader`, `markdown.tools`, `markdown.acl`, `markdown.block.wrapper`, …).
 
 Blocks are watched by default — strict mode, the full sandbox (`Sandbox.DEFAULT_ACL` plus `- write *` and
-`- java.lang.Object#getClass`), and
-of the 2.x conveniences only informal navigation, for prose. Relax any of it in `MarkdownConfig`.
+`- java.lang.Object#getClass`), a loop stopped at 10 000 turns (`directive.foreach.max_loops`; each loop its
+own count), and of the 2.x conveniences only informal navigation, for prose. Relax any of it in `MarkdownConfig`.
 
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.
