@@ -159,7 +159,6 @@
         if (!entry.href) control.addEventListener('click', () => toggle(entry, label, control));
         nav.appendChild(control);
     }
-    nav.querySelector(`button[data-entry="${CSS.escape(memory.get('panel') || '')}"]`)?.click();
 
     function toggle(entry, label, control) {
         nav.querySelectorAll('[aria-pressed]').forEach(b => b.removeAttribute('aria-pressed'));
@@ -617,4 +616,7 @@
             row.forEach(cell => tr.appendChild(element('td', null, cell == null ? '' : String(cell))));
         }
     }
+
+    // reopen where the bar was left, now that the panels exist
+    nav.querySelector(`button[data-entry="${CSS.escape(memory.get('panel') || '')}"]`)?.click();
 })();
