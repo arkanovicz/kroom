@@ -82,7 +82,9 @@ class PluginTest {
 
         val admin = visitor("admin").get("/club/13Ma").bodyAsText()
         assertContains(admin, """<aside class="kroom-admin"""")
-        assertContains(admin, "&quot;id&quot;:&quot;probe&quot;")      // the plugin's entry, as data
+        // tables alone are no entry of the bar: they show under their plugin, in the plugins panel
+        assertFalse(admin.contains("&quot;id&quot;:&quot;probe&quot;"))
+        assertContains(visitor("admin").get("/api/site/plugins").bodyAsText(), """"tables":[{"id":"rows","label":"Rows","url":"/api/probe/rows"}]""")
         assertContains(admin, "/js/admin.js?v=")
         // the plugin's words, as the application translates them, reach the bar
         assertContains(admin, """Object.assign((window.kroomAdmin.strings ??= {}), {"probe.name":"Sonde"});""")

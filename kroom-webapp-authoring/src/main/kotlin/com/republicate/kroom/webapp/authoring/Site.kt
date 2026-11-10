@@ -356,16 +356,22 @@ class Site internal constructor(
         foots.mapNotNull { it(call)?.takeIf(String::isNotEmpty) }
     ).joinToString("\n")
 
-    /** The entries [session] may open: kroom's own, then the plugins' — the bar shows whoever has at least one. */
+    /**
+     * The entries [session] may open: kroom's own, then the plugins' that stand alone (a link, an application
+     * framed) — the bar shows whoever has at least one. A plugin's tables are no entry: see [tables].
+     */
     internal fun adminEntries(session: UserSession?): List<AdminEntry> =
         if (session == null) emptyList()
-        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries.filter { enabled(it.owner) }.map { it.value })
+        else (builtinEntries.filter { it.id != "themes" || themes.size > 1 } + entries.filter { enabled(it.owner) && it.value.standsAlone }.map { it.value })
             .filter { can(session, it.permission) }
+
+    /** The tables [plugin] declared in entries that do not stand alone: the plugins panel shows them under it. */
+    internal fun tables(plugin: Plugin): List<AdminTable> =
+        entries.filter { it.owner === plugin && !it.value.standsAlone }.flatMap { it.value.tables }
 
     private val builtinEntries = listOf(
         AdminEntry("site", "site", tables = listOf(AdminTable("rules", "Redirects", "$apiPrefix/rules"), AdminTable("missing", "Not found", "$apiPrefix/missing"))),
         AdminEntry("pages", "pages", permission = Permissions.PAGE_EDIT),
-        AdminEntry("journal", "journal"), AdminEntry("media", "media"),
         AdminEntry("plugins", "plugins"), AdminEntry("themes", "themes"), AdminEntry("roles", "roles")
     )
 
@@ -479,17 +485,17 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
 
 /** What every site is asked, in the groups the admin bar shows them in. */
 internal val SITE_SETTINGS = listOf(
-    Setting.text("name", "Name", default = "kroom", group = "Site"),
-    Setting.text("lang", "Language", default = "en", help = "The content's default — html lang", group = "Site"),
-    Setting.text("languages", "Languages", help = "The others the site speaks, comma-separated (fr, de)", group = "Site"),
-    Setting.text("baseUrl", "Public URL", help = "https://example.org — absolute URLs need it", group = "Site"),
-    Setting.textarea("description", "Description", help = "What the site is, in a sentence or two", group = "Site"),
-    Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Site"),
-    Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), help = "What a page gets when it names none", group = "Site"),
-    Setting.text("footer", "Footer", help = "A line at the foot of every page", group = "Site"),
-    Setting.number("menuDepth", "Menu depth", default = 2, help = "How many levels of pages the header's menu shows", group = "Site"),
-    Setting.boolean("menuPanels", "Menu panels", default = false, help = "The header shows a section's pages as a panel", group = "Site"),
-    Setting.choice("west", "West region", choices = listOf("section", "none"), help = "What a page shows on its left when it says nothing: the section's pages, or nothing", group = "Site"),
+    Setting.text("name", "Name", default = "kroom", group = "General"),
+    Setting.text("lang", "Language", default = "en", help = "The content's default — html lang", group = "General"),
+    Setting.text("languages", "Languages", help = "The others the site speaks, comma-separated (fr, de)", group = "General"),
+    Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), help = "What a page gets when it names none", group = "General"),
+    Setting.text("footer", "Footer", help = "A line at the foot of every page", group = "General"),
+    Setting.number("menuDepth", "Menu depth", default = 2, help = "How many levels of pages the header's menu shows", group = "General"),
+    Setting.boolean("menuPanels", "Menu panels", default = false, help = "The header shows a section's pages as a panel", group = "General"),
+    Setting.choice("west", "West region", choices = listOf("section", "none"), help = "What a page shows on its left when it says nothing: the section's pages, or nothing", group = "General"),
+    Setting.textarea("description", "Description", help = "What the site is, in a sentence or two", group = "Sharing"),
+    Setting.text("baseUrl", "Public URL", help = "https://example.org — absolute URLs need it", group = "Sharing"),
+    Setting.text("image", "Picture", help = "Absolute URL of the picture a shared link shows", group = "Sharing"),
     Setting.text("smtpHost", "SMTP host", help = "Nothing is sent while empty", group = "Mail"),
     Setting.number("smtpPort", "SMTP port", default = 587, group = "Mail"),
     Setting.choice("smtpSecurity", "Security", choices = listOf("starttls", "tls", "none"), group = "Mail"),

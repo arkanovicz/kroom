@@ -25,6 +25,7 @@ body:has(> .kroom-admin) {
     width: var(--kroom-admin-width);
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;    /* pico spreads a nav's items; the bar stacks them */
     align-items: center;
     gap: .25rem;
     padding: .5rem 0;
@@ -71,6 +72,7 @@ body:has(> .kroom-admin) {
     color: var(--pico-color, #1f2937);
     border-right: 1px solid var(--pico-muted-border-color, #d1d5db);
     box-shadow: .25rem 0 1rem rgb(0 0 0 / .15);
+    transition: transform .2s ease, opacity .2s ease, display .2s allow-discrete;
 }
 
 /* a framed application needs room: most of the page */
@@ -78,6 +80,26 @@ body:has(> .kroom-admin) {
     width: min(64rem, calc(100vw - var(--kroom-admin-width)));
     display: flex;
     flex-direction: column;
+}
+
+/* slides in and out: after the wide rule, so hiding beats its flex */
+.kroom-admin-panel[hidden] {
+    display: none;
+    transform: translateX(-1rem);
+    opacity: 0;
+}
+
+@starting-style {
+    .kroom-admin-panel:not([hidden]) {
+        transform: translateX(-1rem);
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kroom-admin-panel {
+        transition: none;
+    }
 }
 
 .kroom-admin-wide .kroom-admin-body {
@@ -152,8 +174,14 @@ body:has(> .kroom-admin) {
 }
 
 .kroom-admin-plugin summary input[role="switch"] {
+    width: 2.25rem;     /* pico's 2.25em, but pico sizes inputs at 1rem and the summary isn't: rem keeps the offset below exact */
     margin: 0 .5rem 0 0;
     vertical-align: middle;
+}
+
+/* a theme has no switch here: its name lines up with the others' */
+.kroom-admin-plugin-theme > summary {
+    padding-left: 2.75rem;  /* the switch's width plus its margin */
 }
 
 /* off: still there to configure, said quietly */
@@ -185,16 +213,8 @@ body:has(> .kroom-admin) {
     margin: .15rem 0 0;
 }
 
-.kroom-admin-settings fieldset {
-    border: 1px solid var(--pico-muted-border-color, #d1d5db);
-    border-radius: .375rem;
-    padding: .5rem .75rem;
-    margin: 0 0 .75rem;
-}
-
-.kroom-admin-settings legend {
-    font-weight: bold;
-    padding: 0 .25rem;
+.kroom-admin-group {
+    margin-bottom: .5rem;
 }
 
 .kroom-admin-section h4 {
@@ -229,37 +249,6 @@ body:has(> .kroom-admin) {
 
 .kroom-admin-roles dd {
     margin-left: 1rem;
-}
-
-.kroom-admin-media {
-    list-style: none;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
-    gap: .5rem;
-}
-
-.kroom-admin-media li {
-    display: flex;
-    flex-direction: column;
-    gap: .15rem;
-    overflow: hidden;
-    word-break: break-all;
-    font-size: .75rem;
-}
-
-.kroom-admin-media img {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-    border-radius: .25rem;
-}
-
-.kroom-admin-remove {
-    all: unset;
-    cursor: pointer;
-    color: var(--kroom-cancel-color, #dc2626);
-    font-size: .75rem;
 }
 
 .kroom-admin-table {
@@ -312,8 +301,10 @@ button.kroom-admin-menu-reset { width: auto; margin: .5rem 0 0; padding: 0; back
 .kroom-admin-menu-source { margin-top: .5rem; }
 .kroom-admin-phantom { outline: 1px dashed var(--pico-muted-border-color, #ddd); outline-offset: -1px; font-size: .8rem; line-height: 1.6; }
 .kroom-admin-phantom:hover { outline-color: var(--kroom-edit-color, #2563eb); }
-.kroom-admin-new-page { display: flex; gap: .25rem; margin: .125rem 0; grid-column: 1 / -1; }
-.kroom-admin-new-page input { flex: 2 1 0; min-width: 0; margin: 0; padding: .2rem .4rem; height: auto; font-size: .8rem; border-style: dashed; }
+.kroom-admin-phantom, .kroom-admin-phantom > .kroom-admin-handle { cursor: grab; }    /* the whole row drags, not just its handle */
+/* the newborn's form: its name on a line, then where it goes, its layout and the two buttons */
+.kroom-admin-new-page { display: flex; flex-wrap: wrap; gap: .25rem; margin: .125rem 0; grid-column: 1 / -1; }
+.kroom-admin-new-page input { flex: 1 1 100%; min-width: 0; margin: 0; padding: .2rem .4rem; height: auto; font-size: .8rem; border-style: dashed; }
 .kroom-admin-new-page input[name="slug"] { flex: 1 1 0; font-family: var(--pico-font-family-monospace, monospace); }
 .kroom-admin-new-page select { flex: 0 1 auto; width: auto; margin: 0; padding: .2rem 1.6rem .2rem .4rem; height: auto; font-size: .8rem; }
 .kroom-admin-new-page button { width: auto; margin: 0; padding: 0 .6rem; font-size: .9rem; line-height: 1.4; }

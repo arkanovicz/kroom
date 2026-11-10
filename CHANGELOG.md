@@ -430,6 +430,24 @@ All notable changes to kroom will be documented in this file.
   gallery.
 - The pages panel reloads the page after every action — the menu, the west, a TOC are server-rendered — and
   the admin bar reopens where it was (panel and entry, `sessionStorage`); a newborn page is opened.
+- The admin bar's panel slides in and out (CSS, `allow-discrete`; none under `prefers-reduced-motion`); a click
+  on the page closes it. Its last button is the eye: pressed, the page as visitors see it; released (struck
+  through, remembered per tab), every block outlined, the empty regions with them. The site's first group of
+  settings is *General* (was *Site*, the panel's own name); a settings form's groups fold, the first one open.
+  The plugins panel lists the themes first, their names aligned with the switched plugins'.
+- webmaster: every link a page carries is checked, the other sites' too — the `external` setting is gone (a
+  link is a promise whoever it points to).
+- The admin bar is trimmed to what one acts on: site, pages, plugins, themes, roles, the eye. The journal's and
+  the media's entries are gone (the journal's API and panel code stay, the media panel is removed — the media
+  API is the editor's and the gallery's). A plugin's `AdminEntry` of tables alone is no icon any more: its
+  tables show under the plugin in the plugins panel (`AdminEntry.standsAlone`: a link or a frame keeps its
+  icon); `GET /api/site/plugins` carries them (`tables`). forms lists its messages nowhere (`/api/forms/messages`
+  stays). The site's *Description*, *Public URL* and *Picture* are a group of their own, *Sharing*.
+- `Plugin.holds(site)`: what a plugin holds that pages show, or null — the plugins panel asks before switching
+  off one that answers (gallery: "3 galleries, 41 pictures"). Pinned in `GalleryTest`, with what happens then: the
+  blocks calling it say they cannot be displayed (blocks are strict, the call is an undefined reference).
+- Saving a settings form, switching a plugin, reloads the page — it was rendered with the old values (the basic
+  theme's dark scheme seemed to do nothing) — and the bar reopens on the plugin or the group one was in.
 - Logged in, one is back where one was: serving its login page, the site remembers the page it was reached
   from (`kroom_from`, a short-lived cookie); `POST /login` goes there, or where a `from` field says.
 - A root page is born with its content, the loop over its children (`AuthoredPage.TOC`): a section's page is
@@ -464,8 +482,10 @@ All notable changes to kroom will be documented in this file.
   for whoever holds `gallery.edit` (editors and authors), edited in place: upload or drop pictures (the media API),
   drag to reorder (SortableJS), caption per language, remove; every change is one `PUT /api/gallery/{id}` of the
   whole list, the reply the gallery as stored with its URLs, which the grid is rebuilt from. `POST /api/gallery`
-  makes one, `GET /api/gallery/{id}` reads it, `DELETE` removes it; `GET /api/gallery` is the admin bar's table.
-  A page born with the `gallery` layout is seeded with `$gallery.show("<new id>")`. Renditions come from a
+  makes one, `GET /api/gallery/{id}` reads it, `DELETE` removes it — no admin bar entry: the plugins panel is the
+  plugin's place, a gallery's is its page. Pictures pasted on a gallery page land in its gallery (in the one the paste
+  happens in when the page holds several). A page born with the `gallery` layout is seeded with
+  `$gallery.show("<new id>")`. Renditions come from a
   `kroom-webapp-images` `Images` the application hands over (fill 300 for the grid, fit 900 for the show, the
   original to zoom and download; its route mounted by the plugin, on a path of its own — `/img` is the static
   files'), the originals otherwise. Pictures only; videos later. Pinned in `GalleryTest`; the browser side in

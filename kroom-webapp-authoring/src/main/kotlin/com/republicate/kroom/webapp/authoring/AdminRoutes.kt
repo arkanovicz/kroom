@@ -158,6 +158,12 @@ fun Route.siteRoutes() {
                         set("enabled", site.enabled(plugin))
                         if (plugin is Theme) set("theme", true)       // switched on the themes panel, not here
                         set("settings", settingsJson(plugin.settings, site.settings(plugin)))
+                        site.tables(plugin).takeIf { it.isNotEmpty() }?.let { tables ->
+                            set("tables", Json.MutableArray().apply {
+                                tables.forEach { push(Json.MutableObject().apply { set("id", it.id); set("label", it.label); set("url", it.url) }) }
+                            })
+                        }
+                        if (site.enabled(plugin)) plugin.holds(site)?.let { set("holds", it) }
                     })
                 }
             })

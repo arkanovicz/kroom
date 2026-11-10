@@ -32,6 +32,12 @@ interface Plugin {
      * stays off until the service is there.
      */
     fun check(settings: Settings): String? = null
+
+    /**
+     * What this plugin holds that pages show — "3 galleries, 41 pictures" — or null when switching it off
+     * hides nothing. The admin bar asks before switching off a plugin that answers.
+     */
+    fun holds(site: Site): String? = null
 }
 
 /**
@@ -87,7 +93,10 @@ data class AdminEntry(
     val tables: List<AdminTable> = emptyList(),
     val frame: String? = null,
     val permission: String = Permissions.ADMIN
-)
+) {
+    /** A link or a framed application has its icon in the bar; tables alone show under their plugin, in the plugins panel. */
+    val standsAlone: Boolean get() = href != null || frame != null
+}
 
 /** A table of an admin entry: its label, and the API answering `{columns, rows}`. */
 data class AdminTable(val id: String, val label: String, val url: String)

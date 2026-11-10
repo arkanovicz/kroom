@@ -727,7 +727,7 @@ optional `group`, under which the admin form gathers it.
 | `intercept { call -> }` | before routing: redirects, firewall, cache | `template_redirect`, drop-ins |
 | `notFound { call -> }` | what nothing answered: log it, or still answer it | `404_template` |
 | `head { }`, `foot { }` | fragments at `$site.head()` / `$site.foot()` | `wp_head`, `wp_footer` |
-| `admin(AdminEntry)` | an entry of the admin bar: a link, `{columns, rows}` tables, or an application framed | `add_menu_page` |
+| `admin(AdminEntry)` | a link or an application framed, as an entry of the admin bar; `{columns, rows}` tables, under the plugin in the plugins panel | `add_menu_page` |
 | `onPublish { block, author -> }` | after each submit, off the request | `save_post` |
 | `seed(layout) { page -> }` | what a page born with that layout starts as: the plugin's call in its content block | a post template |
 | `every(period) { }` | scheduled jobs, from start to stop | WP-Cron |
@@ -873,8 +873,12 @@ blocks and nothing else. An application computing its own menu sets `navigation 
 
 `$site.foot()` emits, for whoever may open at least one of its entries (*pages* asks `pages.edit`, the others
 `site.admin`), a bar on the left of the page — the site's own settings (below), pages (the tree, see *Pages and
-the menu*), journal, media, plugins with their settings forms (a secret is never read back), themes (when more
-than one is installed), roles, then the plugins' entries. Its data comes from
+the menu*), plugins (themes first; each with its settings form, a secret never read back, and its tables),
+themes (when more than one is installed), roles, then the plugins' entries that stand alone — a link, an
+application framed; tables alone show under their plugin, in the plugins panel — and the eye: pressed, the page as
+visitors see it, released, every block outlined. A panel action that changes what the page shows reloads it, and
+the bar reopens where it was. Switching off a plugin that `holds(site)` something ("3 galleries, 41 pictures")
+asks first. The journal has no entry for now (its API stays). Its data comes from
 `/api/site/{settings, menu, pages, plugins, plugins/{id}/settings, themes, roles}`; its markup is built by `admin.js`. It speaks the editor's language (*The editor's words*); a plugin's
 words are the application's to translate, `installContentSite { strings[…] }` keyed by the plugin's ids (`<entry id>`,
 `<entry id>.<table id>`, `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`,

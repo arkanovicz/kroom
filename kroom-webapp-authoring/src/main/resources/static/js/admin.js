@@ -2,9 +2,9 @@
 // Part of kroom-webapp-authoring. Needs api.js, and Sortable for dragging pages. Emitted by `$site.foot()`.
 //
 // The server hands the entries as data (kroom's own, then the plugins'); every piece of markup is built
-// here. A panel opens beside the bar: the site's settings, the pages (which are the menu), journal, media,
-// plugins and their settings, themes, roles — or a plugin's tables (APIs answering {columns, rows}), or
-// another application, framed.
+// here. A panel opens beside the bar: the site's settings, the pages (which are the menu), journal,
+// plugins with their settings and tables (APIs answering {columns, rows}), themes, roles — or a plugin's
+// own entry, or another application, framed.
 
 (function () {
 
@@ -18,10 +18,10 @@
     // `<plugin>.name`, `<plugin>.description`, `<plugin>.<setting>`, `<plugin>.<setting>.help`, `<plugin>.<group>`
     // — and defaults to what the plugin says. The stock words are not up for rewording.
     const STOCK = { en: {
-        site: 'site', pages: 'pages', journal: 'journal', media: 'media', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
+        site: 'site', pages: 'pages', journal: 'journal', plugins: 'plugins', themes: 'themes', roles: 'roles', close: 'close',
 
         // the site's own settings: their labels come from the server in English, said here in each language
-        'site.Site': 'Site', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects', 'site.rules': 'Redirects', 'site.missing': 'Not found',
+        'site.General': 'General', 'site.Sharing': 'Sharing', 'site.Mail': 'Mail', 'site.Redirects': 'Redirects', 'site.rules': 'Redirects', 'site.missing': 'Not found',
         'site.name': 'Name', 'site.lang': 'Language', 'site.lang.help': 'The content\'s — html lang',
         'site.baseUrl': 'Public URL', 'site.baseUrl.help': 'https://example.org — absolute URLs need it',
         'site.description': 'Description', 'site.description.help': 'What the site is, in a sentence or two',
@@ -36,7 +36,7 @@
         'site.mailFrom': 'Sender', 'site.mailFrom.help': 'Site <noreply@example.org>',
         'site.redirects': 'Rules', 'site.redirects.help': 'One per line: /from /to [301|302|307|308] — a trailing * on both sides, ?id={id}',
         activate: 'use it', active: 'in use', preview: 'preview', layouts: 'layouts: {layouts}',
-        noMedia: 'nothing uploaded yet', remove: 'delete', size: '{kb} kB',
+        asVisitor: 'the page as visitors see it — off, every block shows',
         // the pages panel — which is the menu
         pagesDerived: 'in the order the pages come', pagesArranged: 'as you arranged them', pagesReset: 'forget this arrangement',
         pageDrag: 'drag to move', pageStays: 'it stays in its list: reordered, not moved', pageHasChildren: 'it has pages under it: it cannot move yet',
@@ -45,15 +45,16 @@
         pageNew: 'drag me where a new page or link goes', pageBorn: 'create', pageUnborn: 'cancel',
         publish: 'publish', unpublish: 'unpublish', draft: 'draft', published: 'published',
         confirmDeletePage: 'Delete this page? Its blocks stay in the store.',
+        confirmDisable: 'Switch {name} off? It holds {holds} — the blocks calling it will say they cannot be displayed.',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
         unknownAuthor: 'unknown', noPlugin: 'no plugin installed', enabled: 'enabled', disabled: 'disabled', save: 'save', saved: 'saved',
         secretSet: 'set — leave empty to keep', secretUnset: 'not set',
         yourRoles: 'your roles: {roles}', empty: 'nothing yet', error: 'Error: {message}'
     }, fr: {
-        site: 'site', pages: 'pages', journal: 'journal', media: 'médias', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
+        site: 'site', pages: 'pages', journal: 'journal', plugins: 'extensions', themes: 'thèmes', roles: 'rôles', close: 'fermer',
 
         // the site's own settings: their labels come from the server in English, said here in each language
-        'site.Site': 'Site', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections', 'site.rules': 'Redirections', 'site.missing': 'Introuvables',
+        'site.General': 'Général', 'site.Sharing': 'Partage', 'site.Mail': 'Courrier', 'site.Redirects': 'Redirections', 'site.rules': 'Redirections', 'site.missing': 'Introuvables',
         'site.name': 'Nom', 'site.lang': 'Langue', 'site.lang.help': 'Celle du contenu — html lang',
         'site.baseUrl': 'URL publique', 'site.baseUrl.help': 'https://exemple.org — pour les URL absolues',
         'site.description': 'Description', 'site.description.help': 'Ce qu’est le site, en une phrase ou deux',
@@ -68,7 +69,7 @@
         'site.mailFrom': 'Expéditeur', 'site.mailFrom.help': 'Site <noreply@exemple.org>',
         'site.redirects': 'Règles', 'site.redirects.help': 'Une par ligne\u00a0: /de /vers [301|302|307|308] — * final des deux côtés, ?id={id}',
         activate: 'l’utiliser', active: 'utilisé', preview: 'aperçu', layouts: 'mises en page : {layouts}',
-        noMedia: 'rien d’envoyé pour l’instant', remove: 'supprimer', size: '{kb} ko',
+        asVisitor: 'la page telle que les visiteurs la voient — désactivé, chaque bloc apparaît',
         // the pages panel — which is the menu
         pagesDerived: 'dans l’ordre où viennent les pages', pagesArranged: 'telles que vous les avez arrangées', pagesReset: 'oublier cet arrangement',
         pageDrag: 'glisser pour déplacer', pageStays: 'elle reste dans sa liste\u00a0: on la réordonne, on ne la déplace pas', pageHasChildren: 'elle a des pages sous elle\u00a0: elle ne peut pas encore bouger',
@@ -77,6 +78,7 @@
         pageNew: 'glissez-moi où va une nouvelle page ou un lien', pageBorn: 'créer', pageUnborn: 'annuler',
         publish: 'publier', unpublish: 'dépublier', draft: 'brouillon', published: 'publiée',
         confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.',
+        confirmDisable: 'D\u00e9sactiver {name}\u00a0? Elle contient {holds} \u2014 les blocs qui l\u2019appellent diront qu\u2019ils ne peuvent pas \u00eatre affich\u00e9s.',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
         unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', enabled: 'activée', disabled: 'désactivée', save: 'enregistrer', saved: 'enregistré',
         secretSet: 'défini — laisser vide pour le garder', secretUnset: 'non défini',
@@ -96,12 +98,13 @@
     const icons = Object.assign({
         pages: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
         journal: 'M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v4h-4',
-        media: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         plugins: 'M9 3v4M15 3v4M7 7h10v5a5 5 0 0 1-10 0zM12 17v4',
         site: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
         themes: 'M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14.5 15 16 15h2a3 3 0 0 0 3-3 9 9 0 0 0-9-9zM7.5 12h.01M9.5 7.5h.01M14.5 7.5h.01',
         roles: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 8l2 2 4-4',
-        close: 'M6 6l12 12M18 6L6 18'
+        close: 'M6 6l12 12M18 6L6 18',
+        eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+        eyeOff: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0M3 3l18 18'
     }, window.kroomAdmin?.icons);
 
     window.kroomAdmin = Object.assign(window.kroomAdmin || {}, { strings, icons, language, stock: STOCK });
@@ -134,7 +137,7 @@
         return svg;
     }
 
-    // the panel and the entry left open, per tab: a gesture reloads the page, the bar reopens where it was
+    // the panel, the entry and the fold left open, per tab: a gesture reloads the page, the bar reopens where it was
     const memory = {
         get: (key) => { try { return sessionStorage.getItem('kroom.admin.' + key); } catch { return null; } },
         set: (key, value) => { try { value == null ? sessionStorage.removeItem('kroom.admin.' + key) : sessionStorage.setItem('kroom.admin.' + key, value); } catch { /* no storage: the bar just closes */ } }
@@ -159,6 +162,19 @@
         if (!entry.href) control.addEventListener('click', () => toggle(entry, label, control));
         nav.appendChild(control);
     }
+
+    // the eye: pressed, the page as visitors see it; released, every block shows (the empty regions too) — per tab
+    const eye = nav.appendChild(element('button'));
+    eye.type = 'button'; eye.title = t('asVisitor'); eye.setAttribute('aria-label', t('preview'));
+    const reveal = (shown) => {
+        eye.setAttribute('aria-pressed', String(!shown));
+        // the icon says which: open, as visitors see it; struck through, everything revealed
+        eye.replaceChildren(icon(shown ? icons.eyeOff : icons.eye, t('preview')));
+        document.documentElement.classList.toggle('kroom-admin-revealed', shown);
+        memory.set('reveal', shown ? '1' : null);
+    };
+    reveal(memory.get('reveal') === '1');
+    eye.addEventListener('click', () => reveal(!document.documentElement.classList.contains('kroom-admin-revealed')));
 
     function toggle(entry, label, control) {
         nav.querySelectorAll('[aria-pressed]').forEach(b => b.removeAttribute('aria-pressed'));
@@ -191,6 +207,7 @@
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
+    document.addEventListener('click', e => { if (open && !bar.contains(e.target)) close(); });     // a click on the page closes the panel
 
     function link(href, text) {
         const a = element('a', null, text);
@@ -383,7 +400,7 @@
                 phantom.appendChild(element('span', 'kroom-admin-muted', t('pageNew')));
                 phantom.title = t('pageNew');
                 if (window.Sortable) new window.Sortable(source, {
-                    group: { name: 'kroom-menu', pull: 'clone', put: false }, sort: false, handle: '.kroom-admin-handle',
+                    group: { name: 'kroom-menu', pull: 'clone', put: false }, sort: false,     // no handle: the whole row drags
                     animation: 150, fallbackOnBody: true, ghostClass: 'kroom-admin-ghost'
                 });
                 if (answer.stored) action(body, 'pagesReset', 'kroom-admin-menu-reset', () => act(() => api.deleteJson(siteApi + 'menu')));
@@ -410,36 +427,6 @@
             }
         },
 
-        async media(body) {
-            const files = await api.getJson(contentApi + 'media');
-            if (!files.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noMedia')));
-            const grid = body.appendChild(element('ul', 'kroom-admin-media'));
-            for (const file of files) {
-                const item = grid.appendChild(element('li'));
-                const open = item.appendChild(link(file.url, ''));
-                if (file.type.startsWith('image/')) {
-                    const img = open.appendChild(element('img'));
-                    img.src = file.url;
-                    img.alt = file.name;
-                    img.loading = 'lazy';
-                } else {
-                    open.textContent = file.name;
-                }
-                item.title = file.name;
-                item.appendChild(element('small', 'kroom-admin-muted', t('size', { kb: Math.ceil(file.size / 1024) })));
-                const remove = item.appendChild(element('button', 'kroom-admin-remove', t('remove')));
-                remove.type = 'button';
-                remove.addEventListener('click', async () => {
-                    try {
-                        await api.deleteJson(contentApi + 'media/' + encodeURIComponent(file.name));
-                        item.remove();
-                    } catch (err) {
-                        item.appendChild(element('small', 'kroom-admin-error', said(err)));
-                    }
-                });
-            }
-        },
-
         async site(body, entry) {
             const settings = await api.getJson(siteApi + 'settings');
             body.appendChild(settingsForm({ id: 'site', settings }, siteApi + 'settings'));
@@ -449,12 +436,17 @@
         async plugins(body) {
             const plugins = await api.getJson(siteApi + 'plugins');
             if (!plugins.length) return body.appendChild(element('p', 'kroom-admin-muted', t('noPlugin')));
-            for (const plugin of plugins) {
+            // themes first, then the rest, each in the order given
+            const sorted = [...plugins.filter(p => p.theme), ...plugins.filter(p => !p.theme)];
+            const fold = memory.get('fold');
+            for (const plugin of sorted) {
+                const name = own(`${plugin.id}.name`, plugin.name);
                 const details = body.appendChild(element('details', 'kroom-admin-plugin'));
+                details.classList.toggle('kroom-admin-plugin-theme', !!plugin.theme);
                 details.classList.toggle('kroom-admin-off', !plugin.enabled);
                 const summary = details.appendChild(element('summary'));
                 // a theme is switched on the themes panel; any other plugin here, live — clicking the switch
-                // activates the switch, not the summary
+                // activates the switch, not the summary. Done, the page reloads: what it shows depends on it
                 if (!plugin.theme) {
                     const toggle = summary.appendChild(element('input'));
                     toggle.type = 'checkbox';
@@ -463,20 +455,36 @@
                     toggle.title = t(plugin.enabled ? 'enabled' : 'disabled');
                     toggle.setAttribute('aria-label', toggle.title);
                     toggle.addEventListener('change', async () => {
+                        // switched off, what it holds vanishes from the pages: said before, not after
+                        if (!toggle.checked && plugin.holds && !window.confirm(t('confirmDisable', { name, holds: plugin.holds }))) {
+                            toggle.checked = true;
+                            return;
+                        }
                         try {
                             await api.putJson(siteApi + `plugins/${encodeURIComponent(plugin.id)}/enabled`, { enabled: toggle.checked });
-                            details.classList.toggle('kroom-admin-off', !toggle.checked);
-                            toggle.title = t(toggle.checked ? 'enabled' : 'disabled');
+                            location.reload();
                         } catch (err) {
                             toggle.checked = !toggle.checked;
                             details.appendChild(element('small', 'kroom-admin-error', said(err)));
                         }
                     });
                 }
-                summary.appendChild(document.createTextNode(own(`${plugin.id}.name`, plugin.name)));
+                summary.appendChild(document.createTextNode(name));
                 const description = own(`${plugin.id}.description`, plugin.description);
                 if (description) details.appendChild(element('p', 'kroom-admin-muted', description));
                 if (plugin.settings.length) details.appendChild(settingsForm(plugin, siteApi + `plugins/${encodeURIComponent(plugin.id)}/settings`));
+                // its tables are fetched the first time it opens, not for every plugin listed
+                if (plugin.tables?.length) {
+                    const shelf = details.appendChild(element('div'));
+                    let fetched = false;
+                    details.addEventListener('toggle', () => {
+                        if (!details.open || fetched) return;
+                        fetched = true;
+                        tables({ id: plugin.id, tables: plugin.tables }, shelf).catch(err => shelf.appendChild(element('p', 'kroom-admin-error', said(err))));
+                    });
+                }
+                remember(details, summary, plugin.id);
+                details.open = fold === plugin.id || !!fold?.startsWith(plugin.id + '.');
             }
         },
 
@@ -526,16 +534,22 @@
     function settingsForm(plugin, url) {
         const form = element('form', 'kroom-admin-settings');
         let group = null, into = form;
+        const fold = memory.get('fold');
+        const remembered = plugin.settings.some(s => s.group != null && `${plugin.id}.${s.group}` === fold);
         for (const declared of plugin.settings) {
             const setting = Object.assign({}, declared, {
                 label: own(`${plugin.id}.${declared.key}`, declared.label),
                 help: own(`${plugin.id}.${declared.key}.help`, declared.help)
             });
-            // consecutive settings of one group share a fieldset, under the group's name
+            // consecutive settings of one group fold under the group's name, the one left open (else the first) open
             if ((declared.group ?? null) !== group) {
                 group = declared.group ?? null;
-                into = group ? form.appendChild(element('fieldset')) : form;
-                if (group) into.appendChild(element('legend', null, own(`${plugin.id}.${group}`, group)));
+                into = group ? form.appendChild(element('details', 'kroom-admin-group')) : form;
+                if (group) {
+                    const key = `${plugin.id}.${group}`;
+                    into.open = remembered ? key === fold : form.querySelectorAll('.kroom-admin-group').length === 1;
+                    remember(into, into.appendChild(element('summary', null, own(key, group))), key, plugin.id);
+                }
             }
             const label = into.appendChild(element('label'));
             let input;
@@ -581,14 +595,30 @@
                 const input = form.elements[setting.key];
                 values[setting.key] = setting.type === 'boolean' ? String(input.checked) : input.value;
             }
+            // the page was rendered with the old values: saved, it reloads, and the bar reopens where it was
             try {
                 await api.putJson(url, values);
                 status.textContent = t('saved');
+                location.reload();
             } catch (err) {
                 status.textContent = said(err);
             }
         });
         return form;
+    }
+
+    /**
+     * The fold left open, [key] while [details] is, for the bar to reopen it after a reload; closed, the fold goes
+     * back to [parent] (the plugin around a group). The admin's click, not `toggle`: the defaults set while
+     * building fire `toggle` too.
+     */
+    function remember(details, summary, key, parent = null) {
+        summary.addEventListener('click', (e) => {
+            if (e.target.closest('input')) return;      // the plugin's switch, not the fold
+            const fold = memory.get('fold');
+            if (!details.open) memory.set('fold', key);
+            else if (fold === key || fold?.startsWith(key + '.')) memory.set('fold', parent);
+        });
     }
 
     /** Another application's page, in the panel: whatever it shows, it shows on its own origin. */

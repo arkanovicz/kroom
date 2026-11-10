@@ -417,8 +417,15 @@ ul.kroom-revisions button {
 }
 
 .kroom-region-empty:hover,
-.kroom-region-empty:focus-within {
+.kroom-region-empty:focus-within,
+.kroom-admin-revealed .kroom-region-empty {
     opacity: 1;
+}
+
+/* the admin bar's eye released: every block outlined, the empty regions with them */
+.kroom-admin-revealed .kroom-block {
+    outline: 1px dashed var(--kroom-edit-color, #2563eb);
+    outline-offset: 2px;
 }
 
 .kroom-region-empty small {
