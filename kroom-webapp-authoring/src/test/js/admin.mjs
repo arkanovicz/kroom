@@ -299,9 +299,8 @@ check('forgetting the arrangement deletes it', [sent(), went()], [{ url: '/api/s
     click(docs.querySelector(':scope > details button'));
     await sleep(20);
     check('removing it puts the tree without it, and reloads', [sent().url, sent().method, sent().body.items.some(i => i.href), went()], ['/api/site/menu', 'PUT', false, ['reload']]);
-    // SUSPECT: the button's row is taken out of the tree during the click, so the document's click-outside
-    // listener no longer finds the target in the bar: the panel closes and forgets itself before the reload
-    // check('and the bar will reopen on the pages after the reload', remembered('panel'), 'pages');
+    // its row is out of the tree by the time the click reaches the document: still a click in the bar
+    check('and the bar will reopen on the pages after the reload', remembered('panel'), 'pages');
 }
 
 // a new page: the phantom row dropped in the tree asks its name, then where — the segment following the name
@@ -341,6 +340,24 @@ await sleep(20);
     await sleep(20);
     check('an address makes a link, stored where it was dropped', [sent().url, sent().method, sent().body.items.at(-1), went()],
         ['/api/site/menu', 'PUT', { href: 'https://docs.example', label: { en: 'Docs' }, description: {}, children: [] }, ['reload']]);
+
+    const takes = (text) => new RegExp(`^(?:${drop(list()).elements.slug.pattern})$`, 'v').test(text);
+    check('an address is a place to go, nothing a browser runs', ['https://x.example/a', 'mailto:a@x.example', 'tel:+33123456789', 'javascript:alert(1)', 'data:text/html,x'].map(takes),
+        [true, true, true, false, false]);
+
+    // a form left: its row goes, the panel stays — the click and the key are the form's, not the page's
+    const before = () => calls.filter(c => c.method !== 'GET').length;
+    const sentBefore = before();
+    const left = drop(list());
+    click(left.querySelector('button[type="button"]'));
+    check('cancelled, the form is gone, nothing sent, and the panel stays', [left.isConnected, before() - sentBefore, $('.kroom-admin-panel').hidden, remembered('panel')], [false, 0, false, 'pages']);
+    const escaped = drop(list());
+    escaped.elements.label.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    check('Escape leaves the form, not the panel', [escaped.isConnected, $('.kroom-admin-panel').hidden, remembered('panel')], [false, false, 'pages']);
+    window.document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    check('a second one closes the panel', [$('.kroom-admin-panel').hidden, remembered('panel')], [true, null]);
+    click(entry('pages'));
+    await sleep(20);
 }
 check('the open entry is pressed', entry('pages').getAttribute('aria-pressed'), 'true');
 click(entry('pages'));

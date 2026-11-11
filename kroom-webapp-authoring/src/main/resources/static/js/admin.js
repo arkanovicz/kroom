@@ -207,7 +207,9 @@
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
-    document.addEventListener('click', e => { if (open && !bar.contains(e.target)) close(); });     // a click on the page closes the panel
+    // a click on the page closes the panel — judged on the path the click took: its own handler may have taken
+    // the element clicked out of the bar (a row removed, a form cancelled)
+    document.addEventListener('click', e => { if (open && !e.composedPath().includes(bar)) close(); });
 
     function link(href, text) {
         const a = element('a', null, text);
@@ -227,7 +229,7 @@
             let opened = memory.get('entry');           // the accordion left open, by path or address, across re-renders and reloads
             const strip = (list) => list.map(i => ({ slug: i.slug, href: i.href, label: i.label || {}, description: i.description || {}, children: strip(i.children || []) }));
             // an address elsewhere: anything with a scheme — what a segment can never be
-            const LINK = /^[A-Za-z][A-Za-z0-9+.\-]*:.+$/;     // `\-`: the pattern attribute compiles with the v flag, a bare `-` in a class is an error there
+            const LINK = /^(https?|mailto|tel):.+$/;     // what the server takes for an address: nothing a browser runs
             const fail = (err) => body.appendChild(element('p', 'kroom-admin-error', said(err)));
             const refresh = async () => { answer = await api.getJson(siteApi + 'menu'); render(); };
             // their order and words; whatever happens, the tree shown is the server's. Done, the page reloads: the
@@ -361,7 +363,8 @@
                 const cancel = form.appendChild(element('button', 'secondary outline', '\u2715'));
                 cancel.type = 'button'; cancel.title = t('pageUnborn'); cancel.setAttribute('aria-label', t('pageUnborn'));
                 cancel.addEventListener('click', () => li.remove());
-                form.addEventListener('keydown', (e) => { if (e.key === 'Escape') li.remove(); });
+                // Escape leaves the form; the panel stays, a second one closes it
+                form.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); li.remove(); } });
                 form.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const where = slug.value.trim(), label = { [lang]: name.value.trim() };
