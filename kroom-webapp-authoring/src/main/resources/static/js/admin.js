@@ -263,6 +263,9 @@
                 const authored = item.kind === 'authored';
                 const made = item.status !== undefined;
                 const li = element('li', `kroom-admin-menu-entry kroom-admin-kind-${item.kind}` + (item.movable ? '' : ' kroom-admin-fixed'));
+                // the page one is on, told apart whether its line is open or not
+                const here = !!item.path && item.path === (location.pathname.replace(/\/+$/, '') || '/');
+                li.classList.toggle('kroom-admin-here', here);
                 li._item = item;
                 const handle = li.appendChild(element('span', 'kroom-admin-handle', '\u283f'));
                 handle.title = t(item.movable ? 'pageDrag' : authored ? 'pageHasChildren' : 'pageStays');
@@ -273,6 +276,7 @@
                 details.open = opened === key;
                 details.addEventListener('toggle', () => { if (details.open) opened = key; else if (opened === key) opened = null; memory.set('entry', opened); });
                 const summary = details.appendChild(element('summary', null, item.label?.[lang] || item.label?.[answer.lang] || item.slug || item.href));
+                if (here) summary.setAttribute('aria-current', 'page');
                 if (item.status === 'draft') summary.appendChild(element('small', 'kroom-admin-muted', ' ' + t('draft')));
                 const fields = details.appendChild(element('div', 'kroom-admin-menu-fields'));
                 field(fields, 'pageLabel', item, 'label');
@@ -291,7 +295,9 @@
                     const layout = fields.appendChild(element('p', 'kroom-admin-menu-layout', t('pageLayout') + ' ')).appendChild(element('select'));
                     for (const l of answer.layouts) layout.appendChild(element('option', null, l)).value = l;
                     layout.value = item.layout;
-                    layout.addEventListener('change', () => act(() => api.putJson(siteApi + 'pages' + item.path, { layout: layout.value })));
+                    // another page's layout changes nothing of the page shown: only its own is laid out anew
+                    layout.addEventListener('change', () => act(() => api.putJson(siteApi + 'pages' + item.path, { layout: layout.value }),
+                        () => { if (here) location.reload(); else item.layout = layout.value; }));
                 }
                 if (made) {
                     const actions = fields.appendChild(element('div', 'kroom-admin-actions'));

@@ -288,8 +288,9 @@ button.kroom-admin-menu-reset { width: auto; margin: .5rem 0 0; padding: 0; back
 .kroom-admin-fixed > .kroom-admin-handle:hover { opacity: .35; }
 /* a list the dragged page may not enter */
 .kroom-admin-nodrop { outline: 1px dashed var(--kroom-cancel-color, #dc2626); cursor: not-allowed; }
-/* no page here: a section nobody wrote */
-.kroom-admin-kind-section > details > summary { color: var(--kroom-cancel-color, #dc2626); }
+/* the page one is on */
+.kroom-admin-here > details > summary { font-weight: 600; color: var(--kroom-admin-accent); }
+.kroom-admin-here > .kroom-admin-handle { box-shadow: inset 2px 0 0 var(--kroom-admin-accent); }
 .kroom-admin-menu-fields select { display: inline-block; width: auto; margin: 0; padding: .1rem 1.75rem .1rem .4rem; height: auto; font-size: .8rem; }
 
 /* a new page: its name, its segment, on one line */

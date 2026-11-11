@@ -71,10 +71,10 @@ const calls = [];
  * A page with the bar, admin.js loaded after `preset` as a browser loads them: one shared scope. `kept` is the
  * tab's sessionStorage, carried over as a reload keeps it.
  */
-function bar(preset, kept = {}) {
+function bar(preset, kept = {}, path = '/club/13Ma') {
     const { window } = new JSDOM(`<!doctype html><html><body><main>page</main>
         <aside class="kroom-admin" data-api="/api/site" data-content-api="/api/content" data-entries="${entries}"></aside>
-        </body></html>`, { runScripts: 'outside-only', url: 'http://localhost/club/13Ma' });
+        </body></html>`, { runScripts: 'outside-only', url: 'http://localhost' + path });
     for (const [key, value] of Object.entries(kept)) window.sessionStorage.setItem(key, value);
     window.Response = Response;
     window.fetch = async (url, options = {}) => {
@@ -98,9 +98,9 @@ function bar(preset, kept = {}) {
 const words = `Object.assign(((window.kroomAdmin ??= {}).strings ??= {}), { pages: 'pages du site', inbox: 'Courrier reçu', 'seo.title': 'Titre', 'web.missing': 'Introuvables' });`;
 let window = bar(words);
 /** The page reloaded, in the same tab: what admin.js remembered in sessionStorage is still there. */
-const reload = async () => {
+const reload = async (path) => {
     const storage = window.sessionStorage;
-    window = bar(words, Object.fromEntries([...Array(storage.length).keys()].map(i => [storage.key(i), storage.getItem(storage.key(i))])));
+    window = bar(words, Object.fromEntries([...Array(storage.length).keys()].map(i => [storage.key(i), storage.getItem(storage.key(i))])), path);
     await sleep(20);
 };
 /** Where admin.js asked to go since last asked: 'reload', or an address. */
@@ -153,7 +153,7 @@ check('a draft says so', lines().filter(li => li.querySelector(':scope > details
 check('a line says its kind; only an editor\'s page with nothing under it is free to move', lines().map(li =>
     [li._item.slug, [...li.classList].filter(c => c !== 'kroom-admin-menu-entry').join(' ')]), [
     ['about', 'kroom-admin-kind-authored'], ['contact', 'kroom-admin-kind-template kroom-admin-fixed'], ['club', 'kroom-admin-kind-template kroom-admin-fixed'],
-    ['13Ma', 'kroom-admin-kind-instance kroom-admin-fixed'], ['legal', 'kroom-admin-kind-authored kroom-admin-fixed'],
+    ['13Ma', 'kroom-admin-kind-instance kroom-admin-fixed kroom-admin-here'], ['legal', 'kroom-admin-kind-authored kroom-admin-fixed'],
     ['terms', 'kroom-admin-kind-template kroom-admin-fixed'], ['company', 'kroom-admin-kind-authored kroom-admin-fixed'], ['history', 'kroom-admin-kind-authored'],
     [undefined, 'kroom-admin-kind-link']]);
 check('the arrangement is said to be the editors\', and can be forgotten', [$('.kroom-admin-menu-head small').textContent,
@@ -253,7 +253,21 @@ check('only an editor\'s page has a layout, a publishing switch and a delete', l
     layout.value = 'wide';
     layout.dispatchEvent(new window.Event('change'));
     await sleep(20);
-    check('another layout is put on the page, which reloads', [sent(), went()], [{ url: '/api/site/pages/about', method: 'PUT', body: { layout: 'wide' } }, ['reload']]);
+    check('another layout is put on a page one is not on: nothing here is laid out anew, no reload', [sent(), went(), line('about')._item.layout],
+        [{ url: '/api/site/pages/about', method: 'PUT', body: { layout: 'wide' } }, [], 'wide']);
+}
+check('the page one is on is told apart in the tree, open or not', [lines().filter(li => li.classList.contains('kroom-admin-here')).map(li => li._item.path),
+    line('13Ma').querySelector(':scope > details > summary').getAttribute('aria-current'), line('13Ma').querySelector(':scope > details').open],
+    [['/club/13Ma'], 'page', false]);
+{
+    // on the page itself: its layout changed, it is laid out anew
+    await reload('/about');
+    const layout = line('about').querySelector(':scope > details select');
+    layout.value = 'gallery';
+    layout.dispatchEvent(new window.Event('change'));
+    await sleep(20);
+    check('the layout of the page one is on reloads it', [sent(), went()], [{ url: '/api/site/pages/about', method: 'PUT', body: { layout: 'gallery' } }, ['reload']]);
+    await reload();
 }
 const buttons = (slug) => [...line(slug).querySelectorAll(':scope > details .kroom-admin-actions button')];
 check('a published page offers to unpublish, a draft to publish', [buttons('about').map(b => b.textContent), buttons('company')[0].textContent],
