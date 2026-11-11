@@ -91,6 +91,7 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
     velocity.registerRequest("theme") { call -> site.theme(call)?.let { ThemeView(it, site.settings(it)) } }
     velocity.registerRequest("nav") { call -> site.navigation(call) }
     site.navigation = config.navigation
+    site.hiddenPages += config.hiddenPages
     site.requestLanguage = config.requestLanguage
     config.loginPage?.let { page ->
         site.hiddenPages += page
@@ -182,6 +183,13 @@ class ContentSiteConfig {
      * ends the session. Null leaves logging in to the application (kroom-webapp-auth, oauth).
      */
     var loginPage: String? = null
+
+    /**
+     * Page templates that are served and are no part of the site's tree (`pages/joueur/_id_.html`): what they
+     * answer is in no menu and no sitemap, and nothing is made above them when the tree is completed — pages a
+     * database lists by the thousand, reached from the page that lists them. The login page is one already.
+     */
+    val hiddenPages: MutableSet<String> = mutableSetOf()
 
     /** Classpath root of the `#` layouts; null keeps them at the classpath root. */
     var templatePath: String? = "templates"

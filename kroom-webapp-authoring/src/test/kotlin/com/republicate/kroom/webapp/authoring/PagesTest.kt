@@ -21,9 +21,10 @@ class PagesTest {
 
     private val storage = MemoryStorage()
 
-    private fun ApplicationTestBuilder.site(pageTemplate: String? = null, vararg plugins: Plugin) = application {
+    private fun ApplicationTestBuilder.site(pageTemplate: String? = null, vararg plugins: Plugin, hidden: Set<String> = emptySet()) = application {
         installContentSite {
             storage = this@PagesTest.storage
+            hiddenPages += hidden
             sessionSecret = "test-secret"
             pageTemplate?.let { this.pageTemplate = it }
             this.plugins += plugins
@@ -255,6 +256,23 @@ class PagesTest {
         assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/club/9Zz").status)
         assertNull(storage.content.read("pages/club/9Zz/description.md"), "there by its blocks: they went with it")
         assertFalse(visitor("admin").get("/api/site/menu").bodyAsText().contains("/club/9Zz"))
+    }
+
+    @Test
+    fun `a template the application keeps out of the tree is served, in no menu, and nothing is made above it`() = testApplication {
+        site(hidden = setOf("pages/team/_id_/roster.html", "pages/club/_club_.html"))
+        storage.content.write("pages/team/7/roster/players.md", "Seven.", mapOf("author" to "ed"))
+        storage.content.write("pages/club/13Ma/description.md", "A club.", mapOf("author" to "ed"))
+        assertEquals(HttpStatusCode.OK, visitor().get("/team/7/roster").status, "served as before")
+        assertContains(visitor().get("/club/13Ma").bodyAsText(), "A club.")
+        for (path in listOf("/team", "/club")) {
+            assertEquals(HttpStatusCode.NotFound, visitor().get(path).status, "$path: nothing made above a hidden template")
+            assertNull(storage.records("site", "pages").get(path.trim('/')))
+        }
+        assertEquals(HttpStatusCode.OK, visitor().get("/legal").status, "the others are completed as ever")
+        val menu = visitor("admin").get("/api/site/menu").bodyAsText()
+        assertFalse(menu.contains("/club") || menu.contains("/team"), "in no menu: $menu")
+        visitor("ed").json(HttpMethod.Post, "/api/site/pages", """{"path":"/club/9Zz"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "and no page is made under it: it has no page above") }
     }
 
     @Test

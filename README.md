@@ -707,6 +707,7 @@ installContentSite {
     identity = MemoryIdentityProvider().user("admin", "admin", Roles.ADMIN)    // the demo's; or LDAP, OIDC claims…
     roles.grant("moderator", "forms.*")                   // admin: *; editor: content.*, pages.*; author: content.edit
     loginPage = "pages/login.html"                        // POST /login, /logout over the provider
+    hiddenPages += "pages/player/_id_.html"               // served, and no part of the tree (see *Pages and the menu*)
 }
 ```
 
@@ -882,6 +883,10 @@ under it. The API keeps the tree whole: a page is created or moved only under a 
 top-level one needs none); a page with pages under it is not deleted (409 `pageHolds`: an editor's page, a
 visitor's URL or a template's route), nor unpublished while visitors reach one of them; publishing a page
 publishes the drafts above it.
+
+**Out of the tree.** A template the application names in `hiddenPages` is served and is no part of the tree:
+what it answers is in no menu and no sitemap, and nothing is made above it — the pages a database lists by the
+thousand (`pages/player/_id_.html`), reached from the page that lists them. The login page is one already.
 
 **Under a developer's placeholder.** A page an editor makes where a placeholder template answers — `/club/9Zz`
 under `pages/club/_club_.html` — is the template's: the developer chose how it is laid out, the editor writes its

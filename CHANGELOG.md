@@ -26,6 +26,12 @@ All notable changes to kroom will be documented in this file.
   `pages/club/_club_.html` answered 409 for any name: nothing could be made under such a folder): it is the
   template's, laid out by it and written in its blocks, its record saying it is there and whether it is out —
   kind `instance` with a `status`, no layout to choose, not movable, deleted with its blocks.
+- `installContentSite { hiddenPages += "pages/player/_id_.html" }`: a template served and out of the tree — in
+  no menu, no sitemap, nothing made above it (a folder of pages a database lists got an empty page, back at each
+  start). The login page was the only one.
+- Pages panel: the page one is on is told apart in the tree (`kroom-admin-here`, `aria-current`), open or not;
+  another page's layout changed reloads nothing (it did, each time) — only the layout of the page one is on.
+- Basic theme: the left column is capped at 12rem (it took a quarter of the row, far too wide on a large screen).
 - The breadcrumb shows on a top-level page too (the site, then the page); the home page has none.
 - An authored page's record reads back who made it and when (`author`, `created`, `published` were written and
   read as unknown, or now).
