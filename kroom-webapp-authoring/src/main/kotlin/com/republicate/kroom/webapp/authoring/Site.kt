@@ -330,8 +330,8 @@ class Site internal constructor(
     /** Called after each block an author submits — off the request: a slow listener delays nobody. */
     /**
      * What the content block of a page born with [layout] starts as, when nothing was written there yet — a
-     * plugin's call (`$gallery.show("k7f3a")`, the gallery made for the page), as a root page starts as its table
-     * of contents. One seed per layout; the page's author signs the block.
+     * plugin's call (`$gallery.show("k7f3a")`, the gallery made for the page). One seed per layout; the page's
+     * author signs the block.
      */
     fun seed(layout: String, body: (AuthoredPage) -> String) { seeds[layout] = Owned(installing, body) }
 

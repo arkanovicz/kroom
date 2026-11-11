@@ -23,6 +23,9 @@ All notable changes to kroom will be documented in this file.
   any layout. A stored page whose layout is no longer named (`default`, `sidebar`, `landing`) reads as `article`;
   `POST`/`PUT /api/site/pages` answer 400 for one.
 - A markup-owning theme's required file is `themes/<id>/layouts/article.html` (was `default.html`).
+- A root page is born empty like any other: the loop listing its pages went (`AuthoredPage.TOC`, and the
+  `$children` `kroom/page.html` handed its content block) — the section's menu is that list already, and an
+  editor opening an empty block found code.
 - Pinned in `ThemeTest`, `DummyThemeTest`, `PagesTest`.
 
 #### kroom-webapp-velocity, kroom-markdown, kroom-webapp-authoring — a value is data, markup is a `SafeText`

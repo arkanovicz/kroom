@@ -913,11 +913,9 @@ a developer's handle is greyed) and its label, which opens an accordion: the lab
 chosen language, the page itself (a section offers to create it), and for an editor's page its layout,
 publish/unpublish, delete. A new page is born where it goes: a phantom row under the tree, dragged into place,
 asks its name — the segment derived from it (`Notre Société` → `notre-societe`) until typed over, an address
-there instead makes a link — and the page is created under that list, at that very index. A root page is born
-with its content: the loop listing the pages under it, an ordinary block an editor rewrites or trashes, so a
-section's page is a table of contents until it says otherwise (`AuthoredPage.TOC`; the page hands every content
-block `$children`). Every gesture stores the tree and reloads the page — the menu, the west, a TOC are
-server-rendered — and the bar reopens where it was (the panel and the entry, kept per tab); a newborn page is
+there instead makes a link — and the page is created under that list, at that very index. A page is born
+empty, unless its layout has a seed (a gallery's). Every gesture stores the tree and reloads the page — the menu
+and the west are server-rendered — and the bar reopens where it was (the panel and the entry, kept per tab); a newborn page is
 opened, to be written.
 
 `GET`/`PUT`/`DELETE /api/site/menu` (the tree; its arrangement; forgetting it), `POST /api/site/pages`

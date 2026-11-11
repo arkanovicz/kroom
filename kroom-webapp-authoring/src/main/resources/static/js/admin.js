@@ -233,7 +233,7 @@
             const fail = (err) => body.appendChild(element('p', 'kroom-admin-error', said(err)));
             const refresh = async () => { answer = await api.getJson(siteApi + 'menu'); render(); };
             // their order and words; whatever happens, the tree shown is the server's. Done, the page reloads: the
-            // menu, the west, a TOC are rendered by the server, and the bar reopens where it was
+            // menu and the west are rendered by the server, and the bar reopens where it was
             const store = async (items) => {
                 try { await api.putJson(siteApi + 'menu', { items: strip(items) }); location.reload(); }
                 catch (err) { await refresh(); fail(err); }

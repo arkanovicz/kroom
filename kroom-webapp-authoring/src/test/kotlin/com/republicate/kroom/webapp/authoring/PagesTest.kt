@@ -122,27 +122,20 @@ class PagesTest {
     }
 
     @Test
-    fun `a root page is born with its table of contents - the loop over its children, a block like any other`() = testApplication {
+    fun `a page is born empty, a root page too - and made again where blocks were left, it keeps them`() = testApplication {
         site()
         val editor = visitor("ed")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides","label":{"en":"Guides"},"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        assertEquals(AuthoredPage.TOC, storage.content.read("pages/guides/content.md")?.body, "the loop, stored as the page's content")
-        assertEquals("ed", storage.content.read("pages/guides/content.md")?.meta?.get("author"))
-        assertFalse(visitor().get("/guides").bodyAsText().contains("""<li><a href="/guides/"""), "nothing under it yet: the loop lists nothing")
-
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides/first","label":{"en":"First steps"},"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        assertNull(storage.content.read("pages/guides/first/content.md"), "a deeper page is born empty")
-        editor.json(HttpMethod.Put, "/api/site/menu", """{"items":[{"slug":"guides","label":{"en":"Guides"},"children":[{"slug":"first","label":{"en":"First steps"},"description":{"en":"Where to begin"}}]}]}""")
-            .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        val toc = visitor().get("/guides").bodyAsText()
-        assertContains(toc, """<li><a href="/guides/first">First steps</a> — Where to begin</li>""", message = "the child, its words from the menu")
+        assertNull(storage.content.read("pages/guides/content.md"), "no list of its pages planted there: the section's menu is that")
+        assertNull(storage.content.read("pages/guides/first/content.md"))
+        assertContains(visitor().get("/guides").bodyAsText(), """<nav class="west" aria-label="Guides">""")
 
-        // the loop is the editor's: rewritten, the page says what it says; made again where blocks were left, a page keeps them
         storage.content.write("pages/guides/content.md", "All our **guides**", mapOf("author" to "ed"))
         assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>")
         assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/guides").status)
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides","status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>", message = "its block stayed, the loop is not written over it")
+        assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>", message = "its block stayed")
     }
 
     @Test
@@ -153,8 +146,8 @@ class PagesTest {
         val path = "pages/company/content.md"
         val held = editor.post("/api/content/lock/$path")
         assertEquals(HttpStatusCode.OK, held.status, held.bodyAsText())
-        // a root page is born with its loop: the editor opens on it, and submits over its revision
-        assertContains(held.bodyAsText(), "%foreach(")
+        // born empty: the editor opens on nothing, and submits over no revision
+        assertContains(held.bodyAsText(), """"body":"","rev":""""")
         val rev = Regex(""""rev":"([^"]*)"""").find(held.bodyAsText())!!.groupValues[1]
         val preview = editor.json(HttpMethod.Post, "/api/content/preview/$path", """{"page":"/company","body":"## Draft\n\nbeing *written*"}""")
         assertEquals(HttpStatusCode.OK, preview.status, preview.bodyAsText())
@@ -182,7 +175,7 @@ class PagesTest {
         assertContains(page, "<title>Field notes — kroom</title>", message = "its words followed")
         assertEquals(null, storage.content.read("pages/notes/content.md"))
         val history = (storage.content as Versioned).log("pages/legal/notes/content.md")
-        assertEquals(listOf("moved from pages/notes/content.md", null, null, null), history.map { it.message }, "its past followed (the loop it was born with, two writes), and the move is in it")
+        assertEquals(listOf("moved from pages/notes/content.md", null, null), history.map { it.message }, "its past followed (two writes), and the move is in it")
         assertContains(visitor().get("/about").bodyAsText(), """<a href="/legal/notes">Field notes</a>""")
 
         // its words follow even under a parent the stored arrangement never heard of
@@ -257,7 +250,7 @@ class PagesTest {
     }
 
     @Test
-    fun `a page born with a layout a plugin seeds starts as the plugin's call, a root page as its contents`() = testApplication {
+    fun `a page born with a layout a plugin seeds starts as the plugin's call, any other empty`() = testApplication {
         val seeder = object : Plugin {
             override val id = "seeder"
             override fun install(site: Site) { site.seed("gallery") { page -> "\$gallery.show(\"${page.path.trim('/')}\")" } }
@@ -265,12 +258,12 @@ class PagesTest {
         site(null, seeder)
         val editor = visitor("ed")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/photos","layout":"gallery"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        assertEquals("\$gallery.show(\"photos\")", storage.content.read("pages/photos/content.md")!!.body, "the layout's seed wins over a root page's contents")
+        assertEquals("\$gallery.show(\"photos\")", storage.content.read("pages/photos/content.md")!!.body)
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/photos/plage","layout":"gallery"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         assertEquals("\$gallery.show(\"photos/plage\")", storage.content.read("pages/photos/plage/content.md")!!.body)
         assertEquals("ed", storage.content.read("pages/photos/plage/content.md")!!.author, "the page's author signs the seed")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/team"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        assertEquals(AuthoredPage.TOC, storage.content.read("pages/team/content.md")!!.body)
+        assertNull(storage.content.read("pages/team/content.md"))
         assertNull(storage.content.read("pages/photos/plage/east.md"))
     }
 

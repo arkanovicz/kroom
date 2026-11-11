@@ -42,8 +42,6 @@ data class AuthoredPage(
 
     companion object {
         const val DRAFT = "draft"
-        /** What a root page's content block starts as: its children, as the page hands them (`$children`). */
-        const val TOC = "%foreach(\$child in \$children)\n- [\$child.label](\$child.href)%if(\$child.description) — \$child.description%end\n%end"
         const val PUBLISHED = "published"
         private val PATH = Regex("(/[A-Za-z0-9_-]+)+")
 
@@ -93,17 +91,14 @@ internal class AuthoredPages(private val site: Site) {
     fun put(page: AuthoredPage) = records.put(id(page.path), page.toJson())
 
     /**
-     * A page is born with its content when its layout has a seed ([Site.seed], a plugin's call) or it is a root
-     * page: the loop listing the pages under it — an ordinary block [author] may rewrite or trash, a section's
-     * page is a table of contents until it says otherwise. A page made again where a deleted one left its
-     * blocks keeps them.
+     * A page is born empty, unless its layout has a seed ([Site.seed], a plugin's call): its content then starts
+     * as that, an ordinary block signed by [author]. A page made again where a deleted one left its blocks
+     * keeps them.
      */
     fun seed(page: AuthoredPage, author: String) {
         val block = "pages${page.path}/content.md"
         if (site.storage.content.read(block) != null) return
-        val body = site.seeds[page.layout]?.takeIf { site.enabled(it.owner) }?.value?.invoke(page)
-            ?: AuthoredPage.TOC.takeIf { page.path.count { it == '/' } == 1 }
-            ?: return
+        val body = site.seeds[page.layout]?.takeIf { site.enabled(it.owner) }?.value?.invoke(page) ?: return
         site.storage.content.write(block, body, mapOf("author" to author))
     }
 

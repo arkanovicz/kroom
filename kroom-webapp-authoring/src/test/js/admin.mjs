@@ -195,7 +195,7 @@ check('the arrangement is said to be the editors\', and can be forgotten', [$('.
     check('the tree put is stripped of what the server computes', lastMenu().items.slice(0, 2), [
         { slug: 'contact', label: { en: 'Contact' }, description: {}, children: [] },
         { slug: 'about', label: { en: 'About', fr: 'À propos' }, description: { en: 'Who we are' }, children: [] }]);
-    check('then the page reloads: the menu, the west, a TOC are the server\'s', went(), ['reload']);
+    check('then the page reloads: the menu and the west are the server\'s', went(), ['reload']);
     await reload();
     check('the bar reopens on the pages panel, the tree the server\'s again', [entry('pages').getAttribute('aria-pressed'), $('.kroom-admin-panel').hidden, rows()[0]],
         ['true', false, 'About']);

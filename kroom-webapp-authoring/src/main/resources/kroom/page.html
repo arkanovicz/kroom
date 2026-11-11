@@ -7,8 +7,6 @@ $page.title($authored.title)
 #if($authored.description)$page.description($authored.description)#end
 #if($authored.draft)$page.noindex()#end
 #if($authored.written("top"))#define($top)#markdown("top")#end#elseif($authored.editable)#define($top)<div class="kroom-region-empty">#@markdown("top")<small>page top</small>#end</div>#end#end
-## the page's children, for the loop a root page is born with (a page out of the menu has none)
-#set($children = [])#if($nav.here)#set($children = $nav.here.children)#end
-#define($content)#markdown("content", {"children": $children})#end
+#define($content)#markdown("content")#end
 #if($authored.written("east"))#define($east)#markdown("east")#end#elseif($authored.editable)#define($east)<div class="kroom-region-empty">#@markdown("east")<small>right sidebar</small>#end</div>#end#end
 #layout($authored.layout)
