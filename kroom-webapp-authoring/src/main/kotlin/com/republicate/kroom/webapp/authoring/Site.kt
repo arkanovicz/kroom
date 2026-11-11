@@ -126,10 +126,10 @@ class Site internal constructor(
     /** Make [theme] the one visitors get. */
     fun activate(theme: Theme) { storage.settings(SITE)["theme"] = theme.id }
 
-    /** The layout a page gets for asking [name] — the site's `layout` setting when it asks none, `default` when the theme lacks it. */
+    /** The layout a page gets for asking [name] — the site's `layout` setting when it asks none, `article` when the theme lacks it. */
     fun layoutName(call: ApplicationCall, name: String?): String {
         val theme = theme(call) ?: error("#layout: no theme installed")
-        return (name ?: settings()["layout"])?.takeIf { it in theme.layouts } ?: "default"
+        return (name ?: settings()["layout"])?.takeIf { it in theme.layouts } ?: FALLBACK_LAYOUT
     }
 
     /** The template rendering [layout] in the request's theme: kroom's skeleton for a [Skin], the theme's own otherwise. */
@@ -451,7 +451,7 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
     fun can(permission: String, target: String = ""): Boolean = site.can(call.userSession, permission, target)
 
     /** The layout this page got — `#layout(name)` resolved it, the skeleton reads it. */
-    var layoutName: String = "default"
+    var layoutName: String = FALLBACK_LAYOUT
         private set
 
     /** What `#layout(name)` parses. */
@@ -493,7 +493,7 @@ internal val SITE_SETTINGS = listOf(
     Setting.text("name", "Name", default = "kroom", group = "General"),
     Setting.text("lang", "Language", default = "en", help = "The content's default — html lang", group = "General"),
     Setting.text("languages", "Languages", help = "The others the site speaks, comma-separated (fr, de)", group = "General"),
-    Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), help = "What a page gets when it names none", group = "General"),
+    Setting.choice("layout", "Layout", choices = SKELETON_LAYOUTS.toList(), default = FALLBACK_LAYOUT, help = "What a page gets when it names none", group = "General"),
     Setting.text("footer", "Footer", help = "A line at the foot of every page", group = "General"),
     Setting.number("menuDepth", "Menu depth", default = 2, help = "How many levels of pages the header's menu shows", group = "General"),
     Setting.boolean("menuPanels", "Menu panels", default = false, help = "The header shows a section's pages as a panel", group = "General"),

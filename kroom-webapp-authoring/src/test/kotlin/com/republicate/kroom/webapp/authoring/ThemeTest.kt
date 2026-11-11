@@ -31,7 +31,7 @@ class ThemeTest {
 
     private object Plain : Theme {
         override val id = "plain"
-        override val layouts = setOf("default")
+        override val layouts = setOf("article")
     }
 
     private val storage = MemoryStorage()
@@ -57,19 +57,21 @@ class ThemeTest {
         val page = client.get("/about").bodyAsText()
         assertTrue(page.startsWith("<!doctype html>"), "the page writes nothing of its own: ${page.take(80)}")
         assertContains(page, "<title>About — kroom</title>")
-        assertContains(page, """<main class="container layout-sidebar">""")
+        assertContains(page, """<main class="container layout-article">""")
         assertContains(page, """<div class="content"><h1>About us</h1></div>""")
         assertContains(page, """<aside class="east">in the margin</aside>""")
-        assertContains(page, """data-layout="sidebar"""")
+        assertContains(page, """data-layout="article"""")
     }
 
     @Test
-    fun `a layout the theme lacks is its default, a region it does not show is dropped`() = testApplication {
+    fun `a layout the theme lacks is its article, a region it does not show is dropped`() = testApplication {
         site()
         storage.settings("site")["theme"] = "plain"
-        val page = client.get("/about").bodyAsText()
-        assertContains(page, "<title>plain: About</title>")
-        assertContains(page, "<h1>About us</h1><aside>in the margin</aside>")
+        assertContains(client.get("/about").bodyAsText(), "<h1>About us</h1><aside>in the margin</aside>")
+        val page = client.get("/welcome").bodyAsText()   // wide, which plain lacks
+        assertContains(page, "<title>plain: Welcome</title>")
+        assertContains(page, "<p>features</p>")
+        assertFalse(page.contains("Big hello"), "plain shows no top")
     }
 
     @Test

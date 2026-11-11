@@ -1,6 +1,6 @@
 ## The macros a page and the skeleton speak.
 ##
-## #layout("sidebar") — the page's last word: the active theme's layout, rendered in the page's own context,
+## #layout("article") — the page's last word: the active theme's layout, rendered in the page's own context,
 ## where it writes the regions the page #define'd straight to the response. #layout() is the site's default.
 #macro(layout $name)#parse($site.layout($name))#end
 ##

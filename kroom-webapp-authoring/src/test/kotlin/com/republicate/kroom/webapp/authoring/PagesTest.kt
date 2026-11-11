@@ -66,8 +66,19 @@ class PagesTest {
         assertContains(visitor().get("/about").bodyAsText(), """<a href="/company/history">Our history</a>""", message = "published, it is in the menu under its section, by the name it was given: its label is its title")
         assertContains(visitor().get("/about").bodyAsText(), """<li class="section"><a href="/company/history">Company</a>""", message = "a section nobody wrote leads to its first page")
         assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/company/history","kind":"authored","status":"published","layout":"article","movable":true""")
-        editor.json(HttpMethod.Put, "/api/site/pages/company/history", """{"layout":"sidebar"}""").let { assertEquals(HttpStatusCode.OK, it.status) }
-        assertContains(visitor().get("/company/history").bodyAsText(), """data-layout="sidebar"""")
+        assertContains(page, """<nav class="west" aria-label="Company">""", message = "an article has its section's menu beside it")
+        for (layout in listOf("wide", "gallery")) {
+            editor.json(HttpMethod.Put, "/api/site/pages/company/history", """{"layout":"$layout"}""").let { assertEquals(HttpStatusCode.OK, it.status) }
+            val other = visitor().get("/company/history").bodyAsText()
+            assertContains(other, """data-layout="$layout"""")
+            assertEquals(layout == "gallery", other.contains("""class="west""""), "a wide page runs the whole width, no menu; a gallery keeps its section's")
+        }
+        editor.json(HttpMethod.Put, "/api/site/pages/company/history", """{"layout":"sidebar"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status, "a layout gone from the vocabulary") }
+        // a record stored under a former name still serves, as an article
+        val records = storage.records("site", "pages")
+        records.put("company_-history", com.republicate.kson.Json.MutableObject().apply { putAll(records.get("company_-history")!!); set("layout", "sidebar") })
+        assertContains(visitor().get("/company/history").bodyAsText(), """data-layout="article"""")
+        assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/company/history","kind":"authored","status":"published","layout":"article"""")
 
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history"}""").let { assertEquals(HttpStatusCode.Conflict, it.status) }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/about"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "a template's page is not for the taking") }
@@ -76,6 +87,7 @@ class PagesTest {
         assertEquals(HttpStatusCode.OK, editor.get("/club").status)
         assertContains(editor.get("/club/13Ma").bodyAsText(), "<h1>13Ma</h1>", message = "and its instances answer as before")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"bad path"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status) }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/old","layout":"default"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status, "default is no layout any more") }
         assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/company/history").status)
         assertEquals(HttpStatusCode.NotFound, visitor().get("/company/history").status)
         assertEquals("## Since 1998\n\nA long **story**.", storage.content.read("pages/company/history/content.md")!!.body, "its blocks stay")
@@ -191,7 +203,7 @@ class PagesTest {
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/a"}""")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/a/b"}""")
         refused("/a", "/legal/a", "/a has pages under it")()
-        assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/a","kind":"authored","status":"draft","layout":"default","movable":false""")
+        assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/a","kind":"authored","status":"draft","layout":"article","movable":false""")
         visitor("ed2").post("/api/content/lock/pages/a/b/content.md").let { assertEquals(HttpStatusCode.OK, it.status) }
         storage.content.write("pages/a/b/content.md", "being written", mapOf("author" to "ed2"))
         refused("/a/b", "/b", "pages/a/b/content.md is being written by someone else")()

@@ -10,19 +10,24 @@ package com.republicate.kroom.webapp.authoring
  * #set($title = "Les Vagabonds")
  * #define($east) <article>…</article> #end
  * #define($content) <h1>…</h1> #markdown("description") #end
- * #layout("sidebar")
+ * #layout("article")
  * ```
  *
  * The regions: `$header` and `$footer` (the site's own when the page defines none), `$top` (under the header),
- * `$content`, `$east`, `$west` (the site's own — the section's pages — when the page defines none). The
- * layouts: `default`, `article`, `sidebar`, `landing`, `gallery` (a page that is a gallery, the plugin's call seeded in
- * its content); `#layout()` takes the site's `layout` setting.
+ * `$content`, `$east`, `$west` (the site's own — the section's pages — when the page defines none). A region
+ * nobody defined is not there: a side column is an `$east` written, a page opening on a band a `$top`.
+ *
+ * The layouts say what no region can — how wide the content runs, and whether the section's menu stands
+ * beside it: `article` (a reading column, the menu on its left), `wide` (the whole width, no menu), `gallery`
+ * (a page that is a gallery, the plugin's call seeded in its content at birth: the menu, and all the width
+ * beside it). `#layout()` takes the
+ * site's `layout` setting, `article` until it says otherwise.
  *
  * Two kinds of theme. A **[Skin]** names its stylesheets (and scripts) and renders kroom's own skeleton,
  * `kroom/skeleton.html`, every layout of the contract in one file, each region through a partial the skin may
  * rewrite (`themes/<id>/regions/<region>.html` over `kroom/regions/<region>.html`). A **markup-owning** theme
- * provides its [layouts] under `themes/<id>/layouts/<name>.html` — `default` required, the others when it has
- * them (a missing one falls back to `default`) — rendering `$content` and the regions it shows (`#if($east)`
+ * provides its [layouts] under `themes/<id>/layouts/<name>.html` — `article` required, the others when it has
+ * them (a missing one falls back to `article`) — rendering `$content` and the regions it shows (`#if($east)`
  * tests without rendering), `$title`, `$site.name` and friends, `$site.head()` at the end of `<head>`,
  * `$site.foot()` at the end of `<body>` — all kroom and its plugins ask; `$nav` for the menu (`#nav($nav.items)`
  * renders the tree); `$theme` for itself: `id`, `name`, `stylesheets`, `scripts`, `settings`, and any setting
@@ -35,7 +40,7 @@ package com.republicate.kroom.webapp.authoring
  * live — and an admin previews another with `?theme=<id>`.
  */
 interface Theme : Plugin {
-    /** What it provides, `default` among them. */
+    /** What it provides, `article` among them. */
     val layouts: Set<String>
 
     override fun install(site: Site) {}
@@ -48,8 +53,11 @@ interface Skin : Theme {
     override val layouts: Set<String> get() = SKELETON_LAYOUTS
 }
 
-/** The layouts kroom's skeleton renders — the contract's vocabulary. */
-val SKELETON_LAYOUTS: Set<String> = setOf("default", "article", "sidebar", "landing", "gallery")
+/** The layouts kroom's skeleton renders — the contract's vocabulary, the words an editor chooses among. */
+val SKELETON_LAYOUTS: Set<String> = setOf("article", "wide", "gallery")
+
+/** The layout every theme has: what a page gets when nothing names one, or names one the theme lacks. */
+const val FALLBACK_LAYOUT = "article"
 
 /** `$theme` in a layout: the active theme, and its settings by key (`$theme.scheme`). */
 class ThemeView internal constructor(private val theme: Theme, private val values: Settings) {

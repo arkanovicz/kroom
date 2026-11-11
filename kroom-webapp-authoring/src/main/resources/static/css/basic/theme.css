@@ -21,19 +21,36 @@ main.container { display: flex; gap: 2rem; align-items: flex-start; }
 main > .content { flex: 3 1 0; min-width: 0; }
 main > .east, main > .west { flex: 1 1 0; min-width: 0; }
 main > aside:has(> .kroom-region-empty) { flex: 0 0 1.5rem; }
+/* its words fit when everything is revealed; on a passing hover they run over the page, not out of it */
+.kroom-admin-revealed main > aside:has(> .kroom-region-empty) { flex-basis: auto; }
+main > aside > .kroom-region-empty .kroom-block-body { display: flex; justify-content: flex-end; }
 @media (max-width: 48rem) { main.container { flex-direction: column; } main > aside { flex-basis: auto !important; } }
 /* the west is a nav too: pico lays a nav's lists out in a row, this one reads down */
 nav.west { display: block; }    /* pico lays a nav out as a row: the section's name would sit beside its pages */
 nav.west ul { display: block; list-style: none; margin: 0; padding: 0; }
 nav.west li { display: block; margin: 0; padding: .25rem 0; }
 nav.west li ul { padding-left: 1rem; }
+/* on a small screen, one line that scrolls sideways, of where else to go: the breadcrumb names the section and
+   the page the visitor is on, whose own pages keep its place in the line */
+@media (max-width: 48rem) {
+    main > nav.west { align-self: stretch; }
+    nav.west > strong { display: none; }
+    nav.west ul { display: flex; gap: 1.25rem; white-space: nowrap; }
+    nav.west > ul { overflow-x: auto; padding-bottom: .5rem; border-bottom: 1px solid var(--pico-muted-border-color); }
+    nav.west li { display: flex; flex: none; padding: 0; }
+    nav.west li ul { padding-left: 0; margin-left: 1.25rem; font-size: .875em; }
+    nav.west li:not(:has(> [aria-current])) > ul { display: none; }
+    nav.west [aria-current=page], nav.west li:has(> [aria-current=page]):not(:has(> ul)) { display: none; }
+    nav.west li:has(> [aria-current=page]) > ul { margin-left: 0; }
+}
 
-/* the breadcrumb: small, under the header */
-nav.breadcrumb { font-size: .8rem; margin-bottom: 1rem; }
+/* the breadcrumb: small and close under the header (pico gives a nav's entries a header's height) */
+nav.breadcrumb { font-size: .8rem; --pico-nav-element-spacing-vertical: .25rem; }
 nav.breadcrumb ul { margin: 0; padding: 0; }
 
-/* an article reads at a measure; a landing opens on its top region */
-.layout-article .content { max-width: 70ch; margin: 0 auto; }
+/* an article reads at a measure — in the middle when nothing stands beside it; a page may open on its top region */
+.layout-article > .content { max-width: 70ch; }
+.layout-article:not(:has(> .west, > .east:not(:has(> .kroom-region-empty)))) > .content { margin-inline: auto; }
 .top { padding: 3rem 0; text-align: center; }
 
 footer.container { color: var(--pico-muted-color); border-top: 1px solid var(--pico-muted-border-color); margin-top: 2rem; padding-top: 1rem; }

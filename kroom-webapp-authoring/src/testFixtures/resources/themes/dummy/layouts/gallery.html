@@ -5,9 +5,11 @@
 </head>
 <body>
 #parse("themes/dummy/inc/header.html")
-<main class="dummy-gallery">
-$content
-</main>
+#if($top)<section class="dummy-hero">$top</section>#end
+<div class="dummy-columns">
+    <main class="dummy-gallery">$content</main>
+    #if($east)<aside>$east</aside>#end
+</div>
 #parse("themes/dummy/inc/footer.html")
 </body>
 </html>

@@ -6,6 +6,25 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-webapp-authoring — three layouts: `article`, `wide`, `gallery`
+- The vocabulary was `default`, `article`, `sidebar`, `landing`, `gallery`; a layout now says only what no region
+  can — how wide the content runs, and whether the section's menu stands beside it. `article`: a reading column
+  (70ch in the basic theme), the section's west menu on its left; what a new page gets, the default of the site's
+  `layout` setting, the layout every theme provides and the fallback for one it lacks (`FALLBACK_LAYOUT`).
+  `wide`: the whole width, no west. `gallery`: the west menu and all the width beside it, seeded with a gallery
+  at birth by the gallery plugin.
+- Basic theme: on a small screen the west menu is one line that scrolls sideways (it stacked above the content,
+  a screen of links before the page): where else to go, the current page left to the breadcrumb and its own
+  pages keeping its place in the line; the breadcrumb sits closer under the header.
+- To its editor, a block that renders nothing keeps a place (it was a line nobody could find); with the admin
+  bar's eye released each block wears its name above its top left corner, and an unwritten side block's
+  placeholder fits its words (they ran out of the page).
+- `sidebar` and `landing` are gone: a side column is an `$east` written, a page opening on a band a `$top`, on
+  any layout. A stored page whose layout is no longer named (`default`, `sidebar`, `landing`) reads as `article`;
+  `POST`/`PUT /api/site/pages` answer 400 for one.
+- A markup-owning theme's required file is `themes/<id>/layouts/article.html` (was `default.html`).
+- Pinned in `ThemeTest`, `DummyThemeTest`, `PagesTest`.
+
 #### kroom-webapp-velocity, kroom-markdown, kroom-webapp-authoring — a value is data, markup is a `SafeText`
 - `installVelocity` names velocity's `DynamicEscaper` (`event_handler.reference_insertion.class`): in a web page
   (`.html`, or an `##@output web` header) every value a reference inserts is escaped for where it lands — text, an

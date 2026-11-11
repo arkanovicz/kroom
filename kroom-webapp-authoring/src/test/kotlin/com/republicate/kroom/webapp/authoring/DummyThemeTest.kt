@@ -20,17 +20,18 @@ class DummyThemeTest {
     fun `every layout of the vocabulary renders, with its regions`() = testApplication {
         site()
         client.get("/index").bodyAsText().let {
-            assertContains(it, """data-layout="default"""")
+            assertContains(it, """data-layout="article"""", message = "#layout() with no setting: the fallback")
             assertContains(it, "<title>Home · kroom</title>")
             assertContains(it, "<p>home body</p>")
         }
         assertContains(client.get("/story").bodyAsText(), """data-layout="article"""")
         client.get("/about").bodyAsText().let {
-            assertContains(it, """data-layout="sidebar"""")
-            assertContains(it, "<aside>in the margin</aside>")
+            assertContains(it, """data-layout="article"""")
+            assertContains(it, "<aside>in the margin</aside>", message = "a side column is an \$east written")
         }
         client.get("/welcome").bodyAsText().let {
-            assertContains(it, """data-layout="landing"""")
+            assertContains(it, """data-layout="wide"""")
+            assertContains(it, """<main class="dummy-wide">""")
             assertContains(it, """<section class="dummy-hero"><h1>Big hello</h1></section>""")
             assertContains(it, "<p>features</p>")
         }

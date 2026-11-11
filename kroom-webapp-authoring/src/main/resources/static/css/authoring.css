@@ -428,6 +428,26 @@ ul.kroom-revisions button {
     outline-offset: 2px;
 }
 
+/* and named, outside, at its top left */
+.kroom-admin-revealed .kroom-block[data-api]::before {
+    content: attr(data-name);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    font-size: .7rem;
+    line-height: 1;
+    font-variant: small-caps;
+    white-space: nowrap;
+    color: var(--kroom-edit-color, #2563eb);
+    pointer-events: none;
+}
+
+/* a block that renders nothing keeps a place its editor can find */
+.kroom-block[data-api] > .kroom-block-body:empty {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+}
+
 .kroom-region-empty small {
     color: var(--pico-muted-color, #888);
     white-space: nowrap;

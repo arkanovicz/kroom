@@ -20,7 +20,7 @@ import io.ktor.server.response.respondText
 data class AuthoredPage(
     /** `/company/history`: the slug tree, as in the menu. */
     val path: String,
-    val layout: String = "default",
+    val layout: String = FALLBACK_LAYOUT,
     val status: String = DRAFT,
     val author: String? = null,
     val created: Long = System.currentTimeMillis(),
@@ -49,12 +49,15 @@ data class AuthoredPage(
 
         fun validPath(path: String) = PATH.matches(path)
 
+        /** A record as the store holds it: a layout the vocabulary names no more reads as the fallback. */
+        fun stored(json: Json.Object): AuthoredPage? = parse(json, stored = true).getOrNull()
+
         /** The record from its JSON, [existing] supplying what the JSON leaves out; or why it is not one. */
-        fun parse(json: Json.Object, existing: AuthoredPage? = null): Result<AuthoredPage> = runCatching {
+        fun parse(json: Json.Object, existing: AuthoredPage? = null, stored: Boolean = false): Result<AuthoredPage> = runCatching {
             // what exists keeps its path, whatever the JSON says: a page moves through [AuthoredPages.move]
             val path = existing?.path ?: json.getString("path") ?: throw IllegalArgumentException("path expected")
             require(validPath(path)) { "not a page path: $path" }
-            val layout = json.getString("layout") ?: existing?.layout ?: "default"
+            val layout = (json.getString("layout") ?: existing?.layout ?: FALLBACK_LAYOUT).let { if (stored && it !in SKELETON_LAYOUTS) FALLBACK_LAYOUT else it }
             require(layout in SKELETON_LAYOUTS) { "not a layout: $layout" }
             val status = json.getString("status") ?: existing?.status ?: DRAFT
             require(status == DRAFT || status == PUBLISHED) { "not a status: $status" }
@@ -83,9 +86,9 @@ internal class AuthoredPages(private val site: Site) {
 
     /** The page at [path] — none for whatever is no page path (`/favicon.ico` asked in the not-found phase). */
     fun get(path: String): AuthoredPage? =
-        if (!AuthoredPage.validPath(path)) null else records.get(id(path))?.let { AuthoredPage.parse(it).getOrNull() }
+        if (!AuthoredPage.validPath(path)) null else records.get(id(path))?.let(AuthoredPage::stored)
 
-    fun all(): List<AuthoredPage> = records.list(Int.MAX_VALUE).values.mapNotNull { AuthoredPage.parse(it).getOrNull() }.sortedBy { it.path }
+    fun all(): List<AuthoredPage> = records.list(Int.MAX_VALUE).values.mapNotNull(AuthoredPage::stored).sortedBy { it.path }
 
     fun put(page: AuthoredPage) = records.put(id(page.path), page.toJson())
 

@@ -801,11 +801,16 @@ $page.description("Un club de go à Marseille")
   <h1>Les Vagabonds</h1>
   #markdown("description", {"club": $club})
 #end
-#layout("sidebar")
+#layout("article")
 ```
 
-The regions are `$header`, `$top`, `$content`, `$east`, `$west`, `$footer`; the layouts `default`, `article`,
-`sidebar`, `landing`, `gallery` (a page that is a gallery: a plugin seeds its call). `#layout()` takes the site's `layout` setting. `$header`, `$west` and `$footer` have a
+The regions are `$header`, `$top`, `$content`, `$east`, `$west`, `$footer`; a region nobody defined is not
+there, so a side column is an `$east` written and a page opening on a band a `$top`. The layouts say what no
+region can — how wide the content runs, and whether the section's menu stands beside it: `article` (a reading
+column, the menu on its left), `wide` (the whole width, no menu), `gallery` (a page that is a gallery: a plugin
+seeds its call at birth; the menu, and all the width beside it). On a small screen the basic theme lays the
+menu out as one line that scrolls sideways. `#layout()` takes the site's `layout` setting, `article` until it says
+otherwise. `$header`, `$west` and `$footer` have a
 site-wide default a page overrides by defining them: the brand, the menu and the way in; the section the
 visitor is in, its pages listed; the site's `footer` line. Under the header, a breadcrumb (`$nav.trail`: the
 site, the section, the page) shows on any page inside a section — a region partial like the others.
@@ -817,7 +822,7 @@ from the admin bar, live; an admin previews another with `?theme=<id>`):
   `kroom/skeleton.html` — every layout in one file, `data-layout` and `layout-<name>` for the CSS, each
   region through a partial the skin may rewrite: `themes/<id>/regions/<region>.html` over
   `kroom/regions/<region>.html`. kroom's `BasicTheme` is one: pico and a few lines of CSS.
-- a **markup-owning** theme provides its `layouts` under `themes/<id>/layouts/<name>.html` (`default`
+- a **markup-owning** theme provides its `layouts` under `themes/<id>/layouts/<name>.html` (`article`
   required, a missing one falls back to it), rendering `$content` and the regions it shows (`#if($east)` tests
   without rendering), `$title`, `$site.name`, `$site.head()` at the end of `<head>` and `$site.foot()` at the
   end of `<body>` — all kroom and its plugins ask.

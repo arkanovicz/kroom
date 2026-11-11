@@ -1,6 +1,7 @@
 ## kroom's own skeleton: what a skin-only theme renders, every layout of the contract in one file. The
 ## theme's stylesheets and scripts dress it, its region partials may rewrite any region, CSS tells the
-## layouts apart (data-layout, layout-<name>).
+## layouts apart (data-layout, layout-<name>). A wide page runs the whole width; the others have the
+## section's menu on their left.
 <!doctype html>
 <html lang="$site.lang" data-layout="$site.layoutName"#if($theme.scheme && $theme.scheme != "auto") data-theme="$theme.scheme"#end>
 <head>
@@ -20,7 +21,7 @@ $site.head()
 #region("breadcrumb")
 #region("top")
 <main class="container layout-$site.layoutName">
-#region("west")
+#if($site.layoutName != "wide")#region("west")#end
 #region("content")
 #region("east")
 </main>

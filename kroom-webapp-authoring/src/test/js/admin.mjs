@@ -34,7 +34,7 @@ const answers = {
     '/api/site/missing': { columns: ['uri', 'count', 'last'], rows: [['/gone', 3, '2026-09-30T00:00:00Z']] },
     // every kind of page: an editor's (published, a draft, a draft with a page under it), a developer's, an instance
     // of a placeholder template, a section no page answers
-    '/api/site/menu': { stored: true, lang: 'en', languages: ['en', 'fr'], layouts: ['default', 'article', 'sidebar', 'landing'], items: [
+    '/api/site/menu': { stored: true, lang: 'en', languages: ['en', 'fr'], layouts: ['article', 'wide', 'gallery'], items: [
         { slug: 'about', label: { en: 'About', fr: 'À propos' }, description: { en: 'Who we are' }, path: '/about', kind: 'authored',
           status: 'published', layout: 'article', movable: true, resolved: true, children: [] },
         { slug: 'contact', label: { en: 'Contact' }, path: '/contact', kind: 'template', resolved: true, children: [] },
@@ -42,8 +42,8 @@ const answers = {
             { slug: '13Ma', label: { en: 'Les Vagabonds' }, path: '/club/13Ma', kind: 'instance', resolved: true, children: [] }] },
         { slug: 'legal', label: { en: 'Legal' }, path: '/legal', kind: 'section', resolved: false, children: [
             { slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', kind: 'template', resolved: true, children: [] }] },
-        { slug: 'company', label: { en: 'Company' }, path: '/company', kind: 'authored', status: 'draft', layout: 'default', movable: false, resolved: true, children: [
-            { slug: 'history', label: { en: 'History' }, path: '/company/history', kind: 'authored', status: 'draft', layout: 'default', movable: true, resolved: true, children: [] }] },
+        { slug: 'company', label: { en: 'Company' }, path: '/company', kind: 'authored', status: 'draft', layout: 'article', movable: false, resolved: true, children: [
+            { slug: 'history', label: { en: 'History' }, path: '/company/history', kind: 'authored', status: 'draft', layout: 'article', movable: true, resolved: true, children: [] }] },
         { href: 'https://y.example/doc', label: { en: 'Docs' }, kind: 'link', movable: true, children: [] }] },
     // plugins only, themes have their panel; a plugin's tables come with it, and what switching it off would silence
     '/api/site/plugins': [
@@ -57,9 +57,9 @@ const answers = {
         { id: 'web', name: 'Webmaster', description: '', enabled: false, settings: [],
           tables: [{ id: 'redirects', label: 'Redirects', url: '/api/web/redirects' }, { id: 'missing', label: 'Not found', url: '/api/web/missing' }] }],
     '/api/site/themes': [
-        { id: 'basic', name: 'Basic', description: 'pico', layouts: ['default', 'sidebar'], active: true,
+        { id: 'basic', name: 'Basic', description: 'pico', layouts: ['article', 'wide', 'gallery'], active: true,
           settings: [{ key: 'accent', label: 'Accent', type: 'text', value: 'blue' }] },
-        { id: 'editorial', name: 'Editorial', description: '', layouts: ['default'], active: false, settings: [] }],
+        { id: 'editorial', name: 'Editorial', description: '', layouts: ['article'], active: false, settings: [] }],
     '/api/site/roles': { roles: { admin: ['*'], editor: ['content.*'] }, yours: ['admin'] },
     '/api/web/redirects': { columns: ['from', 'to'], rows: [['/old', '/new']] },
     '/api/web/missing': { columns: ['uri', 'count'], rows: [['/gone', 3]] },
@@ -253,11 +253,11 @@ check('only an editor\'s page has a layout, a publishing switch and a delete', l
 {
     const layout = line('about').querySelector(':scope > details select');
     check('the layouts offered are the skeleton\'s, on the page\'s', [[...layout.options].map(o => o.value), layout.value],
-        [['default', 'article', 'sidebar', 'landing'], 'article']);
-    layout.value = 'sidebar';
+        [['article', 'wide', 'gallery'], 'article']);
+    layout.value = 'wide';
     layout.dispatchEvent(new window.Event('change'));
     await sleep(20);
-    check('another layout is put on the page, which reloads', [sent(), went()], [{ url: '/api/site/pages/about', method: 'PUT', body: { layout: 'sidebar' } }, ['reload']]);
+    check('another layout is put on the page, which reloads', [sent(), went()], [{ url: '/api/site/pages/about', method: 'PUT', body: { layout: 'wide' } }, ['reload']]);
 }
 const buttons = (slug) => [...line(slug).querySelectorAll(':scope > details .kroom-admin-actions button')];
 check('a published page offers to unpublish, a draft to publish', [buttons('about').map(b => b.textContent), buttons('company')[0].textContent],
@@ -323,12 +323,12 @@ await sleep(20);
     type(form.elements.label, 'Notre Société');
     check('typed over, it stays as typed', form.elements.slug.value, 'societe');
     check('the one input says what it takes', form.elements.slug.placeholder, 'segment / URL');
-    check('the layout is asked at birth, among the skeleton\'s', [...form.elements.layout.options].map(o => o.value), ['default', 'article', 'sidebar', 'landing']);
-    form.elements.layout.value = 'landing';
+    check('the layout is asked at birth, among the skeleton\'s', [...form.elements.layout.options].map(o => o.value), ['article', 'wide', 'gallery']);
+    form.elements.layout.value = 'wide';
     form.dispatchEvent(new window.Event('submit', { cancelable: true }));
     await sleep(20);
     check('a new page posts its path under the list it landed in, its name and its layout', calls.findLast(c => c.method === 'POST'),
-        { url: '/api/site/pages', method: 'POST', body: { path: '/club/societe', label: { en: 'Notre Société' }, layout: 'landing' } });
+        { url: '/api/site/pages', method: 'POST', body: { path: '/club/societe', label: { en: 'Notre Société' }, layout: 'wide' } });
     check('then the tree is put with it at that very place', outline(lastMenu().items),
         ['about', 'contact', 'club(13Ma societe)', 'legal(terms)', 'company(history)', 'https://y.example/doc']);
     check('and the new page is opened', went(), ['/club/societe']);
