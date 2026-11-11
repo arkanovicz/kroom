@@ -1,14 +1,15 @@
 <!doctype html>
-<html lang="en" data-layout="landing">
+<html lang="en" data-layout="wide">
 <head>
 #parse("themes/dummy/inc/head.html")
 </head>
 <body>
 #parse("themes/dummy/inc/header.html")
 #if($top)<section class="dummy-hero">$top</section>#end
-<main class="dummy-landing">
-$content
-</main>
+<div class="dummy-columns">
+    <main class="dummy-wide">$content</main>
+    #if($east)<aside>$east</aside>#end
+</div>
 #parse("themes/dummy/inc/footer.html")
 </body>
 </html>
