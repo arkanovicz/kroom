@@ -24,6 +24,8 @@ main > aside:has(> .kroom-region-empty) { flex: 0 0 1.5rem; }
 /* its words fit when everything is revealed; on a passing hover they run over the page, not out of it */
 .kroom-admin-revealed main > aside:has(> .kroom-region-empty) { flex-basis: auto; }
 main > aside > .kroom-region-empty .kroom-block-body { display: flex; justify-content: flex-end; }
+/* as visitors see the page, a region nobody wrote is no column and no band */
+html:has(.kroom-admin):not(.kroom-admin-revealed) :is(main > aside, .top):has(> .kroom-region-empty) { display: none; }
 @media (max-width: 48rem) { main.container { flex-direction: column; } main > aside { flex-basis: auto !important; } }
 /* the west is a nav too: pico lays a nav's lists out in a row, this one reads down */
 nav.west { display: block; }    /* pico lays a nav out as a row: the section's name would sit beside its pages */
@@ -50,7 +52,7 @@ nav.breadcrumb ul { margin: 0; padding: 0; }
 
 /* an article reads at a measure — in the middle when nothing stands beside it; a page may open on its top region */
 .layout-article > .content { max-width: 70ch; }
-.layout-article:not(:has(> .west, > .east:not(:has(> .kroom-region-empty)))) > .content { margin-inline: auto; }
+.layout-article > .content:first-child:not(:has(~ .east > :not(.kroom-region-empty))) { margin-inline: auto; }
 .top { padding: 3rem 0; text-align: center; }
 
 footer.container { color: var(--pico-muted-color); border-top: 1px solid var(--pico-muted-border-color); margin-top: 2rem; padding-top: 1rem; }

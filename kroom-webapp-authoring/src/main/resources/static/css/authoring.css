@@ -448,6 +448,17 @@ ul.kroom-revisions button {
     min-height: 1.5rem;
 }
 
+/* the admin bar's eye pressed is the page as visitors see it: what nobody wrote takes no room there, the eye
+   released shows it. Whoever writes without a bar has no eye, and keeps the sliver to hover. */
+html:has(.kroom-admin):not(.kroom-admin-revealed) .kroom-region-empty {
+    display: none;
+}
+
+html:has(.kroom-admin):not(.kroom-admin-revealed) .kroom-block[data-api] > .kroom-block-body:empty {
+    min-width: 0;
+    min-height: 0;
+}
+
 .kroom-region-empty small {
     color: var(--pico-muted-color, #888);
     white-space: nowrap;
