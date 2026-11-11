@@ -68,6 +68,21 @@ class NavigationTest {
     }
 
     @Test
+    fun `a page in no menu is under the nearest page above it that is, and at the end of its own trail`() = testApplication {
+        site()
+        storage.content.write("pages/club/13Ma/description.md", "Le club", mapOf("author" to "admin"))
+        // an instance nobody wrote: the placeholder answers, the menu does not know it
+        val page = client.get("/club/9-zz").bodyAsText()
+        assertFalse(client.get("/about").bodyAsText().contains("/club/9-zz"), "in no menu")
+        assertContains(page, """<li><a href="/">kroom</a></li><li><a href="/club">Club</a></li><li><span aria-current="page">9 zz</span></li>""", message = "the site, the page above, itself by its segment")
+        assertContains(page, """<nav class="west" aria-label="Club">""", message = "its section's menu beside it, listing the pages the menu holds")
+        assertContains(page, """<li><a href="/club/13Ma">13Ma</a></li>""")
+        assertContains(page, """<a href="/club" aria-current="true">Club</a>""", message = "and the page above marked as on the way")
+        // nothing above it in the menu: no trail, as before
+        assertFalse(client.get("/login").bodyAsText().contains("breadcrumb"), "a page out of the menu with nothing above it has none")
+    }
+
+    @Test
     fun `a stored menu speaks the request's language, the default filling the gaps`() = testApplication {
         site(lang = { it.request.queryParameters["lang"] })
         storage.settings("site")["languages"] = "fr"

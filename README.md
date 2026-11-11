@@ -884,6 +884,11 @@ top-level one needs none); a page with pages under it is not deleted (409 `pageH
 visitor's URL or a template's route), nor unpublished while visitors reach one of them; publishing a page
 publishes the drafts above it.
 
+**In no menu, and somewhere all the same.** A page the menu does not hold — a record a database lists, a template
+kept out of the tree, an instance nobody wrote — has its trail (`$nav.trail`, the breadcrumb, `$nav.section` and
+so the west) from the nearest page above it that is in the menu, then itself, named by its segment:
+`/club/9-zz` reads *the site, Club, 9 zz*. With nothing above it in the menu, it has none.
+
 **Out of the tree.** A template the application names in `hiddenPages` is served and is no part of the tree:
 what it answers is in no menu and no sitemap, and nothing is made above it — the pages a database lists by the
 thousand (`pages/player/_id_.html`), reached from the page that lists them. The login page is one already.

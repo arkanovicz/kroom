@@ -33,6 +33,8 @@ All notable changes to kroom will be documented in this file.
   another page's layout changed reloads nothing (it did, each time) — only the layout of the page one is on.
 - Basic theme: the left column is capped at 12rem (it took a quarter of the row, far too wide on a large screen).
 - The breadcrumb shows on a top-level page too (the site, then the page); the home page has none.
+- A page in no menu has a trail (`Navigation.trail`): the nearest page above it that is in the menu, then itself,
+  named by its segment — a record page showed no section menu and a breadcrumb of the site alone.
 - An authored page's record reads back who made it and when (`author`, `created`, `published` were written and
   read as unknown, or now).
 - Gone with the page-less entry: `NavItem.link` and `NavItem.resolved` (a theme links `$item.href`), the kind

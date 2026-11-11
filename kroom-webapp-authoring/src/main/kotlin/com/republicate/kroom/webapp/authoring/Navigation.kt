@@ -1,6 +1,7 @@
 package com.republicate.kroom.webapp.authoring
 
 import com.republicate.kson.Json
+import io.ktor.http.decodeURLPart
 
 /**
  * One entry of the menu as stored: a page, named by its [slug] — the segment under its parent, so the tree of
@@ -155,8 +156,13 @@ data class NavItem(
 
 /** `$nav` in a layout: the menu, and where in it this request is. */
 class Navigation(val items: List<NavItem>, path: String) {
-    /** From the top item down to the one this request is at; empty when it is at none. */
-    val trail: List<NavItem> = items.firstNotNullOfOrNull { trail(it, path) }.orEmpty()
+    /**
+     * From the top item down to the one this request is at. A page that is in no menu — a record a database
+     * lists, a template kept out of the tree, an instance nobody wrote — is somewhere all the same: under the
+     * nearest page above it that is in the menu, and at the end of its own trail, named by its segment. Empty
+     * when nothing above it is in the menu either.
+     */
+    val trail: List<NavItem> = items.firstNotNullOfOrNull { trail(it, path) } ?: under(path.trimEnd('/'))
 
     /** The top-level entry the visitor is under — whose pages the west region lists. */
     val section: NavItem? get() = trail.firstOrNull()
@@ -164,6 +170,18 @@ class Navigation(val items: List<NavItem>, path: String) {
     val here: NavItem? get() = trail.lastOrNull()
 
     fun contains(item: NavItem): Boolean = item in trail
+
+    private fun under(path: String): List<NavItem> {
+        var above = path.substringBeforeLast('/', "")
+        while (above.isNotEmpty()) {
+            items.firstNotNullOfOrNull { trail(it, above) }?.let { found ->
+                val segment = path.substringAfterLast('/')
+                return found + NavItem(segment.decodeURLPart().replace('-', ' ').replaceFirstChar(Char::titlecase), path, slug = segment)
+            }
+            above = above.substringBeforeLast('/', "")
+        }
+        return emptyList()
+    }
 
     private fun trail(item: NavItem, path: String): List<NavItem>? =
         if (item.href == path) listOf(item)
