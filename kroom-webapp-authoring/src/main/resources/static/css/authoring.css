@@ -454,6 +454,11 @@ html:has(.kroom-admin):not(.kroom-admin-revealed) .kroom-region-empty {
     display: none;
 }
 
+/* nor does what the skeleton wraps it in: no column, no band — whatever skin dresses the skeleton */
+html:has(.kroom-admin):not(.kroom-admin-revealed) :is(aside.east, aside.west, section.top):has(> .kroom-region-empty) {
+    display: none;
+}
+
 html:has(.kroom-admin):not(.kroom-admin-revealed) .kroom-block[data-api] > .kroom-block-body:empty {
     min-width: 0;
     min-height: 0;
