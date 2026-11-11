@@ -20,6 +20,8 @@ small.draft { font-size: .65rem; text-transform: uppercase; letter-spacing: .05e
 main.container { display: flex; gap: 2rem; align-items: flex-start; }
 main > .content { flex: 3 1 0; min-width: 0; }
 main > .east, main > .west { flex: 1 1 0; min-width: 0; }
+/* the left is a column of names: on a wide screen it takes what they need, not a quarter of the page */
+main > .west { max-width: 12rem; }
 main > aside:has(> .kroom-region-empty) { flex: 0 0 1.5rem; }
 /* its words fit when everything is revealed; on a passing hover they run over the page, not out of it */
 .kroom-admin-revealed main > aside:has(> .kroom-region-empty) { flex-basis: auto; }
@@ -35,6 +37,7 @@ nav.west li ul { padding-left: 1rem; }
 /* on a small screen, one line that scrolls sideways, of where else to go: the breadcrumb names the section and
    the page the visitor is on, whose own pages keep its place in the line */
 @media (max-width: 48rem) {
+    main > .west { max-width: none; }
     main > nav.west { align-self: stretch; }
     nav.west > strong { display: none; }
     nav.west ul { display: flex; gap: 1.25rem; white-space: nowrap; }
