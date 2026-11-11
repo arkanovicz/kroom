@@ -199,11 +199,10 @@ class Site internal constructor(
     /** Store [change] of the entry at [path] (its words), the tree as it stands being stored with it. */
     fun rewrite(path: String, change: (MenuItem) -> MenuItem?) = storeMenu(MenuItem.update(menu(), path.trim('/').split('/'), change))
 
-    /** What the page at [path] is: a developer's `template`, an `instance` of a placeholder one, an `authored` page, or a `section` nobody wrote. */
+    /** What the page at [path] is: a developer's `template`, an `instance` of a placeholder one, or an `authored` page. */
     fun kinds(): (String) -> String {
         val sourced = pages().flatMap { page -> page.urls.map { it to if ('{' in page.route) "instance" else "template" } }.toMap()
-        val made = authored.all().associateBy { it.path }
-        return { path -> sourced[path] ?: if (path in made) "authored" else "section" }
+        return { path -> sourced[path] ?: if (authored.templated(path)) "instance" else "authored" }
     }
 
     /** `$nav` for this request: the application's menu, else the site's, in the request's language. */

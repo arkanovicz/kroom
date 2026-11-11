@@ -35,20 +35,21 @@ class NavigationTest {
     private suspend fun ApplicationTestBuilder.admin(): HttpClient = createClient { install(HttpCookies) }.also { it.get("/as/admin") }
 
     @Test
-    fun `derived from the pages, a deeper URL nests under its segment, a section nobody wrote leads to its first page`() = testApplication {
+    fun `derived from the pages, a deeper URL nests under its segment, which is a page of its own`() = testApplication {
         site()
         val page = client.get("/legal/terms").bodyAsText()
         // the header: the tree from its root, the section marked as the trail, the page as current
-        assertContains(page, """<li class="section"><a href="/legal/terms" aria-current="true">Legal</a><ul><li><a href="/legal/terms" aria-current="page">Terms</a></li></ul></li>""")
+        assertContains(page, """<li class="section"><a href="/legal" aria-current="true">Legal</a><ul><li><a href="/legal/terms" aria-current="page">Terms</a></li></ul></li>""")
         assertContains(page, """<a href="/about">About</a>""")
         assertFalse(page.contains(">Login</a>"), "the login page is hidden from the menu")
         // the west region: the section's pages
         assertContains(page, """<nav class="west" aria-label="Legal">""")
         assertFalse(client.get("/about").bodyAsText().contains("""class="west""""), "no section, no west")
-        // the breadcrumb: the site, the section (leading to its first page), the page — inside a section only
+        // the breadcrumb: the site, the section, the page — on a top-level page too, not on the home page
         assertContains(page, """<nav aria-label="breadcrumb" class="container breadcrumb">""")
-        assertContains(page, """<li><a href="/">kroom</a></li><li><a href="/legal/terms">Legal</a></li><li><span aria-current="page">Terms</span></li>""")
-        assertFalse(client.get("/about").bodyAsText().contains("breadcrumb"), "a top-level page has none")
+        assertContains(page, """<li><a href="/">kroom</a></li><li><a href="/legal">Legal</a></li><li><span aria-current="page">Terms</span></li>""")
+        assertContains(client.get("/about").bodyAsText(), """<li><a href="/">kroom</a></li><li><span aria-current="page">About</span></li>""", message = "a top-level page: the site, then it")
+        assertFalse(client.get("/").bodyAsText().contains("breadcrumb"), "the home page has none")
     }
 
     /** A stored tree orders and words what exists; an instance written under a stored section is still there. */
@@ -62,7 +63,7 @@ class NavigationTest {
             .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         assertContains(admin.get("/api/site/menu").bodyAsText(), """"path":"/club/13Ma"""", message = "stored: still there")
         val page = client.get("/club/13Ma").bodyAsText()
-        assertContains(page, """<li><a href="/">kroom</a></li><li><a href="/club/13Ma">Clubs</a></li><li><span aria-current="page">13Ma</span></li>""")
+        assertContains(page, """<li><a href="/">kroom</a></li><li><a href="/club">Clubs</a></li><li><span aria-current="page">13Ma</span></li>""")
         assertContains(page, """<nav class="west" aria-label="Clubs">""")
     }
 
@@ -79,7 +80,7 @@ class NavigationTest {
         val fr = client.get("/about?lang=fr").bodyAsText()
         assertContains(fr, """<html lang="fr"""")
         assertContains(fr, """>La Société</a><small>Who we are</small>""")
-        assertContains(fr, """<a href="/legal/terms">Legal</a>""", message = "a section without a page, in the default language, leading to its first one")
+        assertContains(fr, """<a href="/legal">Legal</a>""", message = "a section's words, in the default language")
         assertContains(fr, """>Mentions</a>""")
         assertContains(client.get("/about?lang=de").bodyAsText(), """<html lang="en"""", message = "a language the site does not speak is the default")
     }
@@ -90,10 +91,10 @@ class NavigationTest {
         val admin = admin()
         val derived = admin.get("/api/site/menu").bodyAsText()
         assertContains(derived, """"stored":false""")
-        assertContains(derived, """"path":"/legal","kind":"section"""")
+        assertContains(derived, """"path":"/legal","kind":"authored"""")
         assertContains(derived, """"path":"/legal/terms","kind":"template"""")
         val order = { body: String -> Regex(""""path":"(/[a-z]+)","kind"""").findAll(body).map { it.groupValues[1] }.toList() }
-        assertEquals(listOf("/about", "/legal", "/story", "/welcome"), order(derived))
+        assertEquals(listOf("/about", "/legal", "/story", "/welcome", "/club", "/team"), order(derived), "the pages made at start, the editor's kind, after the templates'")
 
         val stored = admin.put("/api/site/menu") {
             contentType(ContentType.Application.Json)
@@ -102,7 +103,7 @@ class NavigationTest {
         assertEquals(HttpStatusCode.OK, stored.status, stored.bodyAsText())
         val read = admin.get("/api/site/menu").bodyAsText()
         assertContains(read, """"stored":true""")
-        assertEquals(listOf("/story", "/about", "/legal", "/welcome"), order(read), "the arranged ones first, in their order, then the others")
+        assertEquals(listOf("/story", "/about", "/legal", "/welcome", "/club", "/team"), order(read), "the arranged ones first, in their order, then the others")
         assertFalse(read.contains("nowhere"), "an entry no page answers is no page")
         val page = client.get("/about").bodyAsText()
         assertContains(page, """<a href="/story">Our story</a>""")
@@ -129,7 +130,7 @@ class NavigationTest {
 
         assertEquals(HttpStatusCode.OK, admin.delete("/api/site/menu").status)
         assertTrue(storage.records("site", "menu").get("tree") == null)
-        assertEquals(listOf("/about", "/legal", "/story", "/welcome"), order(admin.get("/api/site/menu").bodyAsText()))
+        assertEquals(listOf("/about", "/legal", "/story", "/welcome", "/club", "/team"), order(admin.get("/api/site/menu").bodyAsText()))
     }
 
     @Test
@@ -141,7 +142,7 @@ class NavigationTest {
         storage.settings("site")["menuDepth"] = "1"
         val one = client.get("/legal/terms").bodyAsText()
         assertFalse(header(one).contains("Terms"), "one level: the sections only")
-        assertContains(header(one), """<a href="/legal/terms" aria-current="true">Legal</a>""")
+        assertContains(header(one), """<a href="/legal" aria-current="true">Legal</a>""")
         assertContains(one.substringAfter("""<nav class="west""""), """<a href="/legal/terms" aria-current="page">Terms</a>""")
     }
 }

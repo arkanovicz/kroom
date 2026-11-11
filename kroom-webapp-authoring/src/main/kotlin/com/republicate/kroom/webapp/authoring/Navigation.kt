@@ -22,8 +22,9 @@ data class MenuItem(
 
     /**
      * The entry a theme sees, in [lang] (then [fallback]), its path under [parent], as [resolve] answers for
-     * that path: a published page, a draft the viewer may see, or nothing — a draft is kept and marked, an
-     * entry nobody may see is dropped (null). A link is never here, never a draft: it resolves by being stored.
+     * that path: a published page, a draft the viewer may see, or nothing — a draft is kept and marked; an
+     * entry the viewer may not see, or no page answers, is dropped (null) with what is under it. A link is
+     * never here, never a draft: it is there by being stored.
      */
     fun view(lang: String, fallback: String, parent: String, resolve: (String) -> PageState): NavItem? {
         val words = label[lang] ?: label[fallback] ?: label.values.firstOrNull()
@@ -35,7 +36,7 @@ data class MenuItem(
         )
         val path = "$parent/$slug"
         val state = resolve(path)
-        if (state == PageState.FORBIDDEN) return null
+        if (state == PageState.FORBIDDEN || state == PageState.MISSING) return null
         val children = children.mapNotNull { it.view(lang, fallback, path, resolve) }
         return NavItem(
             label = words ?: slug.replace('-', ' ').replaceFirstChar(Char::titlecase),
@@ -43,9 +44,7 @@ data class MenuItem(
             description = description[lang] ?: description[fallback],
             children = children,
             slug = slug,
-            resolved = state != PageState.MISSING,
-            draft = state == PageState.DRAFT,
-            link = if (state != PageState.MISSING) path else children.firstNotNullOfOrNull { it.link }
+            draft = state == PageState.DRAFT
         )
     }
 
@@ -118,8 +117,8 @@ data class MenuItem(
             }
 
         /**
-         * A menu from the pages a site serves: one entry per URL, nested by segment, a section made for a
-         * segment no page answers (and marked unresolved) — what a site without a menu of its own shows.
+         * A menu from the pages a site serves: one entry per URL, nested by segment — what a site without
+         * a menu of its own shows. (A segment no page answers is an entry here, and none in a viewer's menu.)
          */
         fun derive(urls: List<String>, lang: String): List<MenuItem> {
             class Node(val slug: String) { val children = LinkedHashMap<String, Node>() }
@@ -150,12 +149,8 @@ data class NavItem(
     val children: List<NavItem> = emptyList(),
     /** The page's segment; null for an entry of an application's own menu that is no page. */
     val slug: String? = null,
-    /** Whether a page answers [href] — a section nobody wrote leads to its first page ([link]), or is only words. */
-    val resolved: Boolean = true,
     /** A page not out yet, shown because this viewer may edit it. */
-    val draft: Boolean = false,
-    /** Where a click leads: the page itself, or — for a section nobody wrote — its first page; null when neither. */
-    val link: String? = href
+    val draft: Boolean = false
 )
 
 /** `$nav` in a layout: the menu, and where in it this request is. */

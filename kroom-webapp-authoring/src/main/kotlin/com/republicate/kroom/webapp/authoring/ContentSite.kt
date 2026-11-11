@@ -84,6 +84,9 @@ fun Application.installContentSite(block: ContentSiteConfig.() -> Unit = {}) {
         pageResolver = { call, url -> this@installContentSite.resolvePage(url, config.pagePrefix, config.pageExtension) ?: site.authored.resolve(call, url) }
     }
 
+    // once everything is in place — the templates, and what the application wrote at its own start
+    monitor.subscribe(ApplicationStarted) { site.authored.complete() }
+
     velocity.registerRequest("site") { site.view(it) }
     velocity.registerRequest("theme") { call -> site.theme(call)?.let { ThemeView(it, site.settings(it)) } }
     velocity.registerRequest("nav") { call -> site.navigation(call) }

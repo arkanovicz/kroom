@@ -33,17 +33,17 @@ const answers = {
     '/api/site/rules': { columns: ['from', 'to', 'status', 'hits'], rows: [['/old', '/new', 301, 2]] },
     '/api/site/missing': { columns: ['uri', 'count', 'last'], rows: [['/gone', 3, '2026-09-30T00:00:00Z']] },
     // every kind of page: an editor's (published, a draft, a draft with a page under it), a developer's, an instance
-    // of a placeholder template, a section no page answers
+    // of a placeholder template, a page kroom made at start over pages that had none
     '/api/site/menu': { stored: true, lang: 'en', languages: ['en', 'fr'], layouts: ['article', 'wide', 'gallery'], items: [
         { slug: 'about', label: { en: 'About', fr: 'À propos' }, description: { en: 'Who we are' }, path: '/about', kind: 'authored',
-          status: 'published', layout: 'article', movable: true, resolved: true, children: [] },
-        { slug: 'contact', label: { en: 'Contact' }, path: '/contact', kind: 'template', resolved: true, children: [] },
-        { slug: 'club', label: { en: 'Clubs' }, path: '/club', kind: 'template', resolved: true, children: [
-            { slug: '13Ma', label: { en: 'Les Vagabonds' }, path: '/club/13Ma', kind: 'instance', resolved: true, children: [] }] },
-        { slug: 'legal', label: { en: 'Legal' }, path: '/legal', kind: 'section', resolved: false, children: [
-            { slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', kind: 'template', resolved: true, children: [] }] },
-        { slug: 'company', label: { en: 'Company' }, path: '/company', kind: 'authored', status: 'draft', layout: 'article', movable: false, resolved: true, children: [
-            { slug: 'history', label: { en: 'History' }, path: '/company/history', kind: 'authored', status: 'draft', layout: 'article', movable: true, resolved: true, children: [] }] },
+          status: 'published', layout: 'article', movable: true, children: [] },
+        { slug: 'contact', label: { en: 'Contact' }, path: '/contact', kind: 'template', children: [] },
+        { slug: 'club', label: { en: 'Clubs' }, path: '/club', kind: 'template', children: [
+            { slug: '13Ma', label: { en: 'Les Vagabonds' }, path: '/club/13Ma', kind: 'instance', children: [] }] },
+        { slug: 'legal', label: { en: 'Legal' }, path: '/legal', kind: 'authored', status: 'published', layout: 'wide', movable: false, children: [
+            { slug: 'terms', label: { en: 'Terms', fr: 'Mentions' }, path: '/legal/terms', kind: 'template', children: [] }] },
+        { slug: 'company', label: { en: 'Company' }, path: '/company', kind: 'authored', status: 'draft', layout: 'article', movable: false, children: [
+            { slug: 'history', label: { en: 'History' }, path: '/company/history', kind: 'authored', status: 'draft', layout: 'article', movable: true, children: [] }] },
         { href: 'https://y.example/doc', label: { en: 'Docs' }, kind: 'link', movable: true, children: [] }] },
     // plugins only, themes have their panel; a plugin's tables come with it, and what switching it off would silence
     '/api/site/plugins': [
@@ -153,7 +153,7 @@ check('a draft says so', lines().filter(li => li.querySelector(':scope > details
 check('a line says its kind; only an editor\'s page with nothing under it is free to move', lines().map(li =>
     [li._item.slug, [...li.classList].filter(c => c !== 'kroom-admin-menu-entry').join(' ')]), [
     ['about', 'kroom-admin-kind-authored'], ['contact', 'kroom-admin-kind-template kroom-admin-fixed'], ['club', 'kroom-admin-kind-template kroom-admin-fixed'],
-    ['13Ma', 'kroom-admin-kind-instance kroom-admin-fixed'], ['legal', 'kroom-admin-kind-section kroom-admin-fixed'],
+    ['13Ma', 'kroom-admin-kind-instance kroom-admin-fixed'], ['legal', 'kroom-admin-kind-authored kroom-admin-fixed'],
     ['terms', 'kroom-admin-kind-template kroom-admin-fixed'], ['company', 'kroom-admin-kind-authored kroom-admin-fixed'], ['history', 'kroom-admin-kind-authored'],
     [undefined, 'kroom-admin-kind-link']]);
 check('the arrangement is said to be the editors\', and can be forgotten', [$('.kroom-admin-menu-head small').textContent,
@@ -242,14 +242,10 @@ check('switching the language shows its labels, the default\'s where it has none
 }
 check('each page links to itself, a developer\'s says whose it is', ['about', 'contact', '13Ma'].map(slug =>
     line(slug).querySelector(':scope > details .kroom-admin-menu-page').textContent), ['/about ↗', '/contact ↗ — a developer\'s page', '/club/13Ma ↗ — a developer\'s page']);
-check('a section offers to create its page', line('legal').querySelector(':scope > details .kroom-admin-menu-page').textContent,
-    '/legal — no page here create this page');
-click(line('legal').querySelector(':scope > details .kroom-admin-menu-page button'));
-await sleep(20);
-check('creating it posts its path and its words, then opens it', [sent(), went()],
-    [{ url: '/api/site/pages', method: 'POST', body: { path: '/legal', label: { en: 'Legal' } } }, ['/legal']]);
+check('a page made at start is an editor\'s like another: it links to itself', line('legal').querySelector(':scope > details .kroom-admin-menu-page').textContent,
+    '/legal ↗');
 check('only an editor\'s page has a layout, a publishing switch and a delete', lines().filter(li => li.querySelector(':scope > details select')).map(li => li._item.slug),
-    ['about', 'company', 'history']);
+    ['about', 'legal', 'company', 'history']);
 {
     const layout = line('about').querySelector(':scope > details select');
     check('the layouts offered are the skeleton\'s, on the page\'s', [[...layout.options].map(o => o.value), layout.value],

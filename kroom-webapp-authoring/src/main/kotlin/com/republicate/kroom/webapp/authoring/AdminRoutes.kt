@@ -18,10 +18,11 @@ import io.ktor.server.routing.*
  * PUT {prefix}/settings                {key: value} — declared keys only; "" keeps a secret, null resets
  * GET {prefix}/menu                    the pages as a tree — the menu: each entry's path, kind, status, whether it may move
  * PUT {prefix}/menu                    {items} — their order and words; DELETE forgets the arrangement
- * POST {prefix}/pages                  {path, label, layout} — a new authored page, a draft
- * POST {prefix}/pages/move             {from, to} — an authored page without pages under it changes place, blocks and past with it
- * PUT {prefix}/pages/{path}            what changes: layout, status (draft|published)
- * DELETE {prefix}/pages/{path}         the record goes; its blocks stay in the store
+ * POST {prefix}/pages                  {path, label, layout, status} — a new authored page, a draft unless said, under a page (409 noParent)
+ * POST {prefix}/pages/move             {from, to} — an authored page without pages under it changes place, blocks and past with it, under a page
+ * PUT {prefix}/pages/{path}            what changes: layout, status (draft|published) — published publishes the drafts above,
+ *                                      draft is refused while visitors reach a page under it (409 pageHolds)
+ * DELETE {prefix}/pages/{path}         the record goes, unless pages live under it (409 pageHolds); its blocks stay in the store
  * GET {prefix}/plugins                 the plugins, each with its settings (a secret never read back)
  * PUT {prefix}/plugins/{id}/settings   {key: value} — declared keys only; "" keeps a secret, null resets
  * PUT {prefix}/plugins/{id}/enabled    {enabled} — live; enabling asks the plugin's `check`, 409 with its answer
@@ -51,9 +52,9 @@ fun Route.siteRoutes() {
             val served = site.urls().toSet()
             val lang = site.defaultLanguage
             val kind = site.kinds()
-            // an editor's view: a draft resolves (they may see it), what is missing does not
-            fun state(path: String) = if (path in served) PageState.PUBLISHED else site.authored.get(path)?.let { PageState.DRAFT } ?: PageState.MISSING
-            fun entry(item: MenuItem, parent: String): Json.MutableObject = item.toJson().apply {
+            // an editor's view: a draft is there (they may see it); a path no page answers is no entry, nor what is under it
+            fun there(path: String) = path in served || site.authored.get(path) != null
+            fun entry(item: MenuItem, parent: String): Json.MutableObject? = if (!item.external && !there("$parent/${item.slug}")) null else item.toJson().apply {
                 if (item.external) {
                     set("kind", "link")
                     set("movable", true)
@@ -65,18 +66,17 @@ fun Route.siteRoutes() {
                 site.authored.get(path)?.let { page ->
                     set("status", page.status)
                     set("layout", page.layout)
-                    // v1 moves leaves only
-                    set("movable", item.children.isEmpty())
+                    // v1 moves leaves only — and what a developer's template lays out stays under it
+                    set("movable", item.children.isEmpty() && !site.authored.templated(path))
                 }
-                set("resolved", state(path) != PageState.MISSING)
-                set("children", Json.MutableArray().apply { item.children.forEach { push(entry(it, path)) } })
+                set("children", Json.MutableArray().apply { item.children.forEach { child -> entry(child, path)?.let { push(it) } } })
             }
             respondJson {
                 set("stored", site.storedMenu() != null)
                 set("lang", lang)
                 set("languages", Json.MutableArray().apply { site.languages.forEach { push(it) } })
                 set("layouts", Json.MutableArray().apply { SKELETON_LAYOUTS.forEach { push(it) } })
-                set("items", Json.MutableArray().apply { site.menu().forEach { push(entry(it, "")) } })
+                set("items", Json.MutableArray().apply { site.menu().forEach { item -> entry(item, "")?.let { push(it) } } })
             }
         }
 
@@ -104,9 +104,13 @@ fun Route.siteRoutes() {
             val page = AuthoredPage.parse(asked).getOrElse { e ->
                 return@post respondError(e.message ?: "invalid page", code = "pageInvalid", args = mapOf("message" to (e.message ?: "")))
             }.copy(author = session.id)
-            if (site.authored.taken(path))
+            if (site.authored.occupied(path))
                 return@post respondError("a page already answers $path", HttpStatusCode.Conflict, "pageExists", mapOf("path" to path))
+            site.authored.parent(path)?.takeIf { !site.authored.taken(it) }?.let { above ->
+                return@post respondError("no page at $above: a page goes under a page", HttpStatusCode.Conflict, "noParent", mapOf("parent" to above))
+            }
             site.authored.put(page)
+            if (page.isPublished) site.authored.publishAbove(path)
             site.authored.seed(page, session.id)
             // its words are its menu entry's: the label it was given is stored there
             asked.getObject("label")?.entries?.associate { (k, v) -> k to v.toString() }?.filterValues { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
@@ -135,13 +139,19 @@ fun Route.siteRoutes() {
             val page = AuthoredPage.parse(receiveJsonObject(), existing).getOrElse { e ->
                 return@put respondError(e.message ?: "invalid page", code = "pageInvalid", args = mapOf("message" to (e.message ?: "")))
             }
+            // a page out under a draft would be in no menu
+            if (existing.isPublished && !page.isPublished && site.urls().any { it.startsWith("$path/") })
+                return@put respondError("$path has pages out under it", HttpStatusCode.Conflict, "pageHolds", mapOf("page" to path))
             site.authored.put(page)
+            if (page.isPublished) site.authored.publishAbove(path)
             respondJson(page.toJson())
         }
 
         delete("/pages/{path...}") {
             val path = "/" + call.parameters.getAll("path").orEmpty().joinToString("/")
             allowed(site, Permissions.PAGE_EDIT, path) ?: return@delete
+            if (site.authored.get(path) != null && site.authored.holds(path))
+                return@delete respondError("$path has pages under it", HttpStatusCode.Conflict, "pageHolds", mapOf("page" to path))
             if (!site.authored.delete(path))
                 return@delete respondError("no authored page at $path", HttpStatusCode.NotFound, "noPage", mapOf("page" to path))
             respondSuccess()

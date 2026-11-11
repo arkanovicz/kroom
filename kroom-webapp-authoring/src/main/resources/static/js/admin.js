@@ -40,11 +40,11 @@
         // the pages panel — which is the menu
         pagesDerived: 'in the order the pages come', pagesArranged: 'as you arranged them', pagesReset: 'forget this arrangement',
         pageDrag: 'drag to move', pageStays: 'it stays in its list: reordered, not moved', pageHasChildren: 'it has pages under it: it cannot move yet',
-        pageLabel: 'label', pageDescription: 'description', pageLayout: 'layout', pageNone: 'no page here', pageCreate: 'create this page',
-        pageSourced: 'a developer\'s page', pageDelete: 'delete this page', linkDelete: 'remove this link', pageNewLabel: 'its name', pageNewSlug: 'segment / URL',
+        pageLabel: 'label', pageDescription: 'description', pageLayout: 'layout',
+        pageSourced: 'a developer\'s page', pageTemplated: 'laid out by a developer\'s page', pageDelete: 'delete this page', linkDelete: 'remove this link', pageNewLabel: 'its name', pageNewSlug: 'segment / URL',
         pageNew: 'drag me where a new page or link goes', pageBorn: 'create', pageUnborn: 'cancel',
         publish: 'publish', unpublish: 'unpublish', draft: 'draft', published: 'published',
-        confirmDeletePage: 'Delete this page? Its blocks stay in the store.',
+        confirmDeletePage: 'Delete this page? Its blocks stay in the store.', confirmDeleteTemplated: 'Delete this page? Its blocks go with it.',
         confirmDisable: 'Switch {name} off? It holds {holds} — the blocks calling it will say they cannot be displayed.',
         noJournal: 'this content store keeps no history', revision: '{time} — {author}',
         unknownAuthor: 'unknown', noPlugin: 'no plugin installed', enabled: 'enabled', disabled: 'disabled', settings: 'settings', save: 'save', saved: 'saved',
@@ -73,11 +73,11 @@
         // the pages panel — which is the menu
         pagesDerived: 'dans l’ordre où viennent les pages', pagesArranged: 'telles que vous les avez arrangées', pagesReset: 'oublier cet arrangement',
         pageDrag: 'glisser pour déplacer', pageStays: 'elle reste dans sa liste\u00a0: on la réordonne, on ne la déplace pas', pageHasChildren: 'elle a des pages sous elle\u00a0: elle ne peut pas encore bouger',
-        pageLabel: 'libellé', pageDescription: 'description', pageLayout: 'mise en page', pageNone: 'pas de page ici', pageCreate: 'créer cette page',
-        pageSourced: 'page d’un développeur', pageDelete: 'supprimer cette page', linkDelete: 'retirer ce lien', pageNewLabel: 'son nom', pageNewSlug: 'segment / URL',
+        pageLabel: 'libellé', pageDescription: 'description', pageLayout: 'mise en page',
+        pageSourced: 'page d’un développeur', pageTemplated: 'mise en page par une page de développeur', pageDelete: 'supprimer cette page', linkDelete: 'retirer ce lien', pageNewLabel: 'son nom', pageNewSlug: 'segment / URL',
         pageNew: 'glissez-moi où va une nouvelle page ou un lien', pageBorn: 'créer', pageUnborn: 'annuler',
         publish: 'publier', unpublish: 'dépublier', draft: 'brouillon', published: 'publiée',
-        confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.',
+        confirmDeletePage: 'Supprimer cette page\u00a0? Ses blocs restent dans le stockage.', confirmDeleteTemplated: 'Supprimer cette page\u00a0? Ses blocs partent avec elle.',
         confirmDisable: 'D\u00e9sactiver {name}\u00a0? Elle contient {holds} \u2014 les blocs qui l\u2019appellent diront qu\u2019ils ne peuvent pas \u00eatre affich\u00e9s.',
         noJournal: 'ce stockage de contenu ne garde pas d’historique', revision: '{time} — {author}',
         unknownAuthor: 'inconnu', noPlugin: 'aucune extension installée', enabled: 'activée', disabled: 'désactivée', settings: 'réglages', save: 'enregistrer', saved: 'enregistré',
@@ -261,6 +261,7 @@
 
             const entry = (item) => {
                 const authored = item.kind === 'authored';
+                const made = item.status !== undefined;
                 const li = element('li', `kroom-admin-menu-entry kroom-admin-kind-${item.kind}` + (item.movable ? '' : ' kroom-admin-fixed'));
                 li._item = item;
                 const handle = li.appendChild(element('span', 'kroom-admin-handle', '\u283f'));
@@ -281,24 +282,24 @@
                     page.appendChild(link(item.href, item.href + ' \u2197'));
                     // nothing behind a link: taking it out of the tree is the whole deletion
                     action(fields.appendChild(element('div', 'kroom-admin-actions')), 'linkDelete', 'secondary outline', () => { li.remove(); store(read(root)); });
-                } else if (item.kind === 'section') {
-                    page.appendChild(element('span', null, `${item.path} \u2014 ${t('pageNone')} `));
-                    action(page, 'pageCreate', 'outline', () => act(() => api.postJson(siteApi + 'pages', { path: item.path, label: item.label || {} }), () => born(item.path)));
                 } else {
                     page.appendChild(link(item.path, item.path + ' \u2197'));
-                    if (!authored) page.appendChild(element('small', 'kroom-admin-muted', ' \u2014 ' + t('pageSourced')));
+                    // a page an editor made under a developer's placeholder: theirs to publish and delete, laid out by the template
+                    if (!authored) page.appendChild(element('small', 'kroom-admin-muted', ' \u2014 ' + t(made ? 'pageTemplated' : 'pageSourced')));
                 }
                 if (authored) {
                     const layout = fields.appendChild(element('p', 'kroom-admin-menu-layout', t('pageLayout') + ' ')).appendChild(element('select'));
                     for (const l of answer.layouts) layout.appendChild(element('option', null, l)).value = l;
                     layout.value = item.layout;
                     layout.addEventListener('change', () => act(() => api.putJson(siteApi + 'pages' + item.path, { layout: layout.value })));
+                }
+                if (made) {
                     const actions = fields.appendChild(element('div', 'kroom-admin-actions'));
                     const out = item.status === 'published';
                     action(actions, out ? 'unpublish' : 'publish', null, () => act(() => api.putJson(siteApi + 'pages' + item.path, { status: out ? 'draft' : 'published' })));
                     action(actions, 'pageDelete', 'secondary outline', () => {
                         // the page one is on, deleted, answers nothing any more: home instead
-                        if (window.confirm(t('confirmDeletePage'))) act(() => api.deleteJson(siteApi + 'pages' + item.path), () => { if (location.pathname === item.path) location.href = '/'; else location.reload(); });
+                        if (window.confirm(t(authored ? 'confirmDeletePage' : 'confirmDeleteTemplated'))) act(() => api.deleteJson(siteApi + 'pages' + item.path), () => { if (location.pathname === item.path) location.href = '/'; else location.reload(); });
                     });
                 }
                 li.appendChild(tree(item.children ??= [], item.path));

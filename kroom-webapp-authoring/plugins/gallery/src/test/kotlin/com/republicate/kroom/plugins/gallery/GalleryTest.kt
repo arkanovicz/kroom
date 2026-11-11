@@ -69,6 +69,7 @@ class GalleryTest {
     fun `a gallery page is born with its gallery, filled through the API, shown to all and edited by some`() = testApplication {
         site()
         val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/photos"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         val id = editor.galleryPage("/photos/plage")
 
         val empty = visitor().get("/photos/plage").bodyAsText()

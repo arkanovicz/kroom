@@ -182,7 +182,7 @@ class PluginTest {
         }
         val pages = admin.get("/api/site/menu").bodyAsText()
         assertContains(pages, """"path":"/club/22Ly","kind":"instance"""")
-        assertContains(pages, """"path":"/club","kind":"section"""")
+        assertContains(pages, """"path":"/club","kind":"authored"""", message = "the folder of a placeholder template: a page made at start")
     }
 
     @Test

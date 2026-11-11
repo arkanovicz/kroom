@@ -6,6 +6,34 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-webapp-authoring — every entry of the menu is a page
+- The tree is completed at start (`AuthoredPages.complete()`, on `ApplicationStarted`): a path with pages under
+  it and none of its own — `/legal` over `pages/legal/terms.html`, `/club` over the placeholder
+  `pages/club/_club_.html`, before any instance — gets an authored page like any other: `wide`, signed `kroom`
+  (`AuthoredPage.COMPLETER`), its content block its name as a heading and the list of the pages under it
+  (`AuthoredPage.TOC`, a loop over the `$children` and `$title` `kroom/page.html` hands the block). It is out when
+  visitors already reach something under it, or when nothing is there yet; a draft when all under it is drafts.
+  It only fills gaps: a page or a block an editor rewrote is theirs.
+- A parameterized address is left alone: `/club/13Ma` when only `pages/club/_code_/members.html` exists is no
+  page, answers 404 as before, and is in nobody's menu, nor what is under it (`MenuItem.view` drops what no page
+  answers; `GET /api/site/menu` skips it).
+- The API keeps the tree whole: `POST /api/site/pages` answers 409 `noParent` under a path with no page (a
+  top-level page needs none), `POST /api/site/pages/move` refuses such a destination; `DELETE
+  /api/site/pages/{path}` answers 409 `pageHolds` while pages live under it (an editor's page, a visitor's URL, a
+  template's route), and `PUT` refuses to unpublish it (409 `pageHolds`) while visitors reach one of them.
+- Publishing climbs: a page published (`PUT`, or `POST` with `"status":"published"`) publishes the drafts above it.
+- A page is made where a developer's placeholder answers (`POST /api/site/pages` with `/club/9Zz` under
+  `pages/club/_club_.html` answered 409 for any name: nothing could be made under such a folder): it is the
+  template's, laid out by it and written in its blocks, its record saying it is there and whether it is out —
+  kind `instance` with a `status`, no layout to choose, not movable, deleted with its blocks.
+- The breadcrumb shows on a top-level page too (the site, then the page); the home page has none.
+- An authored page's record reads back who made it and when (`author`, `created`, `published` were written and
+  read as unknown, or now).
+- Gone with the page-less entry: `NavItem.link` and `NavItem.resolved` (a theme links `$item.href`), the kind
+  `section` (`Site.kinds()` answers `template`, `instance` or `authored`), the menu API's `resolved`, the pages
+  panel's "no page here — create this page", the words-only branch of `#nav` and of the breadcrumb.
+- Pinned in `PagesTest`, `NavigationTest`, `PluginTest`, `admin.mjs`.
+
 #### kroom-webapp-authoring — three layouts: `article`, `wide`, `gallery`
 - The vocabulary was `default`, `article`, `sidebar`, `landing`, `gallery`; a layout now says only what no region
   can — how wide the content runs, and whether the section's menu stands beside it. `article`: a reading column
@@ -18,14 +46,18 @@ All notable changes to kroom will be documented in this file.
   pages keeping its place in the line; the breadcrumb sits closer under the header.
 - To its editor, a block that renders nothing keeps a place (it was a line nobody could find); with the admin
   bar's eye released each block wears its name above its top left corner, and an unwritten side block's
-  placeholder fits its words (they ran out of the page).
+  placeholder fits its words (they ran out of the page). With the eye pressed — the page as visitors see it —
+  a region nobody wrote takes no room (an unwritten right block cost a column's gap, an unwritten top a band);
+  whoever writes without a bar has no eye and keeps the strip to hover. An article is centred when nothing
+  written stands beside it.
 - `sidebar` and `landing` are gone: a side column is an `$east` written, a page opening on a band a `$top`, on
   any layout. A stored page whose layout is no longer named (`default`, `sidebar`, `landing`) reads as `article`;
   `POST`/`PUT /api/site/pages` answer 400 for one.
 - A markup-owning theme's required file is `themes/<id>/layouts/article.html` (was `default.html`).
-- A root page is born empty like any other: the loop listing its pages went (`AuthoredPage.TOC`, and the
-  `$children` `kroom/page.html` handed its content block) — the section's menu is that list already, and an
-  editor opening an empty block found code.
+- A page an editor creates is born empty, a root page too (it was born with the loop listing its pages): the
+  section's menu is that list already, and an editor opening an empty block found code. The loop
+  (`AuthoredPage.TOC`, over the `$children` `kroom/page.html` hands the block) stays for the pages kroom makes to
+  complete the tree.
 - Pinned in `ThemeTest`, `DummyThemeTest`, `PagesTest`.
 
 #### kroom-webapp-velocity, kroom-markdown, kroom-webapp-authoring — a value is data, markup is a `SafeText`

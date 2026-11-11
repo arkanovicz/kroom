@@ -813,7 +813,7 @@ menu out as one line that scrolls sideways. `#layout()` takes the site's `layout
 otherwise. `$header`, `$west` and `$footer` have a
 site-wide default a page overrides by defining them: the brand, the menu and the way in; the section the
 visitor is in, its pages listed; the site's `footer` line. Under the header, a breadcrumb (`$nav.trail`: the
-site, the section, the page) shows on any page inside a section — a region partial like the others.
+site, the section, the page) shows on any page but the home page — a region partial like the others.
 
 Two kinds of theme, both `Theme : Plugin`, several installed, one active (the `theme` site setting, switched
 from the admin bar, live; an admin previews another with `?theme=<id>`):
@@ -827,8 +827,8 @@ from the admin bar, live; an admin previews another with `?theme=<id>`):
   without rendering), `$title`, `$site.name`, `$site.head()` at the end of `<head>` and `$site.foot()` at the
   end of `<body>` — all kroom and its plugins ask.
 
-Both get `$nav` (the menu, see below; `#nav($nav.items)` renders the tree with `aria-current`, a section no
-page answers leading to its first page (`$item.link`), each entry's description in a `<small>` for a theme that shows
+Both get `$nav` (the menu, see below; `#nav($nav.items)` renders the tree with `aria-current`, a draft
+marked for its editors, each entry's description in a `<small>` for a theme that shows
 panels; `$nav.section` is the top-level entry the visitor is under) and `$theme` (the
 theme: `id`, `name`, `stylesheets`, `scripts`, `settings`, and any setting by key — `$theme.scheme`). A theme
 adds to `<head>` like any plugin, `site.head { }` in its `install`, emitted while it is the active one. Assets
@@ -847,7 +847,7 @@ says `##@output web`) every value a reference inserts is escaped for where it la
 
 ```html
 <title>$title — $site.name</title>              text up to the closing tag: `<` and `&`
-<a href="$item.link">$item.label</a>            an attribute value, then text
+<a href="$item.href">$item.label</a>            an attribute value, then text
 <script>const user = $logged.name;</script>     a quoted JS literal
 $site.head()                                    a SafeText: markup, as it stands
 ```
@@ -870,6 +870,25 @@ and words them (`MenuItem`: `slug`, `label` and `description` by language, `chil
 exist: a page made since appears after the arranged ones, an entry no page answers any more is dropped. Until
 one is stored, the tree is derived from the pages, a deeper URL nesting under its first segment.
 
+**No entry without a page.** Every entry is a page (or a link), so a click leads where it says. Once the
+application has started, kroom completes the tree: a path with pages under it and none of its own — `/legal` over
+`pages/legal/terms.html`, `/club` over the placeholder `pages/club/_club_.html` — gets an authored page like any
+other, `wide`, signed `kroom`, its content its name as a heading and the list of the pages under it
+(`AuthoredPage.TOC`, a loop over the `$children` `kroom/page.html` hands the block). It is out when visitors
+already reach something under it, or when nothing is there yet; a draft when all under it is drafts. It only
+fills gaps: what an editor makes of it is theirs. An address where a placeholder binds a value (`/club/13Ma`
+when only `pages/club/_code_/members.html` exists) is left alone: it answers 404, and is in no menu, nor what is
+under it. The API keeps the tree whole: a page is created or moved only under a page (409 `noParent`; a
+top-level one needs none); a page with pages under it is not deleted (409 `pageHolds`: an editor's page, a
+visitor's URL or a template's route), nor unpublished while visitors reach one of them; publishing a page
+publishes the drafts above it.
+
+**Under a developer's placeholder.** A page an editor makes where a placeholder template answers — `/club/9Zz`
+under `pages/club/_club_.html` — is the template's: the developer chose how it is laid out, the editor writes its
+blocks. Its record says it is there, by the name it was given, and whether it is out: a draft is in no visitor's
+menu (its address answers what the template answers, as any other there). It has no layout to choose, does not
+move, and is deleted with its blocks, by which such a page is there.
+
 The one entry that is no page is a link (`href`, anything with a scheme — `https://…`, `mailto:…`), which exists by
 being stored: it has words and a place in the tree, never a page under it, is never the current page, and a
 theme gets it with `external` (`#nav` adds `rel="external"`). In the panel the new-entry form has one input
@@ -882,7 +901,8 @@ application's), the default filling what a language lacks.
 
 **Authored pages.** A page need not be a template: an editor makes one, a record (`path`, `layout`,
 `draft`|`published`), and kroom renders it through one template, `kroom/page.html` (`installContentSite { pageTemplate = … }`
-names an application's own — one that picks its blocks per language, say), each region a block in the
+names an application's own — one that picks its blocks per language, say; it hands the content block `title`
+and `children`, which the list of a page made to complete the tree reads), each region a block in the
 content store right where a template's would be (`pages/company/history/content.md`), edited in place like any
 other, previewed within its page. Authored pages answer after the templates, in the not-found phase: a
 developer's page wins, an editor cannot take `/login`. Deleting the record leaves its blocks in the store.
@@ -898,19 +918,20 @@ do not.
 
 **Moving.** An authored page with no page under it moves by being dragged under another parent — its record,
 its blocks with their history (`ResourceStore.moveAll`), its words. The move is refused when a page (or a
-placeholder template) already answers the destination, when the page has pages under it, or when someone else
+placeholder template) already answers the destination, when no page stands above the destination, when the
+page has pages under it, or when someone else
 is writing one of its blocks. A developer's page is reordered among its siblings, not moved: its address is
 its template's. No redirect is written from the old address; the not-found table of the *site* entry shows
 who still asks for it.
 
 **Rendering.** Three site settings shape the menu a visitor gets: `menuDepth` (how deep the header's menu goes,
 2 by default), `menuPanels` (the header shows a section's pages as a hover panel) and `west` (the section's
-pages on the left by default, or nothing). A section no page answers leads to its first page.
+pages on the left by default, or nothing).
 
 **The *pages* entry** of the admin bar is that tree, compact, one line per page — a handle to drag it by
 (SortableJS; a phantom row shows where it lands, a page's own list, empty, is how it gets a first child;
 a developer's handle is greyed) and its label, which opens an accordion: the label and description in the
-chosen language, the page itself (a section offers to create it), and for an editor's page its layout,
+chosen language, the page itself, and for an editor's page its layout,
 publish/unpublish, delete. A new page is born where it goes: a phantom row under the tree, dragged into place,
 asks its name — the segment derived from it (`Notre Société` → `notre-societe`) until typed over, an address
 there instead makes a link — and the page is created under that list, at that very index. A page is born
@@ -919,7 +940,7 @@ and the west are server-rendered — and the bar reopens where it was (the panel
 opened, to be written.
 
 `GET`/`PUT`/`DELETE /api/site/menu` (the tree; its arrangement; forgetting it), `POST /api/site/pages`
-(`{path, label, layout}`, a draft), `POST /api/site/pages/move` (`{from, to}`),
+(`{path, label, layout, status}`, a draft unless said, under a page), `POST /api/site/pages/move` (`{from, to}`),
 `PUT`/`DELETE /api/site/pages/{path}` (layout, status), all for `pages.edit` — the editor's; an `author` writes
 blocks and nothing else. An application computing its own menu sets `navigation = { call -> List<NavItem> }` over all this.
 

@@ -45,6 +45,11 @@ class PagesTest {
         site()
         val editor = visitor("ed")
         assertEquals(HttpStatusCode.Forbidden, visitor("au").json(HttpMethod.Post, "/api/site/pages", """{"path":"/company"}""").status, "an author writes blocks, not pages")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history","label":{"en":"Our history"}}""").let {
+            assertEquals(HttpStatusCode.Conflict, it.status, "a page goes under a page")
+            assertContains(it.bodyAsText(), """"code":"noParent","args":{"parent":"/company"}""")
+        }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company","label":{"en":"Company"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         val created = editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history","label":{"en":"Our history"},"layout":"article"}""")
         assertEquals(HttpStatusCode.OK, created.status, created.bodyAsText())
         assertContains(created.bodyAsText(), """"status":"draft"""")
@@ -64,7 +69,8 @@ class PagesTest {
         assertContains(page, "A long <strong>story</strong>")
         assertContains(page, """<meta property="og:title" content="Our history">""")
         assertContains(visitor().get("/about").bodyAsText(), """<a href="/company/history">Our history</a>""", message = "published, it is in the menu under its section, by the name it was given: its label is its title")
-        assertContains(visitor().get("/about").bodyAsText(), """<li class="section"><a href="/company/history">Company</a>""", message = "a section nobody wrote leads to its first page")
+        assertContains(visitor().get("/about").bodyAsText(), """<li class="section"><a href="/company">Company</a>""", message = "publishing climbs: the draft above went out with it")
+        assertEquals(HttpStatusCode.OK, visitor().get("/company").status)
         assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/company/history","kind":"authored","status":"published","layout":"article","movable":true""")
         assertContains(page, """<nav class="west" aria-label="Company">""", message = "an article has its section's menu beside it")
         for (layout in listOf("wide", "gallery")) {
@@ -82,15 +88,102 @@ class PagesTest {
 
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history"}""").let { assertEquals(HttpStatusCode.Conflict, it.status) }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/about"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "a template's page is not for the taking") }
-        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club/anything"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "nor a place a placeholder template would answer") }
-        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club"}""").let { assertEquals(HttpStatusCode.OK, it.status, "the section its instances sit under has no page: it may be given one — ${it.bodyAsText()}") }
-        assertEquals(HttpStatusCode.OK, editor.get("/club").status)
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "the section its instances sit under was given a page at start") }
+        assertEquals(HttpStatusCode.OK, visitor().get("/club").status)
         assertContains(editor.get("/club/13Ma").bodyAsText(), "<h1>13Ma</h1>", message = "and its instances answer as before")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"bad path"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status) }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/old","layout":"default"}""").let { assertEquals(HttpStatusCode.BadRequest, it.status, "default is no layout any more") }
-        assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/company/history").status)
+        editor.delete("/api/site/pages/company").let {
+            assertEquals(HttpStatusCode.Conflict, it.status, "a page with pages under it stays")
+            assertContains(it.bodyAsText(), """"code":"pageHolds"""")
+        }
+        assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/company/history").status, "a leaf goes")
         assertEquals(HttpStatusCode.NotFound, visitor().get("/company/history").status)
         assertEquals("## Since 1998\n\nA long **story**.", storage.content.read("pages/company/history/content.md")!!.body, "its blocks stay")
+    }
+
+    @Test
+    fun `at start every path with pages under it and none of its own gets one - wide, listing them, signed by kroom`() = testApplication {
+        storage.content.write("pages/team/7/roster/roster.md", "Seven **strong**.", mapOf("author" to "ed"))
+        storage.records("site", "pages").put("drafts_-one", AuthoredPage("/drafts/one", author = "ed").toJson())
+        site()
+        val admin = visitor("admin")
+        val menu = admin.get("/api/site/menu").bodyAsText()
+        // a concrete gap (pages/legal/terms.html), the folder of a placeholder template (pages/club/_club_.html), of a deeper one (pages/team/_id_/roster.html)
+        for (path in listOf("/legal", "/club", "/team")) {
+            val page = visitor().get(path)
+            assertEquals(HttpStatusCode.OK, page.status, path)
+            assertContains(page.bodyAsText(), """data-layout="wide"""")
+            assertContains(menu, """"path":"$path","kind":"authored","status":"published","layout":"wide"""")
+            assertEquals(AuthoredPage.COMPLETER, application.site.authored.get(path)!!.author)
+            storage.content.read("pages$path/content.md")!!.let {
+                assertEquals(AuthoredPage.TOC, it.body, "its content: the list of the pages under it")
+                assertEquals(AuthoredPage.COMPLETER, it.author)
+            }
+        }
+        assertContains(visitor().get("/legal").bodyAsText(), """<h1>Legal</h1>""", message = "its name heads it")
+        assertContains(visitor().get("/legal").bodyAsText(), """<li><a href="/legal/terms">Terms</a></li>""", message = "the list, as the page hands it")
+        assertContains(visitor().get("/club").bodyAsText(), """<h1>Club</h1>""")
+        assertContains(visitor().get("/about").bodyAsText(), """<li class="section"><a href="/legal">Legal</a>""", message = "the menu's entry leads to the page itself")
+
+        // a parameterized address is left alone: no page, in no menu, what is under it served as before
+        assertEquals(HttpStatusCode.OK, visitor().get("/team/7/roster").status)
+        assertContains(visitor().get("/team/7/roster").bodyAsText(), "Seven <strong>strong</strong>.")
+        assertEquals(HttpStatusCode.NotFound, visitor().get("/team/7").status)
+        assertNull(application.site.authored.get("/team/7"))
+        assertFalse(menu.contains("/team/7"), "nor what is under it")
+        assertFalse(admin.get("/about").bodyAsText().contains("/team/7"))
+
+        // a folder of drafts only: born a draft
+        assertEquals(HttpStatusCode.NotFound, visitor().get("/drafts").status)
+        assertContains(menu, """"path":"/drafts","kind":"authored","status":"draft","layout":"wide"""")
+
+        // again: nothing changes
+        val before = application.site.authored.all()
+        application.site.authored.complete()
+        assertEquals(before, application.site.authored.all())
+        assertEquals(1, (storage.content as Versioned).log("pages/legal/content.md").size)
+        // what an editor made of it is theirs
+        val editor = visitor("ed")
+        storage.content.write("pages/legal/content.md", "Our **terms**", mapOf("author" to "ed"))
+        editor.json(HttpMethod.Put, "/api/site/pages/legal", """{"layout":"article"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        application.site.authored.complete()
+        assertEquals("article", application.site.authored.get("/legal")!!.layout)
+        assertEquals("Our **terms**", storage.content.read("pages/legal/content.md")!!.body)
+
+        // it holds pages, a template's route among them: it stays
+        for (path in listOf("/legal", "/club", "/team")) {
+            editor.delete("/api/site/pages$path").let {
+                assertEquals(HttpStatusCode.Conflict, it.status, path)
+                assertContains(it.bodyAsText(), """"code":"pageHolds"""")
+            }
+        }
+    }
+
+    @Test
+    fun `publishing climbs - a draft above a page going out goes out with it, and a page stays out while visitors reach one under it`() = testApplication {
+        site()
+        val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/news","label":{"en":"News"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/news/today","label":{"en":"Today"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/news/today/noon","label":{"en":"Noon"},"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        for (path in listOf("/news", "/news/today", "/news/today/noon")) assertEquals(HttpStatusCode.OK, visitor().get(path).status, "born published, $path")
+        assertContains(visitor().get("/about").bodyAsText(), """<li class="section"><a href="/news">News</a><ul><li class="section"><a href="/news/today">Today</a>""")
+
+        val unpublish = { path: String -> suspend { editor.json(HttpMethod.Put, "/api/site/pages$path", """{"status":"draft"}""") } }
+        unpublish("/news")().let {
+            assertEquals(HttpStatusCode.Conflict, it.status, "visitors reach pages under it")
+            assertContains(it.bodyAsText(), """"code":"pageHolds"""")
+        }
+        assertEquals(HttpStatusCode.OK, unpublish("/news/today/noon")().status, "a leaf")
+        assertEquals(HttpStatusCode.Conflict, unpublish("/news")().status, "/news/today is still out")
+        assertEquals(HttpStatusCode.OK, unpublish("/news/today")().status, "all under it are drafts")
+        assertEquals(HttpStatusCode.OK, unpublish("/news")().status)
+        for (path in listOf("/news", "/news/today", "/news/today/noon")) assertEquals(HttpStatusCode.NotFound, visitor().get(path).status, path)
+        assertFalse(visitor().get("/about").bodyAsText().contains("/news"))
+
+        editor.json(HttpMethod.Put, "/api/site/pages/news/today/noon", """{"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        for (path in listOf("/news", "/news/today", "/news/today/noon")) assertEquals(HttpStatusCode.OK, visitor().get(path).status, "a PUT climbs too, $path")
     }
 
     @Test
@@ -133,9 +226,35 @@ class PagesTest {
 
         storage.content.write("pages/guides/content.md", "All our **guides**", mapOf("author" to "ed"))
         assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>")
+        assertEquals(HttpStatusCode.Conflict, editor.delete("/api/site/pages/guides").status, "it holds a page")
+        assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/guides/first").status)
         assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/guides").status)
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/guides","status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         assertContains(visitor().get("/guides").bodyAsText(), "All our <strong>guides</strong>", message = "its block stayed")
+    }
+
+    @Test
+    fun `a page made where a developer's placeholder answers is the template's - a draft in the menu, written in its blocks, gone with them`() = testApplication {
+        site()
+        val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club/9Zz","label":{"en":"Nine"},"layout":"gallery"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertNull(storage.content.read("pages/club/9Zz/content.md"), "no block of an editor's page planted: its blocks are its template's")
+        assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/club/9Zz","kind":"instance","status":"draft","layout":"gallery","movable":false""")
+        assertContains(visitor().get("/club/9Zz").bodyAsText(), "<h1>9Zz</h1>", message = "the developer's template lays it out")
+        assertFalse(visitor().get("/about").bodyAsText().contains("/club/9Zz"), "a draft is in no visitor's menu")
+        assertContains(editor.get("/about").bodyAsText(), """<a href="/club/9Zz" class="draft">Nine</a>""", message = "its editor sees it, by the name it was given")
+
+        editor.json(HttpMethod.Put, "/api/site/pages/club/9Zz", """{"status":"published"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertContains(visitor().get("/about").bodyAsText(), """<a href="/club/9Zz">Nine</a>""")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/club/9Zz"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "made once") }
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/about"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "a developer's own page is no place to make one") }
+        editor.json(HttpMethod.Post, "/api/site/pages/move", """{"from":"/club/9Zz","to":"/nine"}""").let { assertEquals(HttpStatusCode.Conflict, it.status, "it stays under its template") }
+
+        storage.content.write("pages/club/9Zz/description.md", "Its **words**.", mapOf("author" to "ed"))
+        assertContains(visitor().get("/club/9Zz").bodyAsText(), "Its <strong>words</strong>.")
+        assertEquals(HttpStatusCode.OK, editor.delete("/api/site/pages/club/9Zz").status)
+        assertNull(storage.content.read("pages/club/9Zz/description.md"), "there by its blocks: they went with it")
+        assertFalse(visitor("admin").get("/api/site/menu").bodyAsText().contains("/club/9Zz"))
     }
 
     @Test
@@ -196,6 +315,7 @@ class PagesTest {
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/a"}""")
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/a/b"}""")
         refused("/a", "/legal/a", "/a has pages under it")()
+        refused("/fresh", "/nowhere/fresh", "no page at /nowhere: a page goes under a page")()
         assertContains(visitor("admin").get("/api/site/menu").bodyAsText(), """"path":"/a","kind":"authored","status":"draft","layout":"article","movable":false""")
         visitor("ed2").post("/api/content/lock/pages/a/b/content.md").let { assertEquals(HttpStatusCode.OK, it.status) }
         storage.content.write("pages/a/b/content.md", "being written", mapOf("author" to "ed2"))
@@ -219,6 +339,7 @@ class PagesTest {
                 assertEquals(HttpStatusCode.NotFound, client.get(miss).status, miss)
             }
             val editor = visitor("ed")
+            editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
             editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/history_1","label":{"en":"History"},"status":"published"}""")
                 .let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
             editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company_-history_1"}""")
@@ -237,6 +358,7 @@ class PagesTest {
     fun `an application renders authored pages through a template of its own`() = testApplication {
         site(pageTemplate = "inc/custom_page.html")
         val editor = visitor("ed")
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/company/team","label":{"en":"Team"}}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         storage.content.write("pages/company/team/content-fr.md", "Bonjour l'équipe.", mapOf("author" to "ed"))
         val page = editor.get("/company/team").bodyAsText()
@@ -262,8 +384,8 @@ class PagesTest {
         editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/photos/plage","layout":"gallery"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
         assertEquals("\$gallery.show(\"photos/plage\")", storage.content.read("pages/photos/plage/content.md")!!.body)
         assertEquals("ed", storage.content.read("pages/photos/plage/content.md")!!.author, "the page's author signs the seed")
-        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/team"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-        assertNull(storage.content.read("pages/team/content.md"))
+        editor.json(HttpMethod.Post, "/api/site/pages", """{"path":"/crew"}""").let { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        assertNull(storage.content.read("pages/crew/content.md"))
         assertNull(storage.content.read("pages/photos/plage/east.md"))
     }
 
