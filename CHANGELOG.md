@@ -618,6 +618,11 @@ All notable changes to kroom will be documented in this file.
   `state.text`, and `TextState(text)` for a room rebuilt from what a store kept. No room class and no store: a
   plain `LogicRoom`, `persist(event)` the application's. Pinned in `TextTest` (common), `TextRoomTest` (server).
 
+#### kroom-common — an array field in the markup
+- `Field.parse` reads an ARRAY field's text as its items separated by blanks, as html writes a list in an
+  attribute: `data-kroom-ids="3 4"` posts `ids: ["3", "4"]`, so a click takes a part of a text with the stock
+  binding. Pinned in `EventTest`.
+
 #### kroom-common — `seq`, a field whose order is state
 - `seq(::V)`: views found by their `id`, in an order that is itself state (an array on the wire), where `keyed`
   keeps the order of birth and `log` only appends. `Seq.splice(index, count, items)` is its one writer — an

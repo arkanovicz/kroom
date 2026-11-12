@@ -162,8 +162,9 @@ abstract class JsonView(val json: Json.MutableObject) {
 
         /**
          * A form's text in this kind, as early as the browser reads it: a number parsed, a checkbox's `on` true, `""` null
-         * for every kind but STRING (the key stays: a field emptied on purpose, a vote undone); a text no kind reads stays
-         * as is, for [check] to refuse.
+         * for every kind but STRING (the key stays: a field emptied on purpose, a vote undone); an ARRAY's is its items
+         * separated by blanks, as html writes a list in an attribute (`class`, `rel`); a text no kind reads stays as is,
+         * for [check] to refuse.
          */
         fun parse(text: String): Any? = when {
             kind == Kind.STRING -> text
@@ -172,6 +173,7 @@ abstract class JsonView(val json: Json.MutableObject) {
             kind == Kind.LONG -> text.toLongOrNull() ?: text
             kind == Kind.DOUBLE -> text.toDoubleOrNull() ?: text
             kind == Kind.BOOL -> when (text.lowercase()) { "true", "on", "1" -> true; "false", "off", "0" -> false; else -> text }
+            kind == Kind.ARRAY -> Json.MutableArray(text.split(BLANKS).filter { it.isNotEmpty() })
             else -> text
         }
     }
@@ -225,3 +227,4 @@ abstract class JsonView(val json: Json.MutableObject) {
 
 /** The fields that name an item, in the order tried. */
 private val IDENTITY = listOf("id", "seq")
+private val BLANKS = Regex("""\s+""")

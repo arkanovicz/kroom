@@ -62,6 +62,10 @@ class EventTest {
         assertEquals(true, rated.parse("on"))   // a checkbox
         assertEquals(false, rated.parse("false"))
         assertNull(rated.parse(""))
+        val ids = Take().fields.single { it.name == "ids" }
+        assertEquals("""["3"]""", ids.parse("3").toString())   // a list in an attribute, as html writes one
+        assertEquals("""["1","2","3"]""", ids.parse(" 1 2\n3 ").toString())
+        assertNull(ids.parse(""))
         val json = Json.MutableObject("player1" to "a", "player2" to "b", "round" to round.parse(""))
         assertTrue(json.containsKey("round"))
         assertNull(Match(json).validate())
