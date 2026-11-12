@@ -598,6 +598,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-common — `seq`, a field whose order is state
+- `seq(::V)`: views found by their `id`, in an order that is itself state (an array on the wire), where `keyed`
+  keeps the order of birth and `log` only appends. `Seq.splice(index, count, items)` is its one writer — an
+  insertion, a removal, a run rewritten in place; `seq[id]`, `id in seq`, `indexOf(id)`. What comes in is dirty by
+  its id, what goes tells the root. Pinned in `EventTest`, `LogicTest`.
+
 #### kroom-markdown-core — markdown to sanitized html, alone
 - A new module, flexmark and jsoup only (no velocity, antlr or kotlin-reflect): `Markdown.html(source)` renders
   markdown, the GFM set on, through the allowlist `kroom-markdown` blocks pass. `Markdown.html(source, before,

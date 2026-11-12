@@ -156,4 +156,27 @@ class EventTest {
         assertEquals("Bob", table.seats[0].name)
         assertFailsWith<IllegalArgumentException> { table.seats.add(Seat(Json.MutableObject("name" to "nobody"))) }
     }
+
+    class Row(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
+        val seats by seq(::Seat)
+    }
+
+    private fun seat(id: String, name: String = id) = Seat(Json.MutableObject("id" to id, "name" to name))
+
+    @Test fun `a seq is an array whose order is state spliced in place found by id`() {
+        val row = Row()
+        row.seats.splice(0, 0, listOf(seat("a"), seat("c")))
+        row.seats.splice(1, 0, listOf(seat("b")))                                    // an insertion, where it is told
+        assertEquals("""{"seats":[{"id":"a","name":"a"},{"id":"b","name":"b"},{"id":"c","name":"c"}]}""", row.json.toString())
+        row.seats.splice(row.seats.indexOf("b"), 2, listOf(seat("b", "Bob"), seat("d"), seat("e")))   // a run rewritten
+        assertEquals(listOf("a", "Bob", "d", "e"), row.seats.map { it.name })
+        assertEquals("Bob", row.seats["b"]?.name)
+        assertTrue("d" in row.seats)
+        row.seats.splice(0, 1)                                                       // a removal
+        assertFalse("a" in row.seats)
+        assertEquals(-1, row.seats.indexOf("a"))
+        assertEquals(3, row.seats.size)
+        assertFailsWith<IllegalArgumentException> { row.seats.splice(0, 0, listOf(Seat(Json.MutableObject("name" to "nobody")))) }
+        assertEquals(3, row.seats.size)                                              // refused whole
+    }
 }

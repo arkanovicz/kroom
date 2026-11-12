@@ -100,6 +100,19 @@ class LogicTest {
         assertFalse(s.touched)                                   // nothing to write: unchanged
     }
 
+    class Queue : State() { val line by seq(::Waiter) }
+
+    @Test fun `a seq marks what comes in by its id and what goes tells the root`() {
+        val s = Queue().also { it.dirty = HashSet() }
+        s.line.splice(0, 0, listOf(Waiter(Json.MutableObject("id" to "p")), Waiter(Json.MutableObject("id" to "q"))))
+        assertEquals("p q", dirty(s))
+        s.dirty!!.clear()
+        s.touched = false
+        s.line.splice(0, 1)
+        assertEquals("", dirty(s))
+        assertTrue(s.touched)
+    }
+
     private fun dirty(s: State) = s.dirty!!.map { it.toString() }.sorted().joinToString(" ")
 
     @Test fun `a handler per intent a cancel per cancellable one checked when first needed`() {

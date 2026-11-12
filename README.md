@@ -141,7 +141,9 @@ class MatchmakingLogic(private val ids: () -> String) : Logic<LobbyState>(LobbyE
 **Field kinds**: `string()`, `int()`, `long()`, `double()`, `bool()`, `enum<E>()` (read whatever the
 case), `obj()` (plain JSON), `array()`, `obj(::V)` (a typed view), `keyed(::V)` (views by `id`, in
 insertion order, an object on the wire: what a page lists whose rows change in place), `log(::V, max)`
-(append-only, capped). A setter given null removes the key.
+(append-only, capped), `seq(::V)` (views by `id` in an order that is itself state, an array on the wire,
+written by `splice(index, count, items)` alone: what people insert into, cut from and rearrange). A setter
+given null removes the key.
 
 **Visibility** is a field's: public, or selective with `.visibleTo { viewer -> … }`, a rule over the
 viewer's user id read on the instance (`var move1 by enum<Move>().visibleTo { it == player1 }`);

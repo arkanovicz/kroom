@@ -85,7 +85,14 @@ abstract class JsonView(val json: Json.MutableObject) {
             Log(arr, view, max, this)
         }, { it.array }, nested = Nested(Shape.LOG, view))
 
-    enum class Shape { ONE, KEYED, LOG }
+    /** Views in an order that is itself state, each found by its `id`; on the wire an array. Absent reads empty. */
+    protected fun <V : JsonView> seq(view: (Json.MutableObject) -> V) =
+        Field<Seq<V>>(Kind.ARRAY, { j, k ->
+            val arr = j.getArray(k) as Json.MutableArray? ?: Json.MutableArray().also { (j as Json.MutableObject)[k] = it }
+            Seq(arr, view, this)
+        }, { it.array }, nested = Nested(Shape.SEQ, view))
+
+    enum class Shape { ONE, KEYED, LOG, SEQ }
 
     /** What a field of views holds: how [view] reaches the selective fields below it. */
     class Nested(val shape: Shape, val factory: (Json.MutableObject) -> JsonView) {
@@ -195,6 +202,24 @@ abstract class JsonView(val json: Json.MutableObject) {
         }
         fun remove(id: String) { if (obj.remove(id) != null) owner?.touched() }
         private fun at(o: Any?): V = view(o as Json.MutableObject).also { it.owner = owner }
+    }
+
+    /** The views over an array of objects whose order is state: [splice] is its one writer. */
+    class Seq<V : JsonView>(val array: Json.MutableArray, private val view: (Json.MutableObject) -> V, private val owner: JsonView? = null) : AbstractList<V>() {
+        override val size: Int get() = array.size
+        override fun get(index: Int): V = view(array[index] as Json.MutableObject).also { it.owner = owner }
+        operator fun get(id: String): V? = indexOf(id).takeIf { it >= 0 }?.let { get(it) }
+        operator fun contains(id: String): Boolean = indexOf(id) >= 0
+        /** Where the item of that [id] stands, -1 when none does. */
+        fun indexOf(id: String): Int = array.indexOfFirst { (it as Json.Object).getString("id") == id }
+        /** [count] items from [index] give way to [items], in their place: an insertion, a removal, a rewrite. */
+        fun splice(index: Int, count: Int, items: List<V> = emptyList()) {
+            items.firstOrNull { it.json.getString("id") == null }?.let { throw IllegalArgumentException("no id: ${it.json}") }
+            repeat(count) { array.removeAt(index) }
+            items.forEachIndexed { i, item -> array.add(index + i, item.json) }
+            for (item in items) { item.owner = owner; item.touched() }
+            if (count > 0 && items.isEmpty()) owner?.touched()
+        }
     }
 }
 
