@@ -325,6 +325,8 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     /**
      * How long (ms) a user's last connection may be gone before the room says anything: a reload, a blip. Past it,
      * `leave`, or LOST first when the room has a [lostGrace]; 0 with a [lostGrace] says LOST at the drop itself.
+     * A connection gone beside another of its user says nothing on the wire; its handler hears the leave (`last`
+     * false) once both graces are over, and not at all when the same tab is back within them.
      */
     protected open val leaveGrace: Long = 1000
 
@@ -344,6 +346,8 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     private val lost = HashSet<String>()
     private val drops = HashMap<String, Long>()
     private var dropCount = 0L
+    // and each connection's, when the user keeps another: its leave waits the same graces, unless the tab is back
+    private val closed = HashMap<String, Long>()
 
     /**
      * A connection id already present is the same tab back (reconnect, or a duplicated tab): the
@@ -362,6 +366,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         val channel = Channel<ServerSentEvent>(channelCapacity)
         actor.channel = channel
         replace(actor)
+        closed.remove(actor.connectionId)
         val spectator = actor is Spectator
         if (spectator) _spectatorCount.value = spectators.size
         var first = true
@@ -378,8 +383,8 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         val join = Join().also { it.user = actor.user?.let(::presence); it.first = first; it.count = users.size }
         join.meta.from = actor.user?.userId
         handle(actor, join)
-        // the handler hears every connection, the wire hears a user's first
-        if (first && join.stage == Stage.APPLIED) { emit(join); follow(join) }
+        // the handler hears every connection, the wire hears a user's first; what the handler emits follows either way
+        if (join.stage == Stage.APPLIED) { if (first) emit(join); follow(join) }
         // back from LOST: never left, so no join, a status
         actor.user?.let { user -> if (lost.remove(user.userId)) status(actor, user) }
     }
@@ -440,6 +445,16 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
                     if (lostGrace == 0L) gone(actor, spectator, true, seen, read) else lose()
                 }
             }
+        } else if (user != null && !none && leaveGrace + lostGrace > 0) {
+            // the user stays, by another connection: nothing for the wire, and the handler hears this one once the
+            // graces a last one gets are over — a tab reloaded beside another never left either
+            val connection = actor.connectionId
+            val drop = ++dropCount
+            closed[connection] = drop
+            scope.launch {
+                delay(leaveGrace + lostGrace)
+                step { if (closed[connection] == drop) { closed.remove(connection); gone(actor, spectator, false, seen, read) } }
+            }
         } else gone(actor, spectator, none, seen, read)
     }
 
@@ -450,7 +465,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         val leave = Leave().also { it.user = user?.let(::presence); it.last = last; it.count = users.size; it.seen = seen; it.read = read }
         leave.meta.from = user?.userId
         handle(actor, leave)
-        if (last && leave.stage == Stage.APPLIED) { emit(leave); follow(leave) }
+        if (leave.stage == Stage.APPLIED) { if (last) emit(leave); follow(leave) }
 
         if (empty) idle()
     }

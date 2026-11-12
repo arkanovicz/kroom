@@ -40,9 +40,9 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
         events.all.filter { it !in kroom }.forEach { name -> on(events.entry(name)!!.factory) { actor, intent -> intent.check(state, actor) ?: settle(intent, logic.decide(state, actor, intent)) } }
         on(::Status) { actor, status -> status(actor, status) }
         on(::Cancel) { actor, cancel -> cancel(actor, cancel) }
-        // the logic hears a user, not a connection
-        on(::Join) { actor, join -> if (join.first == true) hook(actor, join) else null }
-        on(::Leave) { actor, leave -> if (leave.last == true) hook(actor, leave) else null }
+        // the logic hears every connection: `first` and `last` say which are a user's
+        on(::Join) { actor, join -> hook(actor, join) }
+        on(::Leave) { actor, leave -> hook(actor, leave) }
     }
 
     /** A presence event: the logic cannot refuse it, a reason there is the logic's error. */

@@ -37,6 +37,7 @@ class RoomTest {
         override fun stateToJson(actor: Actor): Json.Object = Json.Object("you" to actor.name, "n" to state.getInt("n"))
         override fun permits(user: User, permission: String) = user.userId == "alice"
         var onJoin: (Actor) -> Unit = {}
+        var onLeave: (Actor, Leave) -> Unit = { _, _ -> }
         var onSlow: () -> Unit = {}
         init {
             // the state changes, then (after a pause the test controls) the frames describing it
@@ -48,7 +49,7 @@ class RoomTest {
             on(::Shaped) { _, _ -> null }
             on(::Vip) { _, _ -> null }
             on(::Join) { actor, _ -> onJoin(actor); null }
-            on(::Leave) { actor, leave -> if (leave.last == true) broadcast("gone", Json.Object("who" to actor.name)); null }
+            on(::Leave) { actor, leave -> onLeave(actor, leave); if (leave.last == true) broadcast("gone", Json.Object("who" to actor.name)); null }
         }
     }
 
@@ -324,6 +325,29 @@ class RoomTest {
         assertEquals("gone", cv.next().event)                 // the handler heard it once, after the grace
         cv.next().let { assertEquals("leave", it.event); assertEquals(true, it.json().getBoolean("last")) }
         assertNull(room.getUser("u"))
+    }
+
+    @Test fun `a connection gone beside another is heard after both graces, the same tab back in between never left`() = runBlocking {
+        val room = TestRoom("room-${n++}", grace = 100, lost = 100)
+        val u = user("u")
+        val heard = java.util.concurrent.CopyOnWriteArrayList<String>()
+        room.onLeave = { actor, leave -> heard.add("${actor.tab} ${leave.last}") }
+        val c1 = room.join(actor(u, "t1")).also { it.state() }
+        assertEquals("join", c1.next().event)
+        room.join(actor(u, "t2")).state()
+        room.leave(room.getActor(Actor.connectionId(u, "t2"))!!)
+        kotlinx.coroutines.delay(120)
+        assertTrue(heard.isEmpty())                           // past the leave grace: a last connection would be LOST, not gone
+        kotlinx.coroutines.delay(200)
+        assertEquals(listOf("t2 false"), heard.toList())
+        assertNull(c1.tryReceive().getOrNull())               // and nothing on the wire: the user never moved
+        room.join(actor(u, "t2")).state()
+        room.leave(room.getActor(Actor.connectionId(u, "t2"))!!)
+        kotlinx.coroutines.delay(50)
+        room.join(actor(u, "t2")).state()                     // a reload
+        kotlinx.coroutines.delay(300)
+        assertEquals(listOf("t2 false"), heard.toList())
+        assertNull(c1.tryReceive().getOrNull())
     }
 
     // ---- LOST: past the leave grace, the user is still counted, the room says so, then leaves after the lost grace

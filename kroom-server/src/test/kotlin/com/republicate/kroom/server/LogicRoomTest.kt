@@ -282,6 +282,21 @@ class LogicRoomTest {
         }
     }
 
+    @Test fun `the logic hears every connection, what it emits on a leave the wire does not carry is framed alone`() = runBlocking {
+        val room = room()
+        val alice = user("alice")
+        val c1 = room.join(actor(alice, "t1")).also { it.state(); it.joined() }
+        val t2 = actor(alice, "t2")
+        room.join(t2).state()
+        room.act(t2, Add(json("by" to 3))).await()
+        assertEquals("add", c1.next().event)
+        assertEquals("set", c1.next().event)
+        room.leave(t2)
+        c1.next().let { assertEquals("set", it.event); assertEquals(0, it.json().getInt("n")) }   // no leave before it: alice is still here
+        c1.silent()
+        assertNotNull(room.presenceOf("alice"))
+    }
+
     @Test fun `a leave is framed, then what the logic emits on it`() = runBlocking {
         val room = room()
         val alice = actor(user("alice"), "t1")
