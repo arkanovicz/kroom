@@ -1085,7 +1085,8 @@ A part is held by a client — a tab, not a user: the same user's other tab is r
 typing, a paragraph cut in two, two made one, a page pasted: the i-th text is the i-th part's, a text past them is
 a part born there (`born`, its id), a part past them goes; no text at all (everything selected and cut) leaves the
 first part, blank and still held, for what is typed next. `Part.cut(text)` cuts what a writer typed into parts
-(at its blank lines, a fenced block kept whole); `state.text` is the text they make.
+(at its blank lines, a fenced block kept whole); `state.text` is the text they make, and `TextState(text)` the
+state a room is rebuilt from when a store kept that text.
 
 One writer per part is what keeps it simple: a `write` says what the parts say, whole, so a frame is a state and
 never a difference. Nothing is replayed; a reconnecting writer sends its text again, or finds the part is no

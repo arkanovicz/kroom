@@ -133,6 +133,20 @@ class TextTest {
         assertTrue(one.parts[0].free)
     }
 
+    @Test fun `a text as stored is cut again into free parts, the next one born after them`() {
+        val stored = "A\n\nB\n\n```\nx\n\ny\n```"
+        val s = TextState(stored)
+        assertEquals(listOf("1", "2", "3"), ids(s))
+        assertEquals(3L, s.last)
+        assertTrue(s.parts.all { it.free })
+        assertEquals(stored, s.text)
+        s.act(a1, take("3"))
+        assertNull(s.act(a1, write(listOf("3"), listOf("c", "d"))))
+        assertEquals(listOf("1", "2", "3", "4"), ids(s))
+        assertEquals(listOf("1"), ids(TextState("")))                                 // never without a part
+        assertEquals(1L, TextState(" \n").last)
+    }
+
     @Test fun `everything cut is one empty part still held, typed in again or gone at the release`() {
         val s = text("A", "B", "C")
         s.act(a1, take("1", "2", "3"))

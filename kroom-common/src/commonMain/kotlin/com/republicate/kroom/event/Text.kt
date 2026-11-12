@@ -55,6 +55,11 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
     var last by long().required
     init { if (json["last"] == null) { last = 1; parts.splice(0, 0, listOf(Part("1", ""))) } }
 
+    /** A text as a store kept it ([text]), cut again into its parts, all free: what a room is rebuilt from. */
+    constructor(text: String) : this(Part.cut(text).ifEmpty { listOf("") }.let { cut ->
+        Json.MutableObject("parts" to Json.MutableArray(cut.mapIndexed { i, part -> Part((i + 1).toString(), part).json }), "last" to cut.size.toLong())
+    })
+
     /** The text its parts make; a part emptied and still held says nothing. */
     val text: String get() = parts.filter { it.text.isNotBlank() }.joinToString("\n\n") { it.text }
 

@@ -613,7 +613,8 @@ All notable changes to kroom will be documented in this file.
   texts}` (the parts held, adjacent, say this now — typing, a cut, a merge, a paste; `born` names the new ones;
   `not_held`, `gone`, `scattered`; no text at all is one empty part, still held), `release {ids}` (a part left blank goes, the last one stays). A part
   is held by a client, a tab; what it held is released when its leave is heard. A frame is a state, never a
-  difference: nothing to replay. `Part.cut(text)` cuts a text into parts, a fenced block kept whole; `state.text`.
+  difference: nothing to replay. `Part.cut(text)` cuts a text into parts, a fenced block kept whole; `state.text`, and
+  `TextState(text)` for a room rebuilt from what a store kept.
   No room class and no store: a plain `LogicRoom`, `persist(event)` the application's. Pinned in `TextTest`
   (common), `TextRoomTest` (server).
 
