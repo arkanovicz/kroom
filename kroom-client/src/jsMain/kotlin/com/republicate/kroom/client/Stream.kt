@@ -11,9 +11,9 @@ import org.w3c.dom.EventSource
 import org.w3c.dom.Node
 import kotlin.js.Promise
 
-/** The page merged under [root] of the live document, its `[data-kroom-intent]` triggers posting to the room. */
-fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!): Room<S> =
-    attach(template, JsTree(document), root as Node).also { Intents(root, store.events) { type, payload -> act(type, payload) } }
+/** The page merged under [root] of the live document, its `[data-kroom-intent]` triggers posting to the room — through [post], when a region has a turn of its own to keep. */
+fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!, post: (String, Json.Object) -> Promise<dynamic> = { type, payload -> act(type, payload) }): Room<S> =
+    attach(template, JsTree(document), root as Node).also { Intents(root, store.events, post) }
 
 /**
  * The room's stream (`<api>/rooms/<name>/stream`, what kroom-server's `Route.room` mounts): the snapshot first, then
