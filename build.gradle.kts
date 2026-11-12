@@ -24,7 +24,7 @@ allprojects {
 }
 
 // run, never consumed
-val unpublished = setOf("kroom-webapp-authoring-demo", "kroom-examples", "chifoumi", "chifoumi-common")
+val unpublished = setOf("kroom-webapp-authoring-demo", "kroom-plugin-scratchpad", "kroom-plugin-scratchpad-page", "kroom-examples", "chifoumi", "chifoumi-common")
 
 subprojects {
     if (name in unpublished) return@subprojects

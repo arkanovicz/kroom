@@ -1,0 +1,12 @@
+##@ state: com.republicate.kroom.event.TextState
+##@ page: com.republicate.kroom.client.TextPage
+##@output web
+#foreach($part in $state.parts)
+#if($page.mine($part))
+<textarea data-kroom-part="$part.id" spellcheck="false">$part.text</textarea>
+#elseif($part.free)
+<p data-kroom-intent="take" data-kroom-ids="$part.id">$part.text</p>
+#else
+<p class="held" data-kroom-intent="take" data-kroom-ids="$part.id" data-holder="$page.holder($part)">$part.head<i></i>$part.tail</p>
+#end
+#end

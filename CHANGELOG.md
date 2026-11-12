@@ -114,6 +114,12 @@ All notable changes to kroom will be documented in this file.
   where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
 - Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
+#### velocity 3.0.0-BETA-20261112-01
+- Bumped. `HtmlDomSink` leaves in place the items that did not change order when one before them is gone: it
+  moved every survivor after it, and a node moved loses the focus — a textarea being typed in, under an item
+  removed, was blurred (seen from a text written by several: a writer below a paragraph that went gave its own
+  back). No test moved.
+
 #### velocity 3.0.0-BETA-20261110-03
 - Bumped. A fault during a merge into `HtmlDomSink` reaches the caller as thrown (it was lost to "unclosed
   elements", and every later merge failed); the merge after it empties the root and builds the page again,
@@ -607,16 +613,31 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
-#### kroom-common — a text written by several
+#### kroom-common, kroom-client — a text written by several
 - `TextState` / `TextEvents` / `TextLogic`, beside the chat's: a text as parts in order (`parts`, a `seq` of
-  `Part(id, text, holder, client)`), one writer per part, a part held by a client (a tab). The page computes
-  nothing; the fold decides what the text is made of. `take {ids}` (free, adjacent, by a client holding nothing:
-  they become one part, held; `held`, `gone`, `scattered`, `holding`), `write {id, text}` (the part held says this,
-  whole; `not_held`, `gone`), `release {id}` (cut into its paragraphs by `Part.cut`, a fenced block kept whole, the
-  new ones born after it; left blank it goes, the last one stays). A late view is refused, never applied askew; a
+  `Part(id, text, holder, client, caret)`), one writer per part, a part held by a client (a tab). The page computes
+  nothing; the fold decides what the text is made of. `take {ids}` (free, adjacent: they become one part, held;
+  `held`, `gone`, `scattered`) or `take {after}` (a part born after that one, held: a paragraph begun) — a take
+  gives back what the client held, in the same frame; `write {id, text, caret}` (the part held says this, whole;
+  `not_held`, `gone`); `release {id}` (cut into its paragraphs by `Part.cut`, a fenced block kept whole, the new
+  ones born after it; left blank it goes, the last one stays). A late view is refused, never applied askew; a
   frame is a state, never a difference: nothing to replay. What a client held is released when its leave is heard.
   `state.text`, and `TextState(text)` for a room rebuilt from what a store kept. No room class and no store: a
   plain `LogicRoom`, `persist(event)` the application's. Pinned in `TextTest` (common), `TextRoomTest` (server).
+- kroom-client: `room.write(template, root)` — the region and its `Writer` (the textarea of the part held posts
+  `write` as typed, `take {after}` at a paragraph begun, `release` on leaving it or after five idle seconds; a
+  text's intents leave one after the other, the region's triggers in the same turn) — and `TextPage`, the page
+  memory (`mine(part)`, `holder(part)`). `Room.attach(template, root, post)`: a region's triggers may post through
+  a turn of its own.
+
+#### kroom-plugin-scratchpad — a text written by several, to try in a page
+- An authoring plugin, unpublished, in the demo at `/scratchpad`: `$scratchpad.show()` is the place of one text
+  for the site, kept in memory; whoever is logged in writes, a visitor watches. Two modules: the plugin (the room,
+  its routes under `/api/rooms/scratchpad`, the tool, the stylesheet) and its `page` (the region and the browser's
+  entry, bundled as `/js/scratchpad.js`, 134 KB gz) — apart because a compiled region publishes the settings it
+  was built with, which a site's engine on the same classpath would take.
+- The demo's container builds, then runs what it installed (`installDist && exec …/bin/…`), the host's Gradle home
+  mounted read-write: nothing holds a Gradle lock while the site is up. The private project cache is gone.
 
 #### kroom-common — an array field in the markup
 - `Field.parse` reads an ARRAY field's text as its items separated by blanks, as html writes a list in an

@@ -21,6 +21,7 @@ kroom-webapp-images   resized images through imgproxy, cached on disk, local and
 kroom-markdown-core   markdown to sanitized html: flexmark + jsoup, no velocity
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
+kroom-plugin-scratchpad  a text several people write at once, in a page: `$scratchpad.show()` (demo only, unpublished)
 kroom-webapp-authoring-git  the content store as a git repository: every write a commit, history and journal (kroom-webapp-authoring/git/)
 kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmaster, forms, gallery
 kroom-webapp-authoring-demo  the authoring stack as a thing you can click (kroom-webapp-authoring/demo/)
@@ -1070,32 +1071,60 @@ store reading its own.
 ## A text written by several
 
 `TextState` / `TextEvents` / `TextLogic` (kroom-common) are a text several people write at once, in a plain
-`LogicRoom`: its parts in order (`parts`, a `seq` of `Part(id, text, holder, client)`), one writer per part.
+`LogicRoom`: its parts in order (`parts`, a `seq` of `Part(id, text, holder, client, caret)`), one writer per part.
 
 ```kotlin
 val room = LogicRoom("proposal", TextState(stored), TextLogic())
 ```
 
 ```
-take    {ids}        free, next to each other, by a client holding nothing    they become one part, held     held · gone · scattered · holding
-write   {id, text}   the part held                                            its text, whole                not_held · gone
-release {id}         the part held                                            cut into its paragraphs, free  not_held · gone
+take    {ids}              free, next to each other     they become one part, held             held · gone · scattered
+take    {after}            a part that is there         a part is born after it, held          gone
+write   {id, text, caret}  the part held                its text, whole, and where one is      not_held · gone
+release {id}               the part held                cut into its paragraphs, free          not_held · gone
 ```
 
 The page computes nothing. An intent names parts a frame told it of and says what was done; the fold alone decides
 what the text is made of, the same on the server and in the browser: the parts taken become one (the first, saying
 what they all said), the part given back is cut at its blank lines (`Part.cut`, a fenced block kept whole) — its
 first paragraph keeps the id, the others are born after it (`state.last`), left blank it goes, the text's last one
-stays. So a view that is late is refused, never applied askew, and a frame is a state, never a difference: two
-writes in a row say the same part twice, nothing is replayed, a snapshot is the text.
+stays. A take is "I go there": what the client held before is given back by the same frame, so going from one
+paragraph to the next, or beginning one (`after`), is one step and a client never holds two. A view that is late is
+refused, never applied askew, and a frame is a state, never a difference: two writes in a row say the same part
+twice, nothing is replayed, a snapshot is the text.
 
 The page reacts: a click posts `take`, and it is the frame, folded, that gives its tab something to write in — the
 part rendered as a textarea for the client that holds it (`part.client`, a tab: the same user's other tab is
-refused like anyone). Two people write two parts at once; one part is one writer's, in order. Everything selected
-and pasted over is a `take` of every part, refused while anyone holds one. A writer back from a drop sends its
-text again, or finds the part no longer its own (`not_held`) and keeps what it typed aside. What a client held is
-released when its leave is heard, after the room's graces: a reload keeps its part, a tab closed gives it back.
+refused like anyone); the others see its text follow each write, the holder's mark at `part.caret` (`part.head`,
+`part.tail`). Two people write two parts at once; one part is one writer's, in order. Everything selected and
+pasted over is a `take` of every part, refused while anyone holds one. What a client held is released when its
+leave is heard, after the room's graces: a reload keeps its part, a tab closed gives it back.
 
+In the browser (kroom-client), `room.write(template, root)` is the region and its `Writer`: the textarea of the part
+held posts `write` as it is typed, a line left blank then more posts `take {after}` (what is typed while the part
+is on its way goes into its textarea when it comes), leaving the textarea or five seconds without touching it
+posts `release`. A tab says one thing at a time, in the order it did them: a click on another part waits for the
+reply to the last `write`. `TextPage` is the page memory (`$page.mine($part)`, `$page.holder($part)`):
+
+```html
+##@ state: com.republicate.kroom.event.TextState
+##@ page: com.republicate.kroom.client.TextPage
+##@output web
+#foreach($part in $state.parts)
+#if($page.mine($part))
+<textarea data-kroom-part="$part.id">$part.text</textarea>
+#elseif($part.free)
+<p data-kroom-intent="take" data-kroom-ids="$part.id">$part.text</p>
+#else
+<p data-kroom-intent="take" data-kroom-ids="$part.id" title="$page.holder($part)">$part.head<i></i>$part.tail</p>
+#end
+#end
+```
+
+A click on a part someone holds is refused on the page by the check, without a POST, and shown like any refusal.
+The region is its own module's to compile, for the browser alone: compiled templates publish the settings they
+were built with, and a site's engine sharing their classpath would take them (`kroom-plugin-scratchpad` and its
+`page` module, in the authoring demo at `/scratchpad`, are the worked example).
 `state.text` is the text the parts make, `TextState(text)` the state a room is rebuilt from when a store kept that
 text. The room stores nothing — override `persist(event)` for that.
 

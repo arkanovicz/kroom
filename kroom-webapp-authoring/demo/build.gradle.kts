@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":kroom-plugin-webmaster"))
     implementation(project(":kroom-plugin-forms"))
     implementation(project(":kroom-plugin-gallery"))
+    implementation(project(":kroom-plugin-scratchpad"))                 // a text written by several, to try in a page
     implementation(testFixtures(project(":kroom-webapp-authoring")))   // the dummy theme, beside the basic one
     implementation(libs.ktor.server.netty)
     runtimeOnly(libs.velocity.engine.scripting)                         // pages and blocks are interpreted here

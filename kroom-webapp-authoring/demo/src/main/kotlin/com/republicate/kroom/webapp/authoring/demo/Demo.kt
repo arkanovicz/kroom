@@ -2,6 +2,7 @@ package com.republicate.kroom.webapp.authoring.demo
 
 import com.republicate.kroom.plugins.forms.Forms
 import com.republicate.kroom.plugins.gallery.Gallery
+import com.republicate.kroom.plugins.scratchpad.Scratchpad
 import com.republicate.kroom.plugins.webmaster.Webmaster
 import com.republicate.kroom.webapp.authoring.AuthoredPage
 import com.republicate.kroom.webapp.authoring.BasicTheme
@@ -43,7 +44,7 @@ fun Application.demo(storage: Storage = MemoryStorage()) {
         sessionSecret = "demo-only-secret"
         placeholder = "*Nothing here yet for **\$name**.*"
         // the dummy theme beside the basic one: the themes panel has something to switch
-        plugins += listOf(Webmaster(), Forms(), Gallery(), BasicTheme(), DummyTheme())
+        plugins += listOf(Webmaster(), Forms(), Gallery(), Scratchpad(SCRATCH), BasicTheme(), DummyTheme())
         blockTools += "stack"
     }
     velocity.registerApplication("stack") { STACK }
@@ -132,3 +133,15 @@ private fun seed(storage: Storage) {
         """.trimIndent(), by)
     }
 }
+
+/** What the scratchpad says before anyone writes in it. */
+private const val SCRATCH = """# A proposal
+
+Several people write this text at once. A paragraph is one writer's at a time: click one to write in it.
+
+A line left blank begins another paragraph, and gives the one before back to the others.
+
+```
+a fenced block
+stays whole, blank lines and all
+```"""

@@ -29,10 +29,13 @@ include("kroom-markdown")
 include("kroom-webapp-authoring")
 
 // Authoring plugins: what a site gains beyond its pages, one artifact each
-for (plugin in listOf("webmaster", "forms", "gallery")) {
+for (plugin in listOf("webmaster", "forms", "gallery", "scratchpad")) {
     include("kroom-plugin-$plugin")
     project(":kroom-plugin-$plugin").projectDir = file("kroom-webapp-authoring/plugins/$plugin")
 }
+// the scratchpad's page, for the browser alone (its compiled region stays off a site's classpath)
+include("kroom-plugin-scratchpad-page")
+project(":kroom-plugin-scratchpad-page").projectDir = file("kroom-webapp-authoring/plugins/scratchpad/page")
 
 // The git-backed content store: every write a commit, the editor's history a git log (JGit stays out of authoring)
 include("kroom-webapp-authoring-git")
