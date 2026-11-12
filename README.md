@@ -208,7 +208,10 @@ adds the chat's history store.
   it is refused (`invalid`). The `leave` says where the user was when its last connection dropped:
   `seen`, the room's position (the SSE id of the last frame it may have received; the graces' frames,
   the `leave` itself, come after it), and `read`, the room's own numbering when it has one — a chat's
-  last line, what a store marks the user read up to (`Room.read`, null by default). A joiner is not in its
+  last line, what a store marks the user read up to (`Room.read`, null by default). A logic hears every
+  connection (`first`, `last` say which are a user's), and what it emits is framed whether the `join` or
+  `leave` itself is or not; a connection gone beside another of its user is heard after the same graces, not
+  at all when the tab is back within them — what a tab holds outlives a reload. A joiner is not in its
   own snapshot: its `join`, the same frame everyone gets, follows it. The snapshot also carries `me`,
   the viewer's own entry (absent for a spectator).
 - **Tabs.** A tab id is taken from `sessionStorage` at load and put back on `pagehide` (a duplicated
@@ -1062,6 +1065,32 @@ val room = ChatRoom("lounge", DbChatHistory(), ChatState(line = ::Line), ChatLog
 
 The room hands the store copies and seeds the tail with copies: a fold changing a line of the tail never races a
 store reading its own.
+
+## A text written by several
+
+`TextState` / `TextEvents` / `TextLogic` (kroom-common) are a text several people write at once, in a plain
+`LogicRoom`: its parts in order (`parts`, a `seq` of `Part(id, text, holder, client)`), one writer per part.
+
+```kotlin
+val room = LogicRoom("proposal", TextState(), TextLogic())
+```
+
+```
+take    {ids}          every part free or the client's own already, or none is taken    held · gone
+write   {ids, texts}   the parts held, next to each other, say this now                 not_held · gone · scattered · empty
+release {ids}          given back; a part left blank goes, the last one stays           not_held
+```
+
+A part is held by a client — a tab, not a user: the same user's other tab is refused like anyone. `write` is
+typing, a paragraph cut in two, two made one, a page pasted: the i-th text is the i-th part's, a text past them is
+a part born there (`born`, its id), a part past them goes. `Part.cut(text)` cuts what a writer typed into parts
+(at its blank lines, a fenced block kept whole); `state.text` is the text they make.
+
+One writer per part is what keeps it simple: a `write` says what the parts say, whole, so a frame is a state and
+never a difference. Nothing is replayed; a reconnecting writer sends its text again, or finds the part is no
+longer its own (`not_held`) and keeps what it typed aside. What a client held is released when its leave is heard,
+after the room's graces: a reload keeps its parts, a tab closed gives them back. The room stores nothing — override
+`persist(event)` for that.
 
 ## Images
 

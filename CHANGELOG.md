@@ -6,6 +6,15 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-server — a logic hears every connection, each after its graces
+- `LogicRoom` no longer keeps a `join` or a `leave` that is not a user's first or last from its logic: a handler
+  declared on `events.join` / `events.leave` hears every connection, and reads `first` / `last` when the user is
+  what it means. What it emits is framed whether the `join` / `leave` itself is on the wire or not.
+- A connection gone beside another of its user (`leave`, `last` false) is heard once `leaveGrace + lostGrace` are
+  over, where it was heard at the drop; the same tab back within them is not heard at all. Nothing changes on the
+  wire: the user's `join`, `leave`, `status` and composed status are as before. `Table.onPlayerConnectionClosed`
+  is told that much later. Pinned in `RoomTest`, `LogicRoomTest`.
+
 #### kroom-webapp-authoring — every entry of the menu is a page
 - The tree is completed at start (`AuthoredPages.complete()`, on `ApplicationStarted`): a path with pages under
   it and none of its own — `/legal` over `pages/legal/terms.html`, `/club` over the placeholder
@@ -597,6 +606,16 @@ All notable changes to kroom will be documented in this file.
   a block runs before anyone reviewed it. Each loop its own count.
 
 ### Added
+
+#### kroom-common — a text written by several
+- `TextState` / `TextEvents` / `TextLogic`, beside the chat's: a text as parts in order (`parts`, a `seq` of
+  `Part(id, text, holder, client)`), one writer per part. `take {ids}` (all or none; `held`, `gone`), `write {ids,
+  texts}` (the parts held, adjacent, say this now — typing, a cut, a merge, a paste; `born` names the new ones;
+  `not_held`, `gone`, `scattered`, `empty`), `release {ids}` (a part left blank goes, the last one stays). A part
+  is held by a client, a tab; what it held is released when its leave is heard. A frame is a state, never a
+  difference: nothing to replay. `Part.cut(text)` cuts a text into parts, a fenced block kept whole; `state.text`.
+  No room class and no store: a plain `LogicRoom`, `persist(event)` the application's. Pinned in `TextTest`
+  (common), `TextRoomTest` (server).
 
 #### kroom-common — `seq`, a field whose order is state
 - `seq(::V)`: views found by their `id`, in an order that is itself state (an array on the wire), where `keyed`
