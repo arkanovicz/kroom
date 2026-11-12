@@ -1,12 +1,5 @@
 package com.republicate.kroom.markdown
 
-import com.vladsch.flexmark.ext.autolink.AutolinkExtension
-import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension
-import com.vladsch.flexmark.ext.gfm.tasklist.TaskListExtension
-import com.vladsch.flexmark.ext.tables.TablesExtension
-import com.vladsch.flexmark.html.HtmlRenderer
-import com.vladsch.flexmark.parser.Parser
-import com.vladsch.flexmark.util.data.MutableDataSet
 import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.ResourceNotFoundException
 import org.apache.velocity.engine.VelocityContext
@@ -20,7 +13,7 @@ import org.apache.velocity.engine.runtime.introspection.Sandbox
  * point — a block is VTL that *produces* markdown, so `%foreach` may emit list items and `$name` may
  * land inside a heading, and flexmark sees a finished document rather than a template.
  *
- * What comes out is sanitized ([Sanitizer]): a block keeps its html and loses its scripting. What a
+ * What comes out is sanitized ([Markdown.html]): a block keeps its html and loses its scripting. What a
  * reference inserts is not the block's text: it is set aside while the block is merged ([Slots]) — a value
  * is shown as typed, wherever it lands; a tool's markup, a `SafeText`, passes as the tool wrote it.
  *
@@ -34,19 +27,6 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
 
     /** What blocks may navigate on a type, as this renderer's sandbox decides — for an editor's completion. */
     internal val navigation get() = compiler.navigation
-
-    // flexmark's parser and renderer are immutable and thread-safe once built — built once, here.
-    private val options = MutableDataSet().set(
-        Parser.EXTENSIONS,
-        listOf(
-            TablesExtension.create(),
-            StrikethroughExtension.create(),
-            AutolinkExtension.create(),
-            TaskListExtension.create()
-        )
-    )
-    private val parser: Parser = Parser.builder(options).build()
-    private val html: HtmlRenderer = HtmlRenderer.builder(options).build()
 
     /** Render the markdown template at [path], as [MarkdownConfig.loader] serves it. */
     fun render(path: String, context: Context): String = try {
@@ -66,7 +46,7 @@ class MarkdownRenderer(val config: MarkdownConfig = MarkdownConfig()) {
     /** What [merge] writes, converted, sanitized, and what it set aside put back. */
     private fun emit(merge: (Slots) -> Unit): String {
         val slots = Slots().also(merge)
-        return slots.restore(Sanitizer.clean(html.render(parser.parse(slots.out.toString())), slots))
+        return slots.restore(Markdown.html(slots.out.toString(), slots::write, slots::holds))
     }
 }
 

@@ -24,13 +24,7 @@ dependencies {
     implementation(libs.kotlin.reflect)                 // the editor's completion walks block types (Shape)
     implementation(libs.slf4j.api)                      // a failing stored block is logged, not thrown at the visitor
     implementation(libs.antlr.kotlin)
-    // md→html, JVM-only by design; nothing of it crosses this module's API
-    implementation(libs.flexmark)
-    implementation(libs.flexmark.ext.autolink)
-    implementation(libs.flexmark.ext.gfm.strikethrough)
-    implementation(libs.flexmark.ext.gfm.tasklist)
-    implementation(libs.flexmark.ext.tables)
-    implementation(libs.jsoup)                          // what flexmark renders is sanitized: html stays, scripting goes
+    implementation(project(":kroom-markdown-core"))     // md→html, sanitized; jsoup comes with it (Slots writes the tree)
     grammarTemplate(libs.velocity.engine.common)
     testImplementation(libs.velocity.engine.core)       // the classic facade, as one page engine among two the tests run
     testImplementation(libs.kotlin.test)

@@ -67,16 +67,6 @@ class MarkdownRendererTest {
         )
     }
 
-    @Test
-    fun `the GFM set is on - tables and strikethrough`() {
-        val table = "| a | b |\n|---|---|\n| 1 | 2 |\n"
-        assertEquals(
-            "<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>1</td><td>2</td></tr>\n</tbody>\n</table>\n",
-            renderer.renderSource(table, ctx())
-        )
-        assertEquals("<p><del>gone</del></p>\n", renderer.renderSource("~~gone~~\n", ctx()))
-    }
-
     /** Prose needs `$club.name` unbraced in running text — the one 2.x convenience blocks keep on purpose. */
     @Test
     fun `informal navigation is on, for prose`() {

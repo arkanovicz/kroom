@@ -1,7 +1,5 @@
 package com.republicate.kroom.markdown
 
-import org.apache.velocity.engine.SafeText
-import org.apache.velocity.engine.VelocityContext
 import org.jsoup.Jsoup
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -9,23 +7,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** A block keeps its html and loses its scripting; a tool's markup, a `SafeText`, passes as the tool wrote it. */
-class SanitizerTest {
+/** Markdown keeps its html and loses its scripting. */
+class MarkdownTest {
 
-    /** A plugin's tool: what it answers as a `SafeText` is its own business, scripts and all. */
-    class Widget {
-        fun box() = SafeText(BOX)
-        fun badge() = SafeText(BADGE)
-        val label = "<img src=x onerror=alert(1)> *typed* | [x](y)"
-        val address = "javascript:alert(1)"
-        val site = "https://example.org/a?b=1&c=\"2\""
-        val count = 3
-        fun echo(text: String) = "($text)"
-    }
-
-    private val renderer = MarkdownRenderer()
-
-    private fun render(source: String) = renderer.renderSource(source, VelocityContext(mutableMapOf("w" to Widget())))
+    private fun render(source: String) = Markdown.html(source)
 
     /** Nothing in [html] a browser runs: judged on the tree, as a browser reads it. */
     private fun assertInert(html: String, source: String) {
@@ -85,57 +70,24 @@ class SanitizerTest {
     }
 
     @Test
-    fun `a tool's markup passes as the tool wrote it, where it was called`() {
-        val html = render("Before\n\$w.box()\nAfter, with \$w.badge() members.")
-        assertEquals("<p>Before</p>\n$BOX\n<p>After, with $BADGE members.</p>\n", html)
+    fun `the GFM set is on - tables and strikethrough`() {
+        val table = "| a | b |\n|---|---|\n| 1 | 2 |\n"
+        assertEquals(
+            "<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>1</td><td>2</td></tr>\n</tbody>\n</table>\n",
+            render(table)
+        )
+        assertEquals("<p><del>gone</del></p>\n", render("~~gone~~\n"))
     }
 
+    /** A caller writes on the tree before the allowlist, and a slot passes only when the caller holds it. */
     @Test
-    fun `a value is shown as typed, wherever it lands - text, a table, code, an attribute, an address`() {
-        val typed = "&lt;img src=x onerror=alert(1)&gt; *typed* | [x](y)"
-        val html = render("""
-            # ${'$'}w.label
-
-            | name | n |
-            |------|---|
-            | ${'$'}w.label | **${'$'}w.count** |
-
-            `${'$'}w.label` <span title="${'$'}w.label" class="${'$'}w.label">x</span>
-
-            [site](${'$'}w.site) [gone](${'$'}w.address) <a href="${'$'}w.address">gone too</a> [${'$'}w.label](/club/${'$'}w.count)
-        """.trimIndent())
-        assertContains(html, "<h1>$typed</h1>")
-        assertContains(html, "<td>$typed</td>", message = "its bar is no cell's border")
-        assertContains(html, "<td><strong>3</strong></td>", message = "the block's own markdown still applies around it")
-        assertContains(html, "<code>$typed</code>")
-        assertContains(html, """<span title="$typed" class="$typed">x</span>""", message = "in an attribute, a value that cannot leave it")
-        assertContains(html, """<a href="https://example.org/a?b=1&amp;c=&quot;2&quot;">site</a>""")
-        assertContains(html, "<a>gone</a>", message = "an address a value makes is judged like any other")
-        assertContains(html, "<a>gone too</a>")
-        assertContains(html, """<a href="/club/3">$typed</a>""")
-        assertInert(html, "the values")
-    }
-
-    @Test
-    fun `a value handed on is the value - to a tool, to a string, to a test`() {
-        assertEquals("<p>(n3) 3 items yes</p>\n", render("\$w.echo(\"n\$w.count\") %set(\$x = \"\$w.count items\")\$x %if(\"\$w.count\" == \"3\")yes%end"))
-    }
-
-    @Test
-    fun `a slot an author types is nobody's, the house's names are not an author's`() {
-        val html = render("""
-            <div data-kroom-slot="0000000000000000-0">mine</div>
-
-            <div class="kroom-block note" id="kroom-admin">x</div>
-
-            <input name="q"> <span class="kroom-edit">y</span>
-        """.trimIndent() + "\n\n\$w.badge()")
-        assertContains(html, "<div>mine</div>")
-        assertContains(html, """<div class="note">x</div>""")
-        assertContains(html, "<span>y</span>")
-        assertFalse(html.contains("<input"), html)
-        assertFalse(html.contains("data-kroom-slot"), html)
-        assertContains(html, BADGE)
+    fun `the hooks - written before the allowlist, a slot kept only when held`() {
+        val source = "<div data-kroom-slot=\"mine\"></div>\n\n<div data-kroom-slot=\"yours\"></div>\n\ntext\n"
+        val html = Markdown.html(source, before = { root ->
+            root.selectFirst("p")!!.attr("onclick", "x()").appendElement("a").attr("href", "javascript:alert(1)").text("link")
+        }, holds = { it == "mine" })
+        assertEquals("<div data-kroom-slot=\"mine\"></div>\n<div></div>\n<p>text<a>link</a></p>\n", html)
+        assertFalse(Markdown.html(source).contains(Markdown.SLOT), "nobody holds a slot by default")
     }
 
     @Test
@@ -144,11 +96,6 @@ class SanitizerTest {
     }
 
     companion object {
-        const val BOX = """<div class="kroom-widget" data-id="7" onclick="open()"><script>start()</script>
-
-<p style="color:red">two</p></div>"""
-        const val BADGE = """<b data-n="3">3</b>"""
-
         private val RUNS = setOf("script", "style", "iframe", "object", "embed", "form", "svg", "math", "base", "meta", "link", "button", "textarea", "select")
 
         private val CLASSICS = listOf(

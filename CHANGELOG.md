@@ -598,6 +598,13 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-markdown-core — markdown to sanitized html, alone
+- A new module, flexmark and jsoup only (no velocity, antlr or kotlin-reflect): `Markdown.html(source)` renders
+  markdown, the GFM set on, through the allowlist `kroom-markdown` blocks pass. `Markdown.html(source, before,
+  holds)` lets a caller write on the tree before the allowlist and keep its own `data-kroom-slot` stand-ins
+  (`Markdown.SLOT`). `kroom-markdown` builds on it, its blocks rendered byte for byte as before; nothing changes
+  for its dependents. Pinned in `MarkdownTest`.
+
 #### kroom-webapp-authoring — a miss is a page of the site
 - A content site answers a page nobody answered with a page of its own: after the plugins' `notFound` handlers, a
   browser's GET or HEAD for a page (`Accept: text/html`, outside `/api/`, no asset extension) gets

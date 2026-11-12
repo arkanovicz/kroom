@@ -70,7 +70,7 @@ internal class Slots {
         id.substringAfter('-', "").toIntOrNull()?.takeIf { it in held.indices && id == "$nonce-$it" }
 
     companion object {
-        const val ATTRIBUTE = "data-kroom-slot"
+        const val ATTRIBUTE = Markdown.SLOT
 
         /** The context key a render's slots travel under — no name a block can write. */
         const val KEY = "kroom slots"

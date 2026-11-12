@@ -22,6 +22,7 @@ include("kroom-webapp-push")
 include("kroom-webapp-images")
 
 // Rendering
+include("kroom-markdown-core")
 include("kroom-markdown")
 
 // Authoring

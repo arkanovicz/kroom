@@ -8,26 +8,26 @@ import org.jsoup.safety.Cleaner
 import org.jsoup.safety.Safelist
 
 /**
- * What a block rendered, made safe to show: html stays, scripting goes — whoever typed it, wherever it came
+ * What markdown rendered, made safe to show: html stays, scripting goes — whoever typed it, wherever it came
  * from. An allowlist over the rendered html (the order GitHub sanitizes markdown in): what is not named here
  * does not pass. No `script`, `style`, `iframe`, `object`, form control; no `on*`, `style` or `data-*` attribute
  * (the page's scripts read those); an address is `http(s):`, `mailto:`, `tel:` or relative. The `kroom-` classes
- * and ids are the house's. What needs more — an embed, a form — is a plugin's tool, answering a `SafeText`.
+ * and ids are the house's. What needs more — an embed, a form — is the caller's to set aside ([Markdown.SLOT]).
  */
 internal object Sanitizer {
 
-    fun clean(html: String, slots: Slots): String {
+    fun clean(html: String, before: (Element) -> Unit, holds: (String) -> Boolean): String {
         val dirty = Jsoup.parseBodyFragment(html, BASE)
-        // before the allowlist: an address a value makes is judged with the others
-        slots.write(dirty.body())
+        // before the allowlist: what the caller writes there is judged with the rest
+        before(dirty.body())
         val clean = cleaner.clean(dirty)
-        for (element in clean.body().select("[${Slots.ATTRIBUTE}], [class], [id], input")) tidy(element, slots)
+        for (element in clean.body().select("[${Markdown.SLOT}], [class], [id], input")) tidy(element, holds)
         clean.outputSettings().prettyPrint(false)
         return clean.body().html()
     }
 
-    private fun tidy(element: Element, slots: Slots) {
-        if (element.hasAttr(Slots.ATTRIBUTE) && !slots.holds(element.attr(Slots.ATTRIBUTE))) element.removeAttr(Slots.ATTRIBUTE)
+    private fun tidy(element: Element, holds: (String) -> Boolean) {
+        if (element.hasAttr(Markdown.SLOT) && !holds(element.attr(Markdown.SLOT))) element.removeAttr(Markdown.SLOT)
         if (element.hasAttr("class")) {
             val own = element.classNames().filterNot { it.startsWith(HOUSE) }
             if (own.isEmpty()) element.removeAttr("class") else element.attr("class", own.joinToString(" "))
@@ -54,8 +54,8 @@ internal object Sanitizer {
             "dfn", "bdi", "bdo", "wbr", "ruby", "rt", "rp", "picture", "source", "video", "audio", "track", "input"
         )
         .addAttributes(":all", "class", "id", "title", "lang", "dir", "role", "hidden")
-        .addAttributes("div", Slots.ATTRIBUTE)
-        .addAttributes("span", Slots.ATTRIBUTE)
+        .addAttributes("div", Markdown.SLOT)
+        .addAttributes("span", Markdown.SLOT)
         .addAttributes("a", "target", "rel", "hreflang")
         .addAttributes("img", "loading", "decoding", "srcset", "sizes")
         .addAttributes("td", "align", "scope", "headers")

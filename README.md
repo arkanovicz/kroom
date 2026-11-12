@@ -18,6 +18,7 @@ kroom-webapp-oauth    OIDC authentication
 kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-webapp-images   resized images through imgproxy, cached on disk, local and remote sources
+kroom-markdown-core   markdown to sanitized html: flexmark + jsoup, no velocity
 kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
 kroom-webapp-authoring-git  the content store as a git repository: every write a commit, history and journal (kroom-webapp-authoring/git/)
@@ -538,6 +539,9 @@ makes (`[site]($club.site)`) is judged like any other.
 
 Rendering is JVM-only on purpose: flexmark has no multiplatform build, server rendering is ktor/JVM
 anyway, and kroom's multiplatform scope is model sharing, not rendering.
+
+The markdown half stands alone in `kroom-markdown-core` (flexmark and jsoup, no velocity): `Markdown.html(source)`
+is markdown to html through the same allowlist, for text that is no template.
 
 ## kroom-webapp-authoring
 
