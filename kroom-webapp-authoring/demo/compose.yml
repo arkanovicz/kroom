@@ -3,8 +3,9 @@
 # then http://localhost:8099/login (admin / admin). Mailpit, on :8025, is a debugging mailbox where whatever the
 # site sends lands — a form's notification, for one.
 #
-# The demo is built by the repository's own wrapper, as the user who runs it; the velocity BETA comes from the
-# host's maven-local and known dependencies from the host's Gradle cache, both read-only.
+# Gradle builds the demo and leaves: the container then runs the installed distribution, so nothing holds a
+# Gradle lock while the site is up and a build on the host goes beside it. The wrapper, the Gradle home and
+# maven-local (the velocity BETA) are the host's, as the user who runs it.
 
 services:
   kroom-demo:
@@ -13,16 +14,17 @@ services:
     user: "${KROOM_UID:-1000}:${KROOM_GID:-1000}"
     working_dir: /kroom
     environment:
-      GRADLE_USER_HOME: /kroom/kroom-webapp-authoring/demo/data/gradle
-      GRADLE_RO_DEP_CACHE: /gradle-ro
+      GRADLE_USER_HOME: /gradle
       HOME: /kroom/kroom-webapp-authoring/demo/data/home
+      JAVA_OPTS: -Dport=8080
       KROOM_SMTP: kroom-mailpit:1025
     volumes:
       - ../..:/kroom
       - ${HOME}/.m2/repository:/m2:ro
-      - ${HOME}/.gradle/caches:/gradle-ro:ro
-    # a project cache of its own: the host's Gradle cannot ask a container for the repository's lock, and waits
-    command: ./gradlew --no-daemon --console=plain --project-cache-dir kroom-webapp-authoring/demo/data/project-cache -Dmaven.repo.local=/m2 :kroom-webapp-authoring-demo:run -Pport=8080
+      - ${HOME}/.gradle:/gradle
+    command: >-
+      sh -c "./gradlew --no-daemon --console=plain -Dmaven.repo.local=/m2 :kroom-webapp-authoring-demo:installDist
+      && exec kroom-webapp-authoring/demo/build/install/kroom-webapp-authoring-demo/bin/kroom-webapp-authoring-demo"
     ports:
       - "${KROOM_DEMO_PORT:-8099}:8080"
     depends_on:
