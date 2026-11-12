@@ -14,9 +14,16 @@ class Part(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     var text by string().required
     var holder by string()
     var client by string()
+    /** Where its holder is in it, for the others to see; gone with the hold. */
+    var caret by int()
 
     val free: Boolean get() = holder == null
     fun heldBy(actor: Actor): Boolean = holder == actor.id && client == actor.client
+
+    /** The text up to the caret, and from it: a page shows the holder's mark between the two. */
+    val head: String get() = text.take(at)
+    val tail: String get() = text.drop(at)
+    private val at: Int get() = (caret ?: text.length).coerceIn(0, text.length)
 
     companion object {
         /** A text cut into parts: at its blank lines, a fenced block kept whole. */
@@ -70,24 +77,42 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
     override fun reduce(event: Event) {
         super.reduce(event)
         when (event) {
-            is Take -> take(strings(event.ids).orEmpty(), event.user, event.client)
-            is Write -> parts[event.id]?.let { if (it.text != event.text) it.text = event.text }
+            is Take -> take(event)
+            is Write -> parts[event.id]?.let {
+                if (it.text != event.text) it.text = event.text
+                if (it.caret != event.caret) it.caret = event.caret
+            }
             is Release -> release(event.id)
             else -> {}
         }
     }
 
-    /** The parts [ids], next to each other, become one — the first, saying what they all said — and it is held. */
-    private fun take(ids: List<String>, holder: String?, client: String?) {
-        val at = ids.firstOrNull()?.let { parts.indexOf(it) }?.takeIf { it >= 0 } ?: return
-        val first = parts[at]
-        if (ids.size > 1) {
-            val all = join(ids.mapNotNull { parts[it]?.text })
-            if (first.text != all) first.text = all
-            parts.splice(at + 1, ids.size - 1)
+    /**
+     * A client goes there: a part born after [Take.after], or the parts [Take.ids], next to each other, become one —
+     * the first, saying what they all said. It is held; what the client held before is given back, as a release does.
+     */
+    private fun take(take: Take) {
+        val left = take.user?.let { user -> parts.firstOrNull { it.holder == user && it.client == take.client } }?.id
+        val after = take.after
+        val held = if (after != null) {
+            val at = parts.indexOf(after).takeIf { it >= 0 } ?: return
+            last += 1
+            Part(last.toString(), "").also { parts.splice(at + 1, 0, listOf(it)) }
+        } else {
+            val ids = strings(take.ids).orEmpty()
+            val at = ids.firstOrNull()?.let { parts.indexOf(it) }?.takeIf { it >= 0 } ?: return
+            val first = parts[at]
+            if (ids.size > 1) {
+                val all = join(ids.mapNotNull { parts[it]?.text })
+                if (first.text != all) first.text = all
+                parts.splice(at + 1, ids.size - 1)
+            }
+            first
         }
-        first.holder = holder
-        first.client = client
+        held.holder = take.user
+        held.client = take.client
+        // after the part taken is there: what was left is cut between itself and a part born after it, and goes if blank
+        left?.let { release(it) }
     }
 
     /** The part is free again, and cut: its first paragraph keeps the id, the others are born after it; left blank, it goes — the last one stays. */
@@ -98,6 +123,7 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
         if (cut.isEmpty() && parts.size > 1) { parts.splice(at, 1); return }
         part.holder = null
         part.client = null
+        part.caret = null
         val text = cut.firstOrNull() ?: ""
         if (part.text != text) part.text = text
         if (cut.size > 1) {
@@ -110,18 +136,23 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
 }
 
 /**
- * Parts asked for, to write them as one: free, next to each other, in the text's order, by a client that holds
- * nothing yet. The page waits for the frame: it is the take, folded, that gives it something to write in.
+ * A client goes there, to write: the parts [ids] as one (free, next to each other, in the text's order), or a part
+ * born after [after] (a paragraph begun). What it held before is given back by the same frame: going from one
+ * paragraph to the next is one step. The page waits for the frame: it is the take, folded, that gives it something
+ * to write in.
  */
 class Take(json: Json.MutableObject = Json.MutableObject()) : Event("take", json = json) {
-    val ids by array().required
+    val ids by array()
+    val after by string()
     var user by string().out
     var client by string().out
     init {
-        check { state: TextState, actor ->
-            val named = strings(ids)?.takeIf { it.isNotEmpty() } ?: return@check Reason("invalid", Json.Object("field" to "ids"))
-            state.parts.firstOrNull { it.heldBy(actor) }?.let { return@check Reason("holding", Json.Object("id" to it.id)) }
-            val at = named.map { id ->
+        check { state: TextState, _ ->
+            val next = after
+            val named = strings(ids)
+            if ((ids == null) == (next == null) || (ids != null && named.isNullOrEmpty())) return@check Reason("invalid", Json.Object("field" to "ids"))
+            if (next != null) return@check if (next in state.parts) null else Reason("gone", Json.Object("id" to next))
+            val at = named!!.map { id ->
                 val part = state.parts[id] ?: return@check Reason("gone", Json.Object("id" to id))
                 if (!part.free) return@check Reason("held", Json.Object("id" to id, "by" to part.holder))
                 state.parts.indexOf(id)
@@ -131,10 +162,11 @@ class Take(json: Json.MutableObject = Json.MutableObject()) : Event("take", json
     }
 }
 
-/** What the part its client holds says now, whole. */
+/** What the part its client holds says now, whole, and where its holder is in it. */
 class Write(json: Json.MutableObject = Json.MutableObject()) : Event("write", json = json) {
     val id by string().required
     val text by string().required
+    val caret by int()
     init { check { state: TextState, actor -> held(state, actor, id) } }
 }
 
@@ -154,7 +186,7 @@ open class TextEvents : RoomEvents() {
 }
 
 /**
- * A take is signed; what a client held is released when its leave is heard (every connection's: a tab closed
+ * A take is signed; what a client still held is released when its leave is heard (every connection's: a tab closed
  * beside another gives back its own). The rest is the fold's. A room with more extends it.
  */
 open class TextLogic<S : TextState>(events: TextEvents = TextEvents()) : Logic<S>(events) {

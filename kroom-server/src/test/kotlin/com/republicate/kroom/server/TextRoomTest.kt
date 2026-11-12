@@ -35,6 +35,7 @@ class TextRoomTest {
 
     private suspend fun TestRoom.take(who: Actor, vararg ids: String) = act(who, Take(Json.MutableObject("ids" to Json.MutableArray(ids.toList())))).await()
     private suspend fun TestRoom.write(who: Actor, id: String, text: String) = act(who, Write(Json.MutableObject("id" to id, "text" to text))).await()
+    private suspend fun TestRoom.after(who: Actor, id: String) = act(who, Take(Json.MutableObject("after" to id))).await()
     private suspend fun TestRoom.release(who: Actor, id: String) = act(who, Release(id)).await()
 
     @BeforeTest fun clean() = Users.clear()
@@ -84,10 +85,51 @@ class TextRoomTest {
         cb.drain()
         room.take(bob, "1", "2").let { assertEquals(Stage.REJECTED, it.stage); assertEquals("held", it.meta.reason); assertEquals("alice", it.meta.args?.getString("by")) }
         room.write(bob, "1", "mine").let { assertEquals("not_held", it.meta.reason) }
-        room.take(alice, "2").let { assertEquals("holding", it.meta.reason) }
         cb.silent()
         assertEquals("One.\n\nTwo.", room.text.text)
-        assertNotEquals(Stage.REJECTED, room.take(bob, "2").stage)                          // each in a part of their own
+        assertNotEquals(Stage.REJECTED, room.take(alice, "2").stage)                        // elsewhere: what she held is given back
+        assertTrue(room.text.parts["1"]!!.free)
+        assertEquals("alice", room.text.parts["2"]!!.holder)
+        assertNotEquals(Stage.REJECTED, room.take(bob, "1").stage)                          // each in a part of their own
+    }
+
+    @Test fun `going from one paragraph to the next is one frame`() = runBlocking {
+        val room = TestRoom("text-${n++}", "One.\n\nTwo.")
+        val alice = actor(user("alice"), "t1")
+        room.join(alice).state()
+        val watch = room.join(actor(user("bob"), "t1")).also { it.state() }
+        room.take(alice, "1")
+        room.write(alice, "1", "One.\n\nOne and a half.")
+        watch.drain()
+        assertNotEquals(Stage.REJECTED, room.take(alice, "2").stage)
+        watch.next().let { assertEquals("take", it.event); assertEquals("""{"ids":["2"],"user":"alice","client":"t1"}""", it.data) }
+        watch.silent()                                                                      // no release frame: the take is the release
+        assertEquals(listOf("1", "3", "2"), room.text.parts.map { it.id })
+        assertEquals(listOf(null, null, "alice"), room.text.parts.map { it.holder })
+        assertEquals("One.\n\nOne and a half.\n\nTwo.", room.text.text)
+    }
+
+    @Test fun `a paragraph begun is a part born after, held`() = runBlocking {
+        val room = TestRoom("text-${n++}", "One.\n\nTwo.")
+        val alice = actor(user("alice"), "t1")
+        val watch = room.join(alice).also { it.state() }
+        watch.drain()
+        assertNotEquals(Stage.REJECTED, room.after(alice, "1").stage)
+        watch.next().let { assertEquals("take", it.event); assertEquals("""{"after":"1","user":"alice","client":"t1"}""", it.data) }
+        assertEquals(listOf("1", "3", "2"), room.text.parts.map { it.id })
+        assertEquals(listOf(null, "alice", null), room.text.parts.map { it.holder })
+        room.after(alice, "9").let { assertEquals("gone", it.meta.reason) }
+    }
+
+    @Test fun `a write's frame carries the caret`() = runBlocking {
+        val room = TestRoom("text-${n++}")
+        val alice = actor(user("alice"), "t1")
+        val watch = room.join(alice).also { it.state() }
+        room.take(alice, "1")
+        watch.drain()
+        assertNotEquals(Stage.REJECTED, room.act(alice, Write(Json.MutableObject("id" to "1", "text" to "One", "caret" to 3))).await().stage)
+        watch.next().let { assertEquals("write", it.event); assertEquals("""{"id":"1","text":"One","caret":3}""", it.data) }
+        assertEquals(3, room.text.parts["1"]!!.caret)
     }
 
     @Test fun `a tab closed beside another gives back what it held, the other keeps its own`() = runBlocking {

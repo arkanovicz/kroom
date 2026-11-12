@@ -25,7 +25,9 @@ class TextTest {
     }
 
     private fun take(vararg ids: String) = Take(Json.MutableObject("ids" to Json.MutableArray(ids.toList())))
+    private fun after(id: String) = Take(Json.MutableObject("after" to id))
     private fun write(id: String, text: String) = Write(Json.MutableObject("id" to id, "text" to text))
+    private fun write(id: String, text: String, caret: Int) = Write(Json.MutableObject("id" to id, "text" to text, "caret" to caret))
     private fun release(id: String) = Release(id)
 
     /** The refusal, and the state as it stood. */
@@ -76,12 +78,110 @@ class TextTest {
         s.refused("scattered", b, take("3", "2"))
         s.refused("invalid {\"field\":\"ids\"}", b, take())
         s.refused("invalid {\"field\":\"ids\"}", b, Take(Json.MutableObject("ids" to Json.MutableArray(listOf(1)))))
-        s.refused("holding {\"id\":\"1\"}", a1, take("1"))                              // its own: still holding
-        s.refused("holding {\"id\":\"1\"}", a1, take("2"))
-        s.refused("holding {\"id\":\"1\"}", a1, take("9"))                              // before gone
-        s.refused("holding {\"id\":\"1\"}", a1, take("3", "2"))                         // before scattered
+        s.refused("held {\"id\":\"1\",\"by\":\"a\"}", a1, take("1"))                  // its own: held, by itself
+        s.refused("gone {\"id\":\"9\"}", a1, take("9"))                                 // refused, what it holds stays held
+        s.refused("scattered", a1, take("3", "2"))
         s.act(a2, take("2"))
-        s.refused("holding {\"id\":\"1\"}", a1, take("2"))                              // before held
+        s.refused("held {\"id\":\"2\",\"by\":\"a\"}", a1, take("2"))
+    }
+
+    @Test fun `a take elsewhere gives back what was held, cut`() {
+        val s = TextState("X\n\nY")
+        s.act(a1, take("1"))
+        s.act(a1, write("1", "A\n\nB"))
+        assertNull(s.act(a1, take("2")))
+        assertEquals(listOf("1", "3", "2"), ids(s))
+        assertEquals(listOf("A", "B", "Y"), texts(s))
+        assertEquals(listOf(null, null, "a/t1"), holders(s))                            // one part per client, ever
+        assertEquals(3L, s.last)
+        assertEquals(1, s.parts.count { it.heldBy(a1) })
+        assertEquals("""{"id":"1","text":"A"}""", s.parts[0].json.toString())
+
+        val t = TextState("A\n\nB")
+        t.act(a1, take("2"))
+        t.act(a1, write("2", " "))
+        assertNull(t.act(a1, take("1")))
+        assertEquals(listOf("1"), ids(t))                                               // left blank, it goes
+        assertEquals(listOf("a/t1"), holders(t))
+    }
+
+    @Test fun `a paragraph begun is a part born after, held`() {
+        val free = TextState("A\n\nB")
+        assertNull(free.act(a1, after("1")))
+        assertEquals(listOf("1", "3", "2"), ids(free))
+        assertEquals(listOf("A", "", "B"), texts(free))
+        assertEquals(listOf(null, "a/t1", null), holders(free))
+        assertEquals(3L, free.last)
+
+        val own = TextState("A")
+        own.act(a1, take("1"))
+        own.act(a1, write("1", "A\n\nB"))
+        assertNull(own.act(a1, after("1")))                                             // the new paragraph gesture
+        assertEquals(listOf("1", "3", "2"), ids(own))                                   // the new part born first, the cut ones between
+        assertEquals(listOf("A", "B", ""), texts(own))
+        assertEquals(listOf(null, null, "a/t1"), holders(own))
+        assertEquals(3L, own.last)
+
+        val other = TextState("A\n\nB")
+        other.act(b, take("1"))
+        other.act(b, write("1", "b's"))
+        assertNull(other.act(a1, after("1")))
+        assertEquals(listOf("1", "3", "2"), ids(other))
+        assertEquals(listOf("b's", "", "B"), texts(other))
+        assertEquals(listOf("b/t3", "a/t1", null), holders(other))                      // their hold untouched
+
+        other.refused("gone {\"id\":\"9\"}", a1, after("9"))
+        other.refused("invalid {\"field\":\"ids\"}", a1, Take(Json.MutableObject("ids" to Json.MutableArray(listOf("2")), "after" to "1")))
+        other.refused("invalid {\"field\":\"ids\"}", a1, Take(Json.MutableObject()))
+    }
+
+    @Test fun `a blank part left by a paragraph begun after it goes, the new one stays`() {
+        val s = TextState("A\n\nB")
+        s.act(a1, take("2"))
+        s.act(a1, write("2", ""))
+        assertNull(s.act(a1, after("2")))
+        assertEquals(listOf("1", "3"), ids(s))
+        assertEquals(listOf(null, "a/t1"), holders(s))
+        assertEquals(3L, s.last)
+
+        val empty = TextState()
+        empty.act(a1, take("1"))
+        assertNull(empty.act(a1, after("1")))
+        assertEquals(listOf("2"), ids(empty))                                           // still never without a part
+        assertEquals(listOf("a/t1"), holders(empty))
+    }
+
+    @Test fun `a caret is the holder's, said by each write and gone with the hold`() {
+        val s = TextState("X\n\nY")
+        s.act(a1, take("1"))
+        assertNull(s.act(a1, write("1", "Hello", 3)))
+        assertEquals(3, s.parts[0].caret)
+        assertEquals("Hel", s.parts[0].head)
+        assertEquals("lo", s.parts[0].tail)
+        assertNull(s.act(a1, write("1", "Hello")))
+        assertNull(s.parts[0].caret)                                                    // a write without it removes it
+        assertEquals("Hello", s.parts[0].head)
+        assertEquals("", s.parts[0].tail)
+        assertNull(s.act(a1, write("1", "Hello", 99)))
+        assertEquals("Hello", s.parts[0].head)                                          // clamped
+        assertEquals("", s.parts[0].tail)
+        assertNull(s.act(a1, write("1", "Hello", -1)))
+        assertEquals("", s.parts[0].head)
+        assertEquals("Hello", s.parts[0].tail)
+
+        s.act(a1, write("1", "Hello", 2))
+        assertNull(s.act(a1, release("1")))
+        assertEquals("""{"id":"1","text":"Hello"}""", s.parts[0].json.toString())       // gone, not null
+
+        s.act(a1, take("1"))
+        s.act(a1, write("1", "Hello", 2))
+        assertNull(s.act(a1, take("2")))                                                // a take elsewhere
+        assertNull(s.parts["1"]!!.caret)
+
+        s.act(a1, write("2", "Y", 1))
+        s.reduce((logic.decide(s, a1, Leave()) as Emit<*>).events.single())             // the leave's release
+        assertNull(s.parts["2"]!!.caret)
+        assertTrue(s.parts.all { it.free })
     }
 
     @Test fun `a take of adjacent parts makes one, the first, saying what they all said`() {
@@ -230,6 +330,15 @@ class TextTest {
         s.dirty!!.clear()
         assertNull(s.act(a1, release("2")))
         assertEquals("2 4 5", dirty(s))
+    }
+
+    @Test fun `a paragraph begun after one's own part marks the part, the new one and the cut ones`() {
+        val s = TextState("A")
+        s.act(a1, take("1"))
+        s.act(a1, write("1", "A\n\nB"))
+        s.dirty = HashSet()
+        assertNull(s.act(a1, after("1")))
+        assertEquals("1 2 3", dirty(s))
     }
 
     private fun dirty(s: State) = s.dirty!!.map { it.toString() }.sorted().joinToString(" ")
