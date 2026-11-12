@@ -17,7 +17,7 @@ import kotlin.test.*
 /** Pins a text in a room: a plain [LogicRoom] over [TextState] and [TextLogic], a part held by a tab for as long as the tab is there. */
 class TextRoomTest {
 
-    private class TestRoom(id: String, override val leaveGrace: Long = 0) : LogicRoom<TextState>(id, TextState(), TextLogic()) {
+    private class TestRoom(id: String, text: String = "", override val leaveGrace: Long = 0) : LogicRoom<TextState>(id, TextState(text), TextLogic()) {
         override fun shouldCloseWhenEmpty() = false
         val text get() = state
     }
@@ -25,7 +25,6 @@ class TextRoomTest {
     private var n = 0
     private fun user(id: String) = Users.getOrCreate(id, id)
     private fun actor(user: User, tab: String) = Actor(Actor.connectionId(user, tab), user)
-    private fun ids(vararg ids: String) = Json.MutableArray(ids.toList())
 
     private suspend fun Channel<ServerSentEvent>.next(): ServerSentEvent = withTimeout(2000) { receive() }
     private suspend fun Channel<ServerSentEvent>.state(): Json.Object = next().also { assertEquals("state", it.event) }.json()
@@ -34,66 +33,82 @@ class TextRoomTest {
     private fun ServerSentEvent.json() = Json.parse(data!!) as Json.Object
     private fun Json.Object.parts() = getArray("parts")!!.map { it as Json.Object }
 
-    private suspend fun TestRoom.take(who: Actor, vararg ids: String) = act(who, Take(Json.MutableObject("ids" to ids(*ids)))).await()
-    private suspend fun TestRoom.write(who: Actor, ids: Json.Array, vararg texts: String) =
-        act(who, Write(Json.MutableObject("ids" to ids, "texts" to Json.MutableArray(texts.toList())))).await()
+    private suspend fun TestRoom.take(who: Actor, vararg ids: String) = act(who, Take(Json.MutableObject("ids" to Json.MutableArray(ids.toList())))).await()
+    private suspend fun TestRoom.write(who: Actor, id: String, text: String) = act(who, Write(Json.MutableObject("id" to id, "text" to text))).await()
+    private suspend fun TestRoom.release(who: Actor, id: String) = act(who, Release(id)).await()
 
     @BeforeTest fun clean() = Users.clear()
 
-    @Test fun `a take, a write and a release are frames, the snapshot is their fold`() = runBlocking {
-        val room = TestRoom("text-${n++}")
+    @Test fun `a take, a write and a release are frames that say what was done, the snapshot is their fold`() = runBlocking {
+        val room = TestRoom("text-${n++}", "One.\n\nTwo.\n\nThree.")
         val alice = actor(user("alice"), "t1")
         val ca = room.join(alice).also { it.state() }
         ca.drain()
-        assertNotEquals(Stage.REJECTED, room.take(alice, "1").stage)
+        assertNotEquals(Stage.REJECTED, room.take(alice, "1", "2").stage)
         ca.next().let {
             assertEquals("take", it.event)
-            assertEquals("""{"ids":["1"],"user":"alice","client":"t1"}""", it.data)   // who holds is the frame's: a fold needs no metadata
+            assertEquals("""{"ids":["1","2"],"user":"alice","client":"t1"}""", it.data)   // who holds is the frame's: a fold needs no metadata
         }
-        room.write(alice, ids("1"), "One.", "Two.")
-        ca.next().let { assertEquals("write", it.event); assertEquals("""{"ids":["1"],"texts":["One.","Two."],"born":["2"]}""", it.data) }
+        room.write(alice, "1", "One.\n\nOne and a half.\n\nTwo.")
+        ca.next().let { assertEquals("write", it.event); assertEquals("""{"id":"1","text":"One.\n\nOne and a half.\n\nTwo."}""", it.data) }
         val late = room.join(actor(user("bob"), "t1")).state()
-        assertEquals(listOf("One.", "Two."), late.parts().map { it.getString("text") })
-        assertEquals(listOf("alice", "alice"), late.parts().map { it.getString("holder") })
-        assertNotEquals(Stage.REJECTED, room.act(alice, Release(listOf("1", "2"))).await().stage)
-        assertEquals("One.\n\nTwo.", room.text.text)
+        assertEquals(listOf("1", "3"), late.parts().map { it.getString("id") })           // held, a part is one, whatever it says
+        assertEquals(listOf("alice", null), late.parts().map { it.getString("holder") })
+        room.release(alice, "1")
+        ca.drain()
+        assertEquals("""{"id":"1"}""", Release("1").json.toString())                        // and a release names the part, nothing more
+        assertEquals(listOf("1", "4", "5", "3"), room.text.parts.map { it.id })             // cut by the fold, on both sides alike
+        assertEquals("One.\n\nOne and a half.\n\nTwo.\n\nThree.", room.text.text)
         assertTrue(room.text.parts.all { it.free })
     }
 
-    @Test fun `a refusal is the verdict alone`() = runBlocking {
+    @Test fun `two writes in a row say the same part twice, nothing doubles`() = runBlocking {
         val room = TestRoom("text-${n++}")
+        val alice = actor(user("alice"), "t1")
+        room.join(alice).state()
+        room.take(alice, "1")
+        val first = room.act(alice, Write(Json.MutableObject("id" to "1", "text" to "A\n\nB")))   // not awaited: the page did not wait either
+        room.write(alice, "1", "A\n\nB\n\nC")
+        first.await()
+        room.release(alice, "1")
+        assertEquals("A\n\nB\n\nC", room.text.text)
+        assertEquals(3, room.text.parts.size)
+    }
+
+    @Test fun `a refusal is the verdict alone`() = runBlocking {
+        val room = TestRoom("text-${n++}", "One.\n\nTwo.")
         val alice = actor(user("alice"), "t1"); val bob = actor(user("bob"), "t1")
         room.join(alice).state()
         val cb = room.join(bob).also { it.state() }
         room.take(alice, "1")
         cb.drain()
-        room.take(bob, "1").let { assertEquals(Stage.REJECTED, it.stage); assertEquals("held", it.meta.reason); assertEquals("alice", it.meta.args?.getString("by")) }
-        room.write(bob, ids("1"), "mine").let { assertEquals("not_held", it.meta.reason) }
+        room.take(bob, "1", "2").let { assertEquals(Stage.REJECTED, it.stage); assertEquals("held", it.meta.reason); assertEquals("alice", it.meta.args?.getString("by")) }
+        room.write(bob, "1", "mine").let { assertEquals("not_held", it.meta.reason) }
+        room.take(alice, "2").let { assertEquals("holding", it.meta.reason) }
         cb.silent()
-        assertEquals("", room.text.text)
+        assertEquals("One.\n\nTwo.", room.text.text)
+        assertNotEquals(Stage.REJECTED, room.take(bob, "2").stage)                          // each in a part of their own
     }
 
     @Test fun `a tab closed beside another gives back what it held, the other keeps its own`() = runBlocking {
-        val room = TestRoom("text-${n++}")
+        val room = TestRoom("text-${n++}", "One.\n\nTwo.")
         val alice = user("alice")
         val t1 = actor(alice, "t1"); val t2 = actor(alice, "t2")
         val watch = room.join(actor(user("bob"), "t1")).also { it.state() }
         room.join(t1).state()
         room.join(t2).state()
         room.take(t1, "1")
-        room.write(t1, ids("1"), "One.", "Two.")
-        room.act(t1, Release(listOf("2"))).await()
-        room.take(t2, "2")
         room.take(t2, "1").let { assertEquals("held", it.meta.reason) }   // the same user, another tab: not its own
+        room.take(t2, "2")
         watch.drain()
         room.leave(t1)
-        watch.next().let { assertEquals("release", it.event); assertEquals("""{"ids":["1"]}""", it.data) }   // no leave: alice is still here
+        watch.next().let { assertEquals("release", it.event); assertEquals("""{"id":"1"}""", it.data) }   // no leave: alice is still here
         watch.silent()
         assertTrue(room.text.parts["1"]!!.free)
         assertEquals("t2", room.text.parts["2"]!!.client)
         room.leave(t2)
         assertEquals("leave", watch.next().event)                          // the user's last: the leave, then what it held
-        watch.next().let { assertEquals("release", it.event); assertEquals("""{"ids":["2"]}""", it.data) }
+        watch.next().let { assertEquals("release", it.event); assertEquals("""{"id":"2"}""", it.data) }
     }
 
     @Test fun `a tab reloaded within the grace keeps what it holds`() = runBlocking {
@@ -111,7 +126,7 @@ class TextRoomTest {
         assertEquals("alice", room.join(back).state().parts().single().getString("holder"))   // its own, still: the page takes its text up again
         delay(250)
         assertNull(watch.tryReceive().getOrNull())
-        assertNotEquals(Stage.REJECTED, room.write(back, ids("1"), "Still mine.").stage)
+        assertNotEquals(Stage.REJECTED, room.write(back, "1", "Still mine.").stage)
         assertEquals("write", watch.next().event)
         room.leave(back)
         delay(50)

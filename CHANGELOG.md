@@ -609,14 +609,14 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-common — a text written by several
 - `TextState` / `TextEvents` / `TextLogic`, beside the chat's: a text as parts in order (`parts`, a `seq` of
-  `Part(id, text, holder, client)`), one writer per part. `take {ids}` (all or none; `held`, `gone`), `write {ids,
-  texts}` (the parts held, adjacent, say this now — typing, a cut, a merge, a paste; `born` names the new ones;
-  `not_held`, `gone`, `scattered`; no text at all is one empty part, still held), `release {ids}` (a part left blank goes, the last one stays). A part
-  is held by a client, a tab; what it held is released when its leave is heard. A frame is a state, never a
-  difference: nothing to replay. `Part.cut(text)` cuts a text into parts, a fenced block kept whole; `state.text`, and
-  `TextState(text)` for a room rebuilt from what a store kept.
-  No room class and no store: a plain `LogicRoom`, `persist(event)` the application's. Pinned in `TextTest`
-  (common), `TextRoomTest` (server).
+  `Part(id, text, holder, client)`), one writer per part, a part held by a client (a tab). The page computes
+  nothing; the fold decides what the text is made of. `take {ids}` (free, adjacent, by a client holding nothing:
+  they become one part, held; `held`, `gone`, `scattered`, `holding`), `write {id, text}` (the part held says this,
+  whole; `not_held`, `gone`), `release {id}` (cut into its paragraphs by `Part.cut`, a fenced block kept whole, the
+  new ones born after it; left blank it goes, the last one stays). A late view is refused, never applied askew; a
+  frame is a state, never a difference: nothing to replay. What a client held is released when its leave is heard.
+  `state.text`, and `TextState(text)` for a room rebuilt from what a store kept. No room class and no store: a
+  plain `LogicRoom`, `persist(event)` the application's. Pinned in `TextTest` (common), `TextRoomTest` (server).
 
 #### kroom-common — `seq`, a field whose order is state
 - `seq(::V)`: views found by their `id`, in an order that is itself state (an array on the wire), where `keyed`

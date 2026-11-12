@@ -1072,27 +1072,31 @@ store reading its own.
 `LogicRoom`: its parts in order (`parts`, a `seq` of `Part(id, text, holder, client)`), one writer per part.
 
 ```kotlin
-val room = LogicRoom("proposal", TextState(), TextLogic())
+val room = LogicRoom("proposal", TextState(stored), TextLogic())
 ```
 
 ```
-take    {ids}          every part free or the client's own already, or none is taken    held · gone
-write   {ids, texts}   the parts held, next to each other, say this now                 not_held · gone · scattered
-release {ids}          given back; a part left blank goes, the last one stays           not_held
+take    {ids}        free, next to each other, by a client holding nothing    they become one part, held     held · gone · scattered · holding
+write   {id, text}   the part held                                            its text, whole                not_held · gone
+release {id}         the part held                                            cut into its paragraphs, free  not_held · gone
 ```
 
-A part is held by a client — a tab, not a user: the same user's other tab is refused like anyone. `write` is
-typing, a paragraph cut in two, two made one, a page pasted: the i-th text is the i-th part's, a text past them is
-a part born there (`born`, its id), a part past them goes; no text at all (everything selected and cut) leaves the
-first part, blank and still held, for what is typed next. `Part.cut(text)` cuts what a writer typed into parts
-(at its blank lines, a fenced block kept whole); `state.text` is the text they make, and `TextState(text)` the
-state a room is rebuilt from when a store kept that text.
+The page computes nothing. An intent names parts a frame told it of and says what was done; the fold alone decides
+what the text is made of, the same on the server and in the browser: the parts taken become one (the first, saying
+what they all said), the part given back is cut at its blank lines (`Part.cut`, a fenced block kept whole) — its
+first paragraph keeps the id, the others are born after it (`state.last`), left blank it goes, the text's last one
+stays. So a view that is late is refused, never applied askew, and a frame is a state, never a difference: two
+writes in a row say the same part twice, nothing is replayed, a snapshot is the text.
 
-One writer per part is what keeps it simple: a `write` says what the parts say, whole, so a frame is a state and
-never a difference. Nothing is replayed; a reconnecting writer sends its text again, or finds the part is no
-longer its own (`not_held`) and keeps what it typed aside. What a client held is released when its leave is heard,
-after the room's graces: a reload keeps its parts, a tab closed gives them back. The room stores nothing — override
-`persist(event)` for that.
+The page reacts: a click posts `take`, and it is the frame, folded, that gives its tab something to write in — the
+part rendered as a textarea for the client that holds it (`part.client`, a tab: the same user's other tab is
+refused like anyone). Two people write two parts at once; one part is one writer's, in order. Everything selected
+and pasted over is a `take` of every part, refused while anyone holds one. A writer back from a drop sends its
+text again, or finds the part no longer its own (`not_held`) and keeps what it typed aside. What a client held is
+released when its leave is heard, after the room's graces: a reload keeps its part, a tab closed gives it back.
+
+`state.text` is the text the parts make, `TextState(text)` the state a room is rebuilt from when a store kept that
+text. The room stores nothing — override `persist(event)` for that.
 
 ## Images
 
