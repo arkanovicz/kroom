@@ -74,7 +74,8 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
     }
 
     /** The parts [ids] say [texts]: one for one while both last (only a text that changed is written), then the rest goes, or comes under [born]. */
-    private fun write(ids: List<String>, texts: List<String>, born: List<String>) {
+    private fun write(ids: List<String>, said: List<String>, born: List<String>) {
+        val texts = said.ifEmpty { listOf("") }
         val at = ids.firstOrNull()?.let { parts.indexOf(it) }?.takeIf { it >= 0 } ?: return
         val holder = parts[at].holder
         val client = parts[at].client
@@ -121,7 +122,8 @@ class Release(json: Json.MutableObject = Json.MutableObject()) : Event("release"
 /**
  * What the parts a client holds say now: [ids], next to each other and in the text's order, become [texts] — the
  * i-th text is the i-th part's, a text past them is a part born there ([born], its id, the logic's), a part past
- * them goes. Typing, a paragraph cut in two, two made one, a page pasted: one event.
+ * them goes. Typing, a paragraph cut in two, two made one, a page pasted: one event. No text at all (everything
+ * selected and cut) is one empty text: the first part stays, blank and held, for what is typed next.
  */
 class Write(json: Json.MutableObject = Json.MutableObject()) : Event("write", json = json) {
     val ids by array().required
@@ -130,8 +132,7 @@ class Write(json: Json.MutableObject = Json.MutableObject()) : Event("write", js
     init {
         check { state: TextState, actor ->
             val named = strings(ids)?.takeIf { it.isNotEmpty() } ?: return@check invalid("ids")
-            val said = strings(texts) ?: return@check invalid("texts")
-            if (said.isEmpty()) return@check Reason("empty")
+            strings(texts) ?: return@check invalid("texts")
             val at = named.map { id -> state.parts.indexOf(id).also { if (it < 0) return@check Reason("gone", Json.Object("id" to id)) } }
             named.firstOrNull { !state.parts[it]!!.heldBy(actor) }?.let { return@check Reason("not_held", Json.Object("id" to it)) }
             if (at.indices.any { it > 0 && at[it] != at[it - 1] + 1 }) Reason("scattered") else null

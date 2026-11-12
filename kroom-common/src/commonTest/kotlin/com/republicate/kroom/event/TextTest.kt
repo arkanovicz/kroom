@@ -113,7 +113,6 @@ class TextTest {
         s.act(b, release("2"))
         s.act(a1, take("2"))
         refused("scattered", a1, write(listOf("2", "1"), listOf("x", "y")))              // adjacent, reversed
-        refused("empty", a1, write(listOf("1"), listOf()))
         refused("invalid {\"field\":\"ids\"}", a1, write(listOf(), listOf("x")))
     }
 
@@ -132,6 +131,27 @@ class TextTest {
         assertNull(one.act(a1, release("1")))
         assertEquals(listOf("1"), ids(one))   // a text is never without a part
         assertTrue(one.parts[0].free)
+    }
+
+    @Test fun `everything cut is one empty part still held, typed in again or gone at the release`() {
+        val s = text("A", "B", "C")
+        s.act(a1, take("1", "2", "3"))
+        assertNull(s.act(a1, write(listOf("1", "2", "3"), Part.cut(""))))            // select all, cut
+        assertEquals(listOf("1"), ids(s))
+        assertEquals("", s.parts[0].text)
+        assertEquals(listOf("a/t1"), holders(s))
+        assertNull(s.act(a1, write(listOf("1"), listOf("x"))))                       // a key
+        assertNull(s.act(a1, write(listOf("1"), Part.cut(""))))                      // deleted
+        assertEquals("", s.text)
+        assertNull(s.act(a1, write(listOf("1"), listOf("again"))))
+        assertEquals("again", s.text)
+
+        val t = text("A", "B")
+        t.act(a1, take("2"))
+        t.act(a1, write(listOf("2"), listOf()))
+        assertEquals("A", t.text)                                                    // a blank part says nothing
+        assertNull(t.act(a1, release("2")))
+        assertEquals(listOf("1"), ids(t))
     }
 
     @Test fun `one idle the other replaces everything`() {
