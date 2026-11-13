@@ -1,9 +1,11 @@
 package com.republicate.kroom.webapp.authoring
 
+import com.republicate.kroom.webapp.assets.kroomAssets
 import com.republicate.kroom.webapp.core.installCore
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,20 +14,26 @@ import kotlin.test.assertTrue
 
 /**
  * The editor is three files under this jar's `static/` plus one template at the classpath root, and no
- * route of authoring's own — core's static routes already serve any jar. So what a test can catch here is
+ * route of authoring's own — core's static routes already serve any jar; its toolbar is kroom-webapp-assets'
+ * markdown.js and markdown.css, under `kroomAssets()` as a site mounts it. So what a test can catch here is
  * the packaging: a file moved out of reach, or tags pointing where nothing is served.
  */
 class AssetsTest {
 
     private val served = mapOf(
         "/js/authoring.js" to ContentType.Application.JavaScript,
+        "/js/kroom/markdown.js" to ContentType.Application.JavaScript,
+        "/css/kroom/markdown.css" to ContentType.Text.CSS,
         "/css/authoring.css" to ContentType.Text.CSS,
         "/lib/diff-match-patch/diff_match_patch.js" to ContentType.Application.JavaScript
     )
 
     @Test
-    fun `the editor's files are served, with their type, by the core static routes`() = testApplication {
-        application { installCore() }
+    fun `the editor's files are served, with their type, by the core static routes and kroomAssets`() = testApplication {
+        application {
+            installCore()
+            routing { kroomAssets() }
+        }
 
         served.forEach { (path, expected) ->
             val response = client.get("$path?v=${AuthoringAssets.VERSION}")
@@ -41,6 +49,8 @@ class AssetsTest {
         val tags = AuthoringAssets().tags()
         served.keys.forEach { path -> assertTrue(tags.contains("$path?v="), "$path missing from $tags") }
         assertTrue("kroomAuthoring" !in tags, "no strings, no script for them")
+        assertTrue(tags.indexOf("/css/kroom/markdown.css") < tags.indexOf("/css/authoring.css"), "the toolbar's rules first: $tags")
+        assertTrue(tags.indexOf("/js/kroom/markdown.js") < tags.indexOf("/js/authoring.js"), "the toolbar's script first: $tags")
     }
 
     @Test

@@ -386,9 +386,16 @@ Shared client-side libraries for Ktor webapps:
 | `sse.js` | EventSource wrapper: named events, reconnect, `into(store)` |
 | `intents.js` | `[data-intent]` triggers, busy until the verdict (the reply) |
 | `store.js` | Minimal Redux-like state management |
+| `markdown.js` | The markdown toolbar (+ `markdown.css`): `kroomMarkdown.toolbar(textarea)`, `shortcut(e, textarea)` |
 
 A page on a room built with kroom-client needs only `domhelper.js` and `api.js` (the tab id, the POST): the
 stream, the intents and the State are the bundle's. `sse.js`, `intents.js` and `store.js` serve plain-JS pages.
+
+`markdown.js` formats a textarea's selection: `kroomMarkdown.toolbar(target, {strings, icons, extra, language})`
+answers a `div.kroom-format` of icon buttons (`target` a textarea, or a function answering the one to act on), and
+`kroomMarkdown.shortcut(event, textarea)` handles Ctrl/Cmd+B, I, K; every edit goes through `replace(…)` and is
+heard as `input`. Tags: `KroomAssets.markdownStyle()` and `markdownScript()` (after domhelper.js). The block
+editor's toolbar is this one.
 
 ### Usage
 

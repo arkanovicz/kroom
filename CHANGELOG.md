@@ -620,6 +620,18 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-assets, kroom-webapp-authoring — the markdown toolbar, shared
+- `markdown.js` / `markdown.css` (`/js/kroom/`, `/css/kroom/`; `KroomAssets.markdownScript()` /
+  `markdownStyle()`, not in `coreScripts()`): `window.kroomMarkdown` — `toolbar(target, {strings, icons, extra,
+  language})` (a `div.kroom-format` of icon buttons; `target` a textarea or a function answering one),
+  `shortcut(event, textarea, extra, options)`, `formats`, `replace` / `wrap` / `prefix` / `link` / `code`, the
+  words (en, fr), the pictograms and `icon(name, icons)`. An edit is heard as `input` whether `execCommand` did it
+  or the `setRangeText` fallback; a button no longer takes the focus from the textarea.
+- The block editor is built on it: its toolbar is that one plus `image`, its words and pictograms merged into
+  `kroomAuthoring.strings` / `.icons` / `.stock` as before. `AuthoringAssets` emits markdown.css and markdown.js
+  ahead of its own, so a site mounts `kroomAssets()` (`ContentSite` does). `.kroom-icon` and `.kroom-format`
+  moved from authoring.css to markdown.css. Pinned in `markdown.mjs` (assets' `smoke.sh`), `smoke.mjs`, `AssetsTest`.
+
 #### kroom-common, kroom-client — a text written by several
 - `TextState` / `TextEvents` / `TextLogic`, beside the chat's: a text as parts in order (`parts`, a `seq` of
   `Part(id, text, holder, client, caret)`), one writer per part, a part held by a client (a tab). The page computes

@@ -8,7 +8,8 @@ import com.republicate.kson.Json
  * already serves from any jar on the classpath — so authoring mounts no route of its own.
  *
  * The tags go in the application's layout, **after** the house stack (domhelper.js, api.js): authoring.js
- * builds on it and does not reload it. From a velocity layout, `$authoring.assets.tags()`.
+ * builds on it and does not reload it. The markdown toolbar (markdown.js, markdown.css) is kroom-webapp-assets',
+ * served by `kroomAssets()`; these tags bring it. From a velocity layout, `$authoring.assets.tags()`.
  *
  * [language] picks the stock language ([AuthoringConfig.language]); it reaches the page ahead of authoring.js,
  * which reads it at load.
@@ -19,7 +20,7 @@ class AuthoringAssets(private val language: String = "auto") {
         val VERSION: String get() = KroomAssets.VERSION
     }
 
-    fun styleTags(prefix: String = "") =
+    fun styleTags(prefix: String = "") = KroomAssets.markdownStyle(prefix) + "\n" +
         """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/authoring.css?v=$VERSION">"""
 
     /**
@@ -38,6 +39,7 @@ class AuthoringAssets(private val language: String = "auto") {
     fun scriptTags(prefix: String = "") = listOfNotNull(
         stringTags().takeIf { it.isNotEmpty() },
         """<script src="${prefix.trimEnd('/')}/lib/diff-match-patch/diff_match_patch.js?v=$VERSION"></script>""",
+        KroomAssets.markdownScript(prefix),
         """<script src="${prefix.trimEnd('/')}/js/authoring.js?v=$VERSION"></script>"""
     ).joinToString("\n")
 

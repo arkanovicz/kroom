@@ -1,5 +1,5 @@
 // authoring.js - in-place editing of kroom content blocks
-// Part of kroom-webapp-authoring. Needs domhelper.js, api.js and lib/diff-match-patch.
+// Part of kroom-webapp-authoring. Needs domhelper.js, api.js, markdown.js (kroom-webapp-assets) and lib/diff-match-patch.
 //
 // The wrapper template ships only the block and its edit button; every piece of editor markup below is
 // built here, so a visitor who cannot edit downloads nothing of it.
@@ -11,21 +11,18 @@
 (function () {
 
     const HEARTBEAT_DELAY = 700;           // idle before the lock is refreshed
+    const markdown = window.kroomMarkdown;  // the formatting toolbar, its words and pictograms
 
     // Every word the editor says, error codes of the edit API included, in the languages kroom ships. An
     // application picks one (AuthoringConfig.language, emitted ahead of this script as kroomAuthoring.language;
     // `auto`, the default, follows the browser) and rewords nothing: the editor is kroom's. English is the floor
-    // every table fills up from.
-    const STOCK = { en: {
+    // every table fills up from. The formatting toolbar's words are markdown.js's, merged in below.
+    const OWN = { en: {
         edit: 'edit',
         markdown: 'markdown', preview: 'preview', history: 'history',
         submit: 'submit', cancel: 'cancel', trash: 'trash this block',
         confirmTrash: 'Remove this block? The region falls back to what the site shows by default.',
-        bold: 'bold (Ctrl+B)', italic: 'italic (Ctrl+I)', heading: 'heading', link: 'link (Ctrl+K)',
-        bullets: 'bulleted list', numbers: 'numbered list', quote: 'quote', code: 'code',
         image: 'picture or PDF (or paste, or drop one)', uploading: 'uploading {name}…',
-        // what a formatting button writes when nothing is selected
-        boldText: 'bold', italicText: 'italic', linkText: 'text', codeText: 'code',
         saving: 'saving…',
         lockLost: 'lock lost: {message}',
         conflict: 'This block changed while you were editing',
@@ -64,11 +61,7 @@
         markdown: 'markdown', preview: 'aperçu', history: 'historique',
         submit: 'soumettre', cancel: 'annuler', trash: 'supprimer ce bloc',
         confirmTrash: 'Retirer ce bloc\u00a0? La région reprend ce que le site montre par défaut.',
-        bold: 'gras (Ctrl+B)', italic: 'italique (Ctrl+I)', heading: 'titre', link: 'lien (Ctrl+K)',
-        bullets: 'liste à puces', numbers: 'liste numérotée', quote: 'citation', code: 'code',
         image: 'image ou PDF (ou collez-en, ou déposez-en un)', uploading: 'envoi de {name}…',
-        // what a formatting button writes when nothing is selected
-        boldText: 'gras', italicText: 'italique', linkText: 'texte', codeText: 'code',
         saving: 'enregistrement…',
         lockLost: 'verrou perdu : {message}',
         conflict: 'Ce bloc a changé pendant que vous le modifiiez',
@@ -103,6 +96,7 @@
         mediaTooLarge: 'plus de {max} octets', mediaType: 'ni une image ni un PDF',
         mediaFull: 'plus de place pour les médias', notAllowed: 'non autorisé : {permission}'
     } };
+    const STOCK = Object.fromEntries(Object.entries(OWN).map(([l, words]) => [l, Object.assign({}, markdown.stock[l], words)]));
 
     /** The stock language asked for, or the browser's first one that is stocked; English otherwise. */
     function pickLanguage(stock, asked) {
@@ -148,16 +142,9 @@
 
     // The editor's pictograms: one stroked path each on a 24px grid, in the text's colour — overridable
     // like the words (kroomAuthoring.icons), their stroke width a CSS variable (--kroom-icon-stroke).
-    const icons = Object.assign({
+    // The formatting toolbar's are markdown.js's.
+    const icons = Object.assign({}, markdown.icons, {
         edit: 'M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4',
-        bold: 'M7 5h5.5a3.5 3.5 0 0 1 0 7H7zM7 12h6.5a3.5 3.5 0 0 1 0 7H7z',
-        italic: 'M11 5h7M6 19h7M14.5 5l-5 14',
-        heading: 'M4 5v14M14 5v14M4 12h10M18 14l2-1.5V19',
-        link: 'M10 14a4 4 0 0 0 5.66 0l3.17-3.17a4 4 0 0 0-5.66-5.66L12 6.34M14 10a4 4 0 0 0-5.66 0l-3.17 3.17a4 4 0 0 0 5.66 5.66L12 17.66',
-        bullets: 'M5 6.5h.01M5 12h.01M5 17.5h.01M10 6.5h10M10 12h10M10 17.5h10',
-        numbers: 'M4 5.5l1.5-1V10M4 14.8a1.5 1.5 0 0 1 3 .2c0 1.3-3 2.4-3 4.5h3M11 7h9M11 12h9M11 17h9',
-        quote: 'M9.5 7C6.5 8 5 10 5 13v4h4.5v-4.5H5M19 7c-3 1-4.5 3-4.5 6v4H19v-4.5h-4.5',
-        code: 'M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14',
         image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
         submit: 'M4.5 12.5l4.5 4.5L19.5 6.5',
         cancel: 'M6 6l12 12M18 6L6 18',
@@ -252,16 +239,7 @@
         return btn;
     }
 
-    const SVG = 'http://www.w3.org/2000/svg';
-
-    function icon(name) {
-        const svg = document.createElementNS(SVG, 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        svg.setAttribute('class', 'kroom-icon');
-        svg.setAttribute('aria-hidden', 'true');
-        svg.appendChild(document.createElementNS(SVG, 'path')).setAttribute('d', icons[name]);
-        return svg;
-    }
+    const icon = (name) => markdown.icon(name, icons);
 
     /** A button showing a pictogram, named by the strings table for tooltips and screen readers. */
     function iconButton(name, className, onClick) {
@@ -356,8 +334,7 @@
         tabs.appendChild(button(t('markdown'), 'kroom-tab', () => tab('source'))).data('tab', 'source');
         tabs.appendChild(button(t('preview'), 'kroom-tab', () => tab('preview'))).data('tab', 'preview');
         tabs.appendChild(button(t('history'), 'kroom-tab', () => tab('history'))).data('tab', 'history');
-        const format = bar.appendChild(element('div', 'kroom-format'));
-        FORMATS.forEach(f => format.appendChild(iconButton(f.name, `kroom-format-${f.name}`, () => f.apply(session.textarea))));
+        bar.appendChild(markdown.toolbar(() => session?.textarea, { strings, icons, extra: [IMAGE] }));
         bar.appendChild(help(editor));
 
         const source = editor.appendChild(element('div', 'kroom-pane'));
@@ -472,80 +449,10 @@
         }
     }
 
-    // --- formatting ------------------------------------------------------------------------------
-
-    /**
-     * Replace [start, end) with [text], then select [selStart, selEnd) relative to [start]. Through
-     * execCommand when the browser still has it: that edit lands on the textarea's own undo stack.
-     */
-    function replace(textarea, start, end, text, selStart = text.length, selEnd = selStart) {
-        textarea.focus();
-        textarea.setSelectionRange(start, end);
-        let native = false;
-        try { native = document.execCommand('insertText', false, text); } catch (_) { /* gone */ }
-        if (!native) {
-            textarea.setRangeText(text, start, end);
-            typed();
-        }
-        textarea.setSelectionRange(start + selStart, start + selEnd);
-    }
-
-    /** `**bold**` around the selection, or off it when it already wears it. */
-    function wrap(textarea, mark, placeholder, close = mark) {
-        const { value, selectionStart: s, selectionEnd: e } = textarea;
-        if (value.slice(s - mark.length, s) === mark && value.slice(e, e + close.length) === close) {
-            return replace(textarea, s - mark.length, e + close.length, value.slice(s, e), 0, e - s);
-        }
-        const inner = value.slice(s, e) || placeholder;
-        replace(textarea, s, e, mark + inner + close, mark.length, mark.length + inner.length);
-    }
-
-    /** A prefix on every line the selection touches — or off them all, when they all have it. The selection stays on the text. */
-    function prefix(textarea, marker) {
-        const { value, selectionStart: s, selectionEnd: e } = textarea;
-        const start = s > 0 ? value.lastIndexOf('\n', s - 1) + 1 : 0;
-        const found = value.indexOf('\n', e > s && value[e - 1] === '\n' ? e - 1 : e);
-        const end = found < 0 ? value.length : found;
-        const lines = value.slice(start, end).split('\n');
-        const pattern = typeof marker === 'string' ? new RegExp('^' + marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) : marker.pattern;
-        const on = lines.every(line => pattern.test(line));
-        const text = lines.map((line, i) => on ? line.replace(pattern, '')
-            : (typeof marker === 'string' ? marker : marker.make(i)) + line).join('\n');
-        const first = text.split('\n')[0].length - lines[0].length;   // what the first line gained or lost
-        const selStart = Math.max(0, s - start + first);
-        replace(textarea, start, end, text, selStart, Math.max(selStart, e - start + text.length - (end - start)));
-    }
-
-    function link(textarea) {
-        const { value, selectionStart: s, selectionEnd: e } = textarea;
-        const selected = value.slice(s, e);
-        if (/^https?:\/\/\S+$/.test(selected)) {
-            const text = t('linkText');
-            return replace(textarea, s, e, `[${text}](${selected})`, 1, 1 + text.length);
-        }
-        const label = selected || t('linkText');
-        replace(textarea, s, e, `[${label}](https://)`, label.length + 3, label.length + 11);
-    }
-
-    function code(textarea) {
-        const { value, selectionStart: s, selectionEnd: e } = textarea;
-        if (value.slice(s, e).includes('\n')) wrap(textarea, '```\n', '', '\n```');
-        else wrap(textarea, '`', t('codeText'));
-    }
-
-    const FORMATS = [
-        { name: 'bold', key: 'b', apply: ta => wrap(ta, '**', t('boldText')) },
-        { name: 'italic', key: 'i', apply: ta => wrap(ta, '_', t('italicText')) },
-        { name: 'heading', apply: ta => prefix(ta, '## ') },
-        { name: 'link', key: 'k', apply: link },
-        { name: 'bullets', apply: ta => prefix(ta, '- ') },
-        { name: 'numbers', apply: ta => prefix(ta, { pattern: /^\d+\. /, make: i => `${i + 1}. ` }) },
-        { name: 'quote', apply: ta => prefix(ta, '> ') },
-        { name: 'code', apply: code },
-        { name: 'image', apply: pick }
-    ];
-
     // --- media: picked, pasted or dropped, uploaded, then written in where the caret is ----------------
+
+    // the toolbar's last button, after markdown.js's formats
+    const IMAGE = { name: 'image', apply: pick };
 
     const ACCEPTED = 'image/png,image/jpeg,image/gif,image/webp,image/avif,application/pdf';
 
@@ -575,7 +482,7 @@
         const label = file.name.replace(/\.[^.]*$/, '').replace(/[\[\]]/g, '');
         const text = answer.type.startsWith('image/') ? `![${label}](${answer.url})` : `[${label}](${answer.url})`;
         const { selectionStart: s, selectionEnd: e } = textarea;
-        replace(textarea, s, e, text);
+        markdown.replace(textarea, s, e, text);
     }
 
     function dropped(event) {
@@ -593,11 +500,7 @@
     }
 
     function shortcut(event) {
-        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
-        const format = FORMATS.find(f => f.key === event.key.toLowerCase());
-        if (!format) return;
-        event.preventDefault();
-        format.apply(session.textarea);
+        markdown.shortcut(event, session.textarea, [IMAGE], { strings });
     }
 
     async function submit() {
@@ -791,8 +694,8 @@
         closeCompletion();
         session.accepting = true;
         try {
-            if (call < 0 || key.endsWith('()')) replace(textarea, from, end, key);
-            else replace(textarea, from, end, key, call + 1, key.length - 1);
+            if (call < 0 || key.endsWith('()')) markdown.replace(textarea, from, end, key);
+            else markdown.replace(textarea, from, end, key, call + 1, key.length - 1);
         } finally {
             session.accepting = false;
         }

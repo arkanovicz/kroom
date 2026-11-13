@@ -23,28 +23,10 @@
     --kroom-diff-caption: #2a2f38;
 }
 
-/* --- pictograms: stroked, in the text's colour ------------------------------------------------- */
-
-/* 24px by default: the grid they are drawn on, one unit per pixel */
-.kroom-icon {
-    width: var(--kroom-icon-size, 1.5rem);
-    height: var(--kroom-icon-size, 1.5rem);
-    flex: none;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: var(--kroom-icon-stroke, 1.75);
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-/* bold says it by weight: a stroke heavier than the set's (whatever path draws it) */
-.kroom-format-bold .kroom-icon {
-    stroke-width: calc(var(--kroom-icon-stroke, 1.75) + 1);
-}
+/* the pictograms (.kroom-icon) and the formatting toolbar (.kroom-format) are markdown.css's */
 
 .kroom-block-tools button,
-.kroom-editor-tools button,
-.kroom-format button {
+.kroom-editor-tools button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -162,13 +144,14 @@ html:not(.kroom-busy) .kroom-block[data-api]:has(.kroom-block-tools:focus-within
     margin-bottom: .5rem;
 }
 
-.kroom-tabs,
-.kroom-format {
+.kroom-tabs {
     display: flex;
     gap: .125rem;
 }
 
-.kroom-editor-bar button {
+/* the toolbar's buttons dress themselves (markdown.css) */
+.kroom-tabs button,
+.kroom-editor-bar > button {
     width: auto;
     margin: 0;
     padding: .25rem .6rem;
@@ -190,19 +173,6 @@ html:not(.kroom-busy) .kroom-block[data-api]:has(.kroom-block-tools:focus-within
     opacity: 1;
     border-color: var(--pico-muted-border-color, #ddd);
     border-bottom-color: var(--pico-background-color, #fff);
-}
-
-.kroom-format {
-    margin-bottom: .25rem;
-}
-
-.kroom-format button {
-    padding: .25rem;
-}
-
-.kroom-format button:hover,
-.kroom-format button:focus-visible {
-    border-color: var(--pico-muted-border-color, #ddd);
 }
 
 

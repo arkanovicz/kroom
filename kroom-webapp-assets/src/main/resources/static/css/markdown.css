@@ -1,0 +1,47 @@
+/* markdown.css - the markdown toolbar (markdown.js) and the kroom pictograms. Part of kroom-webapp-assets, pico-compatible. */
+
+/* --- pictograms: stroked, in the text's colour ------------------------------------------------- */
+
+/* 24px by default: the grid they are drawn on, one unit per pixel */
+.kroom-icon {
+    width: var(--kroom-icon-size, 1.5rem);
+    height: var(--kroom-icon-size, 1.5rem);
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: var(--kroom-icon-stroke, 1.75);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* bold says it by weight: a stroke heavier than the set's (whatever path draws it) */
+.kroom-format-bold .kroom-icon {
+    stroke-width: calc(var(--kroom-icon-stroke, 1.75) + 1);
+}
+
+/* --- the toolbar: bare buttons, a border when pointed at ----------------------------------------- */
+
+.kroom-format {
+    display: flex;
+    gap: .125rem;
+    margin-bottom: .25rem;
+}
+
+.kroom-format button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    margin: 0;
+    padding: .25rem;
+    line-height: 1.4;
+    background: none;
+    border: 1px solid transparent;
+    color: inherit;
+    box-shadow: none;
+}
+
+.kroom-format button:hover,
+.kroom-format button:focus-visible {
+    border-color: var(--pico-muted-border-color, #ddd);
+}

@@ -12,6 +12,7 @@ import io.ktor.server.routing.*
  * - domhelper.js - lightweight jQuery-like DOM helper
  * - api.js - fetch wrapper for REST APIs
  * - store.js - minimal Redux-like state management
+ * - markdown.js, markdown.css - the markdown toolbar
  *
  * Usage:
  * ```kotlin
@@ -97,6 +98,12 @@ object KroomAssets {
 
     /** Script tag for sse.js */
     fun sseScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/sse.js?v=$VERSION"></script>"""
+
+    /** Script tag for markdown.js, the markdown toolbar (after domhelper.js) */
+    fun markdownScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/markdown.js?v=$VERSION"></script>"""
+
+    /** Stylesheet tag for markdown.css, the toolbar's and the pictograms' rules */
+    fun markdownStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/markdown.css?v=$VERSION">"""
 
     /** All core scripts in order (domhelper, api, store, sse) */
     fun coreScripts(prefix: String = "") = listOf(
