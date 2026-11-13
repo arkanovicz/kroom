@@ -114,6 +114,13 @@ All notable changes to kroom will be documented in this file.
   where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
 - Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
+#### velocity 3.0.0-BETA-20261113-01
+- Bumped. A module's compiled templates may live under a prefix (`resource.loader.stock.prefix`): `en/lines.html`
+  of a module prefixed `arkad` is the template `arkad/en/lines.html`, its registry
+  `velocity.templates.arkad.VelocityTemplates`, so several modules' pages share one engine
+  (`StockResourceLoader(a::resolve, b::resolve)` in a browser) and `#parse` each other's. Two modules' macros of
+  one name are refused. Nothing here takes a prefix yet; no test moved.
+
 #### velocity 3.0.0-BETA-20261112-01
 - Bumped. `HtmlDomSink` leaves in place the items that did not change order when one before them is gone: it
   moved every survivor after it, and a node moved loses the focus — a textarea being typed in, under an item
