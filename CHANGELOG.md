@@ -655,6 +655,13 @@ All notable changes to kroom will be documented in this file.
   its routes under `/api/rooms/scratchpad`, the tool, the stylesheet) and its `page` (the region and the browser's
   entry, bundled as `/js/scratchpad.js`, 134 KB gz) — apart because a compiled region publishes the settings it
   was built with, which a site's engine on the same classpath would take.
+- A bar over the text: the stock markdown toolbar (kroom-webapp-assets' `markdown.js`), acting on the part this
+  tab holds and dim while it holds none, its shortcuts in the textarea; and a preview, the text as html beside the
+  text (under it on a narrow screen), asked when it opens and a moment after each frame that moves the text while
+  it is open. Neither button takes the focus: looking is not leaving.
+- `$scratchpad.html()`: what the text says now, as html (`kroom-markdown-core`), for any page to show — the demo's
+  `/scratchpad/read`; `GET /api/scratchpad/html` is the same, what the preview asks. The room keeps the text as of
+  its last frame on the loop (`emitted`), so a page or a route reads it from anywhere.
 - The demo's container builds, then runs what it installed (`installDist && exec …/bin/…`), the host's Gradle home
   mounted read-write: nothing holds a Gradle lock while the site is up. The private project cache is gone.
 

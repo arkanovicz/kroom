@@ -12,6 +12,7 @@ java {
 
 dependencies {
     api(project(":kroom-webapp-authoring"))
+    implementation(project(":kroom-markdown-core"))     // the text as html: the preview, and what a page shows of it
 }
 
 // The page's bundle (the page module's js executable) ships under /js/ with the plugin's other static files
