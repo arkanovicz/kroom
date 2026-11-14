@@ -13,6 +13,7 @@ import io.ktor.server.routing.*
  * - api.js - fetch wrapper for REST APIs
  * - store.js - minimal Redux-like state management
  * - markdown.js, markdown.css - the markdown toolbar
+ * - text.css - the parts of a text written by several
  *
  * Usage:
  * ```kotlin
@@ -104,6 +105,9 @@ object KroomAssets {
 
     /** Stylesheet tag for markdown.css, the toolbar's and the pictograms' rules */
     fun markdownStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/markdown.css?v=$VERSION">"""
+
+    /** Stylesheet tag for text.css, the parts of a text written by several (an element of class kroom-text) */
+    fun textStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/text.css?v=$VERSION">"""
 
     /** All core scripts in order (domhelper, api, store, sse) */
     fun coreScripts(prefix: String = "") = listOf(

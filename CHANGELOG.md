@@ -657,12 +657,22 @@ All notable changes to kroom will be documented in this file.
   id, each root's triggers posting to its own room, presence reported to each. Roots must not nest; the `kroom`
   JS facade holds one room.
 
+#### kroom-client-text, kroom-webapp-assets — a text's region and stylesheet, for any application
+- `kroom-client-text` (new, for the browser alone): the text's region compiled under velocity's prefix `kroom` —
+  `kroom/text.html`, registry `velocity.templates.kroom.VelocityTemplates` — so an application gives its engine
+  kroom's registry beside its own (`StockResourceLoader(mine::resolve, kroom::resolve)`) and either writes in it
+  (`room.write("kroom/text.html", root)`) or `#parse("kroom/text.html")` from a region of its own handed to
+  `room.write`. Built with `compat.informal_navigation`: whoever shares an engine with it builds with the same
+  settings. Apart from kroom-client, which has a JVM target: compiled templates publish their build settings to
+  every engine on a JVM classpath.
+- kroom-webapp-assets: `/css/kroom/text.css` (`KroomAssets.textStyle()`), the parts under an element of class
+  `kroom-text` — what was the scratchpad's own, no authoring needed.
+
 #### kroom-plugin-scratchpad — a text written by several, to try in a page
 - An authoring plugin, unpublished, in the demo at `/scratchpad`: `$scratchpad.show()` is the place of one text
   for the site, kept in memory; whoever is logged in writes, a visitor watches. Two modules: the plugin (the room,
-  its routes under `/api/rooms/scratchpad`, the tool, the stylesheet) and its `page` (the region and the browser's
-  entry, bundled as `/js/scratchpad.js`, 134 KB gz) — apart because a compiled region publishes the settings it
-  was built with, which a site's engine on the same classpath would take.
+  its routes under `/api/rooms/scratchpad`, the tool, the stylesheet of what is around the text) and its `page`
+  (the browser's entry over kroom-client-text's region, bundled as `/js/scratchpad.js`, 136 KB gz).
 - A bar over the text: the stock markdown toolbar (kroom-webapp-assets' `markdown.js`), acting on the part this
   tab holds and dim while it holds none, its shortcuts in the textarea; and a preview, the text as html beside the
   text (under it on a narrow screen), asked when it opens and a moment after each frame that moves the text while

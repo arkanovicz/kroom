@@ -13,7 +13,7 @@ import org.apache.velocity.engine.resource.StockResourceLoader
 import org.w3c.dom.Element
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.Node
-import velocity.templates.VelocityTemplates
+import velocity.templates.kroom.VelocityTemplates
 
 /**
  * The scratchpad's page: the text's fold is [TextState], the class the server runs; its region is written in through
@@ -23,7 +23,7 @@ import velocity.templates.VelocityTemplates
 fun main() {
     val root = document.getElementById("kroom-scratchpad") ?: return
     val room = Room(root.getAttribute("data-room") ?: "scratchpad", TextState(), TextEvents(), engine)
-    room.write("scratchpad/text.html", root)
+    room.write("kroom/text.html", root)
 
     val frame = root.closest(".kroom-scratchpad-frame")
     val held = { root.querySelector("textarea[data-kroom-part]") }
@@ -74,5 +74,5 @@ private class Preview(private val frame: Element) {
     }
 }
 
-/** The region, compiled at build: an engine without an interpreter, so no parser ships. */
+/** The region is kroom-client-text's, compiled: an engine without an interpreter, so no parser ships. */
 private val engine = VelocityEngine(null, Config(informalNavigation = true)).apply { addResourceLoader("stock", StockResourceLoader(VelocityTemplates::resolve)) }

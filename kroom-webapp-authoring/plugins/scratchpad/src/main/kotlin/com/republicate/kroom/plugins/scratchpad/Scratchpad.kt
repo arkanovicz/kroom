@@ -74,7 +74,7 @@ class Scratchpad(text: String = "") : Plugin {
                 """<section class="kroom-scratchpad-frame">""" +
                     """<nav class="kroom-scratchpad-bar"><button type="button" class="kroom-scratchpad-preview-toggle outline secondary" aria-pressed="false">Preview</button></nav>""" +
                     """<div class="kroom-scratchpad-panes">""" +
-                    """<div id="kroom-scratchpad" class="kroom-scratchpad" data-room="$ROOM"></div>""" +
+                    """<div id="kroom-scratchpad" class="kroom-scratchpad kroom-text" data-room="$ROOM"></div>""" +
                     """<article class="kroom-scratchpad-preview" hidden></article>""" +
                     """</div></section>""" +
                     """<div id="messages" hidden><span data-kroom-msg="take:spectator">Log in to write.</span></div>"""
@@ -90,6 +90,7 @@ class Scratchpad(text: String = "") : Plugin {
         val SHOWN = AttributeKey<Boolean>("kroom.scratchpad.shown")
         val TAGS = listOf(
             KroomAssets.markdownStyle(),
+            KroomAssets.textStyle(),
             """<link rel="stylesheet" href="/css/scratchpad.css?v=${AuthoringAssets.VERSION}">""",
             KroomAssets.markdownScript(),
             """<script src="/js/scratchpad.js?v=${AuthoringAssets.VERSION}"></script>"""

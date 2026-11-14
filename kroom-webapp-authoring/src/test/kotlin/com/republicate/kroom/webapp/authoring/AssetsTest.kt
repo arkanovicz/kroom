@@ -1,5 +1,6 @@
 package com.republicate.kroom.webapp.authoring
 
+import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.assets.kroomAssets
 import com.republicate.kroom.webapp.core.installCore
 import io.ktor.client.request.*
@@ -42,6 +43,13 @@ class AssetsTest {
             assertEquals(expected.contentSubtype, response.contentType()?.contentSubtype, path)
             assertTrue(response.bodyAsText().isNotEmpty(), path)
         }
+
+        // not the editor's: the stock rules of a text written by several, served beside the toolbar's
+        assertTrue(KroomAssets.textStyle().contains("/css/kroom/text.css?v="), KroomAssets.textStyle())
+        val text = client.get("/css/kroom/text.css?v=${KroomAssets.VERSION}")
+        assertEquals(HttpStatusCode.OK, text.status, "/css/kroom/text.css")
+        assertEquals(ContentType.Text.CSS.contentSubtype, text.contentType()?.contentSubtype, "/css/kroom/text.css")
+        assertTrue(text.bodyAsText().contains(".kroom-text"), "/css/kroom/text.css")
     }
 
     @Test

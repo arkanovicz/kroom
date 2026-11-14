@@ -7,6 +7,7 @@ Kotlin multiplatform library for real-time collaborative applications using Serv
 ```
 kroom-common          the common declaration of a room: State, events, RoomEvents, Logic (KMP)
 kroom-client          a page on a room: the stream folded into the State, its regions merged into the DOM by the engine's sink after every frame (KMP jvm+js)
+kroom-client-text     a text written by several, its region: kroom/text.html, compiled under the prefix kroom (KMP js)
 kroom-view            client-side SSE handling (JS/Wasm)
 kroom-server          rooms on the JVM: the loop, presence, roles, Route.room / rooms (stream, intents, catalog)
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
@@ -387,6 +388,7 @@ Shared client-side libraries for Ktor webapps:
 | `intents.js` | `[data-intent]` triggers, busy until the verdict (the reply) |
 | `store.js` | Minimal Redux-like state management |
 | `markdown.js` | The markdown toolbar (+ `markdown.css`): `kroomMarkdown.toolbar(textarea)`, `shortcut(e, textarea)` |
+| `text.css` | The parts of a text written by several, under an element of class `kroom-text`: `KroomAssets.textStyle()` |
 
 A page on a room built with kroom-client needs only `domhelper.js` and `api.js` (the tab id, the POST): the
 stream, the intents and the State are the bundle's. `sse.js`, `intents.js` and `store.js` serve plain-JS pages.
@@ -1138,15 +1140,27 @@ page that remembers more:
 #elseif($part.free)
 <p data-kroom-intent="take" data-kroom-ids="$part.id">$part.text</p>
 #else
-<p data-kroom-intent="take" data-kroom-ids="$part.id" title="$page.holder($part)">$part.head<i></i>$part.tail</p>
+<p class="held" data-kroom-intent="take" data-kroom-ids="$part.id" data-holder="$page.holder($part)">$part.head<i></i>$part.tail</p>
 #end
 #end
 ```
 
 A click on a part someone holds is refused on the page by the check, without a POST, and shown like any refusal.
-The region is its own module's to compile, for the browser alone: compiled templates publish the settings they
-were built with, and a site's engine sharing their classpath would take them (`kroom-plugin-scratchpad` and its
-`page` module, in the authoring demo at `/scratchpad`, are the worked example).
+That region is `kroom/text.html`, kroom-client-text's, compiled under velocity's prefix `kroom` for the browser
+alone; its parts are styled by kroom-webapp-assets' `text.css` under an element of class `kroom-text`. A page gives
+its engine kroom's registry beside its own and writes in the region, or parses it from a region of its own:
+
+```kotlin
+val engine = VelocityEngine(null, Config(informalNavigation = true)).apply {
+    addResourceLoader("stock", StockResourceLoader(velocity.templates.mine.VelocityTemplates::resolve, velocity.templates.kroom.VelocityTemplates::resolve))
+}
+room.write("kroom/text.html", root)          // or room.write("mine/proposal.html", root), which says #parse("kroom/text.html")
+```
+
+Modules sharing an engine are built with the same settings (`compat.informal_navigation` here). The region is not
+in kroom-client, which has a JVM target: compiled templates publish the settings they were built with, and every
+engine on a JVM classpath takes them (`kroom-plugin-scratchpad`, in the authoring demo at `/scratchpad`, is the
+worked example).
 `state.text` is the text the parts make, `TextState(text)` the state a room is rebuilt from when a store kept that
 text. The room stores nothing — override `persist(event)` for that.
 
