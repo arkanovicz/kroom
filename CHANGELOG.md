@@ -1028,6 +1028,15 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-core, kroom-server — a stream its client closed is no error
+- `installCore`'s catch-all took what ktor answers by itself: since `cancelCallOnClose`, every stream a browser closed
+  was logged `ERROR Unhandled exception` with the cancellation's trace, and a `BadRequestException` (a
+  `call.receive<T>()`, a `getOrFail`) answered 500. It now leaves ktor a cancelled call (its line, at debug) and every
+  exception it has a status for (400, 404, 413, 415, 504). Pinned in `InternalErrorTest`, the closed call over a real
+  Netty socket.
+- `room(…)`'s stream logs its one line (`Stream of '…' closed by the client in room '…'`) when the close cancels
+  the call too, not only when a write fails.
+
 #### kroom-webapp-assets, kroom-webapp-authoring — a snapshot's scripts were the browser's for an hour
 - `KroomAssets.VERSION` (and `AuthoringAssets.VERSION`, `$site.version`) of a `-SNAPSHOT` build also says when the
   run started: its files change from one run to the next under one version, and `?v=…-SNAPSHOT` with

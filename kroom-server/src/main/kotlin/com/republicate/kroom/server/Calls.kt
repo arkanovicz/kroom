@@ -11,6 +11,8 @@ import io.ktor.server.sse.*
 import io.ktor.http.*
 import com.republicate.kson.Json
 import io.ktor.utils.io.ClosedByteChannelException
+import io.ktor.utils.io.ConnectionClosedException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.consumeAsFlow
 import org.slf4j.LoggerFactory
@@ -57,8 +59,11 @@ private fun Route.serve(base: String, resolve: suspend (ApplicationCall) -> Room
                 // the body is written after respond returns: the stream's own end — a write failed, the call cancelled — is the leave
                 call.respond(SSEServerContent(call) {
                     heartbeat { period = 15.seconds }
+                    // a tab gone, seen at a write or as the call cancelled: one line, no trace
+                    fun gone() = logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id)
                     try { actor.channel?.consumeAsFlow()?.collect { send(it) } }
-                    catch (e: ClosedByteChannelException) { logger.info("Stream of '{}' closed by the client in room '{}'", actor.connectionId, room.id) }   // a tab gone: no trace
+                    catch (e: ClosedByteChannelException) { gone() }
+                    catch (e: CancellationException) { if (generateSequence<Throwable>(e) { it.cause }.any { it is ConnectionClosedException }) gone(); throw e }
                     finally { room.leave(actor) }
                 })
             } catch (e: Throwable) { room.leave(actor); throw e }   // gone before the stream started

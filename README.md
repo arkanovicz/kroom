@@ -317,7 +317,8 @@ A stream the client closes (a tab gone, `EventSource.close()`, a proxy's `RST_ST
 once: `room(…)` installs ktor's `HttpRequestLifecycle` (`cancelCallOnClose`) on the stream route alone,
 so the handler is cancelled, the room's `leave` runs and the graces count from the close — on Netty and
 CIO; the other engines only fail at the next write. Nothing else is cancelled: an app's other calls
-finish whether or not the client still waits. Note ktor logs no `CallLogging` line for a cancelled call.
+finish whether or not the client still waits. Note ktor logs no `CallLogging` line for a cancelled call:
+the room's logger (`kroom.room`) says it, one line at info, `Stream of '…' closed by the client in room '…'`.
 
 SSE connections can also die silently — browser killed, network dropped without TCP FIN. Ktor's SSE
 heartbeat periodically writes a comment line to the socket; the write fails on a dead connection,
@@ -360,6 +361,10 @@ installCore {
     }
 }
 ```
+
+An exception nobody caught is logged (`Unhandled exception`, with its trace) and answered 500 with a fixed
+body. Two kinds are left to ktor, and are no error: a call its client left (a cancellation, ktor's line at
+debug) and an exception ktor has a status for (`BadRequestException` 400, `NotFoundException` 404, 413, 415, 504).
 
 ### Static Routes
 
