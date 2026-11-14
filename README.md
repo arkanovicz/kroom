@@ -1107,11 +1107,26 @@ refused like anyone); the others see its text follow each write, the holder's ma
 pasted over is a `take` of every part, refused while anyone holds one. What a client held is released when its
 leave is heard, after the room's graces: a reload keeps its part, a tab closed gives it back.
 
+Who may write is the room's to say, in its own take: a subclass of `Take` whose check reads the room's State, run
+after the text's, in the browser before the post and on the loop. A text that closes gives back what is held: its
+logic emits a `Release` per part, as `TextLogic` does when a tab leaves.
+
+```kotlin
+class Draft(json: Json.MutableObject = Json.MutableObject()) : Take(json) {
+    init { check { state: Proposal, actor -> if (state.closed) Reason("closed") else if (actor.id !in state.editors) Reason("not_editor") else null } }
+}
+object ProposalEvents : TextEvents(::Draft) { val close = intent(::Close) }
+object ProposalLogic : TextLogic<Proposal>(ProposalEvents) {
+    init { on(ProposalEvents.close) { state, _, _ -> Emit(state.parts.filter { !it.free }.map { Release(it.id) }) } }
+}
+```
+
 In the browser (kroom-client), `room.write(template, root)` is the region and its `Writer`: the textarea of the part
 held posts `write` as it is typed, a line left blank then more posts `take {after}` (what is typed while the part
 is on its way goes into its textarea when it comes), leaving the textarea or five seconds without touching it
 posts `release`. A tab says one thing at a time, in the order it did them: a click on another part waits for the
-reply to the last `write`. `TextPage` is the page memory (`$page.mine($part)`, `$page.holder($part)`):
+reply to the last `write`. `TextPage` is the page memory (`$page.mine($part)`, `$page.holder($part)`), open for a
+page that remembers more:
 
 ```html
 ##@ state: com.republicate.kroom.event.TextState
@@ -1134,6 +1149,11 @@ were built with, and a site's engine sharing their classpath would take them (`k
 `page` module, in the authoring demo at `/scratchpad`, are the worked example).
 `state.text` is the text the parts make, `TextState(text)` the state a room is rebuilt from when a store kept that
 text. The room stores nothing — override `persist(event)` for that.
+
+A text shares its page with another room (a proposal over its discussion): each `Room` has its stream, under the
+one tab id, and its regions' triggers post to it. Their roots must not nest — a region owns what is under its root,
+and a click is heard by every root above it; presence is each room's (`report()` on both); the `kroom` JS facade
+holds one room.
 
 ## Images
 

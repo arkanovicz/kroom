@@ -321,6 +321,47 @@ class TextTest {
         assertEquals(emptyList(), (logic.decide(s, b, Leave()) as Emit<*>).events)
     }
 
+    // a room with more: a text only its editors write, until it closes
+    private class Closing(json: Json.MutableObject = Json.MutableObject()) : TextState(json) {
+        var editors by array()
+            private set
+        var closed by bool()
+            private set
+        constructor(text: String, vararg editors: String) : this(TextState(text).json) { this.editors = Json.MutableArray(editors.toList()) }
+        override fun reduce(event: Event) { super.reduce(event); if (event is Close) closed = true }
+    }
+    private class Draft(json: Json.MutableObject = Json.MutableObject()) : Take(json) {
+        init { check { state: Closing, actor -> if (state.closed == true) Reason("closed") else if (state.editors?.contains(actor.id) != true) Reason("not_editor") else null } }
+    }
+    private class Close(json: Json.MutableObject = Json.MutableObject()) : Event("close", json = json)
+    private object ClosingEvents : TextEvents(::Draft) { val close = intent(::Close) }
+    private object ClosingLogic : TextLogic<Closing>(ClosingEvents) {
+        init { on(ClosingEvents.close) { state, _, _ -> Emit(state.parts.filter { !it.free }.map { Release(it.id) }) } }
+    }
+
+    @Test fun `a room's own take says who may write, a text that closes gives back what was held`() {
+        val s = Closing("A\n\nB", "a")
+        fun act(actor: Actor, name: String, json: Json.MutableObject = Json.MutableObject()): Reason? {
+            val event = ClosingEvents.of(name, json)!!
+            event.check(s, actor)?.let { return it }
+            val out = ClosingLogic.decide(s, actor, event)
+            if (out is Reason) return out
+            s.reduce(event)
+            (out as Emit<*>).events.forEach { s.reduce(it) }
+            return null
+        }
+        fun take(id: String) = Json.MutableObject("ids" to Json.MutableArray(listOf(id)))
+        assertEquals("not_editor", act(b, "take", take("1")).toString())
+        assertNull(act(a1, "take", take("1")))                                     // the entry builds the room's take: its check ran, the text's fold took it
+        assertEquals("held {\"id\":\"1\",\"by\":\"a\"}", act(b, "take", take("1")).toString())   // the text's check first
+        assertNull(act(a1, "write", Json.MutableObject("id" to "1", "text" to "A\n\nA2")))
+        assertNull(act(b, "close"))                                                // someone else closes: the part is given back, cut, by the logic
+        assertEquals(listOf(null, null, null), holders(s))
+        assertEquals(listOf("A", "A2", "B"), texts(s))
+        assertEquals("closed", act(a1, "take", take("1")).toString())
+        assertEquals("not_held {\"id\":\"1\"}", act(a1, "write", Json.MutableObject("id" to "1", "text" to "late")).toString())
+    }
+
     @Test fun `a write marks its part, a release that cuts the part and the born ones`() {
         val s = TextState("A\n\nB\n\nC")
         s.act(a1, take("2"))

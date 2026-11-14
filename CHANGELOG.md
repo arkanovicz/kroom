@@ -648,6 +648,14 @@ All notable changes to kroom will be documented in this file.
   text's intents leave one after the other, the region's triggers in the same turn) — and `TextPage`, the page
   memory (`mine(part)`, `holder(part)`). `Room.attach(template, root, post)`: a region's triggers may post through
   a turn of its own.
+- Who may write is a room's to say: `Take` is open and `TextEvents(take = ::Take)` takes a room's own, a subclass
+  whose check reads the room's State (its editors, a text closed) — run after the text's, in the browser before
+  the post and on the loop. A text that closes emits a `Release` for each part still held, as the leave does: what
+  a logic emits is not checked again. `TextPage` is open, for a page memory with more. Pinned in `TextTest`,
+  `TextRoomTest`.
+- Two rooms on one page (a text over a chat) pinned in kroom-client's `TwoRoomsTest`: a stream each under one tab
+  id, each root's triggers posting to its own room, presence reported to each. Roots must not nest; the `kroom`
+  JS facade holds one room.
 
 #### kroom-plugin-scratchpad — a text written by several, to try in a page
 - An authoring plugin, unpublished, in the demo at `/scratchpad`: `$scratchpad.show()` is the place of one text

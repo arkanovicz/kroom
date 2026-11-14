@@ -139,9 +139,10 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
  * A client goes there, to write: the parts [ids] as one (free, next to each other, in the text's order), or a part
  * born after [after] (a paragraph begun). What it held before is given back by the same frame: going from one
  * paragraph to the next is one step. The page waits for the frame: it is the take, folded, that gives it something
- * to write in.
+ * to write in. Who may write is a room's to say: its own take, a subclass, adds a check on its State (the editors,
+ * a text closed), run after this one, in the browser before the post and on the loop.
  */
-class Take(json: Json.MutableObject = Json.MutableObject()) : Event("take", json = json) {
+open class Take(json: Json.MutableObject = Json.MutableObject()) : Event("take", json = json) {
     val ids by array()
     val after by string()
     var user by string().out
@@ -178,16 +179,17 @@ class Release(json: Json.MutableObject = Json.MutableObject()) : Event("release"
     init { check { state: TextState, actor -> held(state, actor, id) } }
 }
 
-/** A text's alphabet: `take`, `write`, `release`, beside kroom's. A room with more extends it. */
-open class TextEvents : RoomEvents() {
-    val take = intent(::Take)
+/** A text's alphabet: `take` (over [take], a room's own when it says who may write), `write`, `release`, beside kroom's. A room with more extends it. */
+open class TextEvents(take: (Json.MutableObject) -> Take = ::Take) : RoomEvents() {
+    val take = intent(take)
     val write = intent(::Write)
     val release = intent(::Release)
 }
 
 /**
  * A take is signed; what a client still held is released when its leave is heard (every connection's: a tab closed
- * beside another gives back its own). The rest is the fold's. A room with more extends it.
+ * beside another gives back its own). The rest is the fold's. A room with more extends it: a text that closes
+ * emits a [Release] for each part still held, as the leave does.
  */
 open class TextLogic<S : TextState>(events: TextEvents = TextEvents()) : Logic<S>(events) {
     init {

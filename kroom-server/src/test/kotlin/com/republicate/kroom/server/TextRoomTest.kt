@@ -1,8 +1,11 @@
 package com.republicate.kroom.server
 
+import com.republicate.kroom.event.Emit
+import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.Release
 import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.Take
+import com.republicate.kroom.event.TextEvents
 import com.republicate.kroom.event.TextLogic
 import com.republicate.kroom.event.TextState
 import com.republicate.kroom.event.Write
@@ -175,5 +178,36 @@ class TextRoomTest {
         assertFalse(room.text.parts["1"]!!.free)                           // not yet
         assertEquals("release", watch.next().event)                        // gone for good: after the grace
         assertTrue(room.text.parts["1"]!!.free)
+    }
+
+    // a room with more: only its editor takes, and the text closes
+    private class Closing(text: String) : TextState(TextState(text).json) {
+        var closed by bool()
+            private set
+        override fun reduce(event: com.republicate.kroom.event.Event) { super.reduce(event); if (event is Close) closed = true }
+    }
+    private class Draft(json: Json.MutableObject = Json.MutableObject()) : Take(json) {
+        init { check { state: Closing, actor -> if (state.closed == true) Reason("closed") else if (actor.id != "alice") Reason("not_editor") else null } }
+    }
+    private class Close(json: Json.MutableObject = Json.MutableObject()) : com.republicate.kroom.event.Event("close", json = json)
+    private object ClosingEvents : TextEvents(::Draft) { val close = intent(::Close) }
+    private object ClosingLogic : TextLogic<Closing>(ClosingEvents) {
+        init { on(ClosingEvents.close) { state, _, _ -> Emit(state.parts.filter { !it.free }.map { Release(it.id) }) } }
+    }
+
+    @Test fun `a room's own take is checked at the door of the loop, a release its logic emits frees a part another holds`() = runBlocking {
+        val room = object : LogicRoom<Closing>("text-${n++}", Closing("One."), ClosingLogic) { override fun shouldCloseWhenEmpty() = false }
+        val alice = actor(user("alice"), "t1")
+        val bob = actor(user("bob"), "t1")
+        val ca = room.join(alice).also { it.state() }
+        room.join(bob).state()
+        fun take() = ClosingEvents.of("take", Json.MutableObject("ids" to Json.MutableArray(listOf("1"))))!!
+        assertEquals("not_editor", room.act(bob, take()).await().meta.reason)
+        assertNotEquals(Stage.REJECTED, room.act(alice, take()).await().stage)
+        ca.drain()
+        assertNotEquals(Stage.REJECTED, room.act(bob, ClosingEvents.of("close")!!).await().stage)   // bob closes: alice's part is given back
+        assertEquals(listOf("close", "release"), listOf(ca.next().event, ca.next().event))
+        assertTrue(room.state.parts["1"]!!.free)
+        assertEquals("closed", room.act(alice, take()).await().meta.reason)
     }
 }
