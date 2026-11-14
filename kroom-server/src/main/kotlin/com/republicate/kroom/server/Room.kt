@@ -175,8 +175,9 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         processingJob = scope.launch {
             logger.info("Room '$id' started")
             while (isActive) {
+                val op = queue.receiveCatching().getOrNull() ?: break   // stopped: the queue is closed
                 try {
-                    process(queue.receive())
+                    process(op)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

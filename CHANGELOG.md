@@ -1036,6 +1036,8 @@ All notable changes to kroom will be documented in this file.
   Netty socket.
 - `room(…)`'s stream logs its one line (`Stream of '…' closed by the client in room '…'`) when the close cancels
   the call too, not only when a write fails.
+- A room stopped from outside its loop (`room.stop()` at shutdown, in a test) no longer logs `ERROR Error in room '…'`
+  with a `ClosedReceiveChannelException`: the loop ends on its closed queue.
 
 #### kroom-webapp-assets, kroom-webapp-authoring — a snapshot's scripts were the browser's for an hour
 - `KroomAssets.VERSION` (and `AuthoringAssets.VERSION`, `$site.version`) of a `-SNAPSHOT` build also says when the
