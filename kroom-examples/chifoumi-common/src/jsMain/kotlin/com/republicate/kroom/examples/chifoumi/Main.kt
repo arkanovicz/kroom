@@ -3,6 +3,9 @@ package com.republicate.kroom.examples.chifoumi
 import com.republicate.kroom.client.Room
 import com.republicate.kroom.client.attach
 import com.republicate.kroom.client.kroom
+import com.republicate.kroom.client.localeOf
+import com.republicate.kroom.client.localized
+import com.republicate.kroom.client.pageLanguage
 import com.republicate.kroom.client.say
 import com.republicate.kroom.examples.chifoumi.game.LobbyEvents
 import com.republicate.kroom.examples.chifoumi.game.LobbyState
@@ -21,12 +24,12 @@ import kotlin.js.Date
  */
 fun main() {
     val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
-    val lang = document.documentElement?.getAttribute("lang") ?: "en"
-    fun region(id: String, template: String) = document.getElementById(id)?.let { room.attach("$lang/$template", it) }
+    val lang = pageLanguage()
+    fun region(id: String, template: String) = document.getElementById(id)?.let { room.attach(engine.localized(lang) { "$it/$template" }, it) }
     val say: Say = { key, vars -> say(key, vars) }
 
     if (document.getElementById("lobby-section") != null) {
-        val page = LobbyPage(room, say) { Date().toLocaleTimeString() }
+        val page = LobbyPage(room, say) { Date().toLocaleTimeString(localeOf(lang)) }
         room.page = page
         region("online-num", "online.html")
         region("lobby-section", "lobby.html")

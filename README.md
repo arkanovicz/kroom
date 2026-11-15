@@ -254,6 +254,11 @@ fun main() {
 }
 ```
 
+- **In the page's language**: a region compiled per language is named through the engine,
+  `room.attach(engine.localized(pageLanguage()) { "$it/lobby.html" }, …)`: the page's language (`<html lang>`),
+  else its primary tag (`fr` for `fr-BE`), else English — a page in a language its regions were not compiled for
+  still has them. Dates are written in `localeOf(lang)`: plain `en` is `en-150`, English as Europe writes it (day
+  first, 24 h), never the US's.
 - **One path down**: each frame is folded into the State by the same `reduce`, then into the page
   memory, then every region is merged again; the engine's DOM sink touches only what differs (a
   value's text node, a dynamic tag's attributes, an item added, moved or removed by its key).

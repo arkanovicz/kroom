@@ -620,6 +620,15 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-client — a region in a language the engine lacks
+- `VelocityEngine.localized(lang) { "$it/lobby.html" }` names a region in the page's language as far as the engine
+  holds it: `lang`, else its primary tag (`fr` for `fr-BE`), else English (`fallback`). A page whose language its
+  regions were not compiled for no longer throws at `attach` (`template "fr/lobby.html" not found`): a server's
+  languages and a client library's are not the same build.
+- `pageLanguage()` (js): `<html lang>`, English when it says nothing. `localeOf(lang)`: the locale dates are
+  written in — plain `en` is `en-150`, day first and 24 h, never the US's; a region the page names is kept.
+- chifoumi's regions and its chat's times go through them. Pinned in `LanguageTest`.
+
 #### kroom-webapp-assets, kroom-webapp-authoring — the markdown toolbar, shared
 - `markdown.js` / `markdown.css` (`/js/kroom/`, `/css/kroom/`; `KroomAssets.markdownScript()` /
   `markdownStyle()`, not in `coreScripts()`): `window.kroomMarkdown` — `toolbar(target, {strings, icons, extra,
