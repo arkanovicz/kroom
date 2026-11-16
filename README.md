@@ -31,6 +31,7 @@ kroom-webapp-authoring-demo  the authoring stack as a thing you can click (kroom
 kroom-webapp-l10n: a library ships its catalog as po files at a path of its own in its jar (never the application's
 `/i18n`), loaded with `application.addCatalog("/<lib>/i18n")` after the application's `installL10n`; the
 application's entries win.
+`call.language = "fr"` pins a request's language (a configured one), whatever the session or the URL says.
 
 ## Features
 

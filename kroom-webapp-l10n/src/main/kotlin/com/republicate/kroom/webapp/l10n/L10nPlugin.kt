@@ -83,7 +83,12 @@ private val LanguageKey = AttributeKey<String>("Language")
 val Application.l10nConfig: L10nConfig
     get() = attributes[L10nConfigKey]
 
-val ApplicationCall.language: String
+/** A request's language; set, it pins one of the configured languages whatever the session or the URL says. */
+var ApplicationCall.language: String
+    set(value) {
+        require(value in application.l10nConfig.languages) { "language '$value' is not configured" }
+        attributes.put(LanguageKey, value)
+    }
     get() {
         attributes.getOrNull(LanguageKey)?.let { return it }
         val config = application.l10nConfig

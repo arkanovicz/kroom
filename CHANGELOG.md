@@ -637,6 +637,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-l10n — a request's language pinned by the host
+- `ApplicationCall.language` is settable: `call.language = "fr"` pins the request's language, whatever the session
+  or the URL says; `$lang` and `$jsTranslations` follow. A language that is not configured is refused
+  (`IllegalArgumentException`). Pinned in `PinnedLanguageTest`.
+
 #### kroom-webapp-l10n — a language's catalog adds up across po files
 - `PoTranslationSource.loadBundle(lang, path)` adds the file's entries to the language's catalog instead of
   replacing it; for a msgid two files hold, the first loaded wins. A missing file adds nothing.
