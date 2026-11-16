@@ -32,6 +32,8 @@ kroom-webapp-l10n: a library ships its catalog as po files at a path of its own 
 `/i18n`), loaded with `application.addCatalog("/<lib>/i18n")` after the application's `installL10n`; the
 application's entries win.
 `call.language = "fr"` pins a request's language (a configured one), whatever the session or the URL says.
+A page hands its scripts the catalog in one line, `<script>window.i18n = $jsTranslations;</script>` (an object:
+velocity writes a map as a literal there), before the scripts that call `t()` (`i18n.js`, kroom-webapp-assets).
 
 ## Features
 

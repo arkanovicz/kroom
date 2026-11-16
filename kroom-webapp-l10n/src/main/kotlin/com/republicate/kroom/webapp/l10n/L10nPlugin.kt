@@ -117,11 +117,12 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
     velocityOrNull?.let { v ->
         v.registerRequest("lang") { it.language }
         v.registerRequest("languages") { it.application.l10nConfig.languages }
+        // the catalog itself: an object literal in a script, its json text anywhere else
         v.registerRequest("jsTranslations") { call ->
             val translations = call.application.l10nConfig.translationSource.getAllTranslations(call.language)
             com.republicate.kson.Json.MutableObject().apply {
                 translations.forEach { (en, translated) -> set(en, translated) }
-            }.toString()
+            }
         }
         // Route.pages() renders content pages translated when l10n is present.
         v.pageRenderer = { respondVelocityTranslated(it) }

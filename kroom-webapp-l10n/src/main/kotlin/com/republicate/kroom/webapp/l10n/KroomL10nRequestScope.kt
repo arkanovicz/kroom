@@ -10,12 +10,13 @@ package com.republicate.kroom.webapp.l10n
  * class MyRequestScope(
  *     override val lang: String,
  *     override val languages: Map<String, String>,
- *     override val jsTranslations: String,
+ *     override val jsTranslations: Map<String, Any?>,
  * ) : KroomL10nRequestScope
  * ```
  */
 interface KroomL10nRequestScope {
     val lang: String
     val languages: Map<String, String>
-    val jsTranslations: String
+    /** The request language's catalog, msgid to translation: `window.i18n = $jsTranslations;` in a page's script. */
+    val jsTranslations: Map<String, Any?>
 }

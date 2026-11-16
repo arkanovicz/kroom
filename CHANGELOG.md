@@ -121,6 +121,13 @@ All notable changes to kroom will be documented in this file.
   string in it escaped for the position; it was its quoted `toString()`. A string stays a string: a json text
   held as a `String` still arrives quoted. No test moved.
 
+#### kroom-webapp-l10n — `$jsTranslations` is the catalog, not its text
+- `$jsTranslations` answers the request language's catalog itself (a kson object) where it answered its json
+  text: in a page's script `window.i18n = $jsTranslations;` is an object, nothing to parse and nothing a
+  translation holds can end the script (under the escaper `installVelocity` names, the text arrived as a quoted
+  string). In an attribute or in text it is still the json text, escaped there. **Breaking** for a typed request
+  scope: `KroomL10nRequestScope.jsTranslations` is a `Map<String, Any?>`. Pinned in `JsTranslationsTest`.
+
 #### velocity 3.0.0-BETA-20261116-02
 - Bumped. One `#parse`, its target literal or computed: the interpreter no longer splices a literal one into its
   parent's tree, the child is resolved at render either way. So a page translated at run time (`Translator`) no
