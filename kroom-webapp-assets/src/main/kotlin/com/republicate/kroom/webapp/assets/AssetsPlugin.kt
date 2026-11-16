@@ -13,6 +13,7 @@ import io.ktor.server.routing.*
  * - api.js - fetch wrapper for REST APIs
  * - store.js - minimal Redux-like state management
  * - markdown.js, markdown.css - the markdown toolbar
+ * - i18n.js - `t(en, vars)`, a hand-written script's text translated
  * - text.css - the parts of a text written by several
  *
  * Usage:
@@ -102,6 +103,9 @@ object KroomAssets {
 
     /** Script tag for markdown.js, the markdown toolbar (after domhelper.js) */
     fun markdownScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/markdown.js?v=$VERSION"></script>"""
+
+    /** Script tag for i18n.js, `t(en, vars)` for hand-written scripts */
+    fun i18nScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/i18n.js?v=$VERSION"></script>"""
 
     /** Stylesheet tag for markdown.css, the toolbar's and the pictograms' rules */
     fun markdownStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/markdown.css?v=$VERSION">"""

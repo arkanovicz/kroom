@@ -637,6 +637,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-assets — `t(en, vars)` for hand-written scripts
+- `i18n.js` (`/js/kroom/`, `KroomAssets.i18nScript()`, not in `coreScripts()`): `window.t(en, …)` answers
+  `window.i18n[en]` (read at each call, an object msgid → translation) or `en` itself, then fills its placeholders —
+  `{name}` from an object, `{0}`, `{1}` from the further arguments; one without a value is left as written. Pinned in
+  `i18n.mjs` (`smoke.sh`).
+
 #### kroom-webapp-l10n — a request's language pinned by the host
 - `ApplicationCall.language` is settable: `call.language = "fr"` pins the request's language, whatever the session
   or the URL says; `$lang` and `$jsTranslations` follow. A language that is not configured is refused

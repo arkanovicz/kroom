@@ -403,6 +403,7 @@ Shared client-side libraries for Ktor webapps:
 | `intents.js` | `[data-intent]` triggers, busy until the verdict (the reply) |
 | `store.js` | Minimal Redux-like state management |
 | `markdown.js` | The markdown toolbar (+ `markdown.css`): `kroomMarkdown.toolbar(textarea)`, `shortcut(e, textarea)` |
+| `i18n.js` | `t(en, vars)`: a hand-written script's text through the page's catalog, `{name}` / `{0}` placeholders filled |
 | `text.css` | The parts of a text written by several, under an element of class `kroom-text`: `KroomAssets.textStyle()` |
 
 A page on a room built with kroom-client needs only `domhelper.js` and `api.js` (the tab id, the POST): the
