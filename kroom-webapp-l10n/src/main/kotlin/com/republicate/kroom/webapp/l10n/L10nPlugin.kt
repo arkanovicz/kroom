@@ -122,15 +122,8 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
         v.pageRenderer = { respondVelocityTranslated(it) }
     }
 
-    // Load translation bundles for PO source
-    val source = config.translationSource
-    if (source is PoTranslationSource) {
-        config.languages.keys.forEach { lang ->
-            if (lang != config.sourceLanguage) {
-                source.loadBundle(lang, "${config.i18nPath}/$lang.po")
-            }
-        }
-    }
+    // First loaded wins: the application's catalog goes before any library's addCatalog.
+    addCatalog(config.i18nPath)
 
     // Intercept requests for language routing
     intercept(ApplicationCallPipeline.Plugins) {
@@ -218,6 +211,18 @@ fun Application.installL10n(block: L10nConfig.() -> Unit = {}) {
             call.respondText(result.toString(), ContentType.Application.Json)
         }
     }
+}
+
+/**
+ * Add the po files under [path] (`<path>/<lang>.po`, every configured language but the source one) to the catalog
+ * of the installed PO source; a msgid it already holds keeps its translation. False when l10n is not installed or
+ * its source is not PO files.
+ */
+fun Application.addCatalog(path: String): Boolean {
+    val config = attributes.getOrNull(L10nConfigKey) ?: return false
+    val source = config.translationSource as? PoTranslationSource ?: return false
+    config.languages.keys.filter { it != config.sourceLanguage }.forEach { source.loadBundle(it, "$path/$it.po") }
+    return true
 }
 
 private fun getPreferredLanguage(acceptLanguage: String?, config: L10nConfig): String {

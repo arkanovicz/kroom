@@ -28,6 +28,10 @@ kroom-plugin-*        example plugins (kroom-webapp-authoring/plugins/): webmast
 kroom-webapp-authoring-demo  the authoring stack as a thing you can click (kroom-webapp-authoring/demo/)
 ```
 
+kroom-webapp-l10n: a library ships its catalog as po files at a path of its own in its jar (never the application's
+`/i18n`), loaded with `application.addCatalog("/<lib>/i18n")` after the application's `installL10n`; the
+application's entries win.
+
 ## Features
 
 - Rooms over events: HTTP intents up, the verdict as the reply, SSE frames down

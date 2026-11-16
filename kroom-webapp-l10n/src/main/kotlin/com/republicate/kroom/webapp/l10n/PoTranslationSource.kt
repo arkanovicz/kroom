@@ -19,17 +19,19 @@ class PoTranslationSource(
     private val bundles = ConcurrentHashMap<String, Map<String, String>>()
 
     /**
-     * Load translations for a language from a PO file.
+     * Add a PO file's translations to a language's catalog; for a msgid two files hold, the first loaded wins.
      */
     fun loadBundle(lang: String, resourcePath: String = "$i18nPath/$lang.po") {
         val resource = PoTranslationSource::class.java.getResourceAsStream(resourcePath)
-        if (resource != null) {
-            bundles[lang] = PoParser.parse(resource)
-            logger.info("Loaded ${bundles[lang]?.size ?: 0} translations for $lang from $resourcePath")
+        val entries = if (resource != null) {
+            PoParser.parse(resource).also {
+                logger.info("Loaded ${it.size} translations for $lang from $resourcePath")
+            }
         } else {
             logger.warn("No translation file found at $resourcePath for $lang")
-            bundles[lang] = emptyMap()
+            emptyMap()
         }
+        bundles.merge(lang, entries) { loaded, added -> added + loaded }
     }
 
     override fun getTranslation(en: String, iso: String): String? {

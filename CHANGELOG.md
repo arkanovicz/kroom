@@ -637,6 +637,13 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-webapp-l10n — a language's catalog adds up across po files
+- `PoTranslationSource.loadBundle(lang, path)` adds the file's entries to the language's catalog instead of
+  replacing it; for a msgid two files hold, the first loaded wins. A missing file adds nothing.
+- `Application.addCatalog(path)` loads `<path>/<lang>.po` for every configured language but the source one into
+  the installed PO source; false when l10n is not installed or its source is not PO files. `installL10n` loads
+  the application's own files through it, first: a library's catalog fills, never overrides. Pinned in `CatalogTest`.
+
 #### kroom-client — a region in a language the engine lacks
 - `VelocityEngine.localized(lang) { "$it/lobby.html" }` names a region in the page's language as far as the engine
   holds it: `lang`, else its primary tag (`fr` for `fr-BE`), else English (`fallback`). A page whose language its

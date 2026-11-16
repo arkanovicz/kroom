@@ -1,0 +1,9 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Welcome"
+msgstr "Salut"
+
+msgid "Goodbye"
+msgstr "Au revoir"
