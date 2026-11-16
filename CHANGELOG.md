@@ -114,6 +114,15 @@ All notable changes to kroom will be documented in this file.
   where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
 - Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
+#### velocity 3.0.0-BETA-20261116-01
+- Bumped. What a classic directive renders goes to the merge's own output, so a template included by `#translate`
+  is escaped as one included by `#parse`: its references went raw, in the source language as in a translated one
+  — a title or a name someone typed reached the page as markup. Pinned in `TranslateEscapingTest`. A `Parse`
+  subclass's child is now rendered as `#parse` renders one: the include handler is asked under the name
+  `translate`, a bare `#break` in the fragment stops the fragment only, `$template` stays bound, and past
+  `directive.parse.max_depth` it throws `ParseErrorException`. A browser engine no longer warns that an
+  `##@output web` region is inert when its sink takes values raw (`HtmlDomSink`).
+
 #### velocity 3.0.0-BETA-20261113-01
 - Bumped. A module's compiled templates may live under a prefix (`resource.loader.stock.prefix`): `en/lines.html`
   of a module prefixed `arkad` is the template `arkad/en/lines.html`, its registry
