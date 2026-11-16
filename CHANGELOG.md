@@ -114,6 +114,14 @@ All notable changes to kroom will be documented in this file.
   where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
 - Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
+#### velocity 3.0.0-BETA-20261116-02
+- Bumped. One `#parse`, its target literal or computed: the interpreter no longer splices a literal one into its
+  parent's tree, the child is resolved at render either way. So a page translated at run time (`Translator`) no
+  longer translates the fragments it `#parse`s — it did for a literal target only, the spliced text being part of
+  the page's tree. A fragment to translate is included by `#translate`, its name written or computed
+  (`TranslateEscapingTest`); `#parse` includes it as written, in every language. The rest of a `#parse` /
+  `#include` line is gobbled as 2.5 does. No test moved.
+
 #### velocity 3.0.0-BETA-20261116-01
 - Bumped. What a classic directive renders goes to the merge's own output, so a template included by `#translate`
   is escaped as one included by `#parse`: its references went raw, in the source language as in a translated one

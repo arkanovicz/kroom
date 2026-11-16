@@ -9,7 +9,8 @@ import io.ktor.server.testing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** A `#translate`d fragment is escaped as a `#parse`d one: what someone typed never reaches the page as markup. */
+/** A `#translate`d fragment is escaped as a `#parse`d one, its name written or computed: what someone typed never
+ *  reaches the page as markup. */
 class TranslateEscapingTest {
 
     private val typed = """<i id="esc-probe">pro"be</i>"""
@@ -29,7 +30,7 @@ class TranslateEscapingTest {
             languages = mapOf("en" to "English", "fr" to "French")
             useSource(source)
         }
-        routing { get("/{...}") { call.respondVelocityTranslated("escape/page.html", mapOf("v" to typed)) } }
+        routing { get("/{...}") { call.respondVelocityTranslated("escape/page.html", mapOf("v" to typed, "name" to "escape/fragment.inc")) } }
     }
 
     private val shown = "&lt;i id=&quot;esc-probe&quot;&gt;pro&quot;be&lt;/i&gt;"
@@ -42,6 +43,7 @@ class TranslateEscapingTest {
         val body = client.get("/en/").bodyAsText()
         assertEquals("<b>Hello</b><p title=\"$shown\">$shown</p>", body.inside("parsed"))
         assertEquals(body.inside("parsed"), body.inside("translated"))
+        assertEquals(body.inside("parsed"), body.inside("computed"))
     }
 
     @Test
@@ -49,5 +51,6 @@ class TranslateEscapingTest {
         app()
         val body = client.get("/fr/").bodyAsText()
         assertEquals("<b>Bonjour</b><p title=\"$shown\">$shown</p>", body.inside("translated"))
+        assertEquals(body.inside("translated"), body.inside("computed"))
     }
 }
