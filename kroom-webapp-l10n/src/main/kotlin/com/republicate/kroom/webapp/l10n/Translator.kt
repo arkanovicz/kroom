@@ -39,9 +39,6 @@ class Translator(
     private val source: TranslationSource
         get() = config.translationSource
 
-    // Per-template HTML fragment translator (carries <script>/<style> ignore state across nodes).
-    private val fragments = HtmlFragmentTranslator { translate(it) }
-
     init {
         current.set(this)
     }
@@ -76,7 +73,8 @@ class Translator(
                 if (translated == null) {
                     translated = template.clone() as Template
                     val data = translated.data as SimpleNode
-                    translateNode(data)
+                    // one reader per template: what a page leaves open is not its fragments' to inherit
+                    translateNode(data, HtmlFragmentTranslator { translate(it) })
                     translationsCache[key] = translated
                 }
             }
@@ -84,12 +82,12 @@ class Translator(
         return translated!!
     }
 
-    private fun translateNode(node: SimpleNode) {
+    private fun translateNode(node: SimpleNode, fragments: HtmlFragmentTranslator) {
         if (node is ASTText) {
             node.setCtext(fragments.translate(node.getCtext()))
         }
         for (i in 0..<node.jjtGetNumChildren()) {
-            translateNode(node.jjtGetChild(i) as SimpleNode)
+            translateNode(node.jjtGetChild(i) as SimpleNode, fragments)
         }
     }
 }

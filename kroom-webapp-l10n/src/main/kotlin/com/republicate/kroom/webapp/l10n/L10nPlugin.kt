@@ -249,15 +249,20 @@ suspend fun ApplicationCall.respondVelocityTranslated(
 ) {
     val plugin = application.velocity
     val template = plugin.engine.getTemplate(templatePath)
-    // Constructing the Translator sets Translator.current for the #translate runtime directive.
-    val translator = Translator(language, application.l10nConfig)
-    val translatedTemplate = translator.translate(templatePath, template)
-
-    // Same scope chain as respondVelocity: $versions, $user, the registered $lang/$jsTranslations,
-    // and the route model on top. l10n only adds template translation.
-    val context = plugin.scopedContext(this, model)
     val writer = StringWriter()
-    translatedTemplate.merge(context, writer)
+    // Constructing the Translator sets Translator.current for the #translate runtime directive:
+    // for this merge only, the thread serves other requests after it.
+    val translator = Translator(language, application.l10nConfig)
+    try {
+        val translatedTemplate = translator.translate(templatePath, template)
+
+        // Same scope chain as respondVelocity: $versions, $user, the registered $lang/$jsTranslations,
+        // and the route model on top. l10n only adds template translation.
+        val context = plugin.scopedContext(this, model)
+        translatedTemplate.merge(context, writer)
+    } finally {
+        Translator.current.remove()
+    }
 
     respondText(writer.toString(), contentType)
 }

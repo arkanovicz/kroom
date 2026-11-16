@@ -1054,6 +1054,14 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-l10n — a translator leaves nothing behind
+- A page translated at run time and the fragments it `#translate`s shared one html reader, so a fragment was read
+  from wherever its page had stopped: after a page ending in an open `<pre>`, a tag or a `<script>`, a fragment's
+  text stayed untranslated, and was cached so. Each template is read on its own.
+- `respondVelocityTranslated` left its `Translator` on the thread (`Translator.current`), where a `#translate` of
+  a later request served by that thread could find it: it is there for the merge only.
+- Pinned in `TranslatorStateTest`.
+
 #### kroom-webapp-core, kroom-server — a stream its client closed is no error
 - `installCore`'s catch-all took what ktor answers by itself: since `cancelCallOnClose`, every stream a browser closed
   was logged `ERROR Unhandled exception` with the cancellation's trace, and a `BadRequestException` (a
