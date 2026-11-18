@@ -2,7 +2,6 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 description = "Kroom view components - WebView integration for embedding kroom webapps"
 
@@ -42,9 +41,6 @@ kotlin {
         }
     }
     jvmToolchain(21)
-    compilerOptions {
-        apiVersion.set(KotlinVersion.KOTLIN_2_0)
-    }
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.get().compilerOptions {

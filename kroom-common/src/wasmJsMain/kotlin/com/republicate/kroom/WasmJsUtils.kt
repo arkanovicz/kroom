@@ -6,4 +6,5 @@ external fun eval(code: String): dynamic
 */
 
 
+@OptIn(ExperimentalWasmJsInterop::class)
 fun getProperty(obj: JsAny, prop: String): JsAny? = js("obj[prop]")

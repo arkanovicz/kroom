@@ -4,7 +4,6 @@ import org.gradle.kotlin.dsl.support.kotlinCompilerOptions
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
@@ -26,9 +25,6 @@ kotlin {
         }
     }
     jvmToolchain(21)
-    compilerOptions {
-        apiVersion.set(KotlinVersion.KOTLIN_2_0)
-    }
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.get().compilerOptions {
