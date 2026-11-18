@@ -6,6 +6,14 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-view
+- `KroomActivity.isImmersiveMode()` (Android, off by default): override to return true and the
+  status bar is hidden (a swipe shows it for a moment), the navigation bar stays, and the
+  page is drawn into the display cutout (API 28+). The window then stops fitting the page:
+  the activity's root makes room for the navigation bar and the soft keyboard itself, so
+  the keyboard still resizes the page where edge-to-edge is enforced (API 35+). Re-applied
+  when the window regains focus.
+
 #### kroom-webapp-assets
 - domhelper: `.first()`, `.last()`, `.has(selector)`. `first`/`last` reduce a set to
   its first/last element (a singleton returns itself); `has` keeps elements with a

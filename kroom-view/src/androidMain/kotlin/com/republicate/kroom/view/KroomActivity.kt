@@ -1,9 +1,11 @@
 package com.republicate.kroom.view
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.webkit.MimeTypeMap
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -11,6 +13,10 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.republicate.kroom.view.databinding.ActivityKroomBinding
 import java.io.ByteArrayInputStream
 
@@ -45,6 +51,13 @@ abstract class KroomActivity : AppCompatActivity() {
      * Override to specify exact paths served locally.
      */
     protected open fun getStaticPaths(): List<String> = emptyList()
+
+    /**
+     * Override to return true for an immersive page: the status bar is hidden (a swipe
+     * shows it for a moment), the navigation bar stays, and the page is drawn into the
+     * display cutout (API 28+). The soft keyboard still resizes the page.
+     */
+    protected open fun isImmersiveMode(): Boolean = false
 
     /**
      * Override to configure the WebView before the URL is loaded.
@@ -113,6 +126,8 @@ abstract class KroomActivity : AppCompatActivity() {
         setContentView(binding.root)
         webView = binding.webview
 
+        if (isImmersiveMode()) immerse()
+
         webView.webViewClient = KroomWebViewClient()
 
         with(webView.settings) {
@@ -128,6 +143,40 @@ abstract class KroomActivity : AppCompatActivity() {
         Log.d(TAG, "Loading ${getSiteUrl()}")
         webView.loadUrl(getSiteUrl())
         webView.requestFocus(View.FOCUS_DOWN or View.FOCUS_UP)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // a dialog or the keyboard may have brought the status bar back
+        if (hasFocus && isImmersiveMode()) hideStatusBar()
+    }
+
+    private fun immerse() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        // The window no longer fits the page for us (nor does it at all once edge-to-edge
+        // is enforced, API 35+): the root makes room for the navigation bar and the keyboard.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val state = window.attributes.softInputMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()
+        @Suppress("DEPRECATION") // below API 30 the keyboard is an inset only under it
+        window.setSoftInputMode(state or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { root, insets ->
+            // not the status bar: hidden, and shown over the page when swiped in
+            val room = insets.getInsets(WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.ime())
+            root.setPadding(room.left, room.top, room.right, room.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        hideStatusBar()
+    }
+
+    private fun hideStatusBar() {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.statusBars())
+        }
     }
 
     private val mimeTypeMap = MimeTypeMap.getSingleton()
