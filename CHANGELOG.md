@@ -20,6 +20,19 @@ All notable changes to kroom will be documented in this file.
   descendant matching `selector`, returning a `NodeList`. All three are no-match safe
   (return the empty proxy).
 
+### Fixed
+
+#### kroom-webapp-core
+- A 500 answers "Internal Server Error": the exception's message (paths, template names,
+  values) goes to the log only.
+- The 404 handler only fills a 404 that has no body: an API's JSON error reaches its client.
+- What ktor answers by itself is left to it: a `BadRequestException` is a 400 (it was a 500),
+  a call its client left is no logged error.
+
+#### kroom-webapp-l10n
+- `PoParser`: a literal backslash before `n`, `t` or `"` is no longer read as an escape, and
+  the header entry is no longer the translation of the empty string.
+
 ## [0.22] - 2026-06-19
 
 ### Added

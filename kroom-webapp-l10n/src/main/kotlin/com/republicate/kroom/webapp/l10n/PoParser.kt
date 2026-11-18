@@ -21,7 +21,8 @@ object PoParser {
         fun flushEntry() {
             val msgid = currentMsgid
             val msgstr = currentMsgstr?.toString()
-            if (msgid != null && !msgstr.isNullOrEmpty()) {
+            // Skip the empty-msgid header entry; keep only real, translated pairs.
+            if (!msgid.isNullOrEmpty() && !msgstr.isNullOrEmpty()) {
                 translations[msgid] = msgstr
             }
             currentMsgid = null
@@ -70,11 +71,25 @@ object PoParser {
         return trimmed
     }
 
+    // Single pass, left-to-right: the correct inverse of PoWriter.escape.
+    // Sequential replace() would mis-decode a literal backslash before n/t/" .
     private fun unescape(s: String): String {
-        return s
-            .replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\\"", "\"")
-            .replace("\\\\", "\\")
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '\\' && i + 1 < s.length) {
+                when (s[i + 1]) {
+                    'n' -> { sb.append('\n'); i += 2 }
+                    't' -> { sb.append('\t'); i += 2 }
+                    '"' -> { sb.append('"'); i += 2 }
+                    '\\' -> { sb.append('\\'); i += 2 }
+                    else -> { sb.append(c); i++ }
+                }
+            } else {
+                sb.append(c); i++
+            }
+        }
+        return sb.toString()
     }
 }

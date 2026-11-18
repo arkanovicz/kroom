@@ -1,12 +1,15 @@
 package com.republicate.kroom.webapp.core
 
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
+import io.ktor.server.engine.defaultExceptionStatusCode
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CancellationException
 import org.slf4j.event.Level
 import java.io.File
 
@@ -35,14 +38,15 @@ fun Application.installCore(block: CoreConfig.() -> Unit = {}) {
 
     install(StatusPages) {
         exception<Throwable> { call, cause ->
+            // ktor's own, and no error: a call its client left, a request it has a status for (400, 404, 413, 415, 504)
+            if (cause is CancellationException || defaultExceptionStatusCode(cause) != null) throw cause
+            // the message is the operator's: it can carry paths, template names, values
             call.application.log.error("Unhandled exception", cause)
-            call.respondText(
-                text = cause.message ?: "Internal Server Error",
-                status = HttpStatusCode.InternalServerError
-            )
+            call.respondText("Internal Server Error", status = HttpStatusCode.InternalServerError)
         }
-        status(HttpStatusCode.NotFound) { call, _ ->
-            call.respondText("Not Found", status = HttpStatusCode.NotFound)
+        // only a 404 nobody explained: one that carries a body (an API's JSON error) says why itself
+        status(HttpStatusCode.NotFound) { _ ->
+            if (content is OutgoingContent.NoContent) call.respondText("Not Found", status = HttpStatusCode.NotFound)
         }
     }
 
