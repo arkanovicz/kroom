@@ -29,6 +29,11 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    // ViewHandler logs through android.util.Log, a stub in unit tests
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 kotlin {

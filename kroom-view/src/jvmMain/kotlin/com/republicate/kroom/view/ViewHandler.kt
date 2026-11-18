@@ -14,28 +14,27 @@ private val logger = KotlinLogging.logger("kroom-view")
 
 actual object ViewHandler {
 
-    private val engine = VelocityEngine()
-    private var initialized = false
-
-    actual fun init() {
-        if (initialized) return
-        val velocityPropsStream = loadResource("velocity.properties")
-        if (velocityPropsStream != null) {
-            val velocityProperties = Properties().apply {
-                load(InputStreamReader(velocityPropsStream, StandardCharsets.UTF_8))
+    // started by the first template rendered: a static file needs no Velocity
+    private val engine by lazy {
+        VelocityEngine().apply {
+            val properties = loadResource("velocity.properties")
+            if (properties != null) {
+                init(Properties().apply {
+                    properties.use { load(InputStreamReader(it, StandardCharsets.UTF_8)) }
+                })
+            } else {
+                init()
             }
-            engine.init(velocityProperties)
-        } else {
-            // Default configuration
-            engine.init()
+            logger.debug { "Velocity started" }
         }
-        initialized = true
-        logger.debug { "ViewHandler initialized" }
+    }
+
+    /** Starts Velocity now rather than with the first template. */
+    actual fun init() {
+        engine
     }
 
     actual fun serve(path: String): ByteArray {
-        if (!initialized) init()
-
         val segments = path.split('/')
         val file = segments.last()
 

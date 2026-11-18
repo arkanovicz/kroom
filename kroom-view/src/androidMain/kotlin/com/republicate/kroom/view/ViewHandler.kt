@@ -15,36 +15,36 @@ private const val TAG = "kroom-view"
 
 actual object ViewHandler {
 
-    private val engine = VelocityEngine()
-    private var initialized = false
+    // started by the first template rendered: a static file needs no Velocity
+    private val engine by lazy {
+        VelocityEngine().apply {
+            val properties = loadResource("velocity.properties")
+            if (properties != null) {
+                init(Properties().apply {
+                    properties.use { load(InputStreamReader(it, StandardCharsets.UTF_8)) }
+                })
+            } else {
+                init()
+            }
+            Log.d(TAG, "Velocity started")
+        }
+    }
     private var context: Context? = null
 
     /**
      * Set the Android context for resource loading.
-     * Must be called before init() when used in Android.
+     * Must be called before anything is served when used in Android.
      */
     fun setContext(ctx: Context) {
         context = ctx.applicationContext
     }
 
+    /** Starts Velocity now rather than with the first template. */
     actual fun init() {
-        if (initialized) return
-        val velocityPropsStream = loadResource("velocity.properties")
-        if (velocityPropsStream != null) {
-            val velocityProperties = Properties().apply {
-                load(InputStreamReader(velocityPropsStream, StandardCharsets.UTF_8))
-            }
-            engine.init(velocityProperties)
-        } else {
-            engine.init()
-        }
-        initialized = true
-        Log.d(TAG, "ViewHandler initialized")
+        engine
     }
 
     actual fun serve(path: String): ByteArray {
-        if (!initialized) init()
-
         val segments = path.split('/')
         val file = segments.last()
 

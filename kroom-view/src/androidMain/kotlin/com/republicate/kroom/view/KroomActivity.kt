@@ -120,7 +120,6 @@ abstract class KroomActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         ViewHandler.setContext(this)
-        ViewHandler.init()
 
         binding = ActivityKroomBinding.inflate(layoutInflater)
         setContentView(binding.root)

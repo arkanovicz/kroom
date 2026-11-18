@@ -12,7 +12,8 @@ package com.republicate.kroom.view
  */
 expect object ViewHandler {
     /**
-     * Initialize the view handler (load templates, configure engine, etc.)
+     * Start the template engine now. Optional: where there is one, the first
+     * template served starts it, and a static file never does.
      */
     fun init()
 

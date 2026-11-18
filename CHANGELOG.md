@@ -2,6 +2,16 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.24]
+
+### Changed
+
+#### kroom-view
+- Velocity starts with the first template rendered (`ViewHandler.serve` of a path without
+  an extension, jvm and Android), no longer in `KroomActivity.onCreate` nor for a static
+  file: an activity that renders no local template never loads it. `ViewHandler.init()`
+  remains as the explicit early start.
+
 ## [0.23]
 
 ### Added
