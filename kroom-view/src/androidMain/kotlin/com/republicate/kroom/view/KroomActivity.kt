@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsCompat.Type
 import androidx.core.view.WindowInsetsControllerCompat
 import com.republicate.kroom.view.databinding.ActivityKroomBinding
 import java.io.ByteArrayInputStream
@@ -28,6 +29,10 @@ private const val TAG = "kroom"
  * Subclass this and implement [getSiteUrl] to specify your webapp's URL.
  * The activity intercepts HTTP requests and serves local assets via [ViewHandler],
  * while letting /api and /events (SSE) pass through to the actual server.
+ *
+ * Where the system draws the window edge to edge (API 35+ for an app targeting it), the
+ * page stays clear of the system bars, the display cutout and the soft keyboard, which
+ * resizes it; the bands left show the root's `kroomBackgroundColor`.
  */
 abstract class KroomActivity : AppCompatActivity() {
 
@@ -126,6 +131,10 @@ abstract class KroomActivity : AppCompatActivity() {
         webView = binding.webview
 
         if (isImmersiveMode()) immerse()
+        // edge-to-edge enforced: the window fits nothing for us, and a WebView ignores its padding
+        else if (Build.VERSION.SDK_INT >= 35 && applicationInfo.targetSdkVersion >= 35) {
+            makeRoom(Type.systemBars() or Type.displayCutout() or Type.ime())
+        }
 
         webView.webViewClient = KroomWebViewClient()
 
@@ -156,25 +165,28 @@ abstract class KroomActivity : AppCompatActivity() {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-        // The window no longer fits the page for us (nor does it at all once edge-to-edge
-        // is enforced, API 35+): the root makes room for the navigation bar and the keyboard.
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // not the status bar: hidden, and shown over the page when swiped in
+        makeRoom(Type.navigationBars() or Type.ime())
+        hideStatusBar()
+    }
+
+    /** For a window that does not fit the page: the root makes room for [types], the keyboard resizes the page. */
+    private fun makeRoom(types: Int) {
         val state = window.attributes.softInputMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()
         @Suppress("DEPRECATION") // below API 30 the keyboard is an inset only under it
         window.setSoftInputMode(state or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { root, insets ->
-            // not the status bar: hidden, and shown over the page when swiped in
-            val room = insets.getInsets(WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.ime())
+            val room = insets.getInsets(types)
             root.setPadding(room.left, room.top, room.right, room.bottom)
             WindowInsetsCompat.CONSUMED
         }
-        hideStatusBar()
     }
 
     private fun hideStatusBar() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.statusBars())
+            hide(Type.statusBars())
         }
     }
 

@@ -2,6 +2,18 @@
 
 All notable changes to kroom will be documented in this file.
 
+## [0.25]
+
+### Fixed
+
+#### kroom-view
+- `KroomActivity`, not immersive, where the system draws the window edge to edge (API 35+
+  for an app targeting it): the page was drawn under the status and navigation bars, the
+  display cutout and the soft keyboard. The activity's root now makes room for them and the
+  keyboard resizes the page, as in immersive mode; the bands left show `kroomBackgroundColor`.
+  Nothing changes where the system still fits the window. The WebView's
+  `fitsSystemWindows` is gone: it only set a padding a WebView ignores.
+
 ## [0.24]
 
 ### Changed
