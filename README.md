@@ -223,6 +223,10 @@ adds the chat's history store. Either takes a `lobby` last: see [A lobby](#a-lob
   at all when the tab is back within them — what a tab holds outlives a reload. A joiner is not in its
   own snapshot: its `join`, the same frame everyone gets, follows it. The snapshot also carries `me`,
   the viewer's own entry (absent for a spectator).
+- **Guests are counted.** A connection without a user (an anonymous visitor's tab) is a guest: its `join`
+  and its `leave` are framed without a `user`, and `guests`, a field of the base `State`, counts them (absent
+  until the first). A guest is its connection: two tabs are two guests, and with no grace a reload is a
+  `leave`, then a `join`.
 - **Tabs.** A tab id is taken from `sessionStorage` at load and put back on `pagehide` (a duplicated
   tab makes its own); `?tabId=` on the stream, `X-Kroom-Tab` on an intent; the connection is
   `<userId>/<tabId>`, never a credential. A user's tabs see the same thing.
@@ -1062,10 +1066,11 @@ lobby at construction, and what its own wire says of presence is said there agai
 
 ```
 state    {users, rooms: {<room id>: roster}, me}            the watcher's snapshot: the rooms that show
-show     {roster: {id, users}}                              a room shows, its roster whole
+show     {roster: {id, users, guests}}                      a room shows, its roster whole
 enter    {room, user: {id, name, avatar, status, clients}}  the room's join: a user's first connection there
 present  {room, user, status}                               the room's status
 exit     {room, user}                                       the room's leave: a user's last connection, past the graces
+enter    {room}, exit {room}                                a guest's join and leave: no user, the roster's guests ± 1
 hide     {room}                                             the room closed, or no longer shows
 ```
 
@@ -1083,8 +1088,10 @@ rooms({ id ->
 }) { call -> userOf(call) }
 ```
 
-- A room's roster is born by a `show` frame when the room gets its first user, and removed by a `hide` frame when
-  the room closes. In between it may be empty.
+- A room's roster is born by a `show` frame when the room gets its first user or guest, and removed by a `hide`
+  frame when the room closes. In between it may be empty.
+- A roster's `guests` is its room's count of connections without a user. The lobby's own `guests` counts its own
+  anonymous watchers.
 - A room whose `show(roster)` answers false leaves no trace in the lobby: no roster, no id, no frame. An app's own
   event about that room is dropped too.
 - `announce()` asks `show` again: call it after the room's access changed. A `show` or a `hide` frame follows.

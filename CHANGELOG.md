@@ -659,6 +659,17 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-common, kroom-server — guests, counted
+- A guest is a connection without a user: an anonymous visitor's tab. Two tabs count as two.
+- `State.guests` is how many are in the room. It is in the snapshot, absent until the first guest.
+- The wire is unchanged: a `join` or a `leave` without a `user` is a guest's, and `reduce` moves the count by one.
+- A guest has no grace: a reload is a `leave`, then a `join`.
+- `Roster.guests` is the same count on the room's roster. A guest's `join` and `leave` reach the lobby as an
+  `enter` and an `exit` without a `user`.
+- A room holding guests alone shows in its lobby. A lobby counts its own anonymous watchers in its own `guests`.
+- `Exit.user` is now `String?`: check it where you read it.
+  Pinned in `LogicTest`, `LobbyTest` (common), `LogicRoomTest`, `LobbyTest` (server).
+
 #### kroom-common — a lobby's State and events
 - `Roster`: a room as its lobby shows it, `id` and `users` (keyed `UserPresence`). Open: an app's subclass adds fields.
 - `LobbyState(roster)`: `rooms`, the rosters of the rooms that show. The base's `users` is who watches.
@@ -1117,6 +1128,12 @@ All notable changes to kroom will be documented in this file.
   and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
+
+#### kroom-server — a `join` always has its `leave`
+- A connection without a user that joins twice under one id is framed once: its second `join` said a newcomer
+  that its single `leave` never took back.
+- A logic that throws on a `join` or a `leave` no longer keeps the frame off the wire: the error is logged, the
+  frame goes.
 
 #### kroom-common — a keyed item that goes is marked
 - `JsonView.Keyed.remove(id)` told the root and the items above it, not the id that left: in a browser's targeted
