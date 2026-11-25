@@ -14,7 +14,7 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
 
     /**
      * What the writes since it was last cleared went under: the identities ([JsonView.identity]) of every view on each
-     * write's path, when a browser's Room keeps one — the merge's clean door answers for the other items. None on the
+     * write's path, an item removed from a `keyed` field's with them, when a browser's Room keeps one — the merge's clean door answers for the other items. None on the
      * server. A write past the views (`json[k] = v`) leaves no mark: reduce through the fields.
      */
     var dirty: MutableSet<Any>? = null

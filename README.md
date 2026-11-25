@@ -270,7 +270,7 @@ fun main() {
   memory, then every region is merged again; the engine's DOM sink touches only what differs (a
   value's text node, a dynamic tag's attributes, an item added, moved or removed by its key).
 - **Targeted**: the fold records what it wrote (`State.dirty`: the `id` / `seq` of every view on a
-  write's path), and an item keyed by its identity that no write went under is clean — moved into
+  write's path, of an item removed from a `keyed` field too), and an item keyed by its identity that no write went under is clean — moved into
   place, its body not rendered. The rule: an item depends only on the writes under its own key (a
   line reading its author's name refreshes when the author is written); an item known by its
   position is never clean. A region is merged when a root its `##@` header declares changed

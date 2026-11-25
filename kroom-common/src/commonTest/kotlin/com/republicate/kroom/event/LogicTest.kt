@@ -91,8 +91,9 @@ class LogicTest {
         assertEquals("b t1", dirty(s))                         // a nested write: every identity on its path
         s.dirty!!.clear()
         s.reduce(Note(Json.MutableObject("text" to "x", "author" to "a")))
+        assertEquals("", dirty(s))                               // a logged event with no seq: no key
         s.reduce(Cancel(Json.MutableObject("intent" to "wait", "user" to "a")))
-        assertEquals("", dirty(s))                               // a logged event with no seq, a removal: no key
+        assertEquals("a", dirty(s))                              // a keyed item gone: its id, for who shows it elsewhere
         assertTrue(s.waiting.isEmpty())
         s.touched = false
         s.reduce(Status(Json.MutableObject("status" to "IDLE", "user" to "nobody")))

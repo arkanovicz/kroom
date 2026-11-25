@@ -1086,6 +1086,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-common — a keyed item that goes is marked
+- `JsonView.Keyed.remove(id)` told the root and the items above it, not the id that left: in a browser's targeted
+  merge an item of another region under that same id (who is here, reading a call keyed by user) stayed clean and
+  showed what was no longer true. The removed item is marked as an added one is (`State.dirty`). Pinned in
+  `LogicTest`.
+
 #### kroom-webapp-l10n — a translator leaves nothing behind
 - A page translated at run time and the fragments it `#translate`s shared one html reader, so a fragment was read
   from wherever its page had stopped: after a page ending in an open `<pre>`, a tag or a `<script>`, a fragment's

@@ -202,7 +202,8 @@ abstract class JsonView(val json: Json.MutableObject) {
             item.owner = owner
             item.touched()
         }
-        fun remove(id: String) { if (obj.remove(id) != null) owner?.touched() }
+        /** What goes is marked as what comes: an item elsewhere under that identity is told. */
+        fun remove(id: String) { obj.remove(id)?.let { at(it).touched() } }
         private fun at(o: Any?): V = view(o as Json.MutableObject).also { it.owner = owner }
     }
 
