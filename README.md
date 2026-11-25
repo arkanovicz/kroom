@@ -9,7 +9,7 @@ kroom-common          the common declaration of a room: State, events, RoomEvent
 kroom-client          a page on a room: the stream folded into the State, its regions merged into the DOM by the engine's sink after every frame (KMP jvm+js)
 kroom-client-text     a text written by several, its region: kroom/text.html, compiled under the prefix kroom (KMP js)
 kroom-view            client-side SSE handling (JS/Wasm)
-kroom-server          rooms on the JVM: the loop, presence, roles, Route.room / rooms (stream, intents, catalog)
+kroom-server          rooms on the JVM: the loop, presence, roles, Route.room / rooms (stream, intents, catalog), lobbies
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
 kroom-webapp-assets   shared client-side JS/CSS
 kroom-webapp-velocity Velocity template integration
@@ -39,7 +39,7 @@ velocity writes a map as a literal there), before the scripts that call `t()` (`
 
 - Rooms over events: HTTP intents up, the verdict as the reply, SSE frames down
 - One declaration in common Kotlin (State, events, logic) for the server and the browser
-- Per-viewer visibility (selective and hidden fields), presence as a State field
+- Per-viewer visibility (selective and hidden fields), presence as a State field (a room's, or a group's in a lobby)
 - Server-rendered chrome, room regions merged into the DOM by the engine's sink
 - Multi-tab support via a user-centric identity model
 - Per-connection heartbeat (dead connection detection)
@@ -179,7 +179,7 @@ catalog (`GET /rooms/{id}/events`) and, for a chat, the scroll-back (`GET /rooms
 lambda names the user from the call, null for anonymous. `rooms(build) { call -> user }` serves the same
 routes for every room of a kind, `/rooms/{room}/…`: the room `Rooms` holds under that id, else `build(id)` (null:
 404 `no_room`), which closes once idle. `LogicRoom(id, state, logic)` is the room for a logic; `ChatRoom`
-adds the chat's history store.
+adds the chat's history store. Either takes a `lobby` last: see [A lobby](#a-lobby-who-is-in-which-room).
 
 - **Who the caller is, the room says**: `role(user)` answers `Role.ACTOR`, `Role.SPECTATOR` or null, asked of
   every call — the stream (an actor or a spectator; anonymous, at most a spectator), each intent (an actor's),
@@ -1053,6 +1053,78 @@ The `Table` class:
 - Sends `mySeat` in state payload so clients know their position
 - Handles reconnection by user identity matching
 - Player status tracking (online/idle/away/offline) with `Seat.status`
+
+## A lobby: who is in which room
+
+A `Lobby` (kroom-server) is a room of rooms: the scope of a group of rooms, such as a community. A page opens one
+stream on the lobby and sees, live, who is in each room of the group, with no stream per room. A room names its
+lobby at construction, and what its own wire says of presence is said there again.
+
+```
+state    {users, rooms: {<room id>: roster}, me}            the watcher's snapshot: the rooms that show
+show     {roster: {id, users}}                              a room shows, its roster whole
+enter    {room, user: {id, name, avatar, status, clients}}  the room's join: a user's first connection there
+present  {room, user, status}                               the room's status
+exit     {room, user}                                       the room's leave: a user's last connection, past the graces
+hide     {room}                                             the room closed, or no longer shows
+```
+
+A lobby is a `LogicRoom` held in `Rooms` like any room, and served the same way. A room's `build` may fetch its
+lobby through `Rooms.getOrCreate`, then pass it as the constructor's last argument:
+
+```kotlin
+class Den(id: String, lobby: Lobby<*, *>?, @Volatile var hidden: Boolean = false) : LogicRoom<DenState>(id, DenState(), DenLogic, lobby) {
+    override fun show(roster: Roster) = !hidden         // asked on the room's loop
+}
+
+rooms({ id ->
+    if (id.startsWith("community-")) Lobby(id)
+    else Den(id, Rooms.getOrCreate("community-${communityOf(id)}") { Lobby(it) } as Lobby<*, *>)
+}) { call -> userOf(call) }
+```
+
+- A room's roster is born by a `show` frame when the room gets its first user, and removed by a `hide` frame when
+  the room closes. In between it may be empty.
+- A room whose `show(roster)` answers false leaves no trace in the lobby: no roster, no id, no frame. An app's own
+  event about that room is dropped too.
+- `announce()` asks `show` again: call it after the room's access changed. A `show` or a `hide` frame follows.
+- The lobby's `role(user)` says who watches, as any room's. Every frame goes to every watcher; the base's `users`
+  is who watches.
+- A lobby built on demand does not close while one of its rooms is live.
+- `Lobby.rooms` lists every live room of the group that `Rooms` holds, shown or not. It is on the server alone,
+  never in the State.
+
+An app's rosters say more by extending `Roster`, `LobbyState` and `LobbyEvents`. Here a roster lists who is in the
+room's call:
+
+```kotlin
+class Caller(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) { var id by string().required }
+class Voiced(json: Json.MutableObject = Json.MutableObject()) : Roster(json) { val call by keyed(::Caller) }
+class Listen(json: Json.MutableObject = Json.MutableObject()) : RosterEvent("listen", json) { var user by string().required.out }
+
+object VoicedEvents : LobbyEvents<Voiced>(::Voiced) { val listen = event(::Listen) }
+class VoicedState : LobbyState<Voiced>(roster = ::Voiced) {
+    override fun reduce(event: Event) {
+        super.reduce(event)
+        if (event is Listen) rooms[event.room]?.call?.add(Caller().also { it.id = event.user })
+    }
+}
+
+val lobby = Lobby("community-go", VoicedState(), LobbyLogic<VoicedState>(VoicedEvents))
+lobby.emit(Listen().also { it.room = "den-1"; it.user = "alice" })
+```
+
+A room fills its own fields in `show`: the roster it gets is of the lobby's class (`roster as Voiced`). The host
+emits on the lobby what it wants, and `.to(userId)` makes a message for one watcher.
+
+In the browser, a lobby is an ordinary kroom-client room:
+
+```kotlin
+val room = Room("community-go", LobbyState(), LobbyEvents(), engine)     // or VoicedState(), VoicedEvents
+room.connect()                                                           // <api>/rooms/community-go/stream
+```
+
+Only rooms that show to every watcher are covered. Showing a private room to its members alone is not built.
 
 ## Reconnect
 

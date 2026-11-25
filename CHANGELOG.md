@@ -659,6 +659,30 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-common — a lobby's State and events
+- `Roster`: a room as its lobby shows it, `id` and `users` (keyed `UserPresence`). Open: an app's subclass adds fields.
+- `LobbyState(roster)`: `rooms`, the rosters of the rooms that show. The base's `users` is who watches.
+- `LobbyEvents(roster)`: `show {roster}`, `hide {room}`, `enter {room, user}`, `present {room, user, status}`,
+  `exit {room, user}`. None is postable.
+- `RosterEvent`: the base of an event about one room (`room`). An app's own extend it and its `LobbyState` reduces them.
+- `LobbyLogic` decides nothing. `LobbyState()`, `LobbyEvents()`, `LobbyLogic()` are a lobby of plain rosters.
+  Pinned in `LobbyTest` (common).
+
+#### kroom-server — `Lobby`, a room of rooms
+- If your page shows who is in which room of a group, `Lobby` gives it one stream for the whole group.
+- `Room`, `LogicRoom` and `ChatRoom` take a `lobby` as last constructor argument, null by default.
+- A room's roster appears with a `show` frame at its first user, and goes with a `hide` frame when the room closes.
+- The room's `join`, `status` and `leave` frames reach the lobby as `enter`, `present` and `exit`.
+- `Room.show(roster)` answers false for a room that must not show. Nothing of it reaches the lobby, not even an
+  app's `RosterEvent` about it.
+- `Room.announce()` asks `show` again, after the room's access changed.
+- `Lobby.rooms` lists every live room of the group that `Rooms` holds, shown or not. Server only.
+- A lobby built on demand stays open while one of its rooms is live.
+- `Rooms.getOrCreate` may be called from inside a `build`: a room's build fetches its lobby.
+- `Room.emit` is `open`.
+- Only rooms that show to every watcher are covered: showing a private room to its members alone is not built.
+  Pinned in `LobbyTest` (server).
+
 #### kroom-webapp-assets — `t(en, vars)` for hand-written scripts
 - `i18n.js` (`/js/kroom/`, `KroomAssets.i18nScript()`, not in `coreScripts()`): `window.t(en, …)` answers
   `window.i18n[en]` (read at each call, an object msgid → translation) or `en` itself, then fills its placeholders —
