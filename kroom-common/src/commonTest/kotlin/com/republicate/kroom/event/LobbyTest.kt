@@ -45,6 +45,21 @@ class LobbyTest {
         assertNull(state.rooms["12"])
     }
 
+    @Test fun `an enter or an exit that names nobody is a guest's, counted on the roster`() {
+        val state = LobbyState()
+        state.reduce(show("12", "alice"))
+        assertNull(state.rooms["12"]!!.guests)
+        state.reduce(Enter().also { it.room = "12" })
+        state.reduce(Enter().also { it.room = "12" })
+        assertEquals(2, state.rooms["12"]!!.guests)
+        assertEquals(listOf("alice"), state.who("12"))
+        state.reduce(Exit().also { it.room = "12" })
+        assertEquals(1, state.rooms["12"]!!.guests)
+        // a roster restated says its count whole
+        state.reduce(Show(::Roster).also { s -> s.roster = Roster().also { it.id = "12"; it.guests = 4 } })
+        assertEquals(4, state.rooms["12"]!!.guests)
+    }
+
     @Test fun `a roster restated replaces the one shown and keeps its rank`() {
         val state = LobbyState()
         state.reduce(show("12", "alice"))

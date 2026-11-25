@@ -313,9 +313,49 @@ class LogicRoomTest {
         cb.silent()
     }
 
+    @Test fun `a guest is counted by its join and its leave, which name nobody`() = runBlocking {
+        val room = room()
+        val ca = room.join(actor(user("alice"), "t1")).also { it.state(); it.joined() }
+        val guest = Spectator("guest-1")
+        val cg = room.join(guest)
+        assertNull(cg.state().getInt("guests"))   // not in its own snapshot: its join follows
+        cg.next().let { assertEquals("join", it.event); assertNull(it.json().getObject("user")) }
+        ca.joined()
+        assertEquals(1, room.state.guests)
+
+        // the same connection id again: no newcomer, nothing framed, and the stale one's leave is nothing
+        val again = Spectator("guest-1")
+        assertEquals(1, room.join(again).state().getInt("guests"))
+        room.leave(guest)
+        ca.silent()
+        assertEquals(1, room.join(actor(user("bob"), "t1")).state().getInt("guests"))
+        ca.joined()
+
+        room.leave(again)
+        ca.next().let { assertEquals("leave", it.event); assertNull(it.json().getObject("user")) }
+        assertEquals("set", ca.next().event)
+        assertEquals(0, room.state.guests)
+    }
+
+    object Bare : RoomEvents()
+    object Faulty : Logic<Counter>(Bare) { init { on(Bare.join) { _, _, _ -> error("boom") } } }
+
+    @Test fun `a logic that fails on a join does not unpair it from its leave`() = runBlocking {
+        val room = object : LogicRoom<Counter>("logic-${n++}", Counter(), Faulty) { override fun shouldCloseWhenEmpty() = false }
+        val guest = Spectator("guest-2")
+        val cg = room.join(guest).also { it.state(); it.joined() }
+        assertEquals(1, room.state.guests)
+        val late = room.join(Spectator("guest-3")).also { assertEquals(1, it.state().getInt("guests")) }
+        room.leave(guest)
+        assertEquals("join", late.next().event)
+        assertEquals("leave", late.next().event)
+        assertEquals(1, room.state.guests)
+        room.stop()
+    }
+
     @Test fun `the room describes the state and the alphabet`() {
         val d = room().describe()
-        assertEquals(listOf("users", "n", "notes", "waiting"), d.objects("state").map { it.getString("name") })
+        assertEquals(listOf("users", "guests", "n", "notes", "waiting"), d.objects("state").map { it.getString("name") })
         val events = d.objects("events").associateBy { it.getString("name")!! }
         assertEquals(false, events["set"]!!.getBoolean("postable"))
         assertEquals(true, events["wait"]!!.getBoolean("cancellable"))

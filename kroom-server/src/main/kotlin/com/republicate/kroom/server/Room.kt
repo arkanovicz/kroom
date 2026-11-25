@@ -362,23 +362,24 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
      * A connection id already present is the same tab back (reconnect, or a duplicated tab): the
      * newcomer takes the slot, the stale connection is closed and its later [leave] is a no-op.
      */
-    private fun replace(actor: Actor) {
+    private fun replace(actor: Actor): Boolean {
         val evicted = if (actor is Spectator) spectators.put(actor.connectionId, actor) else actors.put(actor.connectionId, actor)
         val crossed = if (actor is Spectator) actors.remove(actor.connectionId) else spectators.remove(actor.connectionId)
-        val stale = (evicted ?: crossed)?.takeIf { it !== actor } ?: return
+        val stale = (evicted ?: crossed)?.takeIf { it !== actor } ?: return false
         stale.disconnect()
         stale.user?.removeConnection(id, stale)
         logger.debug("Connection '${actor.connectionId}' replaced in room '$id'")
+        return true
     }
 
     private fun processJoin(actor: Actor) {
         val channel = Channel<ServerSentEvent>(channelCapacity)
         actor.channel = channel
-        replace(actor)
+        // a guest is its connection: one that takes a slot it already held is no newcomer, its one leave is still to come
+        var first = !replace(actor)
         closed.remove(actor.connectionId)
         val spectator = actor is Spectator
         if (spectator) _spectatorCount.value = spectators.size
-        var first = true
         actor.user?.let { user ->
             first = !users.containsKey(user.userId)
             users[user.userId] = user
@@ -591,7 +592,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     fun announce() = step {
         lobby?.let { lobby ->
             announced = true
-            val roster = lobby.roster(id).also { r -> presences().forEach { r.users.add(it) } }
+            val roster = lobby.roster(id).also { r -> presences().forEach { r.users.add(it) }; guests().takeIf { it > 0 }?.let { r.guests = it } }
             lobby.shown(this, roster.takeIf { show(it) })
         }
     }
@@ -602,15 +603,17 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
     /** Who is in, as a roster lists them. */
     internal open fun presences(): List<UserPresence> = users.values.map(::presence)
 
-    /** What the room's own wire says of presence, said to its lobby. */
+    /** How many connections without a user are in, as a roster counts them. */
+    internal open fun guests(): Int = actors.values.count { it.user == null } + spectators.values.count { it.user == null }
+
+    /** What the room's own wire says of presence, said to its lobby: a guest's join and leave too, naming nobody. */
     private fun relay(event: Event) {
         val lobby = lobby ?: return
         when (event) {
-            is Join -> if (!announced) announce() else event.user?.let { user ->
-                lobby.emit(Enter().also { it.room = id; it.user = UserPresence(user.json.copy()) })
-            }
+            is Join -> if (!announced) announce()
+                else lobby.emit(Enter().also { it.room = id; it.user = event.user?.let { user -> UserPresence(user.json.copy()) } })
             is Status -> event.user?.let { user -> lobby.emit(Present().also { it.room = id; it.user = user; it.status = event.status }) }
-            is Leave -> event.user?.let { user -> lobby.emit(Exit().also { it.room = id; it.user = user.id }) }
+            is Leave -> lobby.emit(Exit().also { it.room = id; it.user = event.user?.id })
             else -> {}
         }
     }

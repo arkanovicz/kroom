@@ -28,7 +28,10 @@ class UserPresence(json: Json.MutableObject = Json.MutableObject()) : JsonView(j
     val clients by log(::Client)
 }
 
-/** Born by the room at a user's first connection; the handler also hears the others, with `first` false. */
+/**
+ * Born by the room at a user's first connection; the handler also hears the others, with `first` false.
+ * A connection without a user (a guest) is framed each time, `user` absent.
+ */
 class Join(json: Json.MutableObject = Json.MutableObject()) : Event("join", json = json) {
     var user by obj(::UserPresence).out
     var first by bool().out

@@ -12,6 +12,9 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
     /** kroom's presence, a field like any other: who is in the room, kept from `join`, `leave` and `status`. */
     val users by keyed(::UserPresence)
 
+    /** How many connections without a user are in the room: a `join` or a `leave` that names nobody moves it by one. Absent until the first. */
+    var guests by int()
+
     /**
      * What the writes since it was last cleared went under: the identities ([JsonView.identity]) of every view on each
      * write's path, an item removed from a `keyed` field's with them, when a browser's Room keeps one — the merge's clean door answers for the other items. None on the
@@ -25,8 +28,8 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
     /** One frame into the State: the arrows of the grammar, read right to left. A room's State calls `super` first, for presence. */
     open fun reduce(event: Event) {
         when (event) {
-            is Join -> event.user?.let { users.add(it) }
-            is Leave -> event.user?.let { users.remove(it.id) }
+            is Join -> event.user?.let { users.add(it) } ?: run { guests = (guests ?: 0) + 1 }
+            is Leave -> event.user?.let { users.remove(it.id) } ?: run { guests = (guests ?: 0) - 1 }
             is Status -> event.user?.let { users[it] }?.status = event.status
             else -> {}
         }

@@ -2,10 +2,12 @@ package com.republicate.kroom.event
 
 import com.republicate.kson.Json
 
-/** A room as its lobby shows it: who is in. An app's subclass adds what its rooms show (who is in a call). */
+/** A room as its lobby shows it: who is in, and how many guests. An app's subclass adds what its rooms show (who is in a call). */
 open class Roster(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
     var id by string().required
     val users by keyed(::UserPresence)
+    /** The room's own `guests`: absent until the first. */
+    var guests by int()
 }
 
 /** An event about one room of a lobby. The lobby drops it when that room does not show. */
@@ -21,7 +23,7 @@ class Show<R : Roster>(roster: (Json.MutableObject) -> R, json: Json.MutableObje
 /** A room no longer shows: it closed, or it chose to hide. */
 class Hide(json: Json.MutableObject = Json.MutableObject()) : RosterEvent("hide", json)
 
-/** The room's `join`: a user's first connection there. */
+/** The room's `join`: a user's first connection there, or, naming nobody, a guest's. */
 class Enter(json: Json.MutableObject = Json.MutableObject()) : RosterEvent("enter", json) {
     var user by obj(::UserPresence).out
 }
@@ -32,9 +34,9 @@ class Present(json: Json.MutableObject = Json.MutableObject()) : RosterEvent("pr
     var status by enum<Presence>().required.out
 }
 
-/** The room's `leave`: a user's last connection there, gone past the graces. */
+/** The room's `leave`: a user's last connection there, gone past the graces, or, naming nobody, a guest's. */
 class Exit(json: Json.MutableObject = Json.MutableObject()) : RosterEvent("exit", json) {
-    var user by string().required.out
+    var user by string().out
 }
 
 /**
@@ -49,9 +51,9 @@ open class LobbyState<R : Roster>(json: Json.MutableObject = Json.MutableObject(
         when (event) {
             is Show<*> -> event.roster?.let { rooms.add(roster(it.json)) }
             is Hide -> rooms.remove(event.room)
-            is Enter -> event.user?.let { rooms[event.room]?.users?.add(it) }
+            is Enter -> rooms[event.room]?.let { r -> event.user?.let { r.users.add(it) } ?: run { r.guests = (r.guests ?: 0) + 1 } }
             is Present -> rooms[event.room]?.users?.get(event.user)?.status = event.status
-            is Exit -> rooms[event.room]?.users?.remove(event.user)
+            is Exit -> rooms[event.room]?.let { r -> event.user?.let { r.users.remove(it) } ?: run { r.guests = (r.guests ?: 0) - 1 } }
             else -> {}
         }
     }

@@ -101,6 +101,20 @@ class LogicTest {
         assertFalse(s.touched)                                   // nothing to write: unchanged
     }
 
+    @Test fun `a join or a leave that names nobody is a guest's, counted`() {
+        val s = Counter()
+        assertNull(s.guests)
+        s.reduce(Join())
+        s.reduce(Join(Json.MutableObject("user" to Json.MutableObject("id" to "b"))))
+        s.reduce(Join())
+        assertEquals(2, s.guests)
+        assertEquals(listOf("b"), s.users.map { it.id })
+        s.reduce(Leave())
+        s.reduce(Leave(Json.MutableObject("user" to Json.MutableObject("id" to "b"))))
+        assertEquals(1, s.guests)
+        assertTrue(s.users.isEmpty())
+    }
+
     class Queue : State() { val line by seq(::Waiter) }
 
     @Test fun `a seq marks what comes in by its id and what goes tells the root`() {
@@ -165,7 +179,7 @@ class LogicTest {
         listOf("a", "b", "c").forEach { counter.reduce(Note(Json.MutableObject("text" to it))) }
         assertEquals(listOf("b", "c"), counter.notes.map { it.text })
         assertEquals("""{"n":7,"notes":[{"text":"b"},{"text":"c"}]}""", counter.json.toString()) // the snapshot is the json
-        assertEquals(listOf("users", "n", "notes", "waiting"), counter.describe().map { (it as Json.Object).getString("name") })
+        assertEquals(listOf("users", "guests", "n", "notes", "waiting"), counter.describe().map { (it as Json.Object).getString("name") })
     }
 
     @Test fun `the room's events are the alphabet postable names apart`() {

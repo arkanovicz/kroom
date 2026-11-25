@@ -45,9 +45,13 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
         on(::Leave) { actor, leave -> hook(actor, leave) }
     }
 
-    /** A presence event: the logic cannot refuse it, a reason there is the logic's error. */
+    /** A presence event: the logic cannot refuse it, a reason or a failure there is the logic's error — the frame goes, its pair too. */
     private fun hook(actor: Actor, event: Event): Reason? {
-        settle(event, logic.decide(state, actor, event))?.let { logger.error("'${event.name}' refused by the logic in room '$id': $it") }
+        try {
+            settle(event, logic.decide(state, actor, event))?.let { logger.error("'${event.name}' refused by the logic in room '$id': $it") }
+        } catch (e: Exception) {
+            logger.error("'${event.name}' failed in the logic of room '$id'", e)
+        }
         return null
     }
 
@@ -100,6 +104,8 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
 
     // the fold of the room's own presence frames, in their order
     override fun presences(): List<UserPresence> = state.users.map { UserPresence(it.json.copy()) }
+
+    override fun guests(): Int = state.guests ?: 0
 
     /** A presence entry, for a test or a lobby. */
     fun presenceOf(userId: String): UserPresence? = users[userId]?.let(::presence)

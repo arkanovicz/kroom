@@ -111,6 +111,40 @@ class LobbyTest {
         lobby.stop()
     }
 
+    @Test fun `a room's guests are counted on its roster, and a room of guests alone shows`() = runBlocking {
+        val lobby = lobby()
+        val wanda = lobby.watch("wanda")
+        val den = Den("den-${n++}", lobby)
+        val first = Spectator("guest-${n++}")
+        den.join(first)
+        wanda.next("show").getObject("roster")!!.let {
+            assertEquals(den.id, it.getString("id"))
+            assertEquals(1, it.getInt("guests"))
+            assertEquals(0, it.getObject("users")?.size ?: 0)
+        }
+        den.join(Spectator("guest-${n++}"))
+        wanda.next("enter").let {
+            assertEquals(den.id, it.getString("room"))
+            assertNull(it.getObject("user"))
+        }
+        den.join(actor("alice"))
+        assertEquals("alice", wanda.next("enter").getObject("user")!!.getString("id"))
+
+        // a watcher come late reads the count in its snapshot; without a user it is a guest of the lobby itself
+        val late = lobby.join(Spectator("guest-${n++}")).next("state")
+        assertEquals(2, late.getObject("rooms")!!.getObject(den.id)!!.getInt("guests"))
+        assertNull(wanda.next("join").getObject("user"))
+        assertEquals(1, lobby.state.guests)
+
+        den.leave(first)
+        wanda.next("exit").let {
+            assertEquals(den.id, it.getString("room"))
+            assertNull(it.getString("user"))
+        }
+        assertEquals(1, lobby.state.rooms[den.id]!!.guests)
+        den.stop(); lobby.stop()
+    }
+
     @Test fun `a room that does not show leaves no trace, until it announces otherwise`() = runBlocking {
         val lobby = Lobby("lobby-${n++}", VoicedState(), LobbyLogic<VoicedState>(VoicedEvents))
         val wanda = lobby.watch("wanda")
