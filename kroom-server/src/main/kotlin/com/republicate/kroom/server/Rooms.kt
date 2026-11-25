@@ -5,12 +5,9 @@ import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Central registry for rooms
- * Provides room lifecycle management and discovery
- */
-object Lobby {
-    private val logger = LoggerFactory.getLogger("kroom.lobby")
+/** The process's rooms by id: registered by the host, or built on first use and forgotten once closed. */
+object Rooms {
+    private val logger = LoggerFactory.getLogger("kroom.rooms")
     private val rooms = ConcurrentHashMap<String, Room<*>>()
 
     /**

@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages chat room lifecycle - for backward compatibility
- * For generic rooms, use Lobby directly
+ * For generic rooms, use Rooms directly
  */
 object RoomManager {
     private val logger = LoggerFactory.getLogger("kroom.manager")

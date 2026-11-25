@@ -145,7 +145,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         }
     }
 
-    /** Built by the [Lobby] on first use: such a room closes once idle (see [shouldCloseWhenEmpty]). */
+    /** Built by the [Rooms] on first use: such a room closes once idle (see [shouldCloseWhenEmpty]). */
     internal var onDemand = false
 
     /** False once stopped: a stopped room answers nothing (a join gets a closed channel, an act `closed`). */
@@ -165,7 +165,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
                 if (idleEpoch.get() == epoch && empty && shouldCloseWhenEmpty()) {
                     logger.info("Room '$id' idle for {} ms: closing", idleTimeout)
                     stop()
-                    Lobby.forget(this@Room)
+                    Rooms.forget(this@Room)
                 }
             }
         }

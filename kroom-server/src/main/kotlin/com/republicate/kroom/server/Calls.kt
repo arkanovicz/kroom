@@ -36,11 +36,11 @@ private fun refusal(reason: String, args: Json.Object = Json.Object()) = Json.Ob
 fun Route.room(room: Room<*>, principal: suspend (ApplicationCall) -> User?) = serve("/rooms/${room.id}", { room }, principal)
 
 /**
- * The same routes for every room of a kind, `/rooms/{room}/…`: the room is the [Lobby]'s, else [build]s (null: no
- * such room, 404); one built here closes once idle (see [Lobby.getOrCreate]).
+ * The same routes for every room of a kind, `/rooms/{room}/…`: the room is the [Rooms]'s, else [build]s (null: no
+ * such room, 404); one built here closes once idle (see [Rooms.getOrCreate]).
  */
 fun Route.rooms(build: suspend (id: String) -> Room<*>?, principal: suspend (ApplicationCall) -> User?) =
-    serve("/rooms/{room}", { call -> Lobby.getOrCreate(call.parameters["room"]!!, build) }, principal)
+    serve("/rooms/{room}", { call -> Rooms.getOrCreate(call.parameters["room"]!!, build) }, principal)
 
 private fun Route.serve(base: String, resolve: suspend (ApplicationCall) -> Room<*>?, principal: suspend (ApplicationCall) -> User?) {
     if (application.pluginOrNull(SSE) == null) application.install(SSE)

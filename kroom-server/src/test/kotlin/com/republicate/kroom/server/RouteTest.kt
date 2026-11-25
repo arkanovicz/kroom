@@ -153,11 +153,11 @@ class RouteTest {
         assertEquals(HttpStatusCode.OK, read("$tag-a/events", "alice").status)
         assertEquals(HttpStatusCode.OK, send("$tag-b/add", """{"by":1}""", "alice").status)
         assertEquals(listOf("$tag-a", "$tag-b"), built)
-        assertEquals(2, (Lobby.get<LogicRoomTest.Counter>("$tag-a") as Club).state.n)
+        assertEquals(2, (Rooms.get<LogicRoomTest.Counter>("$tag-a") as Club).state.n)
         send("nope/add", "{}", "alice").let { assertEquals(HttpStatusCode.NotFound, it.status); assertEquals("no_room", it.reason()) }
         assertEquals(HttpStatusCode.NotFound, send("$tag-a/set", """{"n":1}""", "alice").status)   // emitted, not posted
         assertEquals(HttpStatusCode.NotFound, read("$tag-a/history", "alice").status)   // no chat, no scroll-back
-        Lobby.remove("$tag-a"); Lobby.remove("$tag-b")
+        Rooms.remove("$tag-a"); Rooms.remove("$tag-b")
     }
 
     @Test fun `arkad's levels, the room's role decides, before the stream starts`() = testApplication {
@@ -185,7 +185,7 @@ class RouteTest {
         assertEquals(HttpStatusCode.Unauthorized, read("$tag-private/stream", null).status)
         assertEquals(HttpStatusCode.OK, send("$tag-private/add", """{"by":1}""", "alice").status)
         sse.sse("/api/rooms/$tag-private/stream?tabId=t1", { header("X-User", "alice") }) { assertEquals("state", incoming.first().event) }
-        listOf("public", "open", "private").forEach { Lobby.remove("$tag-$it") }
+        listOf("public", "open", "private").forEach { Rooms.remove("$tag-$it") }
     }
 
     @Test fun `a spectator reads the stream and the scroll-back, its intents are refused`() = testApplication {

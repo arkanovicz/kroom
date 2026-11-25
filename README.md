@@ -177,7 +177,7 @@ routing {
 (`GET /rooms/{id}/stream`, with a 15 s heartbeat), one `POST /rooms/{id}/{name}` per intent, the
 catalog (`GET /rooms/{id}/events`) and, for a chat, the scroll-back (`GET /rooms/{id}/history`). The
 lambda names the user from the call, null for anonymous. `rooms(build) { call -> user }` serves the same
-routes for every room of a kind, `/rooms/{room}/…`: the `Lobby`'s room of that id, else `build(id)` (null:
+routes for every room of a kind, `/rooms/{room}/…`: the room `Rooms` holds under that id, else `build(id)` (null:
 404 `no_room`), which closes once idle. `LogicRoom(id, state, logic)` is the room for a logic; `ChatRoom`
 adds the chat's history store.
 
@@ -321,7 +321,7 @@ harness replay.
 `Room.on(::Play) { actor, play -> Reason? }`, a class and a handler that mutates the room's state and
 emits itself, still runs underneath (`Table` is on it); its events register into the room's
 `RoomEvents` as they are declared, and the class's `Audience` (`ROOM` / `USERS`) still applies.
-`Route.intents { call -> user }` is the intent door for every room the `Lobby` knows.
+`Route.intents { call -> user }` is the intent door for every room `Rooms` knows.
 
 ## Heartbeat and Dead Connection Detection
 

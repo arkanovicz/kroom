@@ -6,6 +6,10 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-server — the process's index of rooms is `Rooms`
+- `object Lobby` is renamed `Rooms` (`Rooms.getOrCreate`, `register`, `get`, `remove`, `listRooms`, …), its logger
+  `kroom.rooms`: a rename and nothing else. The word `Lobby` is free for the room of rooms to come.
+
 #### kroom-server — a logic hears every connection, each after its graces
 - `LogicRoom` no longer keeps a `join` or a `leave` that is not a user's first or last from its logic: a handler
   declared on `events.join` / `events.leave` hears every connection, and reads `first` / `last` when the user is
