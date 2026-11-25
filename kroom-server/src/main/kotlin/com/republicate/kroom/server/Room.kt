@@ -2,12 +2,16 @@ package com.republicate.kroom.server
 
 import com.republicate.kroom.event.Audience
 import com.republicate.kroom.event.Client
+import com.republicate.kroom.event.Enter
 import com.republicate.kroom.event.Event
+import com.republicate.kroom.event.Exit
 import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.Presence
+import com.republicate.kroom.event.Present
 import com.republicate.kroom.event.Reason
 import com.republicate.kroom.event.RoomEvents
+import com.republicate.kroom.event.Roster
 import com.republicate.kroom.event.Stage
 import com.republicate.kroom.event.Status
 import com.republicate.kroom.event.UserPresence
@@ -40,8 +44,11 @@ enum class Role { ACTOR, SPECTATOR }
  *
  * A join is an event too: the room births [Join] at a connect; the joiner gets its `state`
  * snapshot ([stateToJson]) first, then its own `join` like everyone, the handler's emissions before it.
+ *
+ * [lobby] is the lobby of the room's group, null when it is in none. A private room names its lobby too:
+ * whether it shows there is [show]'s answer.
  */
-abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents()) {
+abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents(), val lobby: Lobby<*, *>? = null) {
     protected val logger = LoggerFactory.getLogger("kroom.room")
     // the thread inside a step: what a handler emits is framed at once, nothing a step produces is re-enqueued
     @Volatile private var loopThread: Thread? = null
@@ -198,6 +205,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         users.values.forEach { it.connectionsByRoom.remove(id) }
         actors.clear(); spectators.clear(); users.clear(); lost.clear(); drops.clear()
         writer.close()
+        lobby?.release(this)
         logger.info("Room '$id' stopped")
     }
 
@@ -252,7 +260,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
      * [to] names the users of a `USERS` audience; none means the emitter. A `BORN` event applies
      * here: it had no door.
      */
-    fun emit(event: Event, to: Collection<User> = emptyList()) {
+    open fun emit(event: Event, to: Collection<User> = emptyList()) {
         if (event.stage == Stage.BORN) event.apply()
         val userIds = to.map { it.userId }
         if (onLoop) frame(event, userIds) else queue.trySend(Op.Emit(event, userIds))
@@ -527,7 +535,7 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         when {
             targets.isNotEmpty() -> toUsers(targets, frame)
             emitted.audience == Audience.USERS -> toUsers(listOfNotNull(emitted.meta.from), frame)
-            else -> { fold(emitted); toAll(frame) }
+            else -> { fold(emitted); toAll(frame); relay(emitted) }
         }
         emitted(emitted)
         // copied on the loop, before anything may touch what the State kept of it; the metadata too (seq, from)
@@ -564,6 +572,46 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         if (channel.trySend(sse).isFailure) {
             logger.warn("Dropping '${actor.name}' from room '$id': not draining")
             actor.disconnect()
+        }
+    }
+
+    // ---- the lobby
+
+    /**
+     * Does the room show in its [lobby]? Asked on the loop. [roster] arrives with the room's id and users, of the
+     * lobby's own class: the room adds its fields. False (a private room): nothing of the room reaches the lobby's
+     * State or wire.
+     */
+    protected open fun show(roster: Roster): Boolean = true
+
+    /**
+     * Asks [show] again and tells the lobby: the roster whole, or that it is gone. For a room whose access changed.
+     * The room calls it itself at its first user.
+     */
+    fun announce() = step {
+        lobby?.let { lobby ->
+            announced = true
+            val roster = lobby.roster(id).also { r -> presences().forEach { r.users.add(it) } }
+            lobby.shown(this, roster.takeIf { show(it) })
+        }
+    }
+
+    // loop-confined: the lobby was told once, so a join is an `enter` from then on
+    private var announced = false
+
+    /** Who is in, as a roster lists them. */
+    internal open fun presences(): List<UserPresence> = users.values.map(::presence)
+
+    /** What the room's own wire says of presence, said to its lobby. */
+    private fun relay(event: Event) {
+        val lobby = lobby ?: return
+        when (event) {
+            is Join -> if (!announced) announce() else event.user?.let { user ->
+                lobby.emit(Enter().also { it.room = id; it.user = UserPresence(user.json.copy()) })
+            }
+            is Status -> event.user?.let { user -> lobby.emit(Present().also { it.room = id; it.user = user; it.status = event.status }) }
+            is Leave -> event.user?.let { user -> lobby.emit(Exit().also { it.room = id; it.user = user.id }) }
+            else -> {}
         }
     }
 

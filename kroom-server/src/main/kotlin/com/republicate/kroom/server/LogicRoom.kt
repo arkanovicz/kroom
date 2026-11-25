@@ -24,7 +24,7 @@ import com.republicate.kson.Json
  * hands them to the logic like intents. Nothing is held here: a deposit is the State's.
  * Every snapshot carries `me`.
  */
-open class LogicRoom<S : State>(id: String, override var state: S, val logic: Logic<S>) : Room<S>(id, logic.events) {
+open class LogicRoom<S : State>(id: String, override var state: S, val logic: Logic<S>, lobby: Lobby<*, *>? = null) : Room<S>(id, logic.events, lobby) {
     // loop-confined: the current step's emission, kept until the intent itself is framed
     private var outcome: Emit<Event>? = null
 
@@ -97,6 +97,9 @@ open class LogicRoom<S : State>(id: String, override var state: S, val logic: Lo
     }
 
     override fun describe(): Json.Object = Json.Object("state" to state.describe(), "events" to events.describe())
+
+    // the fold of the room's own presence frames, in their order
+    override fun presences(): List<UserPresence> = state.users.map { UserPresence(it.json.copy()) }
 
     /** A presence entry, for a test or a lobby. */
     fun presenceOf(userId: String): UserPresence? = users[userId]?.let(::presence)

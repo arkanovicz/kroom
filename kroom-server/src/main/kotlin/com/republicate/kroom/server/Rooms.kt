@@ -1,7 +1,11 @@
 package com.republicate.kroom.server
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -14,6 +18,7 @@ object Rooms {
      * Register a room
      */
     fun <S : Any> register(room: Room<S>): Room<S> {
+        room.lobby?.adopt(room)
         rooms[room.id] = room
         logger.info("Room '${room.id}' registered")
         return room
@@ -30,18 +35,37 @@ object Rooms {
     /**
      * The running room [id], built by [build] on first use (null: no such room). One build at a time: the room is
      * looked up, then under the lock looked up again before building, so two first calls build it once. A room
-     * built here closes once idle and is forgotten; the next call builds it anew.
+     * built here closes once idle and is forgotten; the next call builds it anew. A [build] may call this for
+     * another room (its lobby): it holds the lock already.
      */
     suspend fun getOrCreate(id: String, build: suspend (id: String) -> Room<*>?): Room<*>? =
-        live(id) ?: building.withLock {
-            live(id) ?: build(id)?.also { room ->
-                require(room.id == id) { "built '${room.id}' for '$id'" }
-                room.onDemand = true
-                rooms[id] = room
-                room.idle()
-                logger.info("Room '$id' built on demand")
-            }
-        }
+        live(id) ?: if (currentCoroutineContext()[Building.Key] != null) create(id, build)
+        else building.withLock { withContext(Building) { create(id, build) } }
+
+    private suspend fun create(id: String, build: suspend (id: String) -> Room<*>?): Room<*>? {
+        live(id)?.let { return it }
+        // a lobby may close between the build that fetched it and here: the room is built once more, with the new one
+        var room = build(id) ?: return null
+        if (!adopted(room)) room = build(id)?.also { check(adopted(it)) { "room '$id': its lobby is closed" } } ?: return null
+        require(room.id == id) { "built '${room.id}' for '$id'" }
+        room.onDemand = true
+        rooms[id] = room
+        room.idle()
+        logger.info("Room '$id' built on demand")
+        return room
+    }
+
+    /** The room is in its lobby's group from here on; false: that lobby closed, and the room is stopped. */
+    private fun adopted(room: Room<*>): Boolean = try {
+        room.lobby?.adopt(room)
+        true
+    } catch (e: IllegalStateException) {
+        room.stop()
+        false
+    }
+
+    /** Marks the coroutine that holds the lock, through the builds it runs. */
+    private object Building : AbstractCoroutineContextElement(Key) { object Key : CoroutineContext.Key<Building> }
 
     private fun live(id: String): Room<*>? = rooms[id]?.takeIf { it.running }
 

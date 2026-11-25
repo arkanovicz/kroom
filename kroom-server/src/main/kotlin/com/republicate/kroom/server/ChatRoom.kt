@@ -18,7 +18,7 @@ import kotlinx.coroutines.runBlocking
  * [ChatHistory.last]). A join gets the tail in its `state`, in whatever order and size the app keeps it; older lines
  * come from [before], newer ones from [after]. Lines are the State's [ChatState.line] everywhere.
  */
-open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history: ChatHistory<C>, state: S, logic: Logic<S>) : LogicRoom<S>(id, state, logic) {
+open class ChatRoom<C : Chat, S : ChatState<C>>(id: String, private val history: ChatHistory<C>, state: S, logic: Logic<S>, lobby: Lobby<*, *>? = null) : LogicRoom<S>(id, state, logic, lobby) {
 
     // the State's lines and the store's never share a JSON: one may change while the other is read
     private fun copy(line: Chat): C = state.line(line.json.copy())
