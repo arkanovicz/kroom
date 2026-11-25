@@ -61,7 +61,7 @@ val done: Emit<Nothing> = Emit(emptyList())
 
 /**
  * The room's decisions: one handler per intent of its [events], declared on the entry
- * (`on(LobbyEvents.play) { state, actor, play -> … }`), one per cancellable intent's `cancel`. Common
+ * (`on(ChifoumiEvents.play) { state, actor, play -> … }`), one per cancellable intent's `cancel`. Common
  * code, pure and stateless — a function of its arguments and of what the platform hands its
  * constructor (a clock, ids) — the loop's business (framing, numbering) kept out: it runs the same
  * in a test, on the server, in a browser. It decides once the intent's [Event.check] passed: what

@@ -21,15 +21,15 @@ class ChifoumiLogicTest {
     private val logic = ChifoumiLogic(ids = { "m${++n}" })
 
     private fun json(vararg pairs: Pair<String, Any?>) = Json.MutableObject(*pairs)
-    private fun LobbyState.fold(vararg frames: Event) = frames.forEach { reduce(it) }
+    private fun ChifoumiState.fold(vararg frames: Event) = frames.forEach { reduce(it) }
     /** As the room does: the check, the decision, then the intent's frame and what it emits, folded. */
-    private fun LobbyState.act(actor: Who, intent: Event): Outcome<Event> {
+    private fun ChifoumiState.act(actor: Who, intent: Event): Outcome<Event> {
         if (intent is Cancel) intent.user = actor.id   // the room's
         return (intent.check(this, actor) ?: logic.decide(this, actor, intent)).also { if (it is Emit) { fold(intent); it.events.forEach { e -> fold(e) } } }
     }
 
     @Test fun `wanting a match is a deposit the second one pairs and the queue is the fold`() {
-        val state = LobbyState()
+        val state = ChifoumiState()
         val wantA = Match()
         assertSame(done, logic.decide(state, alice, wantA))
         assertEquals("a", wantA.player?.id); assertNull(wantA.match)
@@ -49,7 +49,7 @@ class ChifoumiLogicTest {
     }
 
     @Test fun `a move is a deposit the second resolves the round and the stats are the fold`() {
-        val state = LobbyState()
+        val state = ChifoumiState()
         state.act(alice, Match())
         state.act(bob, Match())
         val rock = Play(json("move" to "ROCK"))
@@ -71,7 +71,7 @@ class ChifoumiLogicTest {
     }
 
     @Test fun `a withdrawn move frees the round a leave forfeits the match`() {
-        val state = LobbyState()
+        val state = ChifoumiState()
         state.act(alice, Match())
         assertSame(done, state.act(alice, Cancel(json("intent" to "match"))))
         assertTrue(state.queue.isEmpty())

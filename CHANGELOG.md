@@ -10,6 +10,10 @@ All notable changes to kroom will be documented in this file.
 - `object Lobby` is renamed `Rooms` (`Rooms.getOrCreate`, `register`, `get`, `remove`, `listRooms`, …), its logger
   `kroom.rooms`: a rename and nothing else. The word `Lobby` is free for the room of rooms to come.
 
+#### kroom-examples/chifoumi — `ChifoumiState`, `ChifoumiEvents`
+- Chifoumi's `LobbyState` and `LobbyEvents` take the app's name, in the code, the pages' headers and the guide's
+  examples: those two names are kroom's from here on.
+
 #### kroom-server — a logic hears every connection, each after its graces
 - `LogicRoom` no longer keeps a `join` or a `leave` that is not a user's first or last from its logic: a handler
   declared on `events.join` / `events.leave` hears every connection, and reads `first` / `last` when the user is

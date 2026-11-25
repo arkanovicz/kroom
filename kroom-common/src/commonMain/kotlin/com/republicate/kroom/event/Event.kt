@@ -49,7 +49,7 @@ abstract class Event(
 
     /**
      * The stateful half of validation, declared in the event's body, typed on the State it reads:
-     * `init { check { state: LobbyState, actor -> … } }`. It reads the `in` fields and the State, never an
+     * `init { check { state: ChifoumiState, actor -> … } }`. It reads the `in` fields and the State, never an
      * `out` field (the logic fills those later); no I/O. Null: the logic may decide. Checks compose like `init`
      * blocks: a subclass's is run after its parent's, and the first refusal wins.
      */

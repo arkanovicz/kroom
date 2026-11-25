@@ -7,7 +7,7 @@ import com.republicate.kroom.event.Join
 import com.republicate.kroom.event.JsonView
 import com.republicate.kroom.event.Leave
 import com.republicate.kroom.event.State
-import com.republicate.kroom.examples.chifoumi.game.LobbyState
+import com.republicate.kroom.examples.chifoumi.game.ChifoumiState
 import com.republicate.kroom.examples.chifoumi.game.Match
 import com.republicate.kroom.examples.chifoumi.game.MatchView
 import com.republicate.kroom.examples.chifoumi.game.Play
@@ -21,7 +21,7 @@ typealias Say = (key: String, vars: Map<String, Any?>) -> String
  * The lobby's page memory: the feed, past frames the snapshot has no memory of (newest first, ten kept), and the
  * viewer's perspective on the marking. Its memory is fields, like any State's: a merge sees what went through them.
  */
-class LobbyPage(private val room: Room<LobbyState>, private val say: Say, private val now: () -> String) : State() {
+class LobbyPage(private val room: Room<ChifoumiState>, private val say: Say, private val now: () -> String) : State() {
     class Line(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
         var text by string()
         var time by string()
@@ -58,7 +58,7 @@ class LobbyPage(private val room: Room<LobbyState>, private val say: Say, privat
  * screen for two seconds), what the opponent last did. Phases: `choose`, `waiting` (the viewer has played), `reveal`, `over`.
  */
 class GamePage(
-    private val room: Room<LobbyState>,
+    private val room: Room<ChifoumiState>,
     private val say: Say,
     /** Why a move wins, by `winner-loser` (or `draw`). */
     private val verdict: (String) -> String,

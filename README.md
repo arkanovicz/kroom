@@ -89,7 +89,7 @@ Four declarations, the matchmaking part of the chifoumi example:
 
 ```kotlin
 // the data: a view over the room's JSON, reduce its only writer
-class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Chat>(json, line = ::Chat) {
+class ChifoumiState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Chat>(json, line = ::Chat) {
     val queue by keyed(::Player)                     // who waits, by id, in order
     override fun reduce(event: Event) {
         super.reduce(event)                           // the chat's, then presence (users)
@@ -105,23 +105,23 @@ class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Ch
 // an event: one name, one class, both directions; fields are declared, so the class is also data
 class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", json = json) {
     var player by obj(::Player).out                   // the logic fills it; a client sending it is refused
-    init { check { state: LobbyState, actor -> if (actor.id in state.queue) Reason("in_queue") else null } }
+    init { check { state: ChifoumiState, actor -> if (actor.id in state.queue) Reason("in_queue") else null } }
 }
 
 // the alphabet: every name on the wire; join, leave, status, cancel are kroom's, in every room
-object LobbyEvents : ChatEvents<Chat>(::Chat) {
+object ChifoumiEvents : ChatEvents<Chat>(::Chat) {
     val match = intent(::Match, cancellable = true)   // a client may post it, and withdraw its deposit
     val round = event(::Round)                        // only the logic emits it
 }
 
 // the decisions: one typed handler per intent, pure; the platform's pieces come in by the constructor
-class MatchmakingLogic(private val ids: () -> String) : Logic<LobbyState>(LobbyEvents) {
+class MatchmakingLogic(private val ids: () -> String) : Logic<ChifoumiState>(ChifoumiEvents) {
     init {
-        on(LobbyEvents.match) { state, actor, match ->
+        on(ChifoumiEvents.match) { state, actor, match ->
             match.player = Player(Json.MutableObject("id" to actor.id, "name" to actor.name))
             done                                       // the intent's own frame: the fold queues the player
         }
-        cancel(LobbyEvents.match) { state, actor, _ -> if (actor.id in state.queue) done else Reason("nothing_to_cancel") }
+        cancel(ChifoumiEvents.match) { state, actor, _ -> if (actor.id in state.queue) done else Reason("nothing_to_cancel") }
     }
 }
 ```
@@ -164,7 +164,7 @@ snapshot. `Event.to(users…)` addresses a frame to some users: a message, not f
 ### Serving it (kroom-server)
 
 ```kotlin
-object Arena : ChatRoom<Chat, LobbyState>("lobby", MemoryChatHistory(), LobbyState(), MatchmakingLogic(ids))
+object Arena : ChatRoom<Chat, ChifoumiState>("lobby", MemoryChatHistory(), ChifoumiState(), MatchmakingLogic(ids))
 
 routing {
     route("/api") {
@@ -244,7 +244,7 @@ The app compiles its common module to JS (one bundle) with its pages: velocity t
 roots, compiled at build by the velocity gradle plugin, translated per language by kroom's l10n.
 
 ```
-##@ state: LobbyState
+##@ state: ChifoumiState
 ##@ page: LobbyPage
 ##@output web
 <p>$state.queue.size waiting</p>
@@ -253,10 +253,10 @@ roots, compiled at build by the velocity gradle plugin, translated per language 
 ```
 ```kotlin
 fun main() {
-    val room = Room("lobby", LobbyState(), LobbyEvents, engine)
+    val room = Room("lobby", ChifoumiState(), ChifoumiEvents, engine)
     room.page = LobbyPage(room)                                // what the page knows and no room does
     room.attach("en/lobby.html", document.getElementById("lobby")!!)
-    room.on(LobbyEvents.chat) { scrollChatToBottom() }         // typed reaction to one name
+    room.on(ChifoumiEvents.chat) { scrollChatToBottom() }         // typed reaction to one name
     room.connect()                                             // <api>/rooms/lobby/stream
 }
 ```
@@ -310,7 +310,7 @@ fun main() {
 
 `kroom-examples/chifoumi` is the proof: one `ChatRoom` lobby, matchmaking and rounds of
 rock-paper-scissors-well, a round's moves selective fields of its match. `chifoumi-common` holds the
-State, the events, `LobbyEvents`, `ChifoumiLogic` and the pages, compiled for the JVM and the browser.
+State, the events, `ChifoumiEvents`, `ChifoumiLogic` and the pages, compiled for the JVM and the browser.
 `ChifoumiLogicTest` runs the decisions on both; `LobbyTest` records a whole match as one tab sees it
 and checks the fold of it is the snapshot the room would serve; the recording is the golden that
 `FoldTest` (JVM, node), `RegionsTest` (each region's DOM against its text render) and the pages' jsdom

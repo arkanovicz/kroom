@@ -3,8 +3,8 @@ package com.republicate.kroom.examples.chifoumi
 import com.republicate.kroom.client.Room
 import com.republicate.kroom.event.State
 import com.republicate.kroom.examples.chifoumi.game.FoldTest
-import com.republicate.kroom.examples.chifoumi.game.LobbyEvents
-import com.republicate.kroom.examples.chifoumi.game.LobbyState
+import com.republicate.kroom.examples.chifoumi.game.ChifoumiEvents
+import com.republicate.kroom.examples.chifoumi.game.ChifoumiState
 import com.republicate.kson.Json
 import org.apache.velocity.engine.Config
 import org.apache.velocity.engine.VelocityContext
@@ -33,7 +33,7 @@ class RegionsTest {
     private class Region(val template: String, val root: DElement)
 
     /** The room's regions, each checked against its text render after every frame. */
-    private fun replay(room: Room<LobbyState>, page: State, vararg templates: String, frames: List<Json.Object>, after: (Int, List<DElement>) -> Unit = { _, _ -> }) {
+    private fun replay(room: Room<ChifoumiState>, page: State, vararg templates: String, frames: List<Json.Object>, after: (Int, List<DElement>) -> Unit = { _, _ -> }) {
         val tree = TreeDouble()
         val regions = templates.map { Region(it, tree.element("div")) }
         room.page = page
@@ -49,7 +49,7 @@ class RegionsTest {
     }
 
     @Test fun `the lobby's regions over the match`() {
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        val room = Room("chifoumi-lobby", ChifoumiState(), ChifoumiEvents, engine)
         val page = LobbyPage(room, say) { "t" }
         var stat: DElement? = null
         var line: DElement? = null
@@ -69,7 +69,7 @@ class RegionsTest {
 
     /** The merge is targeted: a frame writing one line of the chat renders that item's body, the others are clean. */
     @Test fun `a frame writing one line renders one body`() {
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        val room = Room("chifoumi-lobby", ChifoumiState(), ChifoumiEvents, engine)
         val tree = TreeDouble()
         val root = tree.element("div")
         room.page = LobbyPage(room, say) { "t" }
@@ -90,7 +90,7 @@ class RegionsTest {
 
     /** A region is merged when a root its header declares changed: `online.html` reads the state, `lobby.html` the state and the page. */
     @Test fun `a region none of whose roots changed is not merged`() {
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        val room = Room("chifoumi-lobby", ChifoumiState(), ChifoumiEvents, engine)
         room.page = LobbyPage(room, say) { "t" }
         val online = TreeDouble(); val onlineRoot = online.element("div")
         val lobby = TreeDouble(); val lobbyRoot = lobby.element("div")
@@ -110,7 +110,7 @@ class RegionsTest {
     @Test fun `the game's regions over the match`() {
         val match = frames[3].getObject("data")!!.getObject("match")!!
         val snapshot = Json.MutableObject(frames[0]).also { it["data"] = Json.MutableObject(frames[0].getObject("data")!!).also { d -> d["matches"] = Json.MutableObject(match.getString("id")!! to match) } }
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        val room = Room("chifoumi-lobby", ChifoumiState(), ChifoumiEvents, engine)
         var pending: (() -> Unit)? = null
         val page = GamePage(room, say, verdict = { "verdict $it" }, later = { _, fn -> pending = fn; { pending = null } })
         val shown = ArrayList<String>()
@@ -127,7 +127,7 @@ class RegionsTest {
     @Test fun `a region that faults is marked broken, the others merge, and its next merge builds it again`() {
         val match = frames[3].getObject("data")!!.getObject("match")!!
         val snapshot = Json.MutableObject(frames[0].getObject("data")!!).also { it["matches"] = Json.MutableObject(match.getString("id")!! to match) }
-        val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+        val room = Room("chifoumi-lobby", ChifoumiState(), ChifoumiEvents, engine)
         var wordless = false
         val page = GamePage(room, { key, vars -> if (wordless) error("no words") else say(key, vars) }, verdict = { "verdict $it" }, later = { _, _ -> {} })
         room.page = page

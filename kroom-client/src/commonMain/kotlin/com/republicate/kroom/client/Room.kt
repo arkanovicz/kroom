@@ -85,7 +85,7 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
         return intent.validate() ?: intent.check(state, actor)
     }
 
-    /** An effect after the merge of each frame of [entry]'s name, handed the event typed: `on(LobbyEvents.round) { round -> … }`. */
+    /** An effect after the merge of each frame of [entry]'s name, handed the event typed: `on(ChifoumiEvents.round) { round -> … }`. */
     @Suppress("UNCHECKED_CAST")
     fun <E : Event> on(entry: RoomEvents.Entry<E>, reaction: (E) -> Unit): Room<S> =
         react { name, event -> if (name == entry.name && event != null) reaction(event as E) }   // folded by the entry's factory: an E

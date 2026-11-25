@@ -31,7 +31,7 @@ class LobbyTest {
 
     /** Ids and the clock fixed: the recording is the same at every run. */
     @OptIn(ExperimentalTime::class)
-    private class Arena(id: String) : ChatRoom<Chat, LobbyState>(id, MemoryChatHistory(), LobbyState(),
+    private class Arena(id: String) : ChatRoom<Chat, ChifoumiState>(id, MemoryChatHistory(), ChifoumiState(),
         ChifoumiLogic(object : Clock { override fun now() = Instant.parse("2026-10-27T12:00:00Z") }, ids = { "m1" })) {
         override val leaveGrace = 0L
         override fun shouldCloseWhenEmpty() = false
@@ -62,7 +62,7 @@ class LobbyTest {
         assertEquals(listOf("state", "join", "match", "match", "chat", "play", "play", "round", "play", "cancel", "play", "play", "round", "leave", "match"), seen.map { it.event })
         // commutation: the fold of what bob's tab received is the snapshot bob would get now
         val final = room.stateToJson(b)
-        val store = Store(LobbyState(), LobbyEvents)
+        val store = Store(ChifoumiState(), ChifoumiEvents)
         seen.forEach { store.fold(it.event!!, it.data!!) }
         assertEquals(final, store.json)   // kson compares objects as maps, numbers by value
         // the recording, the golden of the browser's fold (chifoumi-common's FoldTest) and of the pages (src/test/js): refresh it when the wire changes

@@ -11,7 +11,7 @@ import com.republicate.kroom.event.Leave
 import com.republicate.kson.Json
 
 /** The lobby's alphabet: the chat's, the game's intents, the round the logic emits; kroom's beside. */
-object LobbyEvents : ChatEvents<Chat>(::Chat) {
+object ChifoumiEvents : ChatEvents<Chat>(::Chat) {
     val match = intent(::Match, cancellable = true)
     val play = intent(::Play, cancellable = true)
     val round = event(::Round)
@@ -109,7 +109,7 @@ class Match(json: Json.MutableObject = Json.MutableObject()) : Event("match", js
     var player by obj(::Player).out     // who wants one (a deposit); absent when the room ends a match
     var match by obj(::MatchView).out   // the match, when one starts or ends
     init {
-        check { state: LobbyState, actor ->
+        check { state: ChifoumiState, actor ->
             when {
                 state.myMatch(actor.id) != null -> Reason("in_match")
                 actor.id in state.queue -> Reason("in_queue")
@@ -124,7 +124,7 @@ class Play(json: Json.MutableObject = Json.MutableObject()) : Event("play", json
     val move by enum<Move>().required.visibleTo { it == player }
     var player by string().out
     init {
-        check { state: LobbyState, actor ->
+        check { state: ChifoumiState, actor ->
             val match = state.myMatch(actor.id)
             when {
                 match == null -> Reason("not_in_match")
@@ -142,7 +142,7 @@ class Round(json: Json.MutableObject = Json.MutableObject()) : Event("round", js
 }
 
 /** The lobby's State: the chat's tail, who waits, the matches running, the totals. */
-class LobbyState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Chat>(json, line = ::Chat) {
+class ChifoumiState(json: Json.MutableObject = Json.MutableObject()) : ChatState<Chat>(json, line = ::Chat) {
     val queue by keyed(::Player)
     val matches by keyed(::MatchView)
     val stats by obj(::Stats)

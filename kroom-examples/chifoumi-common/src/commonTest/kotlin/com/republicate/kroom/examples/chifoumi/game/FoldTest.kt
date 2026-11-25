@@ -12,7 +12,7 @@ expect fun golden(): String
 /** The browser's fold is the server's: the same class, on every platform, reaches the snapshot the room would serve. */
 class FoldTest {
     @Test fun `the fold of the recorded frames is the room's snapshot`() {
-        val store = Store(LobbyState(), LobbyEvents)
+        val store = Store(ChifoumiState(), ChifoumiEvents)
         var checked = false
         golden().lines().filter { it.isNotBlank() }.map { Json.parse(it) as Json.Object }.forEach { line ->
             val event = line.getString("event")!!

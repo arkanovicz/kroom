@@ -7,8 +7,8 @@ import com.republicate.kroom.client.localeOf
 import com.republicate.kroom.client.localized
 import com.republicate.kroom.client.pageLanguage
 import com.republicate.kroom.client.say
-import com.republicate.kroom.examples.chifoumi.game.LobbyEvents
-import com.republicate.kroom.examples.chifoumi.game.LobbyState
+import com.republicate.kroom.examples.chifoumi.game.ChifoumiEvents
+import com.republicate.kroom.examples.chifoumi.game.ChifoumiState
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.apache.velocity.engine.Config
@@ -18,12 +18,12 @@ import velocity.templates.VelocityTemplates
 import kotlin.js.Date
 
 /**
- * The browser's side of the arena, both pages: the lobby's fold is [LobbyState], the same class the server runs;
+ * The browser's side of the arena, both pages: the lobby's fold is [ChifoumiState], the same class the server runs;
  * the room's parts of the page are regions, compiled pages merged into the document after every frame, in the
  * document's language. What stays in code is the page memory ([LobbyPage], [GamePage]) and the reactions.
  */
 fun main() {
-    val room = Room("chifoumi-lobby", LobbyState(), LobbyEvents, engine)
+    val room = Room("chifoumi-lobby", ChifoumiState(), ChifoumiEvents, engine)
     val lang = pageLanguage()
     fun region(id: String, template: String) = document.getElementById(id)?.let { room.attach(engine.localized(lang) { "$it/$template" }, it) }
     val say: Say = { key, vars -> say(key, vars) }
@@ -33,7 +33,7 @@ fun main() {
         room.page = page
         region("online-num", "online.html")
         region("lobby-section", "lobby.html")
-        room.on(LobbyEvents.chat) { document.getElementById("chat-log")?.let { it.scrollTop = it.scrollHeight.toDouble() } }
+        room.on(ChifoumiEvents.chat) { document.getElementById("chat-log")?.let { it.scrollTop = it.scrollHeight.toDouble() } }
         room.react { _, _ -> if (page.match != null) window.location.href = "/$lang/game.html" }   // the viewer's match is on (a reconnect lands there too)
     }
     if (document.getElementById("game-area") != null) {
