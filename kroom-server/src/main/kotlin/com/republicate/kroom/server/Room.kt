@@ -611,9 +611,9 @@ abstract class Room<S : Any>(val id: String, val events: RoomEvents = RoomEvents
         val lobby = lobby ?: return
         when (event) {
             is Join -> if (!announced) announce()
-                else lobby.emit(Enter().also { it.room = id; it.user = event.user?.let { user -> UserPresence(user.json.copy()) } })
-            is Status -> event.user?.let { user -> lobby.emit(Present().also { it.room = id; it.user = user; it.status = event.status }) }
-            is Leave -> lobby.emit(Exit().also { it.room = id; it.user = event.user?.id })
+                else lobby.relay(this, Enter().also { it.room = id; it.user = event.user?.let { user -> UserPresence(user.json.copy()) } })
+            is Status -> event.user?.let { user -> lobby.relay(this, Present().also { it.room = id; it.user = user; it.status = event.status }) }
+            is Leave -> lobby.relay(this, Exit().also { it.room = id; it.user = event.user?.id })
             else -> {}
         }
     }

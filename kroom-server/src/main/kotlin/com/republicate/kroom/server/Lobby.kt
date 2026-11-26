@@ -36,21 +36,33 @@ open class Lobby<R : Roster, S : LobbyState<R>>(id: String, state: S, logic: Log
         live += room
     }
 
+    // loop-confined: the room that showed each roster. A room closing late must not take away, nor move, the roster
+    // of the one rebuilt under its id
+    private val shownBy = HashMap<String, Room<*>>()
+
     /** A room of the group stopped: its roster goes, and the lobby may be idle. */
     internal fun release(room: Room<*>) {
         val none = synchronized(live) { live -= room; live.isEmpty() }
-        emit(Hide().also { it.room = room.id })
+        shown(room, null)
         if (none) idle()
     }
 
     /** A roster of this lobby's class, for [room]. */
     internal fun roster(room: String): R = state.roster(Json.MutableObject("id" to room))
 
-    /** A room's answer to [Room.show]: its roster whole, or null when it does not show. */
+    /** A room's answer to [Room.show]: its roster whole, or null when it does not show; the roster is that room's from then on. */
     @Suppress("UNCHECKED_CAST")
-    internal fun shown(room: Room<*>, roster: Roster?) {
-        if (roster == null) emit(Hide().also { it.room = room.id })
-        else emit(Show(state.roster).also { it.roster = roster as R })
+    internal fun shown(room: Room<*>, roster: Roster?) = step {
+        if (roster != null) {
+            shownBy[room.id] = room
+            emit(Show(state.roster).also { it.roster = roster as R })
+        } else if (shownBy.remove(room.id, room)) emit(Hide().also { it.room = room.id })
+    }
+
+    /** What [room]'s own wire says of presence: heard from the room that showed the roster, from no other. */
+    internal fun relay(room: Room<*>, event: RosterEvent) = step {
+        if (shownBy[room.id] === room) emit(event)
+        else logger.debug("{} {} dropped: room '{}' is not the one that shows", id, event.name, event.room)
     }
 
     /** An event about a room that does not show is dropped: a hidden room cannot leak through it. */

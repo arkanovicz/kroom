@@ -145,6 +145,37 @@ class LobbyTest {
         den.stop(); lobby.stop()
     }
 
+    @Test fun `a roster is the room's that showed it, whatever a room closing late under the same id says`() = runBlocking {
+        val lobby = lobby()
+        val wanda = lobby.watch("wanda")
+        val id = "den-${n++}"
+        val old = Den(id, lobby)
+        old.join(actor("alice"))
+        assertEquals(listOf("alice"), wanda.next("show").getObject("roster")!!.ids("users"))
+
+        // rebuilt under the id while the first one is still closing: the roster is the new room's
+        val rebuilt = Den(id, lobby)
+        rebuilt.join(actor("bob"))
+        assertEquals(listOf("bob"), wanda.next("show").getObject("roster")!!.ids("users"))
+        old.join(actor("carol"))   // what the old one still says moves nothing
+        old.stop()                 // nor does its close hide anything
+        wanda.silent()
+        assertEquals(listOf("bob"), lobby.state.rooms[id]!!.users.map { it.id })
+        rebuilt.join(actor("dave"))
+        assertEquals("dave", wanda.next("enter").getObject("user")!!.getString("id"))
+
+        // closed before the next one shows: the roster goes at once, the next room's comes with its first user
+        val third = Den(id, lobby)
+        rebuilt.stop()
+        assertEquals(id, wanda.next("hide").getString("room"))
+        third.join(actor("erin"))
+        assertEquals(listOf("erin"), wanda.next("show").getObject("roster")!!.ids("users"))
+        third.stop()
+        assertEquals(id, wanda.next("hide").getString("room"))
+        wanda.silent()
+        lobby.stop()
+    }
+
     @Test fun `a room that does not show leaves no trace, until it announces otherwise`() = runBlocking {
         val lobby = Lobby("lobby-${n++}", VoicedState(), LobbyLogic<VoicedState>(VoicedEvents))
         val wanda = lobby.watch("wanda")
