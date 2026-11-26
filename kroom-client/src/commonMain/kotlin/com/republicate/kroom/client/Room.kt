@@ -28,9 +28,9 @@ import org.apache.velocity.engine.sink.OutputSink
  * a write through their fields; `me`: a snapshot), so a header declares every root the region reads, through a page
  * getter too. A snapshot, the first merge and a pass the page asks for itself merge every region and render every item.
  *
- * A region whose merge faults is the only one to suffer: the others merge, its root carries [BROKEN] (the page's
- * stylesheet says what a broken region looks like), [onFault] is told, and its next merge builds it again whole —
- * the sink starts over after a fault.
+ * A region whose merge faults is the only one to suffer: the others merge, its root carries [BROKEN] (seen in the
+ * browser by a default rule the page's stylesheet overrides), [onFault] is told, and its next merge builds it again
+ * whole — the sink starts over after a fault.
  *
  * [engine] knows the pages: on the browser, the app's compiled classes behind its template registry.
  */

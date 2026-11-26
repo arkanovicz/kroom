@@ -15,8 +15,29 @@ import kotlin.js.Promise
 fun pageLanguage(): String = document.documentElement?.getAttribute("lang")?.takeIf { it.isNotEmpty() } ?: "en"
 
 /** The page merged under [root] of the live document, its `[data-kroom-intent]` triggers posting to the room — through [post], when a region has a turn of its own to keep. */
-fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!, post: (String, Json.Object) -> Promise<dynamic> = { type, payload -> act(type, payload) }): Room<S> =
-    attach(template, JsTree(document), root as Node).also { Intents(root, store.events, post) }
+fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!, post: (String, Json.Object) -> Promise<dynamic> = { type, payload -> act(type, payload) }): Room<S> {
+    showBroken()
+    return attach(template, JsTree(document), root as Node).also { Intents(root, store.events, post) }
+}
+
+/** What a broken region looks like where the page says nothing: `:where()` weighs nothing, any rule of the page's wins. */
+internal const val BROKEN_STYLE =
+    ":where([${Room.BROKEN}]) { outline: 2px dashed #dc2626; outline-offset: 2px; min-height: 1.5rem; }\n" +
+    ":where([${Room.BROKEN}])::before { content: \"\u26A0\"; color: #dc2626; }"
+
+private var brokenShown = false
+
+/** [BROKEN_STYLE] given to the document, once: a constructed sheet where the browser has them, no element for a style policy to refuse. */
+internal fun showBroken() {
+    if (brokenShown) return
+    brokenShown = true
+    val doc: dynamic = document
+    if (doc.adoptedStyleSheets != null) {
+        val sheet: dynamic = js("new CSSStyleSheet()")
+        sheet.replaceSync(BROKEN_STYLE)
+        doc.adoptedStyleSheets = doc.adoptedStyleSheets.concat(sheet)
+    } else document.head?.appendChild(document.createElement("style").also { it.textContent = BROKEN_STYLE })
+}
 
 /**
  * The room's stream (`<api>/rooms/<name>/stream`, what kroom-server's `Route.room` mounts): the snapshot first, then
