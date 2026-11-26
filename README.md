@@ -1094,6 +1094,8 @@ rooms({ id ->
   anonymous watchers.
 - A room whose `show(roster)` answers false leaves no trace in the lobby: no roster, no id, no frame. An app's own
   event about that room is dropped too.
+- A roster belongs to the room that showed it. A room rebuilt under the same id takes it over with its own
+  `show`; what the closing one still says, its `hide` included, is ignored from then on.
 - `announce()` asks `show` again: call it after the room's access changed. A `show` or a `hide` frame follows.
 - The lobby's `role(user)` says who watches, as any room's. Every frame goes to every watcher; the base's `users`
   is who watches.

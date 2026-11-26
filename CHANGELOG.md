@@ -1129,6 +1129,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-server — a room rebuilt under an id keeps its roster
+- A room closing while another is built under its id could hide the new room's roster: its `hide` landed after
+  the new `show`, and the new room's `enter` / `exit` were then dropped.
+- A roster now belongs to the room that showed it. A `hide`, an `enter`, a `present` or an `exit` from another
+  room of that id changes nothing. Pinned in `LobbyTest` (server).
+
 #### kroom-server — a `join` always has its `leave`
 - A connection without a user that joins twice under one id is framed once: its second `join` said a newcomer
   that its single `leave` never took back.
