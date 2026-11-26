@@ -122,6 +122,14 @@ All notable changes to kroom will be documented in this file.
   where it lands (velocity's `BodyContent`): what it inserts is escaped there — it went raw.
 - Pinned in `SanitizerTest`, and through a page in `PagesTest`.
 
+#### velocity 3.0.0-BETA-20261126-01
+- Two numbers of different types are equal when their values are: a `Long` count against `0` is true in a page's
+  `#if`, where it was silently false.
+- A compiled page comparing two different types that are not both numbers with `==` no longer builds. None of
+  kroom's pages did.
+- `JvmTree` is the DOM sink's tree over the JDK's `org.w3c.dom`: a JVM test can read a merged page as a document.
+- No test moved.
+
 #### velocity 3.0.0-BETA-20261116-04
 - Bumped (`-03` came without a note: a macro defined twice, in one template or by a parent and the template it
   parses, keeps its first definition unless `replace_global`). A map or a list inserted where a literal goes — a
