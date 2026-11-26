@@ -52,7 +52,7 @@ class TextTest {
         assertEquals(s.json.toString(), again.json.toString())   // no second birth
     }
 
-    @Test fun `a text as stored is cut again into free parts, the next one born after them`() {
+    @Test fun `a text as stored is cut again into free parts - the next one born after them`() {
         val stored = "A\n\nB\n\n```\nx\n\ny\n```"
         val s = TextState(stored)
         assertEquals(listOf("1", "2", "3"), ids(s))
@@ -85,7 +85,7 @@ class TextTest {
         s.refused("held {\"id\":\"2\",\"by\":\"a\"}", a1, take("2"))
     }
 
-    @Test fun `a take elsewhere gives back what was held, cut`() {
+    @Test fun `a take elsewhere gives back what was held - cut`() {
         val s = TextState("X\n\nY")
         s.act(a1, take("1"))
         s.act(a1, write("1", "A\n\nB"))
@@ -105,7 +105,7 @@ class TextTest {
         assertEquals(listOf("a/t1"), holders(t))
     }
 
-    @Test fun `a paragraph begun is a part born after, held`() {
+    @Test fun `a paragraph begun is a part born after - held`() {
         val free = TextState("A\n\nB")
         assertNull(free.act(a1, after("1")))
         assertEquals(listOf("1", "3", "2"), ids(free))
@@ -135,7 +135,7 @@ class TextTest {
         other.refused("invalid {\"field\":\"ids\"}", a1, Take(Json.MutableObject()))
     }
 
-    @Test fun `a blank part left by a paragraph begun after it goes, the new one stays`() {
+    @Test fun `a blank part left by a paragraph begun after it goes - the new one stays`() {
         val s = TextState("A\n\nB")
         s.act(a1, take("2"))
         s.act(a1, write("2", ""))
@@ -151,7 +151,7 @@ class TextTest {
         assertEquals(listOf("a/t1"), holders(empty))
     }
 
-    @Test fun `a caret is the holder's, said by each write and gone with the hold`() {
+    @Test fun `a caret is the holder's - said by each write and gone with the hold`() {
         val s = TextState("X\n\nY")
         s.act(a1, take("1"))
         assertNull(s.act(a1, write("1", "Hello", 3)))
@@ -184,7 +184,7 @@ class TextTest {
         assertTrue(s.parts.all { it.free })
     }
 
-    @Test fun `a take of adjacent parts makes one, the first, saying what they all said`() {
+    @Test fun `a take of adjacent parts makes one - the first - saying what they all said`() {
         val s = TextState("A\n\nB\n\nC\n\nD")
         assertNull(s.act(a1, take("1", "2", "3")))
         assertEquals(listOf("1", "4"), ids(s))
@@ -198,7 +198,7 @@ class TextTest {
         t.refused("scattered", a1, take("1", "3"))
     }
 
-    @Test fun `a write is the part's text whole, kept as typed while held`() {
+    @Test fun `a write is the part's text whole - kept as typed while held`() {
         val s = TextState("A\n\nB")
         s.act(a1, take("2"))
         assertNull(s.act(a1, write("2", "x\n\n\ny\n")))
@@ -212,7 +212,7 @@ class TextTest {
         s.refused("gone {\"id\":\"9\"}", a1, write("9", "z"))
     }
 
-    @Test fun `a release cuts the part, the paragraphs born after it free`() {
+    @Test fun `a release cuts the part - the paragraphs born after it free`() {
         val s = TextState("X\n\nY\n\nZ")
         s.act(a1, take("2"))
         s.act(a1, write("2", "A\n\nB\n\nC"))
@@ -267,7 +267,7 @@ class TextTest {
         t.refused("held {\"id\":\"2\",\"by\":\"a\"}", b, take("1", "2", "3"))
     }
 
-    @Test fun `writes without a release in between change one part, nothing doubled`() {
+    @Test fun `writes without a release in between change one part - nothing doubled`() {
         val s = TextState()
         s.act(a1, take("1"))
         assertNull(s.act(a1, write("1", "A\n\nB")))
@@ -279,7 +279,7 @@ class TextTest {
         assertEquals(listOf("1", "2", "3"), ids(s))
     }
 
-    @Test fun `a late view is refused, never misapplied`() {
+    @Test fun `a late view is refused - never misapplied`() {
         val s = TextState("A")
         s.act(a1, take("1"))
         s.act(a1, release("1"))
@@ -339,7 +339,7 @@ class TextTest {
         init { on(ClosingEvents.close) { state, _, _ -> Emit(state.parts.filter { !it.free }.map { Release(it.id) }) } }
     }
 
-    @Test fun `a room's own take says who may write, a text that closes gives back what was held`() {
+    @Test fun `a room's own take says who may write - a text that closes gives back what was held`() {
         val s = Closing("A\n\nB", "a")
         fun act(actor: Actor, name: String, json: Json.MutableObject = Json.MutableObject()): Reason? {
             val event = ClosingEvents.of(name, json)!!
@@ -362,7 +362,7 @@ class TextTest {
         assertEquals("not_held {\"id\":\"1\"}", act(a1, "write", Json.MutableObject("id" to "1", "text" to "late")).toString())
     }
 
-    @Test fun `a write marks its part, a release that cuts the part and the born ones`() {
+    @Test fun `a write marks its part - a release that cuts the part and the born ones`() {
         val s = TextState("A\n\nB\n\nC")
         s.act(a1, take("2"))
         s.dirty = HashSet()
@@ -373,7 +373,7 @@ class TextTest {
         assertEquals("2 4 5", dirty(s))
     }
 
-    @Test fun `a paragraph begun after one's own part marks the part, the new one and the cut ones`() {
+    @Test fun `a paragraph begun after one's own part marks the part and the new one and the cut ones`() {
         val s = TextState("A")
         s.act(a1, take("1"))
         s.act(a1, write("1", "A\n\nB"))

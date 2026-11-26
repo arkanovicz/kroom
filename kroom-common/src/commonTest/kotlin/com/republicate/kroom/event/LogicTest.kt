@@ -101,7 +101,7 @@ class LogicTest {
         assertFalse(s.touched)                                   // nothing to write: unchanged
     }
 
-    @Test fun `a join or a leave that names nobody is a guest's, counted`() {
+    @Test fun `a join or a leave that names nobody is a guest's - counted`() {
         val s = Counter()
         assertNull(s.guests)
         s.reduce(Join())

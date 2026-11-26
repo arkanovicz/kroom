@@ -30,7 +30,7 @@ class LobbyTest {
 
     private fun LobbyState<*>.who(room: String) = rooms[room]?.users?.map { it.id }
 
-    @Test fun `a roster is shown whole, moved by enter, present and exit, gone at hide`() {
+    @Test fun `a roster is shown whole - moved by enter and present and exit - gone at hide`() {
         val state = LobbyState()
         state.reduce(show("12", "alice"))
         assertEquals(listOf("alice"), state.who("12"))
@@ -45,7 +45,7 @@ class LobbyTest {
         assertNull(state.rooms["12"])
     }
 
-    @Test fun `an enter or an exit that names nobody is a guest's, counted on the roster`() {
+    @Test fun `an enter or an exit that names nobody is a guest's - counted on the roster`() {
         val state = LobbyState()
         state.reduce(show("12", "alice"))
         assertNull(state.rooms["12"]!!.guests)
@@ -77,7 +77,7 @@ class LobbyTest {
         assertEquals("{}", state.rooms.obj.toString())
     }
 
-    @Test fun `an app's roster carries its own fields, moved by its own events`() {
+    @Test fun `an app's roster carries its own fields - moved by its own events`() {
         val state = VoicedState()
         state.reduce(Show(::Voiced).also { s -> s.roster = Voiced().also { it.id = "12"; it.call.add(Caller().also { c -> c.id = "alice" }) } })
         state.reduce(Listen().also { it.room = "12"; it.user = "bob" })
