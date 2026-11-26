@@ -190,8 +190,8 @@ All notable changes to kroom will be documented in this file.
 
 #### kroom-client — a fault is its region's alone
 - `Room.merge` catches per region: a region whose merge faults no longer stops the ones after it. Its root
-  carries `data-kroom-broken` (`Room.BROKEN`) until its next good merge — the page's stylesheet says what a broken
-  region looks like — and `Room.onFault(template, fault)` is told (it logs by default). The region waits for a
+  carries `data-kroom-broken` (`Room.BROKEN`) until its next good merge and `Room.onFault(template, fault)` is
+  told (it logs by default). The region waits for a
   root it reads to change, like any other, and is then built again whole: the sink starts over after a fault
   (velocity 20261110-03). Pinned in `RegionsTest`: the page's words failing `match.html` leave `round.html` merged.
 
@@ -658,6 +658,12 @@ All notable changes to kroom will be documented in this file.
   a block runs before anyone reviewed it. Each loop its own count.
 
 ### Added
+
+#### kroom-client — a broken region is seen
+- In the browser, a region whose merge faulted shows a dashed red outline and a `⚠`, with no stylesheet to link.
+- `Room` sets `data-kroom-broken` on the root given to `attach` when that region's merge faults. It removes it at
+  the region's next merge that succeeds.
+- A page's own rule on `[data-kroom-broken]` wins over the default, wherever it stands. Pinned in `BrokenTest`.
 
 #### kroom-common, kroom-server — guests, counted
 - A guest is a connection without a user: an anonymous visitor's tab. Two tabs count as two.

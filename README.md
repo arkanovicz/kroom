@@ -287,10 +287,10 @@ fun main() {
   views (`json[k] = v`, a plain Kotlin property) leaves no mark — a page memory is a State, its
   memory is fields.
 - **A fault is its region's alone**: a region whose merge faults does not stop the others. Its root
-  carries `data-kroom-broken` until its next good merge (the page's stylesheet says what a broken
-  region looks like: `[data-kroom-broken] { … }`), `room.onFault` is told with the template and the
-  fault (it logs by default), and the region is merged again when a root it reads changes — built
-  whole, the engine's sink starting over after a fault.
+  carries `data-kroom-broken` until its next good merge, `room.onFault` is told with the template
+  and the fault (it logs by default), and the region is merged again when a root it reads changes —
+  built whole, the engine's sink starting over after a fault. In the browser a broken region shows a
+  dashed red outline and a `⚠`; a page's own `[data-kroom-broken] { … }` wins over that default.
 - **Roots**: `state` (the viewer's view), `me` (its presence entry), `page` (page memory: a `State`
   of the page's own, folding every frame after the room's, with derived getters like `$page.phase`).
 - **Intents in the markup**: `data-kroom-intent="play"` posts the event with the trigger's
