@@ -37,7 +37,7 @@ function page(responder, preset = '') {
         return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
     };
     if (window.HTMLDialogElement) window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
-    window.eval(['domhelper.js', 'api.js', 'markdown.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
+    window.eval(['domhelper.js', 'api.js', 'keys.js', 'markdown.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
         .concat(preset, readFileSync(`${OWN}/lib/diff-match-patch/diff_match_patch.js`, 'utf8'),
                 readFileSync(`${OWN}/js/authoring.js`, 'utf8')).join('\n;\n'));
     const click = (selector) => window.document.querySelector(selector)
@@ -360,6 +360,7 @@ const seeded = (draft) => `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.s
         await sleep(20);
     };
     const key = async (name) => {
+        textarea.focus();
         textarea.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
         await sleep(20);
     };

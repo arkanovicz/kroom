@@ -6,6 +6,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-webapp-assets — the markdown shortcuts go through keys.js
+- `kroomMarkdown.shortcut(event, textarea)` is gone: `kroomMarkdown.keys(owner, root, target)` registers Ctrl/Cmd+B,
+  I, K (and an extra format's key) in `kroomKeys`, the focus in `root`. It answers what takes them back.
+- `markdown.js` needs `keys.js` first. `KroomAssets.markdownScript()` links both; a page writing its own
+  `<script src=".../markdown.js">` adds `keys.js` before it.
+
 #### kroom-markdown-editor — the text's browser side, in one module
 - `Writer`, `Room.write` and `TextPage` move from kroom-client to kroom-markdown-editor, package
   `com.republicate.kroom.markdown.editor`. Change the dependency and the imports.
@@ -677,6 +683,25 @@ All notable changes to kroom will be documented in this file.
   a block runs before anyone reviewed it. Each loop its own count.
 
 ### Added
+
+#### kroom-webapp-assets — a page's keys, one owner each
+- `keys.js` (`window.kroomKeys`, `KroomAssets.keysScript()`, in `coreScripts()`): a module claims a key where the
+  focus is (`'idle'`, `'unfielded'`, `'anywhere'`, an element). README "Keys" has the rules.
+- Two claims that can hold at once throw at registration, naming both owners. A claim inside another goes first
+  when the outer one says `yields: true`; a handler returning false hands the key outwards.
+- `Char` claims any character typed, and collides with every key it covers.
+- `kroomKeys.list()` says who holds what, where.
+- kroom's own keys moved onto it: the block editor (shortcuts, completion, help panel), the admin bar's Escape,
+  the gallery's show and caption field.
+
+#### kroom-markdown-editor — the keyboard moves the writer between parts
+- In the part held, ArrowUp on its first line takes the part before, the caret at its end. ArrowDown on its last
+  line takes the part after, the caret at its start. Lines count as laid out, wrapped ones included.
+- PageUp and PageDown put the caret at the part's start or end first, then move.
+- A part held by someone else gets the focus, read-only, its border glowing red a moment (`data-kroom-refused`,
+  `text.css`), and this tab writes no more. The next key moves on from it. A character typed there glows it again.
+- Every part of the region takes the focus (`tabindex="-1"`): a click on a held part focuses it, and still flashes.
+- No part there: the key goes on to the page, or to the browser.
 
 #### kroom-markdown-editor — a markdown text several people write, in the browser
 - `room.edit(frame, preview)` writes the text in a `.kroom-editor` frame: the region under its `.kroom-text`, the

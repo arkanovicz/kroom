@@ -26,6 +26,7 @@ window.eval(`
     window.EventSource = function(url) { window.opened.push(url); var on = window.streams[url] = {};
         this.addEventListener = function(name, fn) { on[name] = fn; }; this.close = function() {}; };
 `);
+window.eval(readFileSync(`${ASSETS}/keys.js`, 'utf8'));
 window.eval(readFileSync(`${ASSETS}/markdown.js`, 'utf8'));
 window.eval(readFileSync(BUNDLE, 'utf8'));
 if (window.document.readyState === 'loading') await new Promise(done => window.document.addEventListener('DOMContentLoaded', done));   // the frames open once the page is read
@@ -35,6 +36,8 @@ const stream = '/api/rooms/pad/stream?tabId=t1';
 check('the global is there', typeof window.kroomEditor?.open, 'function');
 check('the frame found at load is opened on the room it names', window.opened, [stream]);
 check('the toolbar heads the bar', frame.querySelector('.kroom-editor-bar').firstElementChild?.className, 'kroom-format');
+check('the writer\'s keys and the shortcuts, the focus in the text', window.kroomKeys.list().map(c => `${c.owner} ${c.context} ${c.key}`),
+    ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Char', 'Mod+b', 'Mod+i', 'Mod+k'].map(k => `kroom-markdown-editor div.kroom-text ${k}`));
 
 window.streams[stream].state({ data: '{"parts":[{"id":"1","text":"One."}],"last":1,"me":{"id":"a","name":"Alice"}}' });
 check('the snapshot is merged in the region', frame.querySelector('.kroom-text p')?.textContent, 'One.');

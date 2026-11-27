@@ -30,6 +30,16 @@ class WriterTest {
 
         fun area() = root.querySelector("textarea") as HTMLTextAreaElement
 
+        /** A region of several parts: [mine]'s textarea holding [value], the others paragraphs, as the merge leaves them. */
+        fun region(vararg ids: String, mine: String? = null, value: String = ""): HTMLTextAreaElement? {
+            root.innerHTML = ids.joinToString("") {
+                if (it == mine) """<textarea data-kroom-part="$it"></textarea>""" else """<p tabindex="-1" data-kroom-ids="$it">$it</p>"""
+            }
+            return (root.querySelector("textarea") as? HTMLTextAreaElement)?.also { it.value = value }
+        }
+
+        fun part(id: String) = root.querySelector("[data-kroom-ids='$id']") as HTMLElement
+
         fun reply(value: dynamic = js("({})")) { assertTrue(replies.isNotEmpty(), "no request pending"); replies.removeAt(0).first(value) }
         fun refuse(reason: dynamic = js("({data: {reason: 'gone'}})")) { assertTrue(replies.isNotEmpty(), "no request pending"); replies.removeAt(0).second(reason.unsafeCast<Throwable>()) }
         val pending get() = replies.size
@@ -293,5 +303,138 @@ class WriterTest {
                 assertEquals(1, area.selectionStart)
             },
             { assertEquals(1, desk.posted.size) })
+    }
+
+    // --- the keys --------------------------------------------------------------------------------------
+
+    private fun takes(id: String) = take(Json.Object("ids" to Json.Array(id)))
+
+    @Test fun anArrowUpOnTheFirstLineTakesThePartBeforeItsCaretAtTheEnd(): Promise<Unit> {
+        val desk = Desk()
+        val area = desk.region("1", "2", "3", mine = "2", value = "Two")!!
+        desk.writer.merged()
+        return play(
+            { desk.reply() },
+            {
+                area.setSelectionRange(1, 1)
+                assertTrue(desk.writer.move(up = true, page = false))
+                assertEquals(write("2", "Two", 1), desk.posted.last())   // what the part says first, the caret moved
+                desk.reply()
+            },
+            { assertEquals(takes("1"), desk.posted.last()); desk.reply() },
+            {
+                val one = desk.region("1", "2", "3", mine = "1", value = "One")!!
+                desk.writer.merged()
+                assertSame(one, document.activeElement)
+                assertEquals(3, one.selectionStart)
+            })
+    }
+
+    @Test fun anArrowDownOnTheLastLineTakesThePartAfterItsCaretAtTheStart(): Promise<Unit> {
+        val desk = Desk()
+        desk.region("1", "2", "3", mine = "2", value = "Two")
+        desk.writer.merged()
+        return play(
+            { desk.reply() },
+            { assertTrue(desk.writer.move(up = false, page = false)); assertEquals(takes("3"), desk.posted.last()); desk.reply() },
+            {
+                val three = desk.region("1", "2", "3", mine = "3", value = "Three")!!
+                desk.writer.merged()
+                assertSame(three, document.activeElement)
+                assertEquals(0, three.selectionStart)
+            })
+    }
+
+    @Test fun aLineToGoInThePartOrASelectionLeavesTheArrowToTheBrowser(): Promise<Unit> {
+        val desk = Desk()
+        val area = desk.region("1", "2", "3", mine = "2", value = "one two three four five six seven eight nine ten")!!
+        area.style.cssText = "width: 12ch; font: 16px monospace; padding: 0; border: 0"   // several lines, wrapped
+        desk.writer.merged()
+        return play(
+            { desk.reply() },
+            {
+                val said = desk.posted.size
+                area.setSelectionRange(area.value.length, area.value.length)
+                assertFalse(desk.writer.move(up = true, page = false), "the last line is not the first")
+                area.setSelectionRange(0, 0)
+                assertFalse(desk.writer.move(up = false, page = false), "nor the first the last")
+                area.setSelectionRange(4, 7)
+                assertFalse(desk.writer.move(up = true, page = false), "a selection on the first line")
+                area.setSelectionRange(3, 3)
+                assertTrue(desk.writer.move(up = true, page = false), "the first line, wrapped")
+                assertEquals(said + 1, desk.posted.size)   // its write: the take waits behind it
+            })
+    }
+
+    @Test fun aPageKeyPutsTheCaretAtThePartsEdgeFirstThenMoves(): Promise<Unit> {
+        val desk = Desk()
+        val area = desk.region("1", "2", "3", mine = "2", value = "Two")!!
+        desk.writer.merged()
+        return play(
+            { desk.reply() },
+            {
+                area.setSelectionRange(1, 2)
+                assertTrue(desk.writer.move(up = true, page = true))
+                assertEquals(0 to 0, area.selectionStart to area.selectionEnd)
+                assertEquals(1, desk.posted.size)                  // nothing taken yet
+                assertTrue(desk.writer.move(up = true, page = true))
+                assertEquals(write("2", "Two", 0), desk.posted.last())
+                desk.reply()
+            },
+            { assertEquals(takes("1"), desk.posted.last()) })
+    }
+
+    @Test fun noPartThereNothingMovesAndTheKeyIsNotTheWriters(): Promise<Unit> {
+        val desk = Desk()
+        val area = desk.region("1", mine = "1", value = "One")!!
+        desk.writer.merged()
+        return play(
+            { desk.reply() },
+            {
+                area.setSelectionRange(0, 0)
+                assertFalse(desk.writer.move(up = true, page = false))
+                assertFalse(desk.writer.move(up = true, page = true))
+                area.setSelectionRange(3, 3)
+                assertFalse(desk.writer.move(up = false, page = true))
+                assertEquals(1, desk.posted.size)
+                desk.button().focus()
+                assertFalse(desk.writer.move(up = true, page = false), "the focus out of the text")
+            })
+    }
+
+    @Test fun aTakeRefusedFocusesThePartReachedTheWriterGivesItsOwnBackAndTheNextKeyMovesOnFromThere(): Promise<Unit> {
+        val desk = Desk()
+        desk.region("1", "2", "3", mine = "2", value = "Two")
+        desk.writer.merged()
+        return play(
+            { desk.reply() },
+            { assertTrue(desk.writer.move(up = true, page = false)); desk.refuse(js("({data: {reason: 'held'}})")) },
+            {
+                assertSame(desk.part("1"), document.activeElement)        // read-only, while held
+                assertTrue(desk.part("1").hasAttribute("data-kroom-refused"))
+            },
+            { assertEquals(release("2"), desk.posted.last()); desk.reply() },   // writing stops, once the focus settled
+            {
+                desk.area().outerHTML = """<p tabindex="-1" data-kroom-ids="2">Two</p>"""   // given back
+                desk.writer.merged()
+                assertTrue(desk.writer.move(up = false, page = true))     // from a part shown, a page key moves on
+                assertEquals(takes("2"), desk.posted.last())
+            })
+    }
+
+    @Test fun aCharacterTypedOnAPartSomeoneElseHoldsMakesItGlowAndIsTheWritersOnlyThere() {
+        val desk = Desk()
+        val area = desk.region("1", "2", "3", mine = "2", value = "Two")!!
+        desk.part("1").setAttribute("data-holder", "Bob")
+        area.focus()
+        assertFalse(desk.writer.typed(), "in the part held, a key typed is its own feedback")
+        desk.part("3").focus()
+        assertFalse(desk.writer.typed(), "a free part: nothing")
+        assertFalse(desk.part("3").hasAttribute("data-kroom-refused"))
+        desk.part("1").focus()
+        assertTrue(desk.writer.typed())
+        assertTrue(desk.part("1").hasAttribute("data-kroom-refused"))
+        desk.button().focus()
+        assertFalse(desk.writer.typed(), "out of the text")
     }
 }

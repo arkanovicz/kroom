@@ -300,8 +300,14 @@
             Object.entries(pages).forEach(([n, table]) => { table.hidden = n !== name; });
         }
         show(null);
-        // Escape closes the panel from wherever the author types (the popover is in the editor's subtree)
-        editor.on('keydown', event => { if (event.key === 'Escape') panel.hidePopover?.(); });
+        // Escape closes the panel from wherever the author types (the popover is in the editor's subtree); the
+        // completion list, inside, closes first
+        let shown = false;
+        panel.on('toggle', event => { shown = event.newState === 'open'; });
+        window.kroomKeys.on('kroom-authoring', 'Escape', editor, () => {
+            if (!shown) return false;
+            panel.hidePopover();
+        }, { yields: true });
         const toggle = iconButton('help', 'kroom-help-toggle', () => {});
         toggle.attr('popovertarget', panel.id);
         return toggle;
@@ -367,8 +373,8 @@
         document.documentElement.addClass('kroom-busy');
         textarea.on('input', typed);
         textarea.on('input', complete);
-        textarea.on('keydown', choose);
-        textarea.on('keydown', shortcut);
+        window.kroomKeys.on('kroom-authoring', ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab', 'Escape'], textarea, choose);
+        markdown.keys('kroom-authoring', textarea, textarea, [IMAGE], { strings });
         textarea.on('click', closeCompletion);
         textarea.on('blur', closeCompletion);
         textarea.on('paste', pasted);
@@ -497,10 +503,6 @@
         if (!files?.length) return;
         event.preventDefault();
         uploads(session.textarea, files);
-    }
-
-    function shortcut(event) {
-        markdown.shortcut(event, session.textarea, [IMAGE], { strings });
     }
 
     async function submit() {
@@ -706,20 +708,17 @@
         if (session) session.completion = null;
     }
 
-    /** While the list is open: the arrows walk it, Enter or Tab take a key, Escape closes it. */
+    /** While the list is open: the arrows walk it, Enter or Tab take a key, Escape closes it, left and right leave it. */
     function choose(event) {
-        const completion = session.completion;
-        if (!completion) return;
+        const completion = session?.completion;
+        if (!completion) return false;
         const moves = { ArrowDown: 1, ArrowUp: -1 };
         if (event.key in moves) selectCompletion(completion.index + moves[event.key]);
         else if (event.key === 'Enter' || event.key === 'Tab') acceptCompletion(completion.index);
-        else if (event.key === 'Escape') closeCompletion();
         else {
-            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') closeCompletion();
-            return;
+            closeCompletion();
+            return event.key === 'Escape';   // the caret moves as it would have
         }
-        event.preventDefault();
-        event.stopImmediatePropagation();
     }
 
     /** Where the character at [index] sits in the textarea: a hidden copy laid out alike, up to there. */

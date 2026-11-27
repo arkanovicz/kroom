@@ -90,7 +90,7 @@ function bar(preset, kept = {}, path = '/club/13Ma') {
         get href() { return window.location.href; }, set href(url) { window.navigations.push(url); },
         get pathname() { return window.location.pathname; }, reload() { window.navigations.push('reload'); }
     };
-    window.eval(['domhelper.js', 'api.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
+    window.eval(['domhelper.js', 'api.js', 'keys.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
         .concat(preset, `(function (location) {\n${readFileSync(`${OWN}/js/admin.js`, 'utf8')}\n})(window.recordingLocation);`).join('\n;\n'));
     return window;
 }

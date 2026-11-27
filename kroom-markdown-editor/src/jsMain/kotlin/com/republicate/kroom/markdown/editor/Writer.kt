@@ -9,6 +9,7 @@ import com.republicate.kson.Json
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.Element
+import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.js.Promise
 
@@ -23,6 +24,8 @@ import kotlin.js.Promise
  * the one before, and a `write` says the text as it is when it leaves — the region's own triggers (a click that
  * takes another part) go through [post] for the same reason. What is typed while a part is on its way goes into
  * its textarea when it comes; what is typed in a part no longer held is dropped.
+ *
+ * The keyboard moves it between parts ([move]): `write` registers the keys with kroom-webapp-assets' keys.js.
  */
 class Writer(
     private val root: Element,
@@ -42,6 +45,7 @@ class Writer(
     private var begun: Int? = null                  // a paragraph was begun: where, in the textarea, what goes on in it starts
     private var leaving = false                     // its release is asked
     private var timer: Int? = null
+    private var landing: Boolean? = null            // a part reached by a key: its caret at its start (true) or its end, once taken
 
     init {
         root.addEventListener("input", { e ->
@@ -68,7 +72,9 @@ class Writer(
         part = id
         if (!rest.isNullOrEmpty()) now.value = rest
         now.focus()
-        now.setSelectionRange(now.value.length, now.value.length)
+        val caret = if (landing == true) 0 else now.value.length
+        landing = null
+        now.setSelectionRange(caret, caret)
         arm()
         tell()
     }
@@ -78,6 +84,42 @@ class Writer(
         steps += Step("write", ::text)
         steps += Step(type, { payload }, resolve, { reject(it.unsafeCast<Throwable>()) })
         run()
+    }
+
+    /**
+     * A key moving the writer to the part before ([up]) or after, by a line or a [page]. In the part held, a line
+     * moves from its first (last) line as laid out, a page puts the caret at its start (end) first; from a part
+     * shown, either moves on. The part reached is taken, the caret at its end going up, at its start going down;
+     * the take refused (held, or the room's check), that part gets the focus and this tab writes no more. False
+     * when the key is not the writer's: the caret has a line to go, or there is no part there.
+     */
+    fun move(up: Boolean, page: Boolean): Boolean {
+        val at = document.activeElement ?: return false
+        val from = at.closest(PART)?.takeIf { it.parentElement === root } ?: return false
+        if (at === area) {
+            val area = at as HTMLTextAreaElement
+            val edge = if (up) 0 else area.value.length
+            if (page) {
+                if (area.selectionStart != edge || area.selectionEnd != edge) { area.setSelectionRange(edge, edge); return true }
+            } else if (area.selectionStart != area.selectionEnd || !onEdge(area, up)) return false
+        }
+        var to = if (up) from.previousElementSibling else from.nextElementSibling
+        while (to != null && !to.matches(PART)) to = if (up) to.previousElementSibling else to.nextElementSibling
+        val id = to?.getAttribute("data-kroom-ids") ?: return false
+        landing = !up
+        post("take", Json.Object("ids" to Json.Array(id))).catch<Unit> {
+            landing = null
+            (root.querySelector("[data-kroom-ids=\"$id\"]") as? HTMLElement)?.let { it.focus(); glow(it) }
+        }
+        return true
+    }
+
+    /** A character typed: on a part someone else holds, focused, its border glows; false anywhere else. */
+    fun typed(): Boolean {
+        val at = document.activeElement as? HTMLElement ?: return false
+        if (at.parentElement !== root || !at.hasAttribute("data-holder")) return false
+        glow(at)
+        return true
     }
 
     /** The tab gives its part back. */
@@ -131,7 +173,36 @@ class Writer(
         run()
     }
 
+    /** Whether the caret stands on the textarea's first ([up]) or last line, wrapped lines counted. */
+    private fun onEdge(area: HTMLTextAreaElement, up: Boolean): Boolean =
+        top(area, area.selectionStart ?: 0) == top(area, if (up) 0 else area.value.length)
+
+    /** How far down the textarea [index] is laid out: measured on a hidden copy, the text after it included (a word wraps whole). */
+    private fun top(area: HTMLTextAreaElement, index: Int): Int {
+        val style = window.getComputedStyle(area)
+        val copy = document.createElement("div") as HTMLElement
+        for (property in LAYOUT) copy.style.setProperty(property, style.getPropertyValue(property))
+        copy.style.cssText += "position: absolute; visibility: hidden; left: -9999px; top: 0; border: 0; height: auto;" +
+            "box-sizing: border-box; width: ${area.clientWidth}px"
+        val mark = document.createElement("span") as HTMLElement
+        mark.textContent = "\u2060"   // zero width, and no line break on either side
+        copy.appendChild(document.createTextNode(area.value.take(index)))
+        copy.appendChild(mark)
+        copy.appendChild(document.createTextNode(area.value.drop(index)))
+        document.body!!.appendChild(copy)
+        return mark.offsetTop.also { copy.remove() }
+    }
+
     private fun held(target: Any?): HTMLTextAreaElement? = (target as? HTMLTextAreaElement)?.takeIf { it === area }
+
+    /** A key that did nothing on [part]: `data-kroom-refused` a moment (text.css makes its border glow), again at each key. */
+    private fun glow(part: HTMLElement) {
+        part.removeAttribute(REFUSED)
+        part.offsetWidth   // a layout in between: the animation starts over
+        part.setAttribute(REFUSED, "")
+        window.clearTimeout(part.asDynamic().kroomGlow as? Int ?: 0)
+        part.asDynamic().kroomGlow = window.setTimeout({ part.removeAttribute(REFUSED) }, 250)
+    }
 
     private fun arm() {
         timer?.let { window.clearTimeout(it) }
@@ -142,16 +213,37 @@ class Writer(
         timer?.let { window.clearTimeout(it) }
         timer = null; area = null; part = null; said = null; begun = null; leaving = false
     }
+
+    private companion object {
+        const val PART = "[data-kroom-part], [data-kroom-ids]"
+        const val REFUSED = "data-kroom-refused"
+        /** What lays a textarea's text out, copied to measure it. */
+        val LAYOUT = listOf("font-family", "font-size", "font-weight", "font-style", "font-variant", "letter-spacing", "word-spacing",
+            "line-height", "text-transform", "text-indent", "tab-size", "white-space", "overflow-wrap", "word-break",
+            "padding-top", "padding-right", "padding-bottom", "padding-left")
+    }
 }
 
 /**
  * A text's region: [template] merged under [root], the part this tab holds typed in through a [Writer], the region's
- * triggers posting in the writer's turn. The page memory is a [TextPage] unless the page has one of its own.
+ * triggers posting in the writer's turn. The page memory is a [TextPage] unless the page has one of its own. With
+ * kroom-webapp-assets' keys.js (`window.kroomKeys`), the arrows and the page keys move the writer, the focus in [root],
+ * and a character typed on a part someone else holds makes it glow.
  */
 fun <S : TextState> Room<S>.write(template: String, root: Element, idle: Int = 5000): Writer {
     if (page == null) page = TextPage(this, js("api").tabId() as String?)   // api.js owns the tab id
     val writer = Writer(root, { type, payload -> act(type, payload) }, idle, state.cut)
     attach(template, root) { type, payload -> writer.post(type, payload) }
     react { _, _ -> writer.merged() }
+    val keys = window.asDynamic().kroomKeys
+    if (keys != null) {
+        for ((key, up, byPage) in MOVES) keys.on(OWNER, key, root, { _: dynamic -> writer.move(up, byPage) })
+        keys.on(OWNER, "Char", root, { _: dynamic -> writer.typed() })
+    }
     return writer
 }
+
+/** Who registers the editor's keys. */
+internal const val OWNER = "kroom-markdown-editor"
+
+private val MOVES = listOf(Triple("ArrowUp", true, false), Triple("ArrowDown", false, false), Triple("PageUp", true, true), Triple("PageDown", false, true))

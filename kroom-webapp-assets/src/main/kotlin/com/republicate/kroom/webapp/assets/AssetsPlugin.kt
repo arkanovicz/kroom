@@ -12,6 +12,7 @@ import io.ktor.server.routing.*
  * - domhelper.js - lightweight jQuery-like DOM helper
  * - api.js - fetch wrapper for REST APIs
  * - store.js - minimal Redux-like state management
+ * - keys.js - a page's keys, one owner each (`window.kroomKeys`)
  * - markdown.js, markdown.css - the markdown toolbar
  * - i18n.js - `t(en, vars)`, a hand-written script's text translated
  * - text.css - the parts of a text written by several
@@ -101,8 +102,12 @@ object KroomAssets {
     /** Script tag for sse.js */
     fun sseScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/sse.js?v=$VERSION"></script>"""
 
-    /** Script tag for markdown.js, the markdown toolbar (after domhelper.js) */
-    fun markdownScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/markdown.js?v=$VERSION"></script>"""
+    /** Script tag for keys.js, a page's keys, one owner each */
+    fun keysScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/keys.js?v=$VERSION"></script>"""
+
+    /** Script tags for markdown.js, the markdown toolbar (after domhelper.js), keys.js first: its shortcuts are registered there */
+    fun markdownScript(prefix: String = "") = keysScript(prefix) + "\n" +
+        """<script src="${prefix.trimEnd('/')}/js/kroom/markdown.js?v=$VERSION"></script>"""
 
     /** Script tag for i18n.js, `t(en, vars)` for hand-written scripts */
     fun i18nScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/i18n.js?v=$VERSION"></script>"""
@@ -119,11 +124,12 @@ object KroomAssets {
     /** Stylesheet tag for editor.css, the editor's bar and preview around a text (an element of class kroom-editor) */
     fun editorStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/editor.css?v=$VERSION">"""
 
-    /** All core scripts in order (domhelper, api, store, sse) */
+    /** All core scripts in order (domhelper, api, store, sse, keys) */
     fun coreScripts(prefix: String = "") = listOf(
         domhelperScript(prefix),
         apiScript(prefix),
         storeScript(prefix),
-        sseScript(prefix)
+        sseScript(prefix),
+        keysScript(prefix)
     ).joinToString("\n")
 }

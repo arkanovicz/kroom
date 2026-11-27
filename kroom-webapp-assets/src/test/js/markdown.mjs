@@ -18,7 +18,7 @@ function page(preset = '') {
     const dom = new JSDOM(`<!doctype html><html><body><textarea></textarea></body></html>`,
         { runScripts: 'outside-only', url: 'http://localhost/' });
     const { window } = dom;
-    window.eval(['domhelper.js', 'markdown.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
+    window.eval(['domhelper.js', 'keys.js', 'markdown.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
         .concat(preset).join('\n;\n'));
     const textarea = window.document.querySelector('textarea');
     const select = (text, from, to = from) => { textarea.value = text; textarea.setSelectionRange(from, to); };
@@ -85,20 +85,24 @@ function page(preset = '') {
 
 // --- shortcuts ----------------------------------------------------------------------------------------
 {
-    const { md, textarea, select, key } = page();
-    select('mot', 0, 3);
-    const bold = key('b');
-    check('Ctrl+B is handled', md.shortcut(bold, textarea), true);
-    check('its default prevented, the text bold', [bold.defaultPrevented, textarea.value], [true, '**mot**']);
-    const unbound = key('q');
-    check('an unbound key is not', [md.shortcut(unbound, textarea), unbound.defaultPrevented], [false, false]);
-    check('nor a bound one without Ctrl', md.shortcut(key('b', {}), textarea), false);
-    check('nor with Shift', md.shortcut(key('b', { ctrlKey: true, shiftKey: true }), textarea), false);
-    const meta = key('i', { metaKey: true });
-    check('Cmd counts as Ctrl', [md.shortcut(meta, textarea), textarea.value], [true, '**_mot_**']);
+    const { window, md, textarea, select, key } = page();
     let extra = 0;
-    check('an extra format\'s key', md.shortcut(key('e'), textarea, [{ name: 'emoji', key: 'e', apply: () => extra++ }]), true);
-    check('applies it', extra, 1);
+    const off = md.keys('editor', textarea, textarea, [{ name: 'emoji', key: 'e', apply: () => extra++ }]);
+    const press = (event) => { textarea.dispatchEvent(event); return event.defaultPrevented; };
+    select('mot', 0, 3);
+    textarea.focus();
+    check('Ctrl+B is handled, the text bold', [press(key('b')), textarea.value], [true, '**mot**']);
+    check('an unbound key is not', press(key('q')), false);
+    check('nor a bound one without Ctrl', press(key('b', {})), false);
+    check('nor with Shift', press(key('b', { ctrlKey: true, shiftKey: true })), false);
+    check('Cmd counts as Ctrl', [press(key('i', { metaKey: true })), textarea.value], [true, '**_mot_**']);
+    check('an extra format\'s key, applied', [press(key('e')), extra], [true, 1]);
+    textarea.blur();
+    check('the focus elsewhere, the key is the browser\'s', press(key('b')), false);
+    textarea.focus();
+    check('registered with kroomKeys', window.kroomKeys.list().map(c => c.key), ['Mod+b', 'Mod+i', 'Mod+k', 'Mod+e']);
+    off();
+    check('taken back', [window.kroomKeys.list().length, press(key('b'))], [0, false]);
 }
 
 // --- the toolbar ----------------------------------------------------------------------------------------

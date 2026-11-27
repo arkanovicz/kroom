@@ -24,7 +24,9 @@ class EditorTest {
             window.api = { base: '/api/', tabId: function() { return 't1'; },
                            act: function(room, type, payload) { window.posted.push(type); return Promise.resolve({}); } };
             window.kroomMarkdown = { toolbar: function(target) { var d = document.createElement('div'); d.className = 'kroom-format'; window.target = target; return d; },
-                                     shortcut: function() {} };
+                                     keys: function(owner, root) { window.claimed.push(owner + ' ' + root.className + ' Mod+…'); } };
+            window.claimed = [];
+            window.kroomKeys = { on: function(owner, key, root) { window.claimed.push(owner + ' ' + root.className + ' ' + key); return function() {}; } };
             window.fetch = function(url) { window.fetched.push(url); return Promise.resolve({ text: function() { return Promise.resolve('<p>One.</p>'); } }); };
         """)
         val frame = (document.createElement("section") as HTMLElement).also { document.body!!.appendChild(it) }
@@ -35,6 +37,9 @@ class EditorTest {
         val room = Room("draft", TextState(), TextEvents(), engine)
         room.edit(frame, "/api/draft/html")
 
+        assertEquals(listOf("ArrowUp", "ArrowDown", "PageUp", "PageDown", "Char", "Mod+…").map { "kroom-markdown-editor kroom-text $it" },
+            (js("window.claimed") as Array<String>).toList())   // the writer's keys, then the shortcuts, the focus in the text
+        js("delete window.kroomKeys")
         val bar = frame.querySelector(".kroom-editor-bar")!!
         assertEquals("kroom-format", bar.firstElementChild?.className)   // the toolbar heads the bar
         room.frame("state", """{"parts":[{"id":"1","text":"One."}],"last":1,"me":{"id":"a","name":"Alice"}}""")

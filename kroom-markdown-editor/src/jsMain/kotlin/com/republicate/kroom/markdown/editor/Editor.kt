@@ -20,7 +20,7 @@ import velocity.templates.kroom.VelocityTemplates
  * A markdown text several people write, in [frame] (an element of class `kroom-editor`): the region
  * `kroom/text.html` merged under its `.kroom-text`, the part this tab holds typed in through a [Writer]. Around it,
  * what a text does not know of: kroom-webapp-assets' markdown toolbar (`window.kroomMarkdown`, markdown.js, loaded
- * first) put at the head of its `.kroom-editor-bar` and acting on the part held, its shortcuts, and `data-writing`
+ * first) put at the head of its `.kroom-editor-bar` and acting on the part held, its shortcuts (through keys.js), and `data-writing`
  * on the frame while there is one; with [preview], the URL answering the text as html, its `.kroom-editor-preview`
  * pane, opened by its `.kroom-editor-preview-toggle`. Each piece is optional but the `.kroom-text`.
  */
@@ -32,7 +32,7 @@ fun <S : TextState> Room<S>.edit(frame: Element, preview: String? = null, idle: 
     val bar = frame.querySelector(".kroom-editor-bar")
     if (bar != null && markdown != null) {
         bar.insertBefore(markdown.toolbar(held).unsafeCast<Node>(), bar.firstChild)
-        root.addEventListener("keydown", { e -> held()?.let { markdown.shortcut(e, it) } })
+        markdown.keys(OWNER, root, held)
     }
     val pane = preview?.let { Preview(frame, it) }
     react { name, _ ->

@@ -408,7 +408,8 @@ Shared client-side libraries for Ktor webapps:
 | `sse.js` | EventSource wrapper: named events, reconnect, `into(store)` |
 | `intents.js` | `[data-intent]` triggers, busy until the verdict (the reply) |
 | `store.js` | Minimal Redux-like state management |
-| `markdown.js` | The markdown toolbar (+ `markdown.css`): `kroomMarkdown.toolbar(textarea)`, `shortcut(e, textarea)` |
+| `keys.js` | A page's keys, one owner each: `kroomKeys.on(owner, keys, context, handler, {yields})`, `list()` |
+| `markdown.js` | The markdown toolbar (+ `markdown.css`): `kroomMarkdown.toolbar(textarea)`, `keys(owner, root, textarea)` |
 | `i18n.js` | `t(en, vars)`: a hand-written script's text through the page's catalog, `{name}` / `{0}` placeholders filled |
 | `text.css` | The parts of a text written by several, under an element of class `kroom-text`: `KroomAssets.textStyle()` |
 | `editor.js` | kroom-markdown-editor's bundle, for a page with no Kotlin of its own (+ `editor.css`): `KroomAssets.editorScript()`, `editorStyle()` |
@@ -418,9 +419,35 @@ stream, the intents and the State are the bundle's. `sse.js`, `intents.js` and `
 
 `markdown.js` formats a textarea's selection: `kroomMarkdown.toolbar(target, {strings, icons, extra, language})`
 answers a `div.kroom-format` of icon buttons (`target` a textarea, or a function answering the one to act on), and
-`kroomMarkdown.shortcut(event, textarea)` handles Ctrl/Cmd+B, I, K; every edit goes through `replace(…)` and is
-heard as `input`. Tags: `KroomAssets.markdownStyle()` and `markdownScript()` (after domhelper.js). The block
-editor's toolbar is this one.
+`kroomMarkdown.keys(owner, root, target)` registers Ctrl/Cmd+B, I, K in `kroomKeys`, the focus in `root`; every
+edit goes through `replace(…)` and is heard as `input`. Tags: `KroomAssets.markdownStyle()` and `markdownScript()`
+(after domhelper.js; it links keys.js first). The block editor's toolbar is this one.
+
+### Keys
+
+`keys.js` gives every key of a page one owner. A module claims keys where the focus is, and gets an answer back that
+takes them back:
+
+```js
+const off = kroomKeys.on('kroom-markdown-editor', ['PageUp', 'PageDown'], textRoot, event => move(event))
+kroomKeys.on('arkad', ['PageUp', 'PageDown'], ['unfielded', input], page, { yields: true })
+```
+
+- **A key** is the browser's name for it (`event.key`, `Space` for a space), after `Mod+` (Ctrl, or Cmd), `Alt+`,
+  `Shift+`. Shift counts before a letter or a named key only: `?` is a key of its own. `Char` is any character
+  typed (shifted, or with AltGr; not Space), and collides with every key it covers.
+- **A context** is where the focus is: `'idle'` (nothing focused), `'unfielded'` (anything but an input typed in, a
+  textarea, a select, an editable), `'anywhere'`, an element (the focus inside it), or a list of them.
+- **Two claims of one key that can hold at once throw** at registration, naming both owners. The exception is a
+  claim inside another, the outer one saying `yields: true`. Inside means an element in an element, an element in a
+  page-wide context, `'idle'` or `'unfielded'` in `'anywhere'`. `'idle'` and an element never hold at once, nor
+  `'unfielded'` and a field.
+- **The innermost claim gets the key.** A handler returning `false` declines: the key goes to the next claim out,
+  then to the browser. Anything else is handled, its default prevented.
+- An element gone from the document claims nothing any more. `kroomKeys.list()` says who holds what, where.
+
+It listens first of all (on the window, capturing), and does not stop the event: a script watching for activity
+still hears it. A key typed while an input method composes is left alone.
 
 ### Usage
 
@@ -1265,7 +1292,19 @@ Around the region, `room.edit(frame, preview)` is the markdown editor: the frame
 `kroom-editor`, the region goes under its `.kroom-text`. kroom-webapp-assets' toolbar (`markdown.js`, loaded first)
 heads its `.kroom-editor-bar` and acts on the part held; the frame carries `data-writing` while there is one. With
 `preview`, a URL answering the text as html, `.kroom-editor-preview-toggle` opens `.kroom-editor-preview` and the
-pane follows the text. Only `.kroom-text` is required; `editor.css` lays the rest out:
+pane follows the text. Only `.kroom-text` is required; `editor.css` lays the rest out.
+
+With `keys.js` loaded, the keyboard moves the writer (`room.write` registers it as `kroom-markdown-editor`):
+
+- In the part held, ArrowUp on its first line takes the part before, the caret at its end. ArrowDown on its last line
+  takes the part after, the caret at its start. Lines count as laid out, wrapped ones included.
+- PageUp and PageDown put the caret at the part's start or end first, then move.
+- A part held by someone else gets the focus, read-only, its border glowing red a moment (`data-kroom-refused`), and
+  this tab gives its own back. The next key moves on. A character typed there glows it again (the writer claims
+  `Char` on the text, and declines it anywhere else).
+- No part there: the key goes on to whoever yields around the text, or to the browser.
+
+The frame:
 
 ```html
 <section class="kroom-editor" data-room="scratchpad" data-preview="/api/scratchpad/html">

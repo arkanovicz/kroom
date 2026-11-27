@@ -37,9 +37,9 @@ function page({ figures = THREE, edit = false, hash = '', responder = () => ({})
         return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
     };
     // jsdom has no modal dialogs
-    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; this.focus(); };   // the focus goes in, as a browser moves it
     window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-    window.eval(['domhelper.js', 'api.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
+    window.eval(['domhelper.js', 'api.js', 'keys.js'].map(f => readFileSync(`${ASSETS}/${f}`, 'utf8'))
         .concat(readFileSync(`${OWN}/js/gallery.js`, 'utf8')).join('\n;\n'));
     const document = window.document;
     const click = (target) => (typeof target === 'string' ? document.querySelector(target) : target)

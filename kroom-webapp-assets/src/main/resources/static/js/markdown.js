@@ -1,9 +1,9 @@
 // markdown.js - the markdown toolbar: buttons and shortcuts that format a textarea's selection
-// Part of kroom-webapp-assets (after domhelper.js)
+// Part of kroom-webapp-assets (after domhelper.js and keys.js)
 //
 // Usage:
 //   textarea.before(kroomMarkdown.toolbar(textarea));
-//   textarea.on('keydown', e => kroomMarkdown.shortcut(e, textarea));
+//   kroomMarkdown.keys('my-editor', textarea, textarea);   // Ctrl/Cmd + a format's key, the focus in the textarea
 //
 // Every edit goes through replace(), which the textarea hears as `input`. The block editor (authoring.js)
 // is built on it, and any other editor of markdown text may be.
@@ -156,16 +156,20 @@
         return bar;
     }
 
-    /** Ctrl/Cmd + a format's key: true when handled (its default prevented). */
-    function shortcut(event, textarea, extra = [], options = {}) {
-        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return false;
-        const format = formats.concat(extra).find(f => f.key && f.key === event.key.toLowerCase());
-        const target = format && resolve(textarea);
-        if (!target) return false;
-        event.preventDefault();
-        format.apply(target, wordsOf(options));
-        return true;
+    /**
+     * Ctrl/Cmd + each format's key, registered for [owner] in kroomKeys while the focus is in [root]; [target] is
+     * the textarea, or a function answering it (none: the key is the browser's). Answers what takes them back.
+     */
+    function keys(owner, root, target, extra = [], options = {}) {
+        if (!window.kroomKeys) throw new Error('kroomMarkdown.keys: keys.js is not loaded');
+        const offs = formats.concat(extra).filter(f => f.key).map(format =>
+            window.kroomKeys.on(owner, 'Mod+' + format.key, root, () => {
+                const textarea = resolve(target);
+                if (!textarea) return false;
+                format.apply(textarea, wordsOf(options));
+            }));
+        return () => offs.forEach(off => off());
     }
 
-    window.kroomMarkdown = { formats, replace, wrap, prefix, link, code, toolbar, shortcut, strings, stock: STOCK, language, icons, icon };
+    window.kroomMarkdown = { formats, replace, wrap, prefix, link, code, toolbar, keys, strings, stock: STOCK, language, icons, icon };
 })();

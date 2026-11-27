@@ -98,6 +98,8 @@
         dialog.append(scroller, close, prev, next, show.play, zoom, show.download, show.dots || show.counter, show.zoom);
         dialog.on('click', e => { if (e.target === dialog) hide(show); });
         dialog.on('cancel', e => e.preventDefault());     // Escape is ours: it closes the zoom first
+        dialog.tabIndex = -1;                             // a click on a picture keeps the focus, and the keys, in the show
+        window.kroomKeys.on('kroom-gallery', ['ArrowLeft', 'ArrowRight', 'Space', 'Escape'], dialog, e => keyed(show, e));
         document.body.append(dialog);
         observe(show);
         return show;
@@ -201,20 +203,17 @@
         }
     }
 
-    document.addEventListener('keydown', e => {
-        const show = current;
-        if (!show) return;
+    function keyed(show, e) {
         switch (e.key) {
             case 'ArrowLeft': go(show, show.index - 1); break;
             case 'ArrowRight': go(show, show.index + 1); break;
-            case ' ': e.preventDefault(); toggle(show); break;
+            case ' ': toggle(show); break;
             case 'Escape':
-                e.preventDefault();
                 if (!show.zoom.hidden) zoomOut(show);
                 else hide(show);
                 break;
         }
-    });
+    }
 
     // --- the editor ---------------------------------------------------------------------------------
 
@@ -310,10 +309,7 @@
             figure.dataset.captions = JSON.stringify(captions);
             save(gallery);
         };
-        input.on('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-            else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-        });
+        window.kroomKeys.on('kroom-gallery', ['Enter', 'Escape'], input, e => finish(e.key === 'Enter'));
         input.on('blur', () => finish(true));
     }
 

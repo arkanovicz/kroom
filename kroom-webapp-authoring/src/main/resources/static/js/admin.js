@@ -206,7 +206,8 @@
         nav.querySelectorAll('[aria-pressed]').forEach(b => b.removeAttribute('aria-pressed'));
     }
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
+    // Escape closes the panel from anywhere, unless something inside claims it first
+    window.kroomKeys.on('kroom-admin', 'Escape', 'anywhere', () => { if (!open) return false; close(); }, { yields: true });
     // a click on the page closes the panel — judged on the path the click took: its own handler may have taken
     // the element clicked out of the bar (a row removed, a form cancelled)
     document.addEventListener('click', e => { if (open && !e.composedPath().includes(bar)) close(); });
@@ -371,7 +372,7 @@
                 cancel.type = 'button'; cancel.title = t('pageUnborn'); cancel.setAttribute('aria-label', t('pageUnborn'));
                 cancel.addEventListener('click', () => li.remove());
                 // Escape leaves the form; the panel stays, a second one closes it
-                form.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); li.remove(); } });
+                window.kroomKeys.on('kroom-admin', 'Escape', form, () => { li.remove(); });
                 form.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const where = slug.value.trim(), label = { [lang]: name.value.trim() };

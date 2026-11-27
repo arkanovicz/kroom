@@ -23,6 +23,10 @@
 .kroom-text > p.held > i { display: inline-block; width: 0; height: 1.1em; margin: 0 -1px; vertical-align: text-bottom; border-left: 2px solid var(--pico-primary, #06c); animation: kroom-caret 1s steps(2) infinite; }
 @keyframes kroom-caret { 50% { opacity: 0; } }
 
+/* a key refused on a part someone else holds (reached, or a character typed on it): its border glows red a moment */
+.kroom-text > p[data-kroom-refused] { animation: kroom-glow .2s ease-out; }
+@keyframes kroom-glow { 40% { border-color: rgb(220 38 38); box-shadow: 0 0 .4rem rgb(220 38 38 / .6); } }
+
 /* a click refused: the part flashes, the reason shows under it until the next frame */
 .kroom-text > p:has(+ .intent-reason) { animation: kroom-refused .6s ease-out; }
 @keyframes kroom-refused { 30% { background: rgb(220 38 38 / .8); } }
