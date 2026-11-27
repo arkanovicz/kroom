@@ -20,7 +20,7 @@ kroom-webapp-auth     email+password identity with OIDC linking
 kroom-webapp-push     Web Push notifications
 kroom-webapp-images   resized images through imgproxy, cached on disk, local and remote sources
 kroom-markdown-core   markdown to sanitized html: flexmark + jsoup, no velocity
-kroom-markdown        %-Velocity markdown blocks, #markdown directive (ktor-free)
+kroom-velocity-markdown  %-Velocity markdown blocks, #markdown directive (ktor-free)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
 kroom-plugin-scratchpad  a text several people write at once, in a page: `$scratchpad.show()` (demo only, unpublished)
 kroom-webapp-authoring-git  the content store as a git repository: every write a commit, history and journal (kroom-webapp-authoring/git/)
@@ -531,7 +531,7 @@ logMiddleware    // console.log actions and state
 thunkMiddleware  // dispatch functions for async
 ```
 
-## kroom-markdown
+## kroom-velocity-markdown
 
 Editable content blocks: markdown files with `%` directives (`%if`, `%foreach`, `$refs`, `%%@` headers),
 rendered by a `#`-template page through `#markdown`. A block sits in its page's folder and sees only what

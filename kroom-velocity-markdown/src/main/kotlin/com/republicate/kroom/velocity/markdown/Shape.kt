@@ -1,4 +1,4 @@
-package com.republicate.kroom.markdown
+package com.republicate.kroom.velocity.markdown
 
 import org.apache.velocity.engine.jvm.Navigation
 import java.time.temporal.Temporal

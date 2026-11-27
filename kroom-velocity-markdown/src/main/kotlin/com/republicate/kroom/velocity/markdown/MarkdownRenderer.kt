@@ -1,5 +1,6 @@
-package com.republicate.kroom.markdown
+package com.republicate.kroom.velocity.markdown
 
+import com.republicate.kroom.markdown.Markdown
 import org.apache.velocity.engine.Context
 import org.apache.velocity.engine.ResourceNotFoundException
 import org.apache.velocity.engine.VelocityContext

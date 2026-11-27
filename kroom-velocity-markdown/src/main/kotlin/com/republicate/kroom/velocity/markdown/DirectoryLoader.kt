@@ -1,4 +1,4 @@
-package com.republicate.kroom.markdown
+package com.republicate.kroom.velocity.markdown
 
 import kotlinx.io.Source
 import kotlinx.io.asSource

@@ -3,7 +3,7 @@ agp = "9.2.1"
 kotlin = "2.4.21"
 dokka = "2.2.0"
 maven-publish = "0.37.0"
-# velocity 3.0 pins the antlr-kotlin runtime at 1.0.10; the generated `%` lexer in kroom-markdown must match it
+# velocity 3.0 pins the antlr-kotlin runtime at 1.0.10; the generated `%` lexer in kroom-velocity-markdown must match it
 antlr-kotlin = "1.0.10"
 bouncycastle = "1.86"
 essential-kson = "2.18"

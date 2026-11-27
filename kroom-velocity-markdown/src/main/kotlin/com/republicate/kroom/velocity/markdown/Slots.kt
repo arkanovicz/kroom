@@ -1,5 +1,6 @@
-package com.republicate.kroom.markdown
+package com.republicate.kroom.velocity.markdown
 
+import com.republicate.kroom.markdown.Markdown
 import org.apache.velocity.engine.ReferenceInsertionEvents
 import org.apache.velocity.engine.SafeText
 import org.apache.velocity.engine.sink.PlainSyntax

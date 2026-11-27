@@ -3,7 +3,7 @@ package com.republicate.kroom.webapp.authoring
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
 
-/** kroom-markdown's completion walk (`MarkdownMacro.SHAPES`): path steps → the level they lead to, or null. */
+/** kroom-velocity-markdown's completion walk (`MarkdownMacro.SHAPES`): path steps → the level they lead to, or null. */
 typealias Shape = (List<String>) -> Map<String, Any>?
 
 /**

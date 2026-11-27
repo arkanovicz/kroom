@@ -6,6 +6,11 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-velocity-markdown — the `%` blocks' module, renamed
+- `kroom-markdown` is now `kroom-velocity-markdown`, its package `com.republicate.kroom.velocity.markdown`. Change
+  the dependency and the imports (`MarkdownConfig`, `MarkdownMacro`, …); the `markdown.*` keys and `#markdown` are
+  unchanged. `kroom-markdown-core` keeps its name and package.
+
 #### kroom-server — the process's index of rooms is `Rooms`
 - `object Lobby` is renamed `Rooms` (`Rooms.getOrCreate`, `register`, `get`, `remove`, `listRooms`, …), its logger
   `kroom.rooms`: a rename and nothing else. The word `Lobby` is free for the room of rooms to come.

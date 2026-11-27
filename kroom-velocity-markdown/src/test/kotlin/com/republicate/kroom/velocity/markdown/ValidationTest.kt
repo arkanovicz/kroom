@@ -1,4 +1,4 @@
-package com.republicate.kroom.markdown
+package com.republicate.kroom.velocity.markdown
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

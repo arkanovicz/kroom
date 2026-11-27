@@ -21,7 +21,7 @@ dependencies {
     api(libs.velocity.engine.core)
     implementation(libs.angus.mail)                      // the site's SMTP transport
     testImplementation(libs.greenmail)                   // …tested against an in-process server
-    testImplementation(project(":kroom-markdown"))       // the tests render real `%` blocks
+    testImplementation(project(":kroom-velocity-markdown"))       // the tests render real `%` blocks
     testRuntimeOnly(libs.slf4j.simple)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter.api)

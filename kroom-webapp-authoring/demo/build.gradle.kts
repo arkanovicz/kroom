@@ -17,7 +17,7 @@ application {
 
 dependencies {
     implementation(project(":kroom-webapp-authoring"))
-    implementation(project(":kroom-markdown"))                          // the blocks
+    implementation(project(":kroom-velocity-markdown"))                          // the blocks
     implementation(project(":kroom-plugin-webmaster"))
     implementation(project(":kroom-plugin-forms"))
     implementation(project(":kroom-plugin-gallery"))

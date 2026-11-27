@@ -39,10 +39,10 @@ import io.ktor.server.routing.*
  * A submit carries the rev the author started from, so a block edited meanwhile is answered with *theirs*
  * instead of being overwritten — the lock is the polite path, the rev check is the safe one.
  */
-/** The context key `#markdown` reads a draft from (kroom-markdown's `MarkdownMacro.DRAFTS`). */
+/** The context key `#markdown` reads a draft from (kroom-velocity-markdown's `MarkdownMacro.DRAFTS`). */
 private const val DRAFTS = "kroomDrafts"
 
-/** The context key `#markdown` answers what a block sees in (kroom-markdown's `MarkdownMacro.SHAPES`). */
+/** The context key `#markdown` answers what a block sees in (kroom-velocity-markdown's `MarkdownMacro.SHAPES`). */
 private const val SHAPES = "kroomShapes"
 
 fun Route.authoringRoutes() {

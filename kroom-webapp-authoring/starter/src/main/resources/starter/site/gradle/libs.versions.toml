@@ -7,7 +7,7 @@ slf4j = "{{slf4jVersion}}"
 
 [libraries]
 kroom-webapp-authoring = { module = "com.republicate.kroom:kroom-webapp-authoring", version.ref = "kroom" }
-kroom-markdown = { module = "com.republicate.kroom:kroom-markdown", version.ref = "kroom" }
+kroom-velocity-markdown = { module = "com.republicate.kroom:kroom-velocity-markdown", version.ref = "kroom" }
 kroom-plugin-webmaster = { module = "com.republicate.kroom:kroom-plugin-webmaster", version.ref = "kroom" }
 kroom-plugin-forms = { module = "com.republicate.kroom:kroom-plugin-forms", version.ref = "kroom" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }

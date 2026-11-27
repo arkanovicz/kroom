@@ -1,9 +1,9 @@
-package com.republicate.kroom.markdown
+package com.republicate.kroom.velocity.markdown
 
 import org.antlr.v4.kotlinruntime.CharStream
 import org.antlr.v4.kotlinruntime.Lexer
 import org.apache.velocity.engine.LexerSource
-import com.republicate.kroom.markdown.parser.MarkdownLexer
+import com.republicate.kroom.velocity.markdown.parser.MarkdownLexer
 
 /**
  * VTL for Markdown documents: directives are written `%if`, `%foreach`, `%end`, comments `%* … *%`, and

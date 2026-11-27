@@ -63,7 +63,7 @@ val generateMarkdownLexer = tasks.register<AntlrKotlinTask>("generateMarkdownLex
     antlrClasspath = configurations.detachedConfiguration(
         project.dependencies.create(libs.antlr.kotlin.target.get())
     )
-    packageName = "com.republicate.kroom.markdown.parser"
+    packageName = "com.republicate.kroom.velocity.markdown.parser"
     arguments = listOf("-Dlanguage=Kotlin", "-no-visitor", "-no-listener", "-encoding", "UTF-8")
     source = objects.sourceDirectorySet("antlr", "antlr")
         .srcDir(layout.buildDirectory.dir("grammar")).apply { include("*.g4") }

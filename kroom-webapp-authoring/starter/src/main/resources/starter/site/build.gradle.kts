@@ -21,7 +21,7 @@ application {
 
 dependencies {
     implementation(libs.kroom.webapp.authoring)
-    implementation(libs.kroom.markdown)                 // the blocks
+    implementation(libs.kroom.velocity.markdown)                 // the blocks
     implementation(libs.kroom.plugin.webmaster)
 {{#forms}}    implementation(libs.kroom.plugin.forms)
 {{/forms}}    implementation(libs.ktor.server.netty)

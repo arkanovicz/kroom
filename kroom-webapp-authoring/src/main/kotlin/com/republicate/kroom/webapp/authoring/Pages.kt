@@ -74,7 +74,7 @@ data class AuthoredPage(
     }
 }
 
-/** kroom-markdown's `MarkdownMacro.PAGE`: the context key naming the page a block binds under (no dependency, as for `markdown.*`). */
+/** kroom-velocity-markdown's `MarkdownMacro.PAGE`: the context key naming the page a block binds under (no dependency, as for `markdown.*`). */
 internal const val MARKDOWN_PAGE = "kroomPage"
 
 /** The authored pages, keyed by path in the site's records. */
