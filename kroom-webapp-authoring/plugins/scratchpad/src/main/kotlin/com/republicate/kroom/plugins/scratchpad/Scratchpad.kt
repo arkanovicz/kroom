@@ -13,7 +13,6 @@ import com.republicate.kroom.server.User
 import com.republicate.kroom.server.Users
 import com.republicate.kroom.server.room
 import com.republicate.kroom.webapp.assets.KroomAssets
-import com.republicate.kroom.webapp.authoring.AuthoringAssets
 import com.republicate.kroom.webapp.authoring.Plugin
 import com.republicate.kroom.webapp.authoring.Site
 import com.republicate.kroom.webapp.session.userSession
@@ -29,7 +28,7 @@ import org.apache.velocity.engine.SafeText
  * A text several people write at once, in a page: `$scratchpad.show()` is where it is written (the text, a
  * markdown toolbar, a preview beside), `$scratchpad.html()` what it says, as html, for any page to show. One text
  * for the site, kept in memory and gone with the process — a place to try kroom's shared text (`TextState`,
- * kroom-client's writer), not a store. Whoever is logged in writes, a visitor watches.
+ * kroom-markdown-editor), not a store. Whoever is logged in writes, a visitor watches.
  */
 class Scratchpad(text: String = "") : Plugin {
     override val id = "scratchpad"
@@ -67,15 +66,15 @@ class Scratchpad(text: String = "") : Plugin {
     }
 
     inner class Tool(private val call: ApplicationCall) {
-        /** Where the text is written: the bar (the toolbar is put there by the page's script), the region's root, the preview's pane. */
+        /** Where the text is written: kroom-markdown-editor's frame, opened by editor.js (the room and the preview named on it). */
         fun show(): SafeText {
             call.attributes.put(SHOWN, true)
             return SafeText(
-                """<section class="kroom-scratchpad-frame">""" +
-                    """<nav class="kroom-scratchpad-bar"><button type="button" class="kroom-scratchpad-preview-toggle outline secondary" aria-pressed="false">Preview</button></nav>""" +
-                    """<div class="kroom-scratchpad-panes">""" +
-                    """<div id="kroom-scratchpad" class="kroom-scratchpad kroom-text" data-room="$ROOM"></div>""" +
-                    """<article class="kroom-scratchpad-preview" hidden></article>""" +
+                """<section class="kroom-editor" data-room="$ROOM" data-preview="/api/scratchpad/html">""" +
+                    """<nav class="kroom-editor-bar"><button type="button" class="kroom-editor-preview-toggle outline secondary" aria-pressed="false">Preview</button></nav>""" +
+                    """<div class="kroom-editor-panes">""" +
+                    """<div class="kroom-text"></div>""" +
+                    """<article class="kroom-editor-preview" hidden></article>""" +
                     """</div></section>""" +
                     """<div id="messages" hidden><span data-kroom-msg="take:spectator">Log in to write.</span></div>"""
             )
@@ -91,9 +90,9 @@ class Scratchpad(text: String = "") : Plugin {
         val TAGS = listOf(
             KroomAssets.markdownStyle(),
             KroomAssets.textStyle(),
-            """<link rel="stylesheet" href="/css/scratchpad.css?v=${AuthoringAssets.VERSION}">""",
+            KroomAssets.editorStyle(),
             KroomAssets.markdownScript(),
-            """<script src="/js/scratchpad.js?v=${AuthoringAssets.VERSION}"></script>"""
+            KroomAssets.editorScript()
         ).joinToString("\n")
     }
 }

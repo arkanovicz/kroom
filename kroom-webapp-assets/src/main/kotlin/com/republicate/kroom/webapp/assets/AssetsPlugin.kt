@@ -113,6 +113,12 @@ object KroomAssets {
     /** Stylesheet tag for text.css, the parts of a text written by several (an element of class kroom-text) */
     fun textStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/text.css?v=$VERSION">"""
 
+    /** Script tag for editor.js, the markdown editor of a text written by several (after api.js and markdown.js) */
+    fun editorScript(prefix: String = "") = """<script src="${prefix.trimEnd('/')}/js/kroom/editor.js?v=$VERSION"></script>"""
+
+    /** Stylesheet tag for editor.css, the editor's bar and preview around a text (an element of class kroom-editor) */
+    fun editorStyle(prefix: String = "") = """<link rel="stylesheet" href="${prefix.trimEnd('/')}/css/kroom/editor.css?v=$VERSION">"""
+
     /** All core scripts in order (domhelper, api, store, sse) */
     fun coreScripts(prefix: String = "") = listOf(
         domhelperScript(prefix),

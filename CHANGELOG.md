@@ -6,6 +6,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-markdown-editor — the text's browser side, in one module
+- `Writer`, `Room.write` and `TextPage` move from kroom-client to kroom-markdown-editor, package
+  `com.republicate.kroom.markdown.editor`. Change the dependency and the imports.
+- kroom-client-text is gone: its region `kroom/text.html` is kroom-markdown-editor's. A region that names its page
+  memory says `##@ page: com.republicate.kroom.markdown.editor.TextPage`.
+
 #### kroom-velocity-markdown — the `%` blocks' module, renamed
 - `kroom-markdown` is now `kroom-velocity-markdown`, its package `com.republicate.kroom.velocity.markdown`. Change
   the dependency and the imports (`MarkdownConfig`, `MarkdownMacro`, …); the `markdown.*` keys and `#markdown` are
@@ -672,6 +678,14 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-markdown-editor — a markdown text several people write, in the browser
+- `room.edit(frame, preview)` writes the text in a `.kroom-editor` frame: the region under its `.kroom-text`, the
+  markdown toolbar on the part held, a preview pane following the text from the URL the page gives. README "A text
+  written by several" has the frame's markup.
+- A page with no Kotlin of its own links `KroomAssets.editorScript()` (`/js/kroom/editor.js`, 137 KB gz) and
+  `editorStyle()`: every `.kroom-editor[data-room]` opens at load, `kroomEditor.open(frame)` opens one later.
+- The scratchpad plugin runs on it; its own page bundle is gone.
+
 #### kroom-common — a text cuts where it says
 - With `TextState(json, cut)` or `TextState(text, cut)`, a part given back is cut by `cut`, not at its blank lines.
   `Part.cut` stays the default. Give the server's State and the browser's the same cut: a subclass says it once.
@@ -1151,6 +1165,10 @@ All notable changes to kroom will be documented in this file.
   and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
+
+#### kroom-webapp-authoring — a page links a script once
+- A script or a stylesheet that `$site.head()` already links is dropped from `$site.foot()`: a signed-in editor on
+  the scratchpad no longer loads `markdown.js` and `markdown.css` twice.
 
 #### kroom-server — a room rebuilt under an id keeps its roster
 - A room closing while another is built under its id could hide the new room's roster: its `hide` landed after

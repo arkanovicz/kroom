@@ -1,5 +1,6 @@
 package com.republicate.kroom.webapp.authoring
 
+import com.republicate.kroom.webapp.assets.KroomAssets
 import com.republicate.kroom.webapp.session.UserSession
 import io.ktor.client.*
 import io.ktor.client.plugins.cookies.*
@@ -30,7 +31,7 @@ class PluginTest {
             site.grant(Roles.EDITOR, "probe.read")
             site.tool("probe", Greeter(site, this), blocks = true)
             site.head { """<meta name="probe" content="${site.settings(this)["greeting"]}">""" }
-            site.foot { "<!-- probe foot -->" }
+            site.foot { "<!-- probe foot -->\n" + KroomAssets.markdownScript() }   // the toolbar, as the editor links it for whoever is logged in
             site.admin(AdminEntry("probe", "Probe", tables = listOf(AdminTable("rows", "Rows", "/api/probe/rows")), permission = "probe.read"))
             site.routes { get("/api/probe/rows") { call.respondText("""{"columns":["a"],"rows":[["1"]]}""", ContentType.Application.Json) } }
             site.intercept { call -> if (call.request.local.uri == "/old") call.respondRedirect("/club/13Ma", permanent = true) }
@@ -67,6 +68,14 @@ class PluginTest {
 
     private suspend fun ApplicationTestBuilder.visitor(name: String? = null): HttpClient =
         createClient { install(HttpCookies); followRedirects = false }.also { if (name != null) it.get("/as/$name") }
+
+    @Test
+    fun `a script the page already links is not linked again`() = testApplication {
+        site()
+        fun links(page: String) = Regex("""/js/kroom/markdown\.js\?v=""").findAll(page).count()
+        assertEquals(1, links(visitor().get("/club/13Ma").bodyAsText()))           // the plugin's
+        assertEquals(1, links(visitor("editor").get("/club/13Ma").bodyAsText()))   // the editor's, in the head: the plugin's is dropped
+    }
 
     @Test
     fun `head and foot reach the layout, the admin bar only an admin`() = testApplication {

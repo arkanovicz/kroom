@@ -7,8 +7,6 @@ include("kroom-view")
 include("kroom-server")
 include("kroom-client")
 // a text's region, compiled under the prefix `kroom`, for the browser alone
-include("kroom-client-text")
-project(":kroom-client-text").projectDir = file("kroom-client/text")
 
 // Build tooling
 include("kroom-velocity-l10n")
@@ -27,6 +25,7 @@ include("kroom-webapp-images")
 // Rendering
 include("kroom-markdown-core")
 include("kroom-velocity-markdown")
+include("kroom-markdown-editor")
 
 // Authoring
 include("kroom-webapp-authoring")
@@ -36,9 +35,6 @@ for (plugin in listOf("webmaster", "forms", "gallery", "scratchpad")) {
     include("kroom-plugin-$plugin")
     project(":kroom-plugin-$plugin").projectDir = file("kroom-webapp-authoring/plugins/$plugin")
 }
-// the scratchpad's page: the browser's entry, bundled with kroom-client-text's region
-include("kroom-plugin-scratchpad-page")
-project(":kroom-plugin-scratchpad-page").projectDir = file("kroom-webapp-authoring/plugins/scratchpad/page")
 
 // The git-backed content store: every write a commit, the editor's history a git log (JGit stays out of authoring)
 include("kroom-webapp-authoring-git")

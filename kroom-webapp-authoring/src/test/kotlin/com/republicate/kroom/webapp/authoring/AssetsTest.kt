@@ -50,6 +50,14 @@ class AssetsTest {
         assertEquals(HttpStatusCode.OK, text.status, "/css/kroom/text.css")
         assertEquals(ContentType.Text.CSS.contentSubtype, text.contentType()?.contentSubtype, "/css/kroom/text.css")
         assertTrue(text.bodyAsText().contains(".kroom-text"), "/css/kroom/text.css")
+
+        // the markdown editor's bundle and rules, for pages with no Kotlin of their own
+        for ((tag, path) in listOf(KroomAssets.editorScript() to "/js/kroom/editor.js", KroomAssets.editorStyle() to "/css/kroom/editor.css")) {
+            assertTrue(tag.contains("$path?v="), tag)
+            val response = client.get("$path?v=${KroomAssets.VERSION}")
+            assertEquals(HttpStatusCode.OK, response.status, path)
+            assertTrue(response.bodyAsText().contains(if (path.endsWith(".js")) "kroomEditor" else ".kroom-editor"), path)
+        }
     }
 
     @Test

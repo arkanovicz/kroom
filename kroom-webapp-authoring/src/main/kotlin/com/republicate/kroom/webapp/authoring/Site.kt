@@ -440,13 +440,19 @@ class SiteView internal constructor(private val site: Site, private val call: Ap
      * Everything kroom and its plugins put in `<head>`: the house scripts, the editor's for whoever is logged
      * in (a visitor downloads none of it), then the plugins' fragments.
      */
-    fun head(): SafeText = SafeText(listOfNotNull(
+    fun head(): SafeText = SafeText(once(listOfNotNull(
         KroomAssets.coreScripts(),
         call.userSession?.let { site.application.authoringOrNull?.assets?.tags() },
         site.head(call).takeIf { it.isNotEmpty() }
-    ).joinToString("\n"))
+    ).joinToString("\n")))
 
-    fun foot(): SafeText = SafeText(site.foot(call))
+    fun foot(): SafeText = SafeText(once(site.foot(call)))
+
+    /** A script or a stylesheet the page already links is not linked again: the editor's and a plugin's may be the same. */
+    private fun once(html: String): String {
+        val linked = call.attributes.computeIfAbsent(LINKED) { mutableSetOf() }
+        return html.lines().filter { line -> !LINK.matches(line.trim()) || linked.add(line.trim()) }.joinToString("\n")
+    }
     fun can(permission: String, target: String = ""): Boolean = site.can(call.userSession, permission, target)
 
     /** The layout this page got — `#layout(name)` resolved it, the skeleton reads it. */
@@ -524,6 +530,8 @@ fun htmlEscape(value: String) =
 internal const val SITE = "site"
 
 private val SiteKey = AttributeKey<Site>("KroomSite")
+private val LINKED = AttributeKey<MutableSet<String>>("kroom.linked")
+private val LINK = Regex("""<script src="[^"]*"></script>|<link rel="stylesheet" href="[^"]*">""")
 
 val Application.site: Site get() = attributes[SiteKey]
 val Application.siteOrNull: Site? get() = attributes.getOrNull(SiteKey)

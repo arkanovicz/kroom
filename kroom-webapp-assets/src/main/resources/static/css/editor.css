@@ -1,0 +1,15 @@
+/* a markdown text several people write (kroom-markdown-editor), around its .kroom-text: the bar (the stock toolbar,
+   dim while this tab holds no part; the preview's button), and the preview beside the text when there is room,
+   under it otherwise */
+.kroom-editor-bar { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--pico-muted-border-color, #ddd); }
+.kroom-editor-bar .kroom-format { flex: 1; }
+.kroom-editor:not([data-writing]) .kroom-format { opacity: .35; pointer-events: none; }
+.kroom-editor-preview-toggle { width: auto; margin: 0; padding: .2rem .75rem; font-size: .85rem; }
+.kroom-editor-preview-toggle[aria-pressed="true"] { background: var(--pico-primary, #06c); border-color: var(--pico-primary, #06c); color: #fff; }
+.kroom-editor[data-previewing] .kroom-editor-panes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.kroom-editor-preview { margin: 0; padding: .25rem 0 .25rem 1.5rem; border-left: 1px solid var(--pico-muted-border-color, #ddd); background: none; box-shadow: none; }
+.kroom-editor-preview > :first-child { margin-top: 0; }
+@media (max-width: 62rem) {
+    .kroom-editor[data-previewing] .kroom-editor-panes { grid-template-columns: minmax(0, 1fr); }
+    .kroom-editor-preview { padding: 1rem 0 0; border-left: 0; border-top: 1px solid var(--pico-muted-border-color, #ddd); }
+}

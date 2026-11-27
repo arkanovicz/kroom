@@ -1,4 +1,4 @@
-package com.republicate.kroom.client
+package com.republicate.kroom.markdown.editor
 
 import com.republicate.kson.Json
 import kotlinx.browser.document

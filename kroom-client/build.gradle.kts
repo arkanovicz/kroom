@@ -11,7 +11,7 @@ kotlin {
     }
     js {
         browser { testTask { useKarma { useChromeHeadless() } } }   // jsTest: the DOM half (Intents); the grammar runs here too, and on node
-        nodejs { testTask { filter.excludeTestsMatching("*IntentsTest*"); filter.excludeTestsMatching("*PresenceTest*"); filter.excludeTestsMatching("*StreamTest*"); filter.excludeTestsMatching("*WriterTest*"); filter.excludeTestsMatching("*TwoRoomsTest*"); filter.excludeTestsMatching("*BrokenTest*") } }   // no document on node
+        nodejs { testTask { filter.excludeTestsMatching("*IntentsTest*"); filter.excludeTestsMatching("*PresenceTest*"); filter.excludeTestsMatching("*StreamTest*"); filter.excludeTestsMatching("*TwoRoomsTest*"); filter.excludeTestsMatching("*BrokenTest*") } }   // no document on node
     }
     sourceSets {
         commonMain.dependencies {

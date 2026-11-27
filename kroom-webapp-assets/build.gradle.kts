@@ -58,3 +58,11 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+// The markdown editor's bundle (kroom-markdown-editor's js executable) ships under /js/kroom/ with the house scripts,
+// for the pages with no Kotlin of their own
+val editor = tasks.getByPath(":kroom-markdown-editor:jsBrowserDistribution")
+tasks.processResources {
+    dependsOn(editor)
+    from(editor.outputs.files) { into("static/js"); include("editor.js", "editor.js.map") }
+}

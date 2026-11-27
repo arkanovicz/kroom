@@ -7,7 +7,6 @@ Kotlin multiplatform library for real-time collaborative applications using Serv
 ```
 kroom-common          the common declaration of a room: State, events, RoomEvents, Logic (KMP)
 kroom-client          a page on a room: the stream folded into the State, its regions merged into the DOM by the engine's sink after every frame (KMP jvm+js)
-kroom-client-text     a text written by several, its region: kroom/text.html, compiled under the prefix kroom (KMP js)
 kroom-view            client-side SSE handling (JS/Wasm)
 kroom-server          rooms on the JVM: the loop, presence, roles, Route.room / rooms (stream, intents, catalog), lobbies
 kroom-webapp-core     Ktor webapp foundation (routing, API helpers)
@@ -21,6 +20,7 @@ kroom-webapp-push     Web Push notifications
 kroom-webapp-images   resized images through imgproxy, cached on disk, local and remote sources
 kroom-markdown-core   markdown to sanitized html: flexmark + jsoup, no velocity
 kroom-velocity-markdown  %-Velocity markdown blocks, #markdown directive (ktor-free)
+kroom-markdown-editor  a markdown text several people write, in the browser: region, writer, toolbar, preview (KMP js)
 kroom-webapp-authoring in-place block editing, storage/identity APIs, plugins, admin bar
 kroom-plugin-scratchpad  a text several people write at once, in a page: `$scratchpad.show()` (demo only, unpublished)
 kroom-webapp-authoring-git  the content store as a git repository: every write a commit, history and journal (kroom-webapp-authoring/git/)
@@ -411,6 +411,7 @@ Shared client-side libraries for Ktor webapps:
 | `markdown.js` | The markdown toolbar (+ `markdown.css`): `kroomMarkdown.toolbar(textarea)`, `shortcut(e, textarea)` |
 | `i18n.js` | `t(en, vars)`: a hand-written script's text through the page's catalog, `{name}` / `{0}` placeholders filled |
 | `text.css` | The parts of a text written by several, under an element of class `kroom-text`: `KroomAssets.textStyle()` |
+| `editor.js` | kroom-markdown-editor's bundle, for a page with no Kotlin of its own (+ `editor.css`): `KroomAssets.editorScript()`, `editorStyle()` |
 
 A page on a room built with kroom-client needs only `domhelper.js` and `api.js` (the tab id, the POST): the
 stream, the intents and the State are the bundle's. `sse.js`, `intents.js` and `store.js` serve plain-JS pages.
@@ -1222,7 +1223,7 @@ object ProposalLogic : TextLogic<Proposal>(ProposalEvents) {
 }
 ```
 
-In the browser (kroom-client), `room.write(template, root)` is the region and its `Writer`: the textarea of the part
+In the browser (kroom-markdown-editor), `room.write(template, root)` is the region and its `Writer`: the textarea of the part
 held posts `write` as it is typed, a line left blank then more posts `take {after}` (what is typed while the part
 is on its way goes into its textarea when it comes), leaving the textarea or five seconds without touching it
 posts `release`. A tab says one thing at a time, in the order it did them: a click on another part waits for the
@@ -1231,7 +1232,7 @@ page that remembers more:
 
 ```html
 ##@ state: com.republicate.kroom.event.TextState
-##@ page: com.republicate.kroom.client.TextPage
+##@ page: com.republicate.kroom.markdown.editor.TextPage
 ##@output web
 #foreach($part in $state.parts)
 #if($page.mine($part))
@@ -1245,7 +1246,7 @@ page that remembers more:
 ```
 
 A click on a part someone holds is refused on the page by the check, without a POST, and shown like any refusal.
-That region is `kroom/text.html`, kroom-client-text's, compiled under velocity's prefix `kroom` for the browser
+That region is `kroom/text.html`, kroom-markdown-editor's, compiled under velocity's prefix `kroom` for the browser
 alone; its parts are styled by kroom-webapp-assets' `text.css` under an element of class `kroom-text`. A page gives
 its engine kroom's registry beside its own and writes in the region, or parses it from a region of its own:
 
@@ -1256,10 +1257,30 @@ val engine = VelocityEngine(null, Config(informalNavigation = true)).apply {
 room.write("kroom/text.html", root)          // or room.write("mine/proposal.html", root), which says #parse("kroom/text.html")
 ```
 
-Modules sharing an engine are built with the same settings (`compat.informal_navigation` here). The region is not
-in kroom-client, which has a JVM target: compiled templates publish the settings they were built with, and every
-engine on a JVM classpath takes them (`kroom-plugin-scratchpad`, in the authoring demo at `/scratchpad`, is the
-worked example).
+Modules sharing an engine are built with the same settings (`compat.informal_navigation` here). The editor module
+has no JVM target: compiled templates publish the settings they were built with, and every engine on a JVM classpath
+takes them. The text's model stays kroom-common's, for the server.
+
+Around the region, `room.edit(frame, preview)` is the markdown editor: the frame is an element of class
+`kroom-editor`, the region goes under its `.kroom-text`. kroom-webapp-assets' toolbar (`markdown.js`, loaded first)
+heads its `.kroom-editor-bar` and acts on the part held; the frame carries `data-writing` while there is one. With
+`preview`, a URL answering the text as html, `.kroom-editor-preview-toggle` opens `.kroom-editor-preview` and the
+pane follows the text. Only `.kroom-text` is required; `editor.css` lays the rest out:
+
+```html
+<section class="kroom-editor" data-room="scratchpad" data-preview="/api/scratchpad/html">
+  <nav class="kroom-editor-bar"><button type="button" class="kroom-editor-preview-toggle" aria-pressed="false">Preview</button></nav>
+  <div class="kroom-editor-panes"><div class="kroom-text"></div><article class="kroom-editor-preview" hidden></article></div>
+</section>
+```
+
+A page with no Kotlin of its own links `KroomAssets.editorScript()` after `api.js` and `markdown.js`: every
+`.kroom-editor[data-room]` is opened at load, and `kroomEditor.open(frame, room, preview)` opens one later. A page
+with a Kotlin/JS bundle of its own depends on kroom-markdown-editor and calls `edit`; it never also loads `editor.js`
+(two runtimes). `kroom-plugin-scratchpad`, in the authoring demo at `/scratchpad`, is the worked example.
+
+A text cuts where its State says: `TextState(json, cut)`, `Part.cut` by default (blank lines, a fence kept whole).
+The server's State and the browser's must cut alike; the writer begins a paragraph where the cut would.
 `state.text` is the text the parts make, `TextState(text)` the state a room is rebuilt from when a store kept that
 text. The room stores nothing — override `persist(event)` for that.
 

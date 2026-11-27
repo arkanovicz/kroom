@@ -1,5 +1,6 @@
-package com.republicate.kroom.client
+package com.republicate.kroom.markdown.editor
 
+import com.republicate.kroom.client.Room
 import com.republicate.kroom.event.Part
 import com.republicate.kroom.event.State
 import com.republicate.kroom.event.TextState

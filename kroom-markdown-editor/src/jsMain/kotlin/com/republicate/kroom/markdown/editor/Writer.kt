@@ -1,5 +1,8 @@
-package com.republicate.kroom.client
+package com.republicate.kroom.markdown.editor
 
+import com.republicate.kroom.client.Room
+import com.republicate.kroom.client.act
+import com.republicate.kroom.client.attach
 import com.republicate.kroom.event.Part
 import com.republicate.kroom.event.TextState
 import com.republicate.kson.Json
@@ -21,7 +24,12 @@ import kotlin.js.Promise
  * takes another part) go through [post] for the same reason. What is typed while a part is on its way goes into
  * its textarea when it comes; what is typed in a part no longer held is dropped.
  */
-class Writer(private val root: Element, private val act: (String, Json.Object) -> Promise<dynamic>, private val idle: Int = 5000) {
+class Writer(
+    private val root: Element,
+    private val act: (String, Json.Object) -> Promise<dynamic>,
+    private val idle: Int = 5000,
+    private val cut: (String) -> List<String> = Part::cut,
+) {
 
     private class Step(val type: String, val payload: () -> Json.Object?, val done: (dynamic) -> Unit = {}, val failed: (dynamic) -> Unit = {})
 
@@ -112,7 +120,7 @@ class Writer(private val root: Element, private val act: (String, Json.Object) -
     /** Whether the line just broken leaves a blank one behind a paragraph: the caret stands where another would begin. */
     private fun begins(area: HTMLTextAreaElement): Boolean {
         val before = area.value.take(area.selectionStart ?: return false)
-        return before.endsWith("\n") && Part.cut(before + "x").let { it.size > 1 && it.last() == "x" }
+        return before.endsWith("\n") && cut(before + "x").let { it.size > 1 && it.last() == "x" }
     }
 
     private fun begin(area: HTMLTextAreaElement) {
@@ -141,8 +149,8 @@ class Writer(private val root: Element, private val act: (String, Json.Object) -
  * triggers posting in the writer's turn. The page memory is a [TextPage] unless the page has one of its own.
  */
 fun <S : TextState> Room<S>.write(template: String, root: Element, idle: Int = 5000): Writer {
-    if (page == null) page = TextPage(this, api.tabId() as String?)
-    val writer = Writer(root, { type, payload -> act(type, payload) }, idle)
+    if (page == null) page = TextPage(this, js("api").tabId() as String?)   // api.js owns the tab id
+    val writer = Writer(root, { type, payload -> act(type, payload) }, idle, state.cut)
     attach(template, root) { type, payload -> writer.post(type, payload) }
     react { _, _ -> writer.merged() }
     return writer
