@@ -30,8 +30,18 @@ abstract class JsonView(val json: Json.MutableObject) {
         val keys = ArrayList<Any>(2)
         var v: JsonView = this
         while (true) { v.identity?.let { keys += it }; v = v.owner ?: break }
-        (v as? State)?.let { it.touched = true; it.dirty?.addAll(keys) }
+        (v as? State)?.let {
+            check(!it.reading) { "${it::class.simpleName} written while read: a check, a decision or a page writes nothing" }
+            it.touched = true; it.dirty?.addAll(keys)
+        }
     }
+
+    /** The State this view is read from, if any. */
+    private val root: State? get() { var v: JsonView = this; while (true) v = v.owner ?: return v as? State }
+
+    /** A container not there yet: put in the json, unless its State is being read — then an empty one, left out. */
+    private fun <C : Any> absent(j: Json.Object, k: String, new: () -> C): C =
+        new().also { if (root?.reading != true) (j as Json.MutableObject)[k] = it }
 
     /**
      * What [viewer] (a user id, null for nobody in particular) sees of the JSON, at any depth: the selective fields
@@ -74,21 +84,21 @@ abstract class JsonView(val json: Json.MutableObject) {
     /** Views by their `id`, in insertion order; on the wire an object keyed by id. Absent reads empty. */
     protected fun <V : JsonView> keyed(view: (Json.MutableObject) -> V) =
         Field<Keyed<V>>(Kind.OBJECT, { j, k ->
-            val obj = j.getObject(k) as Json.MutableObject? ?: Json.MutableObject().also { (j as Json.MutableObject)[k] = it }
+            val obj = j.getObject(k) as Json.MutableObject? ?: absent(j, k) { Json.MutableObject() }
             Keyed(obj, view, this)
         }, { it.obj }, nested = Nested(Shape.KEYED, view))
 
     /** An append-only list of views, the last [max] when bounded: a frame named like it appends. */
     protected fun <V : JsonView> log(view: (Json.MutableObject) -> V, max: Int = 0) =
         Field<Log<V>>(Kind.ARRAY, { j, k ->
-            val arr = j.getArray(k) as Json.MutableArray? ?: Json.MutableArray().also { (j as Json.MutableObject)[k] = it }
+            val arr = j.getArray(k) as Json.MutableArray? ?: absent(j, k) { Json.MutableArray() }
             Log(arr, view, max, this)
         }, { it.array }, nested = Nested(Shape.LOG, view))
 
     /** Views in an order that is itself state, each found by its `id`; on the wire an array. Absent reads empty. */
     protected fun <V : JsonView> seq(view: (Json.MutableObject) -> V) =
         Field<Seq<V>>(Kind.ARRAY, { j, k ->
-            val arr = j.getArray(k) as Json.MutableArray? ?: Json.MutableArray().also { (j as Json.MutableObject)[k] = it }
+            val arr = j.getArray(k) as Json.MutableArray? ?: absent(j, k) { Json.MutableArray() }
             Seq(arr, view, this)
         }, { it.array }, nested = Nested(Shape.SEQ, view))
 

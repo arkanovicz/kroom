@@ -73,6 +73,18 @@ class LogicTest {
         assertEquals(4, counter.n) // a function: the State is read, never written
     }
 
+    @Test fun `a check or a decision reads the State and writes nothing`() {
+        val counter = Counter()
+        assertEquals(done, Rule.decide(counter, alice, Wait()))                       // reads `waiting`, not there yet
+        assertNull(Events.add.factory(Json.MutableObject("by" to 1)).check(counter, alice))
+        assertEquals(Json.Object(), counter.json)                                      // an absent container read empty, left out
+        val written = assertFailsWith<IllegalStateException> { counter.read { counter.waiting.add(Waiter(Json.MutableObject("id" to "bob"))) } }
+        assertEquals("Counter written while read: a check, a decision or a page writes nothing", written.message)
+        assertFalse(counter.reading)
+        counter.reduce(Wait(Json.MutableObject("user" to "bob")))                      // the fold writes, the container comes
+        assertTrue("bob" in counter.waiting)
+    }
+
     @Test fun `a fold records the identities each write went under when asked`() {
         val s = Counter()
         s.reduce(Set(Json.MutableObject("n" to 3)))                                   // no set: nothing kept, nothing thrown

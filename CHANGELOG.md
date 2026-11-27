@@ -6,6 +6,10 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-common — a check, a decision or a page that writes the State throws
+- Inside `Event.check`, `Logic.decide` and the browser's `Room.merge`, a write through a State's fields throws
+  `IllegalStateException`. `State.read { … }` opens the same window elsewhere.
+
 #### kroom-common — a text's `held` names the holder, never their id
 - A `take` refused as `held` says `{id, by}` with `by` the holder's name, as a page shows it. A holder the room does
   not know leaves `by` out.
@@ -1203,6 +1207,10 @@ All notable changes to kroom will be documented in this file.
   and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
+
+#### kroom-common — a check reading a container leaves the State as it was
+- A check reading a `keyed`, `log` or `seq` field not there yet (`state.users` before any `join`) no longer adds it
+  to the State.
 
 #### kroom-client — a refusal finds its sentence when it has args
 - A page's `#messages [data-kroom-msg="take:held"]` is shown for a `held` refusal, its `{k}` filled from the args.

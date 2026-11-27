@@ -65,9 +65,11 @@ abstract class Event(
     val checkStates: List<KClass<out State>> get() = checkers.map { it.state }
 
     /** The checks on that State, by that actor, parent's first: the first refusal, or null. */
-    fun check(state: State, actor: Actor): Reason? = checkers.firstNotNullOfOrNull { c ->
-        kotlin.check(c.state.isInstance(state)) { "$name: checked on ${c.state.simpleName}, not ${state::class.simpleName}" }
-        c.body(state, actor)
+    fun check(state: State, actor: Actor): Reason? = state.read {
+        checkers.firstNotNullOfOrNull { c ->
+            kotlin.check(c.state.isInstance(state)) { "$name: checked on ${c.state.simpleName}, not ${state::class.simpleName}" }
+            c.body(state, actor)
+        }
     }
 
     /** Validation's half: who, from which tab, and a payload of the declared shape, nothing else. */

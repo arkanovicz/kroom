@@ -25,6 +25,17 @@ abstract class State(json: Json.MutableObject = Json.MutableObject()) : JsonView
     /** A write went through the fields since a browser's Room last cleared it: the root changed. Never cleared on the server. */
     var touched: Boolean = false
 
+    /** Inside [read]: a write through the fields throws, a container not there yet reads empty and stays out. */
+    var reading: Boolean = false
+        private set
+
+    /** [block] reads this State and writes nothing: a check, a decision, a page. */
+    fun <T> read(block: () -> T): T {
+        val was = reading
+        reading = true
+        try { return block() } finally { reading = was }
+    }
+
     /** One frame into the State: the arrows of the grammar, read right to left. A room's State calls `super` first, for presence. */
     open fun reduce(event: Event) {
         when (event) {
@@ -105,7 +116,7 @@ abstract class Logic<S : State>(val events: RoomEvents) {
 
     fun decide(state: S, actor: Actor, intent: Event): Outcome<Event> {
         coverage
-        return if (intent is Cancel) withdrawals[intent.intent]?.invoke(state, actor, intent) ?: Reason("not_cancellable")
-        else handlers[intent.name]?.invoke(state, actor, intent) ?: done
+        return state.read { if (intent is Cancel) withdrawals[intent.intent]?.invoke(state, actor, intent) ?: Reason("not_cancellable")
+        else handlers[intent.name]?.invoke(state, actor, intent) ?: done }
     }
 }

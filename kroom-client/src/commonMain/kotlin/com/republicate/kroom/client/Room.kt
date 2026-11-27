@@ -128,7 +128,8 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
             // what the roots held made it fault: it waits for them to change, like any region
             r.fresh = false
             try {
-                engine.getTemplate(r.template).merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), r.sink)
+                val template = engine.getTemplate(r.template)
+                read { template.merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), r.sink) }
                 if (r.broken) { r.broken = false; r.mark(BROKEN, false) }
             } catch (fault: Throwable) {
                 if (!r.broken) { r.broken = true; r.mark(BROKEN, true) }
@@ -139,6 +140,9 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
         state.dirty!!.clear(); state.touched = false
         page?.let { it.dirty?.clear(); it.touched = false }
     }
+
+    /** A page reads the State and the page memory, and writes neither. */
+    private fun read(block: () -> Unit) = state.read { page?.read(block) ?: block() }
 
     /** Whether a root changed since the last merge; a name the room does not know is taken as changed. */
     private fun changed(root: String): Boolean = when (root) { "state" -> state.touched; "page" -> page?.touched == true; "me" -> false; else -> true }

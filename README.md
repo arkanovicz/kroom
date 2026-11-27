@@ -129,7 +129,9 @@ class MatchmakingLogic(private val ids: () -> String) : Logic<ChifoumiState>(Chi
 - **State.** Fields are delegates over the JSON (declare them `private set`): the logic reads,
   `reduce` writes, on the server for its own frames and in the browser for the same frames, so
   `reduce*(snapshot@N, frames]N,M]) == snapshot@M` for every viewer. Nothing lives beside the State:
-  a secret is a field of it, visible to nobody or to some (below).
+  a secret is a field of it, visible to nobody or to some (below). A check, a handler and a page only read
+  (`State.read`): a write through the fields there throws, and a `keyed`, `log` or `seq` not there yet reads empty
+  without being added.
 - **Events.** A field is `in` (a client sends it, validated) or `.out` (the logic fills it);
   `.required` refuses its absence. `check { state: S, actor -> Reason? }` is the stateful half of
   validation, typed on the State it reads: the browser runs it before posting, the room first on its
