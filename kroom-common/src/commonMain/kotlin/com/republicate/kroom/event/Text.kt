@@ -59,17 +59,20 @@ class Part(json: Json.MutableObject = Json.MutableObject()) : JsonView(json) {
  * is late is refused at the check, never applied askew, and a frame is a state, never a difference: nothing to
  * replay, a snapshot is the text. A text is never without a part: it is born with an empty one. A room with more
  * extends it.
+ *
+ * [cut] is where a part given back is cut, [Part.cut] by default; the server's State and the browser's must cut
+ * alike: a subclass passing its own says it once for both.
  */
-open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(json) {
+open class TextState(json: Json.MutableObject = Json.MutableObject(), val cut: (String) -> List<String> = Part::cut) : State(json) {
     val parts by seq(::Part)
     /** How many parts were ever born: the next one is `last + 1`. */
     var last by long().required
     init { if (json["last"] == null) { last = 1; parts.splice(0, 0, listOf(Part("1", ""))) } }
 
     /** A text as a store kept it ([text]), cut again into its parts, all free: what a room is rebuilt from. */
-    constructor(text: String) : this(Part.cut(text).ifEmpty { listOf("") }.let { cut ->
-        Json.MutableObject("parts" to Json.MutableArray(cut.mapIndexed { i, part -> Part((i + 1).toString(), part).json }), "last" to cut.size.toLong())
-    })
+    constructor(text: String, cut: (String) -> List<String> = Part::cut) : this(cut(text).ifEmpty { listOf("") }.let { parts ->
+        Json.MutableObject("parts" to Json.MutableArray(parts.mapIndexed { i, part -> Part((i + 1).toString(), part).json }), "last" to parts.size.toLong())
+    }, cut)
 
     /** The text its parts make; a blank part says nothing. */
     val text: String get() = join(parts.map { it.text })
@@ -119,16 +122,16 @@ open class TextState(json: Json.MutableObject = Json.MutableObject()) : State(js
     private fun release(id: String) {
         val at = parts.indexOf(id).takeIf { it >= 0 } ?: return
         val part = parts[at]
-        val cut = Part.cut(part.text)
-        if (cut.isEmpty() && parts.size > 1) { parts.splice(at, 1); return }
+        val pieces = cut(part.text)
+        if (pieces.isEmpty() && parts.size > 1) { parts.splice(at, 1); return }
         part.holder = null
         part.client = null
         part.caret = null
-        val text = cut.firstOrNull() ?: ""
+        val text = pieces.firstOrNull() ?: ""
         if (part.text != text) part.text = text
-        if (cut.size > 1) {
-            parts.splice(at + 1, 0, cut.drop(1).mapIndexed { i, more -> Part((last + 1 + i).toString(), more) })
-            last += cut.size - 1
+        if (pieces.size > 1) {
+            parts.splice(at + 1, 0, pieces.drop(1).mapIndexed { i, more -> Part((last + 1 + i).toString(), more) })
+            last += pieces.size - 1
         }
     }
 

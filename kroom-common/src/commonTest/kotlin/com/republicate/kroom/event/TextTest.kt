@@ -253,6 +253,17 @@ class TextTest {
         assertTrue(one.parts[0].free)
     }
 
+    @Test fun `a text cuts where its own cut says - at the store and at the release`() {
+        val lines = { text: String -> text.lines().filter { it.isNotBlank() } }   // a part per line
+        val s = TextState("A\nB", lines)
+        assertEquals(listOf("A", "B"), texts(s))
+        s.act(a1, take("1", "2"))
+        s.act(a1, write("1", "A\nB\nC"))
+        assertNull(s.act(a1, release("1")))
+        assertEquals(listOf("A", "B", "C"), texts(s))
+        assertEquals(listOf("1", "3", "4"), ids(s))
+    }
+
     @Test fun `select all and paste takes every free part as one`() {
         val s = TextState("A\n\nB\n\nC")
         assertNull(s.act(b, take("1", "2", "3")))

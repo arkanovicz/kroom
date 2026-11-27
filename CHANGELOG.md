@@ -672,6 +672,10 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-common — a text cuts where it says
+- With `TextState(json, cut)` or `TextState(text, cut)`, a part given back is cut by `cut`, not at its blank lines.
+  `Part.cut` stays the default. Give the server's State and the browser's the same cut: a subclass says it once.
+
 #### kroom-client — a broken region is seen
 - In the browser, a region whose merge faulted shows a dashed red outline and a `⚠`, with no stylesheet to link.
 - `Room` sets `data-kroom-broken` on the root given to `attach` when that region's merge faults. It removes it at
