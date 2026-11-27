@@ -25,6 +25,8 @@
 
 /* a key refused on a part someone else holds (reached, or a character typed on it): its border glows red a moment */
 .kroom-text > p[data-kroom-refused] { animation: kroom-glow .2s ease-out; }
+/* focused only to be refused (a click, the keys): the glow is the feedback, the browser's ring would outlast it */
+.kroom-text > p:focus-visible { outline: none; }
 @keyframes kroom-glow { 40% { border-color: rgb(220 38 38); box-shadow: 0 0 .4rem rgb(220 38 38 / .6); } }
 
 /* a click refused: the part flashes, the reason shows under it until the next frame */

@@ -1208,6 +1208,9 @@ All notable changes to kroom will be documented in this file.
 
 ### Fixed
 
+#### kroom-webapp-assets — a part someone else holds shows its glow alone
+- A held part, clicked or reached by the keys, no longer keeps the browser's focus ring once a key is typed.
+
 #### kroom-common — a check reading a container leaves the State as it was
 - A check reading a `keyed`, `log` or `seq` field not there yet (`state.users` before any `join`) no longer adds it
   to the State.
