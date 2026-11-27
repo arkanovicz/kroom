@@ -81,18 +81,18 @@ class TextRoomTest {
 
     @Test fun `a refusal is the verdict alone`() = runBlocking {
         val room = TestRoom("text-${n++}", "One.\n\nTwo.")
-        val alice = actor(user("alice"), "t1"); val bob = actor(user("bob"), "t1")
+        val alice = actor(Users.getOrCreate("alice-7", "Alice"), "t1"); val bob = actor(user("bob"), "t1")
         room.join(alice).state()
         val cb = room.join(bob).also { it.state() }
         room.take(alice, "1")
         cb.drain()
-        room.take(bob, "1", "2").let { assertEquals(Stage.REJECTED, it.stage); assertEquals("held", it.meta.reason); assertEquals("alice", it.meta.args?.getString("by")) }
+        room.take(bob, "1", "2").let { assertEquals(Stage.REJECTED, it.stage); assertEquals("held", it.meta.reason); assertEquals("Alice", it.meta.args?.getString("by")) }   // a name, never an id
         room.write(bob, "1", "mine").let { assertEquals("not_held", it.meta.reason) }
         cb.silent()
         assertEquals("One.\n\nTwo.", room.text.text)
         assertNotEquals(Stage.REJECTED, room.take(alice, "2").stage)                        // elsewhere: what she held is given back
         assertTrue(room.text.parts["1"]!!.free)
-        assertEquals("alice", room.text.parts["2"]!!.holder)
+        assertEquals("alice-7", room.text.parts["2"]!!.holder)
         assertNotEquals(Stage.REJECTED, room.take(bob, "1").stage)                          // each in a part of their own
     }
 

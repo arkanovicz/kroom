@@ -16,27 +16,28 @@ fun pageLanguage(): String = document.documentElement?.getAttribute("lang")?.tak
 
 /** The page merged under [root] of the live document, its `[data-kroom-intent]` triggers posting to the room — through [post], when a region has a turn of its own to keep. */
 fun <S : State> Room<S>.attach(template: String, root: Element = document.body!!, post: (String, Json.Object) -> Promise<dynamic> = { type, payload -> act(type, payload) }): Room<S> {
-    showBroken()
+    showMarks()
     return attach(template, JsTree(document), root as Node).also { Intents(root, store.events, post) }
 }
 
-/** What a broken region looks like where the page says nothing: `:where()` weighs nothing, any rule of the page's wins. */
-internal const val BROKEN_STYLE =
+/** What a broken region, or one offline, looks like where the page says nothing: `:where()` weighs nothing, any rule of the page's wins. */
+internal const val MARKS_STYLE =
     ":where([${Room.BROKEN}]) { outline: 2px dashed #dc2626; outline-offset: 2px; min-height: 1.5rem; }\n" +
-    ":where([${Room.BROKEN}])::before { content: \"\u26A0\"; color: #dc2626; }"
+    ":where([${Room.BROKEN}])::before { content: \"\u26A0\"; color: #dc2626; }\n" +
+    ":where([${Room.OFFLINE}]) { opacity: .5; filter: grayscale(1); cursor: progress; }"
 
-private var brokenShown = false
+private var marksShown = false
 
-/** [BROKEN_STYLE] given to the document, once: a constructed sheet where the browser has them, no element for a style policy to refuse. */
-internal fun showBroken() {
-    if (brokenShown) return
-    brokenShown = true
+/** [MARKS_STYLE] given to the document, once: a constructed sheet where the browser has them, no element for a style policy to refuse. */
+internal fun showMarks() {
+    if (marksShown) return
+    marksShown = true
     val doc: dynamic = document
     if (doc.adoptedStyleSheets != null) {
         val sheet: dynamic = js("new CSSStyleSheet()")
-        sheet.replaceSync(BROKEN_STYLE)
+        sheet.replaceSync(MARKS_STYLE)
         doc.adoptedStyleSheets = doc.adoptedStyleSheets.concat(sheet)
-    } else document.head?.appendChild(document.createElement("style").also { it.textContent = BROKEN_STYLE })
+    } else document.head?.appendChild(document.createElement("style").also { it.textContent = MARKS_STYLE })
 }
 
 /**
@@ -46,6 +47,10 @@ internal fun showBroken() {
  * server only sees the drop when the browser discards the page — 60 s in Chrome), `pageshow` opens it again, the
  * same tab id, the snapshot first like any reconnect (back within the graces: a `status`, no `leave`, no `join`); a
  * reload's `pagehide` is the close the unload would have made. `api.js` owns the API's base and the tab id.
+ *
+ * A stream that fails puts the room [offline][Room.offline] until the next snapshot. The browser retries a dropped
+ * connection by itself; one closed by an HTTP error (a 503 while the server restarts) is opened again here, after 1 s,
+ * then twice as long each time, up to 30 s — not while the page is away.
  */
 fun Room<*>.connect(stream: String = "${api.base}rooms/${encodeURIComponent(name)}/stream"): Stream {
     val tab = api.tabId() as String?
@@ -55,25 +60,48 @@ fun Room<*>.connect(stream: String = "${api.base}rooms/${encodeURIComponent(name
 
 /** The room's stream over an `EventSource`, open until [close]d; parked while the page is away (`pagehide` → `pageshow`). */
 class Stream internal constructor(private val room: Room<*>, val url: String) {
-    private var source: EventSource? = open()
+    private var source: EventSource? = null
     private var parked = false
-    private val hide: (org.w3c.dom.events.Event) -> Unit = { source?.let { s -> s.close(); source = null; parked = true } }
+    private var retry: Int? = null   // the reopening's timer
+    private var wait = 0             // the next reopening's wait, ms
+    private val hide: (org.w3c.dom.events.Event) -> Unit = {
+        if (source != null || retry != null) { source?.close(); source = null; cancel(); parked = true }
+    }
     private val show: (org.w3c.dom.events.Event) -> Unit = { if (parked) { parked = false; source = open() } }
 
     init {
+        source = open()
         window.addEventListener("pagehide", hide)
         window.addEventListener("pageshow", show)
     }
 
     private fun open(): EventSource = EventSource(url).also { source ->
+        // the snapshot puts the room back online before it is folded: what reacts to it may act
+        source.addEventListener("state", { _: org.w3c.dom.events.Event -> room.offline = false; wait = 0 })
         for (name in room.store.events.all + "state") source.addEventListener(name, { e: org.w3c.dom.events.Event -> room.frame(name, e.asDynamic().data as String) })
+        source.addEventListener("error", { _: org.w3c.dom.events.Event ->
+            if (source !== this.source) return@addEventListener
+            room.offline = true
+            if (source.readyState == EventSource.CLOSED) {   // an HTTP error: the browser gave up
+                this.source = null
+                wait = if (wait == 0) FIRST else minOf(wait * 2, LAST)
+                retry = window.setTimeout({ retry = null; this.source = open() }, wait)
+            }
+        })
     }
 
-    /** Closed for good: no frame after this, nothing reopened on `pageshow`. */
+    private fun cancel() { retry?.let { window.clearTimeout(it) }; retry = null }
+
+    /** Closed for good: no frame after this, nothing reopened on `pageshow` nor after a failure. */
     fun close() {
         window.removeEventListener("pagehide", hide)
         window.removeEventListener("pageshow", show)
-        source?.close(); source = null; parked = false
+        source?.close(); source = null; parked = false; cancel()
+    }
+
+    private companion object {
+        const val FIRST = 1000
+        const val LAST = 30_000
     }
 }
 

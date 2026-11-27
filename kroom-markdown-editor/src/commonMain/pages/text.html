@@ -7,6 +7,6 @@
 #elseif($part.free)
 <p tabindex="-1" data-kroom-intent="take" data-kroom-ids="$part.id">$part.text</p>
 #else
-<p class="held" tabindex="-1" data-kroom-intent="take" data-kroom-ids="$part.id" data-holder="$page.holder($part)">$part.head<i></i>$part.tail</p>
+<p class="held" tabindex="-1" data-kroom-ids="$part.id" data-holder="$page.holder($part)">$part.head<i></i>$part.tail</p>
 #end
 #end

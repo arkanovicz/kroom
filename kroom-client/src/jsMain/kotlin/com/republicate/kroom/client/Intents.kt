@@ -41,7 +41,7 @@ class Intents(private val root: Element, private val events: RoomEvents, private
             clearReason(trigger)
             act(intent, payload(intent, el)).then<Unit>(
                 onFulfilled = { settle(trigger, null); formOf(el)?.reset() },
-                onRejected = { err -> settle(trigger, reasonOf(err)) })
+                onRejected = { err -> settle(trigger, Refusal(err)) })
         })
     }
 
@@ -71,7 +71,7 @@ class Intents(private val root: Element, private val events: RoomEvents, private
 
     private fun camel(s: String) = s.split('-').mapIndexed { i, p -> if (i == 0) p else p.replaceFirstChar { it.uppercase() } }.joinToString("")
 
-    private fun settle(trigger: String, reason: String?) {
+    private fun settle(trigger: String, reason: Refusal?) {
         pending -= trigger
         triggers(trigger).forEach { busy(it, false) }
         if (reason != null) showReason(trigger, reason) else clearReason(trigger)
@@ -96,10 +96,11 @@ class Intents(private val root: Element, private val events: RoomEvents, private
         root.querySelectorAll("[$attribute-reason=${quote(trigger)}]").asList().forEach { (it as Element).remove() }
 
     /**
-     * The reason is a key the page may hold a sentence for (`#messages [data-kroom-msg="play:already_played"]`), else shown raw with its args.
+     * The reason is a key the page may hold a sentence for (`#messages [data-kroom-msg="take:held"]`), its args filling
+     * the sentence's `{k}`; without one, shown raw with its args.
      * TODO: sentences no page holds (reasons, informative messages, outputs the server decides) need one generic, localized home.
      */
-    private fun showReason(trigger: String, reason: String) {
+    private fun showReason(trigger: String, reason: Refusal) {
         clearReason(trigger)
         triggers(trigger).firstOrNull()?.let { el ->
             val intent = el.getAttribute(attribute)
@@ -107,23 +108,30 @@ class Intents(private val root: Element, private val events: RoomEvents, private
             small.className = "intent-reason"
             small.setAttribute("role", "alert")
             small.setAttribute("$attribute-reason", trigger)
-            small.textContent = say("$intent:$reason").let { if (it == "$intent:$reason") reason else it }
+            small.textContent = if (said("$intent:${reason.key}")) say("$intent:${reason.key}", reason.args) else reason.raw
             el.after(small)
         }
     }
 
-    private fun reasonOf(err: dynamic): String {
-        val data = err?.data
-        val reason = (data?.reason ?: err?.message ?: "rejected").toString()
-        val args = data?.args
-        if (args == null) return reason
-        val keys = js("Object.keys(args)") as Array<String>
-        return if (keys.isEmpty()) reason else "$reason (${keys.joinToString(", ") { "$it: ${args[it]}" }})"
+    /** A verdict's reason and its args, as a rejected promise carries them (`data.reason`, `data.args`). */
+    private class Refusal(err: dynamic) {
+        val key = (err?.data?.reason ?: err?.message ?: "rejected").toString()
+        val args: Map<String, Any?>
+        init {
+            val args = err?.data?.args
+            this.args = if (args == null) emptyMap() else (js("Object.keys(args)") as Array<String>).associateWith { args[it] }
+        }
+        val raw get() = if (args.isEmpty()) key else "$key (${args.entries.joinToString(", ") { "${it.key}: ${it.value}" }})"
     }
 }
 
+private fun sentence(key: String) = document.querySelector("#messages [data-kroom-msg=\"$key\"]")
+
+/** Whether the page holds a sentence for [key]. */
+fun said(key: String): Boolean = sentence(key) != null
+
 /** A sentence held by the page (`#messages [data-kroom-msg=key]`, so l10n translates it), `{k}` filled from [vars]; the key when absent. */
 fun say(key: String, vars: Map<String, Any?> = emptyMap()): String {
-    val text = document.querySelector("#messages [data-kroom-msg=\"$key\"]")?.textContent ?: key
+    val text = sentence(key)?.textContent ?: key
     return Regex("""\{(\w+)\}""").replace(text) { m -> vars[m.groupValues[1]]?.toString() ?: "" }
 }

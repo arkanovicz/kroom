@@ -300,7 +300,8 @@ fun main() {
   on its own (a vote per line: another line's vote posts meanwhile, a second click on the same is swallowed).
   The intent's shape and its check run on the viewer's view first: a refusal there is shown like a
   reply's, without a request. A reason is a key a page may hold a sentence for
-  (`#messages [data-kroom-msg="play:already_played"]`).
+  (`#messages [data-kroom-msg="play:already_played"]`), its args filling the sentence's `{k}`
+  (`<li data-kroom-msg="take:held">Being written by {by}</li>`); without one it shows raw, args and all.
 - **Presence from the tab**: `room.report(idleAfter)` (`kroom.report()` from plain JS) posts `status` on change —
   hidden → `AWAY`, no input for `idleAfter` ms (2 min) → `IDLE`, back → `ONLINE` — and again after a snapshot when
   not `ONLINE` (a reconnect is a join, started `ONLINE`); a spectator posts nothing, a page going away (`pagehide`)
@@ -1174,6 +1175,12 @@ discards the page (60 s in Chrome), the user listed present in a room they left 
 again with the same tab id (back within the graces: a `status`, no `leave`, no `join`). A reload's
 `pagehide` is the close the unload would have made. A `Stream` closed by the page stays closed.
 
+The browser reconnects a dropped connection by itself, but gives up on an HTTP error (a 503 while the server
+restarts). Then the `Stream` opens it again: after 1 s, then twice as long each time, up to 30 s, never while the
+page is away. Until the next snapshot the room is offline (`room.offline`): every region's root carries
+`data-kroom-offline`, and an intent is refused on the page (`offline`), nothing posted. By default an offline region
+is dimmed and grey; a page's own `[data-kroom-offline] { … }` wins.
+
 ## Chat history
 
 `ChatRoom(id, history: ChatHistory<Chat> = MemoryChatHistory())` keeps a chat beyond the State's tail. The logic
@@ -1299,6 +1306,7 @@ With `keys.js` loaded, the keyboard moves the writer (`room.write` registers it 
 - In the part held, ArrowUp on its first line takes the part before, the caret at its end. ArrowDown on its last line
   takes the part after, the caret at its start. Lines count as laid out, wrapped ones included.
 - PageUp and PageDown put the caret at the part's start or end first, then move.
+- A click on a part held by someone else posts nothing: the part gets the focus and glows, as a key does.
 - A part held by someone else gets the focus, read-only, its border glowing red a moment (`data-kroom-refused`), and
   this tab gives its own back. The next key moves on. A character typed there glows it again (the writer claims
   `Char` on the text, and declines it anywhere else).

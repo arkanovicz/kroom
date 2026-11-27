@@ -50,5 +50,9 @@ class RoomTest {
         assertEquals("missing", room.check("chat", Json.Object())?.key)   // the shape first
         assertNull(room.check("chat", Json.Object("text" to "hi")))
         assertNull(room.check("nope", Json.Object()))
+        room.offline = true
+        assertEquals("offline", room.check("chat", Json.Object("text" to "hi"))?.key)   // the stream down: nothing posted, a spectator's neither
+        room.offline = false
+        assertNull(room.check("chat", Json.Object("text" to "hi")))
     }
 }

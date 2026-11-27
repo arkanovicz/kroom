@@ -158,7 +158,7 @@ open class Take(json: Json.MutableObject = Json.MutableObject()) : Event("take",
             if (next != null) return@check if (next in state.parts) null else Reason("gone", Json.Object("id" to next))
             val at = named!!.map { id ->
                 val part = state.parts[id] ?: return@check Reason("gone", Json.Object("id" to id))
-                if (!part.free) return@check Reason("held", Json.Object("id" to id, "by" to part.holder))
+                if (!part.free) return@check Reason("held", nameOf(state, part.holder!!)?.let { Json.Object("id" to id, "by" to it) } ?: Json.Object("id" to id))
                 state.parts.indexOf(id)
             }
             if (at.indices.any { it > 0 && at[it] != at[it - 1] + 1 }) Reason("scattered") else null
@@ -205,6 +205,13 @@ open class TextLogic<S : TextState>(events: TextEvents = TextEvents()) : Logic<S
 
 /** The strings of an array field, null when it is absent or holds anything else. */
 private fun strings(array: Json.Array?): List<String>? = array?.map { it as? String ?: return null }
+
+/**
+ * A user by name, as a page shows them, for a reason a reader may see; null when the room does not know them. Read
+ * off the json: a check never writes, and `users` read through its field is created when absent.
+ */
+private fun nameOf(state: TextState, user: String): String? =
+    ((state.json["users"] as? Json.Object)?.get(user) as? Json.Object)?.getString("name")
 
 private fun held(state: TextState, actor: Actor, id: String): Reason? {
     val part = state.parts[id] ?: return Reason("gone", Json.Object("id" to id))

@@ -437,4 +437,15 @@ class WriterTest {
         desk.button().focus()
         assertFalse(desk.writer.typed(), "out of the text")
     }
+
+    @Test fun aClickOnAPartSomeoneElseHoldsPostsNothingAndMakesItGlow() {
+        val desk = Desk()
+        desk.region("1", "2")
+        desk.part("1").setAttribute("data-holder", "Bob")
+        desk.part("1").click()
+        assertTrue(desk.part("1").hasAttribute("data-kroom-refused"))
+        desk.part("2").click()
+        assertFalse(desk.part("2").hasAttribute("data-kroom-refused"), "a free part: the region's take, not a glow")
+        assertEquals(emptyList(), desk.posted)
+    }
 }

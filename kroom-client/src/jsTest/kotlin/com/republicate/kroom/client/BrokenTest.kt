@@ -14,7 +14,7 @@ class BrokenTest {
     private fun mark(root: HTMLElement) = window.getComputedStyle(root, "::before").getPropertyValue("content")
 
     @Test fun aBrokenRegionIsSeenUnlessThePageSaysHow() {
-        showBroken(); showBroken()
+        showMarks(); showMarks()
         val root = root()
         assertEquals("none", outline(root))
         assertEquals("none", mark(root))
@@ -30,5 +30,14 @@ class BrokenTest {
         root.removeAttribute(Room.BROKEN)
         assertEquals("none", outline(root))
         page.remove(); root.remove()
+    }
+
+    @Test fun anOfflineRegionIsSeenUnlessThePageSaysHow() {
+        showMarks()
+        val root = root()
+        assertEquals("1", window.getComputedStyle(root).opacity)
+        root.setAttribute(Room.OFFLINE, "")
+        assertEquals("0.5", window.getComputedStyle(root).opacity)
+        root.remove()
     }
 }

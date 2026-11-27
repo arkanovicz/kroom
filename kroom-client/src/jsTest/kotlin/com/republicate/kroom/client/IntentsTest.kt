@@ -104,6 +104,23 @@ class IntentsTest {
         }
     }
 
+    /** A refusal's sentence is found by `intent:reason`, its args filling the `{k}`; raw, args and all, only without one. */
+    @Test fun aReasonWithArgsFindsItsSentenceAndFillsIt(): Promise<Unit> {
+        val messages = document.createElement("div").also { it.id = "messages"; document.body!!.appendChild(it) }
+        messages.innerHTML = """<span data-kroom-msg="vote:closed">Closed by {by}.</span>"""
+        val root = document.createElement("div") as HTMLElement
+        root.innerHTML = """<button id="a" data-kroom-intent="vote" data-kroom-seq="3">👍</button><button id="b" data-kroom-intent="say">Say</button>"""
+        document.body!!.appendChild(root)
+        Intents(root, Events) { _, _ -> Promise.reject(js("({data: {reason: 'closed', args: {by: 'Alice'}}})").unsafeCast<Throwable>()) }
+        (root.querySelector("#a") as HTMLElement).click()
+        (root.querySelector("#b") as HTMLElement).click()
+        return Promise.resolve(Unit).then { }.then {
+            assertEquals("Closed by Alice.", root.querySelector("#a + .intent-reason")?.textContent)
+            assertEquals("closed (by: Alice)", root.querySelector("#b + .intent-reason")?.textContent)   // no say:closed on the page
+            messages.remove(); root.remove()
+        }
+    }
+
     @Test fun aCancelNamesWhatItWithdraws() {
         val (root, posted) = page("""<button data-kroom-intent="cancel" data-kroom-intent-of="say">Cancel</button>""")
         click(root, "button")

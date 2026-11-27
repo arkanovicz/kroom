@@ -6,6 +6,10 @@ All notable changes to kroom will be documented in this file.
 
 ### Changed (breaking)
 
+#### kroom-common — a text's `held` names the holder, never their id
+- A `take` refused as `held` says `{id, by}` with `by` the holder's name, as a page shows it. A holder the room does
+  not know leaves `by` out.
+
 #### kroom-webapp-assets — the markdown shortcuts go through keys.js
 - `kroomMarkdown.shortcut(event, textarea)` is gone: `kroomMarkdown.keys(owner, root, target)` registers Ctrl/Cmd+B,
   I, K (and an extra format's key) in `kroomKeys`, the focus in `root`. It answers what takes them back.
@@ -684,6 +688,12 @@ All notable changes to kroom will be documented in this file.
 
 ### Added
 
+#### kroom-client — a stream an HTTP error closed is opened again
+- The browser gives up on a stream answered by an error (a 503 while the server restarts). The `Stream` opens it
+  again after 1 s, then twice as long each time, up to 30 s, never while the page is away. README "Reconnect".
+- Until the next snapshot, `room.offline` is true. Every region's root carries `data-kroom-offline`, dimmed by default.
+- An intent is refused on the page meanwhile (`offline`), nothing posted.
+
 #### kroom-webapp-assets — a page's keys, one owner each
 - `keys.js` (`window.kroomKeys`, `KroomAssets.keysScript()`, in `coreScripts()`): a module claims a key where the
   focus is (`'idle'`, `'unfielded'`, `'anywhere'`, an element). README "Keys" has the rules.
@@ -693,6 +703,9 @@ All notable changes to kroom will be documented in this file.
 - `kroomKeys.list()` says who holds what, where.
 - kroom's own keys moved onto it: the block editor (shortcuts, completion, help panel), the admin bar's Escape,
   the gallery's show and caption field.
+
+#### kroom-markdown-editor — a click on a part someone else holds asks nothing
+- The part gets the focus and glows, as a key does: no take posted, no reason shown.
 
 #### kroom-markdown-editor — the keyboard moves the writer between parts
 - In the part held, ArrowUp on its first line takes the part before, the caret at its end. ArrowDown on its last
@@ -1190,6 +1203,10 @@ All notable changes to kroom will be documented in this file.
   and the catalog. `installContentSite { privateSegments = … }` passes it through.
 
 ### Fixed
+
+#### kroom-client — a refusal finds its sentence when it has args
+- A page's `#messages [data-kroom-msg="take:held"]` is shown for a `held` refusal, its `{k}` filled from the args.
+  Before, the args made the key miss and the reason showed raw.
 
 #### kroom-webapp-authoring — a page links a script once
 - A script or a stylesheet that `$site.head()` already links is dropped from `$site.foot()`: a signed-in editor on

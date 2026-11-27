@@ -51,6 +51,10 @@ class EditorTest {
         assertNotNull(area)
         assertTrue(frame.hasAttribute("data-writing"))
         assertSame(area, js("window.target()"))                         // the toolbar acts on the part held
+        room.offline = true                                              // the stream down: the text says so
+        assertTrue(frame.querySelector(".kroom-text")!!.hasAttribute("data-kroom-offline"))
+        room.offline = false
+        assertFalse(frame.querySelector(".kroom-text")!!.hasAttribute("data-kroom-offline"))
 
         (frame.querySelector(".kroom-editor-preview-toggle") as HTMLElement).click()
         assertEquals(listOf("/api/draft/html"), (js("window.fetched") as Array<String>).toList())

@@ -56,6 +56,10 @@ class Writer(
             }
         })
         for (type in listOf("keyup", "mouseup")) root.addEventListener(type, { e -> held(e.target)?.let { arm(); if (!leaving && begun == null) tell() } })
+        // a part someone else holds: no take to ask, the click focuses it and it glows, as a key does
+        root.addEventListener("click", { e ->
+            ((e.target as? Element)?.closest("[data-holder]") as? HTMLElement)?.takeIf { it.parentElement === root }?.let(::glow)
+        })
         // once the event settled: a focus gone elsewhere, not a textarea being rebuilt
         root.addEventListener("focusout", { e -> held(e.target)?.let { area -> window.setTimeout({ if (area === this.area && document.activeElement !== area) leave() }, 0) } })
     }

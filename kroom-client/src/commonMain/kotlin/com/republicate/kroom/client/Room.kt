@@ -32,6 +32,8 @@ import org.apache.velocity.engine.sink.OutputSink
  * browser by a default rule the page's stylesheet overrides), [onFault] is told, and its next merge builds it again
  * whole — the sink starts over after a fault.
  *
+ * While the stream is down ([offline]), every region's root carries [OFFLINE] and an intent is refused here (`offline`).
+ *
  * [engine] knows the pages: on the browser, the app's compiled classes behind its template registry.
  */
 class Room<S : State>(val name: String, val state: S, events: RoomEvents, private val engine: VelocityEngine) {
@@ -51,9 +53,9 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
 
     /**
      * A region: its template, its sink, the roots its header declares (none: merged on every frame), how its root is
-     * marked broken, whether never merged, whether its last merge faulted.
+     * marked (an attribute on or off), whether never merged, whether its last merge faulted.
      */
-    private class Region(val template: String, val sink: OutputSink, val roots: Set<String>, val mark: (Boolean) -> Unit) {
+    private class Region(val template: String, val sink: OutputSink, val roots: Set<String>, val mark: (String, Boolean) -> Unit) {
         var fresh = true
         var broken = false
     }
@@ -62,23 +64,33 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
     var onFault: (template: String, fault: Throwable) -> Unit = { template, fault -> println("kroom: region $template is broken: ${fault.stackTraceToString()}") }
 
     private val regions = ArrayList<Region>()
+
+    /** Whether the stream is down, the stream says: the regions' roots marked [OFFLINE], intents refused by [check]. */
+    var offline = false
+        set(value) {
+            if (field == value) return
+            field = value
+            regions.forEach { it.mark(OFFLINE, value) }
+        }
     private val reactions = ArrayList<(String, Event?) -> Unit>()
 
     /** A region: [template] merged under [root]; its first merge, at the snapshot, builds the tree. */
     fun <N : Any> attach(template: String, tree: Tree<N>, root: N): Room<S> = apply {
-        regions += Region(template, HtmlDomSink(tree, root, ::key, ::clean), engine.getTemplate(template).header.map { it.name }.toSet()) { broken ->
-            if (broken) tree.setAttribute(root, BROKEN, "") else tree.removeAttribute(root, BROKEN)
-        }
+        regions += Region(template, HtmlDomSink(tree, root, ::key, ::clean), engine.getTemplate(template).header.map { it.name }.toSet()) { name, on ->
+            if (on) tree.setAttribute(root, name, "") else tree.removeAttribute(root, name)
+        }.also { if (offline) it.mark(OFFLINE, true) }
     }
 
     /** The sink's door: an item the fold did not write under, known by its identity (a position shifts). */
     private fun clean(key: Any?): Boolean = !all && key !is Position && key !in state.dirty!! && page?.dirty?.contains(key) != true
 
     /**
-     * What the room would refuse first, on this view, before the POST: the declared shape, then the intent's check, by
-     * the viewer from [client]. Null: post it (a spectator, or a name the room does not speak, is the server's to refuse).
+     * What the room would refuse first, on this view, before the POST: nothing while [offline], then the declared shape,
+     * then the intent's check, by the viewer from [client]. Null: post it (a spectator, or a name the room does not
+     * speak, is the server's to refuse).
      */
     fun check(type: String, payload: Json.Object, client: String? = null): Reason? {
+        if (offline) return Reason("offline")
         val me = me ?: return null
         val intent = store.events.of(type, Json.MutableObject(payload)) ?: return null
         val actor = object : Actor { override val id = me.id; override val name = me.name ?: me.id; override val client = client }
@@ -117,9 +129,9 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
             r.fresh = false
             try {
                 engine.getTemplate(r.template).merge(VelocityContext(mutableMapOf("state" to state, "me" to me, "page" to page)), r.sink)
-                if (r.broken) { r.broken = false; r.mark(false) }
+                if (r.broken) { r.broken = false; r.mark(BROKEN, false) }
             } catch (fault: Throwable) {
-                if (!r.broken) { r.broken = true; r.mark(true) }
+                if (!r.broken) { r.broken = true; r.mark(BROKEN, true) }
                 onFault(r.template, fault)
             }
         }
@@ -134,6 +146,9 @@ class Room<S : State>(val name: String, val state: S, events: RoomEvents, privat
     companion object {
         /** The attribute a region's root carries while its last merge faulted. */
         const val BROKEN = "data-kroom-broken"
+
+        /** The attribute a region's root carries while the stream is down. */
+        const val OFFLINE = "data-kroom-offline"
     }
 }
 

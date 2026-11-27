@@ -72,17 +72,17 @@ class TextTest {
         val s = TextState("A\n\nB\n\nC")
         assertNull(s.act(a1, take("1")))
         assertEquals(listOf("a/t1", null, null), holders(s))
-        s.refused("held {\"id\":\"1\",\"by\":\"a\"}", a2, take("1"))                   // a tab holds, not a user
-        s.refused("held {\"id\":\"1\",\"by\":\"a\"}", b, take("1", "2"))
+        s.refused("held {\"id\":\"1\"}", a2, take("1"))                   // a tab holds, not a user
+        s.refused("held {\"id\":\"1\"}", b, take("1", "2"))
         s.refused("gone {\"id\":\"9\"}", b, take("2", "9"))
         s.refused("scattered", b, take("3", "2"))
         s.refused("invalid {\"field\":\"ids\"}", b, take())
         s.refused("invalid {\"field\":\"ids\"}", b, Take(Json.MutableObject("ids" to Json.MutableArray(listOf(1)))))
-        s.refused("held {\"id\":\"1\",\"by\":\"a\"}", a1, take("1"))                  // its own: held, by itself
+        s.refused("held {\"id\":\"1\"}", a1, take("1"))                  // its own: held, by itself
         s.refused("gone {\"id\":\"9\"}", a1, take("9"))                                 // refused, what it holds stays held
         s.refused("scattered", a1, take("3", "2"))
         s.act(a2, take("2"))
-        s.refused("held {\"id\":\"2\",\"by\":\"a\"}", a1, take("2"))
+        s.refused("held {\"id\":\"2\"}", a1, take("2"))
     }
 
     @Test fun `a take elsewhere gives back what was held - cut`() {
@@ -275,7 +275,7 @@ class TextTest {
 
         val t = TextState("A\n\nB\n\nC")
         t.act(a1, take("2"))
-        t.refused("held {\"id\":\"2\",\"by\":\"a\"}", b, take("1", "2", "3"))
+        t.refused("held {\"id\":\"2\"}", b, take("1", "2", "3"))
     }
 
     @Test fun `writes without a release in between change one part - nothing doubled`() {
@@ -364,7 +364,7 @@ class TextTest {
         fun take(id: String) = Json.MutableObject("ids" to Json.MutableArray(listOf(id)))
         assertEquals("not_editor", act(b, "take", take("1")).toString())
         assertNull(act(a1, "take", take("1")))                                     // the entry builds the room's take: its check ran, the text's fold took it
-        assertEquals("held {\"id\":\"1\",\"by\":\"a\"}", act(b, "take", take("1")).toString())   // the text's check first
+        assertEquals("held {\"id\":\"1\"}", act(b, "take", take("1")).toString())   // the text's check first
         assertNull(act(a1, "write", Json.MutableObject("id" to "1", "text" to "A\n\nA2")))
         assertNull(act(b, "close"))                                                // someone else closes: the part is given back, cut, by the logic
         assertEquals(listOf(null, null, null), holders(s))
